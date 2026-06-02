@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { ShellResult } from '@shared/types'
 import { useAppStore, type ResultView } from '@renderer/store/useAppStore'
 import { docActionContext } from '@renderer/lib/docActions'
@@ -17,6 +17,23 @@ export function ResultPanel(): JSX.Element {
   const setView = useAppStore((s) => s.setResultView)
   const lastQuery = useAppStore((s) => s.lastQuery)
   const docCtx = docActionContext(result, lastQuery)
+
+  // Cmd/Ctrl+1/2/3 switch Tree/JSON/Table — only while the switcher is showing
+  // (a documents/value result, not error/explain/empty).
+  const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
+  useEffect(() => {
+    if (!switchable) return
+    const keyMap: Record<string, ResultView> = { '1': 'tree', '2': 'json', '3': 'table' }
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      const target = keyMap[e.key]
+      if (!target) return
+      e.preventDefault()
+      setView(target)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [switchable, setView])
 
   if (!result) {
     return (
@@ -60,11 +77,19 @@ export function ResultPanel(): JSX.Element {
     <div className="result-panel">
       <div className="result-bar">
         <div className="view-switch">
-          {(['tree', 'json', 'table'] as ResultView[]).map((v) => (
-            <button key={v} className={view === v ? 'active' : ''} onClick={() => setView(v)}>
-              {v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : 'Table'}
-            </button>
-          ))}
+          {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
+            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : 'Table'
+            return (
+              <button
+                key={v}
+                className={view === v ? 'active' : ''}
+                title={`${label} (⌘${i + 1})`}
+                onClick={() => setView(v)}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
         <ResultMeta result={result} docCount={docs.length} />
       </div>
