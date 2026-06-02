@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
@@ -15,8 +15,9 @@ import { DocEditor } from './DocEditor'
  *    dot-flatten ONE level for nested plain objects (e.g. `address.city`);
  *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves, not flattened.
  *    Deeper recursive flattening is intentionally out of scope (Phase 2).
- *  - The header is CSS-sticky; the whole table scrolls horizontally as a unit
- *    with fixed-width columns so header and rows stay aligned.
+ *  - The header is CSS-sticky; the whole table scrolls horizontally as a unit.
+ *    Columns default to a fixed width but are resizable — drag the handle on a
+ *    header cell's right edge; header and body share the per-column width.
  *
  * NOTE: column derivation scans all docs, but the result set is already bounded
  * at the data layer (ADR-0004 rule 2), so this is cheap.
@@ -30,6 +31,7 @@ interface TableViewProps {
 
 const ROW_HEIGHT = 24
 const COL_WIDTH = 200
+const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 const ACTIONS_COL_WIDTH = 72
 
@@ -63,6 +65,26 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const parentRef = useRef<HTMLDivElement>(null)
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const showActions = docCtx != null
+  // Per-column widths (column name → px); unset columns use COL_WIDTH.
+  const [colWidths, setColWidths] = useState<Record<string, number>>({})
+  const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
+
+  // Drag a header cell's right-edge handle to resize that column.
+  const startColResize = (col: string, e: MouseEvent): void => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = widthOf(col)
+    const onMove = (ev: globalThis.MouseEvent): void => {
+      const w = Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX)
+      setColWidths((prev) => ({ ...prev, [col]: w }))
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   const columns = useMemo<string[]>(() => {
     const seen = new Set<string>()
@@ -113,7 +135,9 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   }
 
   const totalWidth =
-    INDEX_COL_WIDTH + columns.length * COL_WIDTH + (showActions ? ACTIONS_COL_WIDTH : 0)
+    INDEX_COL_WIDTH +
+    columns.reduce((sum, c) => sum + widthOf(c), 0) +
+    (showActions ? ACTIONS_COL_WIDTH : 0)
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
@@ -126,8 +150,12 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
             #
           </div>
           {columns.map((col) => (
-            <div key={col} className="tbl-th" style={{ width: COL_WIDTH }} title={col}>
+            <div key={col} className="tbl-th" style={{ width: widthOf(col) }} title={col}>
               {col}
+              <span
+                className="tbl-col-resizer"
+                onMouseDown={(e) => startColResize(col, e)}
+              />
             </div>
           ))}
           {showActions && (
@@ -148,10 +176,10 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
               style={{ transform: `translateY(${vi.start + ROW_HEIGHT}px)`, width: totalWidth }}
             >
               <div className="tbl-td idx" style={{ width: INDEX_COL_WIDTH }}>
-                {vi.index}
+                {vi.index + 1}
               </div>
               {columns.map((col) => (
-                <Cell key={col} doc={doc} column={col} />
+                <Cell key={col} doc={doc} column={col} width={widthOf(col)} />
               ))}
               {showActions && (
                 <div className="tbl-td tbl-actions" style={{ width: ACTIONS_COL_WIDTH }}>
@@ -190,11 +218,19 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   )
 }
 
-function Cell({ doc, column }: { doc: unknown; column: string }): JSX.Element {
+function Cell({
+  doc,
+  column,
+  width
+}: {
+  doc: unknown
+  column: string
+  width: number
+}): JSX.Element {
   const { present, value } = cellValue(doc, column)
   if (!present) {
     return (
-      <div className="tbl-td" style={{ width: COL_WIDTH }}>
+      <div className="tbl-td" style={{ width }}>
         <span className="empty">—</span>
       </div>
     )
@@ -209,7 +245,7 @@ function Cell({ doc, column }: { doc: unknown; column: string }): JSX.Element {
   const text = typeof display === 'string' ? display : display.text
   const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
   return (
-    <div className="tbl-td" style={{ width: COL_WIDTH }} title={text}>
+    <div className="tbl-td" style={{ width }} title={text}>
       <span className={cls}>{text}</span>
     </div>
   )

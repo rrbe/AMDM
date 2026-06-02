@@ -787,17 +787,31 @@ label {
   z-index: 2;
   display: flex;
   background: var(--bg-2);
-  border-bottom: 1px solid var(--border-strong);
+  border-bottom: 1px dashed var(--border-strong);
 }
 .tbl-th {
+  position: relative;
   flex: 0 0 auto;
   padding: 4px 8px;
-  border-right: 1px solid var(--border);
+  border-right: 1px dashed var(--border);
   font-weight: 600;
   color: var(--fg-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Drag the right edge of a header cell to resize that column. */
+.tbl-col-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 1;
+}
+.tbl-col-resizer:hover {
+  background: var(--accent-soft-strong);
 }
 .tbl-th.idx {
   color: var(--fg-3);
@@ -805,9 +819,10 @@ label {
 }
 .tbl-row {
   position: absolute;
+  top: 0;
   left: 0;
   display: flex;
-  border-bottom: 1px solid var(--bg-2);
+  border-bottom: 1px dashed var(--border);
 }
 .tbl-row:hover {
   background: var(--bg-1);
@@ -817,7 +832,7 @@ label {
   padding: 0 8px;
   height: var(--row-h);
   line-height: var(--row-h);
-  border-right: 1px solid var(--bg-2);
+  border-right: 1px dashed var(--border);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
