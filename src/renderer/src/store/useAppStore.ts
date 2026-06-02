@@ -1,0 +1,677 @@
+/**
+ * The single source of truth for the renderer.
+ *
+ * Holds: connections, the active connection, per-connection status,
+ * the lazily-loaded catalog tree state, the active database, the shell editor
+ * code, the last ShellResult, the chosen result view, and loading/error flags.
+ *
+ * All backend access happens here via `window.api`; components dispatch actions
+ * and read state. Every async action catches rejections and surfaces them as
+ * `lastError` (or per-connection status) rather than letting the UI crash.
+ */
+import { create } from 'zustand'
+import { DEFAULT_SETTINGS } from '@shared/types'
+import type {
+  AppSettings,
+  CollectionInfo,
+  ConnectionConfig,
+  ConnectionInput,
+  ConnectionStatus,
+  DatabaseInfo,
+  DataOpResult,
+  DocMutateRequest,
+  DocMutateResult,
+  DocUpdateRequest,
+  ExportRequest,
+  HistoryEntry,
+  ImportRequest,
+  IndexInfo,
+  SavedQuery,
+  SavedQueryInput,
+  ShellResult,
+  TestResult,
+  ToolStatus,
+  UserInfo
+} from '@shared/types'
+
+export type ResultView = 'tree' | 'json' | 'table'
+
+/** Loaded children for a catalog node, keyed by a synthetic node id. */
+export interface CatalogState {
+  /** db name -> collections (undefined = not loaded yet). */
+  collections: Record<string, CollectionInfo[] | undefined>
+  /** `${db}` -> databases loaded flag handled separately. */
+  databases?: DatabaseInfo[]
+  /** `${db}/${coll}` -> indexes. */
+  indexes: Record<string, IndexInfo[] | undefined>
+  /** `${db}` -> users. */
+  users: Record<string, UserInfo[] | undefined>
+  /** Set of expanded node ids in the tree. */
+  expanded: Set<string>
+  /** Set of node ids currently loading. */
+  loading: Set<string>
+}
+
+function emptyCatalog(): CatalogState {
+  return {
+    collections: {},
+    databases: undefined,
+    indexes: {},
+    users: {},
+    expanded: new Set(),
+    loading: new Set()
+  }
+}
+
+interface AppState {
+  // ---- connections ----
+  connections: ConnectionConfig[]
+  statuses: Record<string, ConnectionStatus>
+  activeConnectionId: string | null
+
+  // ---- catalog (per connection) ----
+  catalogs: Record<string, CatalogState>
+
+  // ---- shell workspace ----
+  activeDatabase: string
+  code: string
+  result: ShellResult | null
+  resultView: ResultView
+  running: boolean
+  /** The query that produced the current result (for refresh after edit/delete). */
+  lastQuery: { connectionId: string; database: string; code: string } | null
+
+  // ---- saved queries + history + autocomplete (Phase 2) ----
+  savedQueries: SavedQuery[]
+  history: HistoryEntry[]
+  /** Sampled field names for autocomplete, keyed `${connId}:${db}.${coll}`. */
+  fieldCache: Record<string, string[]>
+
+  // ---- import/export (Phase 3) ----
+  /** Resolved mongodump/mongorestore paths (null = not yet checked). */
+  toolStatus: ToolStatus | null
+
+  // ---- preferences ----
+  settings: AppSettings
+
+  // ---- ui ----
+  initializing: boolean
+  lastError: string | null
+
+  // ---- actions: bootstrap ----
+  bootstrap(): Promise<void>
+  loadConnections(): Promise<void>
+
+  // ---- actions: connection crud ----
+  saveConnection(input: ConnectionInput): Promise<ConnectionConfig | null>
+  deleteConnection(id: string): Promise<void>
+  testConnection(input: ConnectionInput): Promise<TestResult>
+
+  // ---- actions: session ----
+  connect(id: string): Promise<void>
+  disconnect(id: string): Promise<void>
+  setActiveConnection(id: string | null): void
+
+  // ---- actions: catalog ----
+  toggleNode(connId: string, nodeId: string, kind: NodeKind, payload: NodePayload): Promise<void>
+  loadDatabases(connId: string): Promise<void>
+  loadCollections(connId: string, db: string): Promise<void>
+  loadIndexes(connId: string, db: string, coll: string): Promise<void>
+  loadUsers(connId: string, db: string): Promise<void>
+
+  // ---- actions: shell ----
+  setCode(code: string): void
+  setActiveDatabase(db: string): void
+  setResultView(view: ResultView): void
+  insertSnippet(db: string, coll: string): void
+  runShell(): Promise<void>
+  runExplain(): Promise<void>
+  refreshResult(): Promise<void>
+  clearError(): void
+
+  // ---- actions: saved queries + history (Phase 2) ----
+  loadQueries(): Promise<void>
+  saveQuery(input: SavedQueryInput): Promise<SavedQuery | null>
+  deleteQuery(id: string): Promise<void>
+  loadHistory(): Promise<void>
+  clearHistory(): Promise<void>
+  /** Load a query/history snippet into the editor (never auto-runs). */
+  applyQuery(code: string, database?: string): void
+
+  // ---- actions: autocomplete (Phase 2) ----
+  /** Fetch (and cache) sampled field names for a collection. */
+  sampleFields(connId: string, db: string, coll: string): Promise<string[]>
+  /** Synchronous read of cached field names (for completion sources). */
+  getFields(connId: string, db: string, coll: string): string[]
+
+  // ---- actions: document edit/delete (Phase 2) ----
+  updateDocument(req: DocUpdateRequest): Promise<DocMutateResult>
+  deleteDocument(req: DocMutateRequest): Promise<DocMutateResult>
+
+  // ---- actions: import/export (Phase 3) ----
+  loadToolStatus(): Promise<void>
+  exportCollection(req: ExportRequest): Promise<DataOpResult>
+  importCollection(req: ImportRequest): Promise<DataOpResult>
+
+  // ---- actions: preferences ----
+  loadSettings(): Promise<void>
+  updateSettings(patch: Partial<AppSettings>): Promise<void>
+}
+
+export type NodeKind = 'database' | 'collection' | 'indexes' | 'users'
+export interface NodePayload {
+  db?: string
+  coll?: string
+}
+
+function statusFor(connId: string, statuses: Record<string, ConnectionStatus>): ConnectionStatus {
+  return statuses[connId] ?? { id: connId, state: 'disconnected' }
+}
+
+function errMessage(e: unknown): string {
+  if (e instanceof Error) return e.message
+  if (typeof e === 'string') return e
+  return 'Unknown error'
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  connections: [],
+  statuses: {},
+  activeConnectionId: null,
+
+  catalogs: {},
+
+  activeDatabase: '',
+  code: '',
+  result: null,
+  resultView: 'tree',
+  running: false,
+  lastQuery: null,
+
+  savedQueries: [],
+  history: [],
+  fieldCache: {},
+
+  toolStatus: null,
+
+  settings: DEFAULT_SETTINGS,
+
+  initializing: true,
+  lastError: null,
+
+  // --------------------------------------------------------------------- boot
+  async bootstrap() {
+    set({ initializing: true })
+    await Promise.all([
+      get().loadConnections(),
+      get().loadQueries(),
+      get().loadHistory(),
+      get().loadToolStatus(),
+      get().loadSettings()
+    ])
+    set({ initializing: false })
+  },
+
+  async loadConnections() {
+    try {
+      const connections = await window.api.connections.list()
+      set({ connections })
+    } catch (e) {
+      set({ lastError: `Failed to load connections: ${errMessage(e)}` })
+    }
+  },
+
+  // ----------------------------------------------------------------- conn crud
+  async saveConnection(input) {
+    try {
+      const saved = await window.api.connections.save(input)
+      await get().loadConnections()
+      return saved
+    } catch (e) {
+      set({ lastError: `Failed to save connection: ${errMessage(e)}` })
+      return null
+    }
+  },
+
+  async deleteConnection(id) {
+    try {
+      await window.api.connections.delete(id)
+      set((s) => {
+        const { [id]: _removedCatalog, ...catalogs } = s.catalogs
+        const { [id]: _removedStatus, ...statuses } = s.statuses
+        return {
+          catalogs,
+          statuses,
+          activeConnectionId: s.activeConnectionId === id ? null : s.activeConnectionId
+        }
+      })
+      await get().loadConnections()
+    } catch (e) {
+      set({ lastError: `Failed to delete connection: ${errMessage(e)}` })
+    }
+  },
+
+  async testConnection(input) {
+    try {
+      return await window.api.connections.test(input)
+    } catch (e) {
+      return { ok: false, error: errMessage(e) }
+    }
+  },
+
+  // ------------------------------------------------------------------- session
+  async connect(id) {
+    set((s) => ({
+      statuses: { ...s.statuses, [id]: { id, state: 'connecting' } }
+    }))
+    try {
+      const status = await window.api.session.connect(id)
+      set((s) => ({
+        statuses: { ...s.statuses, [id]: status },
+        activeConnectionId: id,
+        catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() }
+      }))
+      if (status.state === 'connected') {
+        // Default the active database to the connection's preferred db, if any.
+        const conn = get().connections.find((c) => c.id === id)
+        if (conn?.defaultDatabase && get().activeConnectionId === id) {
+          set({ activeDatabase: conn.defaultDatabase })
+        }
+        await get().loadDatabases(id)
+      }
+    } catch (e) {
+      set((s) => ({
+        statuses: { ...s.statuses, [id]: { id, state: 'error', error: errMessage(e) } }
+      }))
+    }
+  },
+
+  async disconnect(id) {
+    try {
+      await window.api.session.disconnect(id)
+    } catch (e) {
+      set({ lastError: `Failed to disconnect: ${errMessage(e)}` })
+    } finally {
+      // Dispose catalog cache for this connection (ADR-0004 rule 6).
+      set((s) => {
+        const { [id]: _removed, ...catalogs } = s.catalogs
+        return {
+          statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
+          catalogs
+        }
+      })
+    }
+  },
+
+  setActiveConnection(id) {
+    set({ activeConnectionId: id })
+  },
+
+  // ------------------------------------------------------------------- catalog
+  async toggleNode(connId, nodeId, kind, payload) {
+    const cat = get().catalogs[connId] ?? emptyCatalog()
+    const wasExpanded = cat.expanded.has(nodeId)
+
+    // Collapse: just toggle off, keep cached children.
+    if (wasExpanded) {
+      set((s) => {
+        const c = s.catalogs[connId] ?? emptyCatalog()
+        const expanded = new Set(c.expanded)
+        expanded.delete(nodeId)
+        return { catalogs: { ...s.catalogs, [connId]: { ...c, expanded } } }
+      })
+      return
+    }
+
+    // Expand: mark expanded, then lazily load children if not already cached.
+    set((s) => {
+      const c = s.catalogs[connId] ?? emptyCatalog()
+      const expanded = new Set(c.expanded)
+      expanded.add(nodeId)
+      return { catalogs: { ...s.catalogs, [connId]: { ...c, expanded } } }
+    })
+
+    if (kind === 'database' && payload.db) {
+      if (get().catalogs[connId]?.collections[payload.db] === undefined) {
+        await get().loadCollections(connId, payload.db)
+      }
+    } else if (kind === 'collection' && payload.db && payload.coll) {
+      // No-op: collection children (Indexes/Users) are static folders;
+      // their contents load when those folders expand.
+    } else if (kind === 'indexes' && payload.db && payload.coll) {
+      const key = `${payload.db}/${payload.coll}`
+      if (get().catalogs[connId]?.indexes[key] === undefined) {
+        await get().loadIndexes(connId, payload.db, payload.coll)
+      }
+    } else if (kind === 'users' && payload.db) {
+      if (get().catalogs[connId]?.users[payload.db] === undefined) {
+        await get().loadUsers(connId, payload.db)
+      }
+    }
+  },
+
+  async loadDatabases(connId) {
+    const nodeId = `${connId}:databases`
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      const databases = await window.api.catalog.databases(connId)
+      set((s) => {
+        const c = s.catalogs[connId] ?? emptyCatalog()
+        return { catalogs: { ...s.catalogs, [connId]: { ...c, databases } } }
+      })
+    } catch (e) {
+      set({ lastError: `Failed to load databases: ${errMessage(e)}` })
+    } finally {
+      set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  async loadCollections(connId, db) {
+    const nodeId = `${connId}:db:${db}`
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      const collections = await window.api.catalog.collections(connId, db)
+      set((s) => {
+        const c = s.catalogs[connId] ?? emptyCatalog()
+        return {
+          catalogs: {
+            ...s.catalogs,
+            [connId]: { ...c, collections: { ...c.collections, [db]: collections } }
+          }
+        }
+      })
+    } catch (e) {
+      set({ lastError: `Failed to load collections for ${db}: ${errMessage(e)}` })
+    } finally {
+      set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  async loadIndexes(connId, db, coll) {
+    const key = `${db}/${coll}`
+    const nodeId = `${connId}:idx:${key}`
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      const indexes = await window.api.catalog.indexes(connId, db, coll)
+      set((s) => {
+        const c = s.catalogs[connId] ?? emptyCatalog()
+        return {
+          catalogs: {
+            ...s.catalogs,
+            [connId]: { ...c, indexes: { ...c.indexes, [key]: indexes } }
+          }
+        }
+      })
+    } catch (e) {
+      set({ lastError: `Failed to load indexes for ${key}: ${errMessage(e)}` })
+    } finally {
+      set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  async loadUsers(connId, db) {
+    const nodeId = `${connId}:users:${db}`
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      const users = await window.api.catalog.users(connId, db)
+      set((s) => {
+        const c = s.catalogs[connId] ?? emptyCatalog()
+        return {
+          catalogs: { ...s.catalogs, [connId]: { ...c, users: { ...c.users, [db]: users } } }
+        }
+      })
+    } catch (e) {
+      set({ lastError: `Failed to load users for ${db}: ${errMessage(e)}` })
+    } finally {
+      set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  // --------------------------------------------------------------------- shell
+  setCode(code) {
+    set({ code })
+  },
+
+  setActiveDatabase(db) {
+    set({ activeDatabase: db })
+  },
+
+  setResultView(view) {
+    set({ resultView: view })
+  },
+
+  insertSnippet(db, coll) {
+    // ADR-0004 rule 5: never auto-run. We only seed the editor.
+    set({ activeDatabase: db, code: `db.${coll}.find({})` })
+  },
+
+  async runShell() {
+    const { activeConnectionId, activeDatabase, code } = get()
+    if (!activeConnectionId) {
+      set({ lastError: 'No active connection.' })
+      return
+    }
+    if (!code.trim()) return
+    const database = activeDatabase || 'test'
+    set({ running: true, lastError: null })
+    try {
+      const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code })
+      set({ result, lastQuery: { connectionId: activeConnectionId, database, code } })
+    } catch (e) {
+      set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+    } finally {
+      set({ running: false })
+    }
+    void get().loadHistory()
+  },
+
+  async runExplain() {
+    const { activeConnectionId, activeDatabase, code } = get()
+    if (!activeConnectionId) {
+      set({ lastError: 'No active connection.' })
+      return
+    }
+    if (!code.trim()) return
+    const database = activeDatabase || 'test'
+    set({ running: true, lastError: null })
+    try {
+      const result = await window.api.shell.execute({
+        connectionId: activeConnectionId,
+        database,
+        code,
+        explain: true
+      })
+      set({ result, lastQuery: { connectionId: activeConnectionId, database, code } })
+    } catch (e) {
+      set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+    } finally {
+      set({ running: false })
+    }
+    void get().loadHistory()
+  },
+
+  async refreshResult() {
+    const lq = get().lastQuery
+    if (!lq) return
+    try {
+      const result = await window.api.shell.execute({
+        connectionId: lq.connectionId,
+        database: lq.database,
+        code: lq.code
+      })
+      set({ result })
+    } catch (e) {
+      set({ lastError: `Refresh failed: ${errMessage(e)}` })
+    }
+  },
+
+  clearError() {
+    set({ lastError: null })
+  },
+
+  // ----------------------------------------------------- saved queries + history
+  async loadQueries() {
+    try {
+      set({ savedQueries: await window.api.queries.list() })
+    } catch (e) {
+      set({ lastError: `Failed to load saved queries: ${errMessage(e)}` })
+    }
+  },
+
+  async saveQuery(input) {
+    try {
+      const saved = await window.api.queries.save(input)
+      await get().loadQueries()
+      return saved
+    } catch (e) {
+      set({ lastError: `Failed to save query: ${errMessage(e)}` })
+      return null
+    }
+  },
+
+  async deleteQuery(id) {
+    try {
+      await window.api.queries.delete(id)
+      await get().loadQueries()
+    } catch (e) {
+      set({ lastError: `Failed to delete query: ${errMessage(e)}` })
+    }
+  },
+
+  async loadHistory() {
+    try {
+      set({ history: await window.api.history.list() })
+    } catch (e) {
+      set({ lastError: `Failed to load history: ${errMessage(e)}` })
+    }
+  },
+
+  async clearHistory() {
+    try {
+      await window.api.history.clear()
+      set({ history: [] })
+    } catch (e) {
+      set({ lastError: `Failed to clear history: ${errMessage(e)}` })
+    }
+  },
+
+  applyQuery(code, database) {
+    // Never auto-run (ADR-0004 rule 5) — just load into the editor.
+    set((s) => ({ code, activeDatabase: database || s.activeDatabase }))
+  },
+
+  // ---------------------------------------------------------------- autocomplete
+  async sampleFields(connId, db, coll) {
+    const key = `${connId}:${db}.${coll}`
+    const cached = get().fieldCache[key]
+    if (cached) return cached
+    try {
+      const fields = await window.api.catalog.sampleFields(connId, db, coll)
+      set((s) => ({ fieldCache: { ...s.fieldCache, [key]: fields } }))
+      return fields
+    } catch {
+      return []
+    }
+  },
+
+  getFields(connId, db, coll) {
+    return get().fieldCache[`${connId}:${db}.${coll}`] ?? []
+  },
+
+  // ----------------------------------------------------------- document mutations
+  async updateDocument(req) {
+    try {
+      const res = await window.api.docs.update(req)
+      if (res.ok) await get().refreshResult()
+      else set({ lastError: `Update failed: ${res.error ?? 'unknown'}` })
+      return res
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: `Update failed: ${error}` })
+      return { ok: false, error }
+    }
+  },
+
+  async deleteDocument(req) {
+    try {
+      const res = await window.api.docs.delete(req)
+      if (res.ok) await get().refreshResult()
+      else set({ lastError: `Delete failed: ${res.error ?? 'unknown'}` })
+      return res
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: `Delete failed: ${error}` })
+      return { ok: false, error }
+    }
+  },
+
+  // ------------------------------------------------------------- import/export
+  async loadToolStatus() {
+    try {
+      set({ toolStatus: await window.api.io.toolStatus() })
+    } catch {
+      set({ toolStatus: {} })
+    }
+  },
+
+  async exportCollection(req) {
+    try {
+      const res = await window.api.io.export(req)
+      if (!res.ok && !res.cancelled) set({ lastError: `Export failed: ${res.error ?? 'unknown'}` })
+      return res
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: `Export failed: ${error}` })
+      return { ok: false, error }
+    }
+  },
+
+  async importCollection(req) {
+    try {
+      const res = await window.api.io.import(req)
+      if (!res.ok && !res.cancelled) set({ lastError: `Import failed: ${res.error ?? 'unknown'}` })
+      return res
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: `Import failed: ${error}` })
+      return { ok: false, error }
+    }
+  },
+
+  // -------------------------------------------------------------- preferences
+  async loadSettings() {
+    try {
+      set({ settings: await window.api.settings.get() })
+    } catch {
+      /* keep defaults */
+    }
+  },
+
+  async updateSettings(patch) {
+    // Optimistic: apply immediately so the UI reflects the toggle, then persist.
+    set((s) => ({ settings: { ...s.settings, ...patch } }))
+    try {
+      const saved = await window.api.settings.update(patch)
+      set({ settings: saved })
+    } catch (e) {
+      set({ lastError: `Failed to save settings: ${errMessage(e)}` })
+    }
+  }
+}))
+
+/** Helper to flip a node's loading flag immutably. */
+function withLoading(
+  s: AppState,
+  connId: string,
+  nodeId: string,
+  on: boolean
+): Pick<AppState, 'catalogs'> {
+  const c = s.catalogs[connId] ?? emptyCatalog()
+  const loading = new Set(c.loading)
+  if (on) loading.add(nodeId)
+  else loading.delete(nodeId)
+  return { catalogs: { ...s.catalogs, [connId]: { ...c, loading } } }
+}
+
+// Re-export the empty-catalog factory for selectors that need a fallback.
+export { emptyCatalog, statusFor }

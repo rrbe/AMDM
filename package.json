@@ -1,0 +1,49 @@
+{
+  "name": "mongo-shell-gui",
+  "version": "0.1.0",
+  "description": "A lean, performance-first MongoDB shell GUI (NoSQLBooster alternative)",
+  "main": "./out/main/index.js",
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@tanstack/react-virtual": "^3.10.9",
+    "@uiw/react-codemirror": "^4.23.6",
+    "bson": "^6.9.0",
+    "exceljs": "^4.4.0",
+    "mongodb": "^6.10.0",
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/ssh2": "^1.15.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "electron": "^33.2.0",
+    "electron-vite": "^2.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "zustand": "^5.0.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  }
+}
