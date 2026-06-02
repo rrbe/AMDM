@@ -52,7 +52,11 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
             >
               <pre>
                 {indentFor(line.depth)}
-                {line.text}
+                {line.tokens.map((t, i) => (
+                  <span key={i} className={t.cls}>
+                    {t.text}
+                  </span>
+                ))}
               </pre>
             </div>
           )

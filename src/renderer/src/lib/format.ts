@@ -10,11 +10,20 @@
  */
 import { entriesOf, formatScalar, isExpandable } from './ejson'
 
+/** A colored segment of a JSON line (key, scalar value, or punctuation). */
+export interface JsonToken {
+  text: string
+  /** CSS class: 'json-key' | 'json-punct' | `v-${ValueType}` for scalars. */
+  cls: string
+}
+
 export interface JsonLine {
   /** Indentation depth (number of 2-space units). */
   depth: number
-  /** Rendered line text (already indented-free; indent applied via CSS/padding). */
+  /** Rendered line text (indent-free; the plain fallback for export/edit/explain). */
   text: string
+  /** Same content split into colored segments, for the syntax-highlighted view. */
+  tokens: JsonToken[]
 }
 
 const INDENT = '  '
@@ -22,6 +31,10 @@ const INDENT = '  '
 function quoteKey(key: string): string {
   // Always quote keys in JSON-ish output for predictability.
   return JSON.stringify(key)
+}
+
+function punct(text: string): JsonToken {
+  return { text, cls: 'json-punct' }
 }
 
 /** Render a primitive/extended scalar as its JSON-line representation. */
@@ -47,11 +60,27 @@ function scalarText(value: unknown): string {
  * Recursively flatten a value into JsonLine[]. `keyPrefix`, when provided, is
  * prepended to the opening line (e.g. `"name": `).
  */
-function pushLines(value: unknown, depth: number, keyPrefix: string, trailingComma: boolean, out: JsonLine[]): void {
+function pushLines(
+  value: unknown,
+  depth: number,
+  keyText: string | null,
+  trailingComma: boolean,
+  out: JsonLine[]
+): void {
   const comma = trailingComma ? ',' : ''
+  const keyPrefix = keyText === null ? '' : `${keyText}: `
+  const keyToks: JsonToken[] =
+    keyText === null ? [] : [{ text: keyText, cls: 'json-key' }, punct(': ')]
+  const commaToks: JsonToken[] = comma ? [punct(comma)] : []
 
   if (!isExpandable(value)) {
-    out.push({ depth, text: `${keyPrefix}${scalarText(value)}${comma}` })
+    const { type } = formatScalar(value)
+    const valText = scalarText(value)
+    out.push({
+      depth,
+      text: `${keyPrefix}${valText}${comma}`,
+      tokens: [...keyToks, { text: valText, cls: `v-${type}` }, ...commaToks]
+    })
     return
   }
 
@@ -61,23 +90,27 @@ function pushLines(value: unknown, depth: number, keyPrefix: string, trailingCom
   const entries = entriesOf(value)
 
   if (entries.length === 0) {
-    out.push({ depth, text: `${keyPrefix}${open}${close}${comma}` })
+    out.push({
+      depth,
+      text: `${keyPrefix}${open}${close}${comma}`,
+      tokens: [...keyToks, punct(`${open}${close}`), ...commaToks]
+    })
     return
   }
 
-  out.push({ depth, text: `${keyPrefix}${open}` })
+  out.push({ depth, text: `${keyPrefix}${open}`, tokens: [...keyToks, punct(open)] })
   entries.forEach(([k, v], i) => {
     const last = i === entries.length - 1
-    const childPrefix = isArray ? '' : `${quoteKey(k)}: `
-    pushLines(v, depth + 1, childPrefix, !last, out)
+    const childKey = isArray ? null : quoteKey(k)
+    pushLines(v, depth + 1, childKey, !last, out)
   })
-  out.push({ depth, text: `${close}${comma}` })
+  out.push({ depth, text: `${close}${comma}`, tokens: [punct(close), ...commaToks] })
 }
 
 /** Flatten any EJSON value into virtualizable lines. */
 export function toJsonLines(value: unknown): JsonLine[] {
   const out: JsonLine[] = []
-  pushLines(value, 0, '', false, out)
+  pushLines(value, 0, null, false, out)
   return out
 }
 

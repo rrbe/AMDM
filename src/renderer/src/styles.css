@@ -765,6 +765,12 @@ label {
   margin: 0;
   white-space: pre;
 }
+.json-key {
+  color: var(--t-key);
+}
+.json-punct {
+  color: var(--fg-3);
+}
 
 /* ------------------------------------------------------------ table result */
 .table-scroller {
