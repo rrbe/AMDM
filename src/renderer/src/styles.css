@@ -609,6 +609,7 @@ label {
   position: relative;
   width: 100%;
 }
+/* Shared virtualized row (JSON view, and the base for .kv-row below). */
 .vrow {
   position: absolute;
   top: 0;
@@ -619,31 +620,86 @@ label {
   height: var(--row-h);
   white-space: nowrap;
 }
-.tree-row {
-  cursor: default;
-  padding-right: 12px;
+
+/* Two-column KEY | VALUE rows. */
+.kv-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  height: var(--row-h);
+  white-space: nowrap;
+  border-bottom: 1px dashed var(--border);
 }
-.tree-row:hover {
+.kv-row:hover {
   background: var(--bg-2);
 }
-.tree-row .twisty {
+.kv-key {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.kv-key .twisty {
   width: 14px;
   flex: 0 0 auto;
   text-align: center;
   color: var(--fg-2);
-  cursor: pointer;
   font-size: 9px;
 }
-.tree-row .doc-badge {
+.kv-key .doc-badge {
   color: var(--fg-3);
-  margin-right: 4px;
 }
-.tree-key {
+.kv-key-name {
   color: var(--t-key);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.tree-colon {
-  color: var(--fg-3);
-  margin: 0 4px 0 0;
+.kv-val {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Full-height draggable divider at the key/value boundary. */
+.kv-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  transform: translateX(-4px);
+  cursor: col-resize;
+  z-index: 3;
+}
+.kv-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  border-left: 1px dashed var(--border);
+}
+.kv-resizer:hover::before {
+  left: 3px;
+  border-left: 2px solid var(--accent);
+}
+/* Per-doc edit/delete, revealed on row hover at the right edge. */
+.kv-actions {
+  position: absolute;
+  right: 8px;
+  display: none;
+  gap: 2px;
+  background: var(--bg-2);
+  padding-left: 6px;
+}
+.kv-row:hover .kv-actions {
+  display: flex;
+}
+.kv-actions button svg {
+  display: block;
 }
 .tree-val {
   overflow: hidden;

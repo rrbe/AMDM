@@ -1,31 +1,35 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { Pencil, Trash2 } from 'lucide-react'
 import { entriesOf, formatScalar, isExpandable, summarize } from '@renderer/lib/ejson'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { DocEditor } from './DocEditor'
 
 /**
- * Virtualized, lazily-expanding tree of the result documents.
+ * Two-column KEY | VALUE tree of the result documents.
+ *
+ * Each row is an aligned pair: the field name (left, indented by depth) and its
+ * value (right). Each top-level array index is a collapsible "document" row, and
+ * nested objects/arrays collapse by default — double-click a row (or click its
+ * twisty) to expand/collapse. A draggable divider sets the key-column width so
+ * keys and values line up in two clean columns.
  *
  * VIRTUALIZATION APPROACH (ADR-0004 rule 1):
  *  - We never render the whole nested tree as DOM. Instead we FLATTEN only the
  *    currently-visible nodes into a single `FlatNode[]` array. A node's children
- *    are appended to the flat list ONLY when that node is in the `expanded` set,
- *    so collapsed subtrees cost nothing (lazy expansion, rule 1's "render nested
- *    children only on expand").
- *  - That flat array is fed to `useVirtualizer`, which keeps only the visible
- *    rows (+ small overscan) in the DOM regardless of total node count.
+ *    are appended ONLY when that node is in the `expanded` set, so collapsed
+ *    subtrees cost nothing (lazy expansion).
+ *  - That flat array feeds `useVirtualizer`, which keeps only the visible rows
+ *    (+ small overscan) in the DOM regardless of total node count.
  *  - The flatten pass is memoized on (docs identity, expanded set), so typing /
  *    re-renders don't re-walk the tree unless something actually changed.
- *
- * Each top-level array index is a collapsible "document" row.
  */
 
 interface FlatNode {
   /** Stable path id, e.g. "0.address.city". */
   id: string
   depth: number
-  /** Display key (array index or field name); empty for the synthetic root rows. */
+  /** Array index or field name; the synthetic doc rows use "(0)". */
   keyLabel: string
   value: unknown
   expandable: boolean
@@ -41,13 +45,20 @@ interface TreeViewProps {
 }
 
 const ROW_HEIGHT = 24
+const DEFAULT_KEY_WIDTH = 280
+const MIN_KEY_WIDTH = 120
+const MAX_KEY_WIDTH = 680
 
 export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   const parentRef = useRef<HTMLDivElement>(null)
   // Index of the document currently being edited (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
-  // Expanded paths. Top-level docs start collapsed except the first for context.
-  const [expanded, setExpanded] = useState<Set<string>>(() => (docs.length > 0 ? new Set(['0']) : new Set()))
+  // Expanded paths. Top-level docs start collapsed except the first (for
+  // context); nested containers always start collapsed.
+  const [expanded, setExpanded] = useState<Set<string>>(() =>
+    docs.length > 0 ? new Set(['0']) : new Set()
+  )
+  const [keyWidth, setKeyWidth] = useState(DEFAULT_KEY_WIDTH)
 
   const toggle = (id: string): void => {
     setExpanded((prev) => {
@@ -61,7 +72,13 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   // Flatten visible nodes. Memo keyed by docs identity + expanded set reference.
   const flat = useMemo<FlatNode[]>(() => {
     const out: FlatNode[] = []
-    const walk = (key: string, value: unknown, depth: number, path: string, docIndex?: number): void => {
+    const walk = (
+      key: string,
+      value: unknown,
+      depth: number,
+      path: string,
+      docIndex?: number
+    ): void => {
       const canExpand = isExpandable(value)
       const isOpen = canExpand && expanded.has(path)
       out.push({
@@ -79,7 +96,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
         }
       }
     }
-    docs.forEach((doc, i) => walk(`(${i})`, doc, 0, String(i), i))
+    // Display badge is 1-based for humans; the path id stays 0-based (it keys
+    // expand state and child paths).
+    docs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
     return out
   }, [docs, expanded])
 
@@ -89,6 +108,26 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     estimateSize: () => ROW_HEIGHT,
     overscan: 12
   })
+
+  // Drag the divider to resize the key column.
+  const startResize = useCallback(
+    (e: MouseEvent): void => {
+      e.preventDefault()
+      const startX = e.clientX
+      const startW = keyWidth
+      const onMove = (ev: globalThis.MouseEvent): void => {
+        const w = Math.min(MAX_KEY_WIDTH, Math.max(MIN_KEY_WIDTH, startW + ev.clientX - startX))
+        setKeyWidth(w)
+      }
+      const onUp = (): void => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [keyWidth]
+  )
 
   if (docs.length === 0) {
     return <div className="center-msg muted">No documents.</div>
@@ -100,6 +139,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   return (
     <div ref={parentRef} className="virtual-scroller">
       <div className="virtual-inner" style={{ height: rowVirtualizer.getTotalSize() }}>
+        <div className="kv-resizer" style={{ left: keyWidth }} onMouseDown={startResize} />
         {rowVirtualizer.getVirtualItems().map((vi) => {
           const node = flat[vi.index]
           const showActions =
@@ -107,31 +147,55 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
           return (
             <div
               key={node.id}
-              className="vrow tree-row"
-              style={{
-                transform: `translateY(${vi.start}px)`,
-                paddingLeft: 6 + node.depth * 14
-              }}
+              className={node.expandable ? 'kv-row expandable' : 'kv-row'}
+              style={{ transform: `translateY(${vi.start}px)` }}
+              onDoubleClick={() => node.expandable && toggle(node.id)}
             >
-              <span
-                className="twisty"
-                onClick={() => node.expandable && toggle(node.id)}
-                style={{ cursor: node.expandable ? 'pointer' : 'default' }}
-              >
-                {node.expandable ? (node.expanded ? '▾' : '▸') : ''}
-              </span>
-              <NodeContent node={node} />
+              <div className="kv-key" style={{ width: keyWidth, paddingLeft: 6 + node.depth * 14 }}>
+                <span
+                  className="twisty"
+                  onClick={(e) => {
+                    if (node.expandable) {
+                      e.stopPropagation()
+                      toggle(node.id)
+                    }
+                  }}
+                  style={{ cursor: node.expandable ? 'pointer' : 'default' }}
+                >
+                  {node.expandable ? (node.expanded ? '▾' : '▸') : ''}
+                </span>
+                {node.depth === 0 ? (
+                  <span className="doc-badge">{node.keyLabel}</span>
+                ) : (
+                  <span className="kv-key-name" title={node.keyLabel}>
+                    {node.keyLabel}
+                  </span>
+                )}
+              </div>
+              <div className="kv-val">
+                <ValueCell node={node} />
+              </div>
               {showActions && docCtx && (
-                <span className="row-actions">
-                  <button className="ghost row-act" title="Edit document" onClick={() => setEditIndex(node.docIndex ?? null)}>
-                    ✎
+                <span className="kv-actions">
+                  <button
+                    className="ghost row-act"
+                    title="Edit document"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditIndex(node.docIndex ?? null)
+                    }}
+                  >
+                    <Pencil size={13} />
                   </button>
                   <button
                     className="ghost row-act danger"
                     title="Delete document"
-                    onClick={() => void confirmDeleteDoc(docCtx, (node.value as { _id: unknown })._id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void confirmDeleteDoc(docCtx, (node.value as { _id: unknown })._id)
+                    }}
                   >
-                    🗑
+                    <Trash2 size={13} />
                   </button>
                 </span>
               )}
@@ -154,45 +218,17 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   )
 }
 
-function NodeContent({ node }: { node: FlatNode }): JSX.Element {
-  const keyEl =
-    node.depth === 0 ? (
-      <span className="doc-badge">{node.keyLabel}</span>
-    ) : (
-      <>
-        <span className="tree-key">{node.keyLabel}</span>
-        <span className="tree-colon">:</span>
-      </>
-    )
-
-  if (node.expandable && node.expanded) {
-    // Open container: show just the opening bracket-ish summary marker.
-    return (
-      <>
-        {keyEl}
-        <span className="tree-summary">{Array.isArray(node.value) ? '[' : '{'}</span>
-      </>
-    )
-  }
-
+function ValueCell({ node }: { node: FlatNode }): JSX.Element {
   if (node.expandable) {
-    return (
-      <>
-        {keyEl}
-        <span className="tree-summary">{summarize(node.value)}</span>
-      </>
-    )
+    // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
+    // or closed; their children render as indented rows below.
+    return <span className="tree-summary">{summarize(node.value)}</span>
   }
-
-  // Leaf: scalar / EJSON extended type. `type` already encodes the semantic
-  // value type used for color-coding (see formatScalar/valueType).
+  // Leaf: scalar / EJSON extended type; `type` drives the color class.
   const { text, type } = formatScalar(node.value)
   return (
-    <>
-      {keyEl}
-      <span className={`tree-val v-${type}`} title={text}>
-        {text}
-      </span>
-    </>
+    <span className={`tree-val v-${type}`} title={text}>
+      {text}
+    </span>
   )
 }
