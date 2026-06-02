@@ -1,7 +1,7 @@
 /* =========================================================================
    Mongo Shell GUI — global styles
    Dark, dense, developer-tool aesthetic. No Tailwind, no UI lib.
-   Layout: [ Sidebar | CatalogTree (collapsible) | Work area ]
+   Layout: [ Explorer (connections + catalog, one tree) | Work area ]
    ========================================================================= */
 
 :root {
@@ -162,10 +162,36 @@ label {
   flex: 0 0 auto;
 }
 
-/* ------------------------------------------------------------------ sidebar */
-.sidebar {
-  width: 240px;
-  min-width: 200px;
+/* ---- Window drag (macOS frameless titleBarStyle: hiddenInset) ----
+   Header strips act as the window's drag handle; interactive children opt
+   back out so clicks still register. Scoped to macOS — other platforms keep
+   their native title bar. */
+.is-mac .app-drag {
+  -webkit-app-region: drag;
+}
+.is-mac .app-drag button,
+.is-mac .app-drag select,
+.is-mac .app-drag input,
+.is-mac .app-drag textarea,
+.is-mac .app-drag a,
+.is-mac .app-drag .conn-row-actions,
+.is-mac .app-drag .tree-row-actions {
+  -webkit-app-region: no-drag;
+}
+/* Reserve the top-left for the traffic lights so they never cover the title. */
+.is-mac .explorer-header {
+  padding-left: 78px;
+}
+/* A slim draggable strip above the empty work area (no header of its own). */
+.work-titlebar {
+  height: 38px;
+  flex: 0 0 auto;
+}
+
+/* ----------------------------------------------------------------- explorer */
+.explorer {
+  width: 300px;
+  min-width: 220px;
   flex: 0 0 auto;
   background: var(--bg-1);
   border-right: 1px solid var(--border);
@@ -173,24 +199,40 @@ label {
   flex-direction: column;
   overflow: hidden;
 }
-.sidebar-header {
+.explorer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  gap: 8px;
+  height: 38px;
+  flex: 0 0 auto;
+  padding: 0 10px;
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--fg-1);
 }
-.sidebar-actions {
-  display: flex;
-  gap: 4px;
+.explorer-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.sidebar-body {
+.explorer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.explorer-body {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+  user-select: none;
+}
+.explorer-empty {
+  padding: 14px;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
 }
 
 .group {
@@ -226,8 +268,8 @@ label {
 .conn-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 10px 5px 18px;
+  gap: 6px;
+  padding: 5px 8px;
   cursor: pointer;
   border-left: 2px solid transparent;
 }
@@ -237,19 +279,28 @@ label {
 .conn-item.active {
   background: var(--bg-sel);
 }
-.conn-item .conn-name {
+.conn-text {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.conn-item .conn-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--fg-0);
 }
 .conn-item .conn-sub {
   color: var(--fg-3);
   font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .conn-row-actions {
   display: none;
   gap: 2px;
+  flex: 0 0 auto;
 }
 .conn-item:hover .conn-row-actions {
   display: flex;
@@ -281,31 +332,7 @@ label {
   }
 }
 
-/* ------------------------------------------------------------- catalog pane */
-.catalog {
-  width: 260px;
-  min-width: 180px;
-  flex: 0 0 auto;
-  background: var(--bg-1);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.catalog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  color: var(--fg-1);
-  font-weight: 600;
-}
-.catalog-body {
-  flex: 1;
-  overflow: auto;
-  padding: 4px 0;
-}
+/* --------------------------------------------------------------- catalog tree */
 .tree-node {
   display: flex;
   align-items: center;
@@ -1259,14 +1286,8 @@ label {
   color: var(--warn);
 }
 
-/* ---- Catalog sort toggle ---- */
-.catalog-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+/* ---- Catalog sort toggle (A–Z button in the explorer header) ---- */
 .catalog-sort {
-  margin-left: auto;
   font-size: 10px;
   letter-spacing: 0.5px;
   padding: 1px 6px;

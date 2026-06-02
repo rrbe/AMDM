@@ -71,6 +71,8 @@ interface AppState {
 
   // ---- catalog (per connection) ----
   catalogs: Record<string, CatalogState>
+  /** Connection ids whose database subtree is expanded in the unified explorer. */
+  expandedConnections: Set<string>
 
   // ---- shell workspace ----
   activeDatabase: string
@@ -111,6 +113,8 @@ interface AppState {
   connect(id: string): Promise<void>
   disconnect(id: string): Promise<void>
   setActiveConnection(id: string | null): void
+  /** Expand/collapse a connection's database subtree in the explorer. */
+  toggleConnectionExpanded(id: string): void
 
   // ---- actions: catalog ----
   toggleNode(connId: string, nodeId: string, kind: NodeKind, payload: NodePayload): Promise<void>
@@ -180,6 +184,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeConnectionId: null,
 
   catalogs: {},
+  expandedConnections: new Set(),
 
   activeDatabase: '',
   code: '',
@@ -239,9 +244,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => {
         const { [id]: _removedCatalog, ...catalogs } = s.catalogs
         const { [id]: _removedStatus, ...statuses } = s.statuses
+        const expandedConnections = new Set(s.expandedConnections)
+        expandedConnections.delete(id)
         return {
           catalogs,
           statuses,
+          expandedConnections,
           activeConnectionId: s.activeConnectionId === id ? null : s.activeConnectionId
         }
       })
@@ -266,11 +274,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
     try {
       const status = await window.api.session.connect(id)
-      set((s) => ({
-        statuses: { ...s.statuses, [id]: status },
-        activeConnectionId: id,
-        catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() }
-      }))
+      set((s) => {
+        // Auto-expand the connection in the explorer so its databases appear.
+        const expandedConnections = new Set(s.expandedConnections)
+        if (status.state === 'connected') expandedConnections.add(id)
+        return {
+          statuses: { ...s.statuses, [id]: status },
+          activeConnectionId: id,
+          catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() },
+          expandedConnections
+        }
+      })
       if (status.state === 'connected') {
         // Default the active database to the connection's preferred db, if any.
         const conn = get().connections.find((c) => c.id === id)
@@ -295,9 +309,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Dispose catalog cache for this connection (ADR-0004 rule 6).
       set((s) => {
         const { [id]: _removed, ...catalogs } = s.catalogs
+        const expandedConnections = new Set(s.expandedConnections)
+        expandedConnections.delete(id)
         return {
           statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
-          catalogs
+          catalogs,
+          expandedConnections
         }
       })
     }
@@ -305,6 +322,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveConnection(id) {
     set({ activeConnectionId: id })
+  },
+
+  toggleConnectionExpanded(id) {
+    set((s) => {
+      const expandedConnections = new Set(s.expandedConnections)
+      if (expandedConnections.has(id)) expandedConnections.delete(id)
+      else expandedConnections.add(id)
+      return { expandedConnections }
+    })
   },
 
   // ------------------------------------------------------------------- catalog

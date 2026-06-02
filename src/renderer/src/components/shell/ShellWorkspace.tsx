@@ -37,7 +37,7 @@ export function ShellWorkspace(): JSX.Element {
 
   return (
     <div className="work">
-      <div className="work-header">
+      <div className="work-header app-drag">
         <span className="conn-title">{conn?.name ?? 'Shell'}</span>
         <select
           className="db-select"

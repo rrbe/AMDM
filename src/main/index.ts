@@ -15,6 +15,8 @@ function createWindow(): void {
     minHeight: 620,
     show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // Vertically center the traffic lights within the 38px header strip.
+    trafficLightPosition: process.platform === 'darwin' ? { x: 14, y: 12 } : undefined,
     backgroundColor: '#1e1e1e',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
