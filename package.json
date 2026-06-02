@@ -19,7 +19,10 @@
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.2",
     "@codemirror/lang-javascript": "^6.2.2",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/space-grotesk": "^5.2.10",
     "@tanstack/react-virtual": "^3.10.9",
+    "@uiw/codemirror-themes": "^4.25.10",
     "@uiw/react-codemirror": "^4.23.6",
     "bson": "^6.9.0",
     "exceljs": "^4.4.0",

@@ -4,50 +4,130 @@
    Layout: [ Explorer (connections + catalog, one tree) | Work area ]
    ========================================================================= */
 
+/* ---------------------------------------------------------------------------
+   Design tokens — the "Pine" system. Light-first (default in :root), with a
+   warm dark mode under [data-theme='dark']. Existing semantic token names are
+   preserved so every component rule inherits the new palette unchanged; the
+   dark block only re-points the palette, so toggling back to light falls
+   through to :root.
+   --------------------------------------------------------------------------- */
 :root {
-  /* Surfaces */
-  --bg-0: #0d1117; /* app background */
-  --bg-1: #161b22; /* panels */
-  --bg-2: #1c2128; /* raised / headers */
-  --bg-3: #21262d; /* hover */
-  --bg-sel: #1f3a5f; /* selection */
-
-  /* Borders */
-  --border: #30363d;
-  --border-strong: #444c56;
-
-  /* Text */
-  --fg-0: #e6edf3;
-  --fg-1: #adbac7;
-  --fg-2: #768390; /* muted */
-  --fg-3: #545d68; /* very muted */
-
-  /* Accents */
-  --accent: #2f81f7;
-  --accent-hover: #4493f8;
-  --ok: #3fb950;
-  --warn: #d29922;
-  --err: #f85149;
-  --err-bg: #2d1416;
-
-  /* Value type colors (Tree/Table/JSON) */
-  --t-string: #a5d6ff;
-  --t-number: #79c0ff;
-  --t-boolean: #ff7b72;
-  --t-null: #8b949e;
-  --t-objectId: #d2a8ff;
-  --t-date: #7ee787;
-  --t-key: #ffa657;
-  --t-binary: #f0883e;
-  --t-regex: #ff7b72;
-  --t-special: #db61a2;
-
-  /* Metrics */
+  /* Shape + type (theme-independent) */
+  --radius: 5px;
+  --radius-sm: 4px;
+  --radius-lg: 9px;
   --row-h: 24px;
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'SF Mono', ui-monospace, 'Menlo', 'Monaco', 'Cascadia Code', monospace;
+  --font-ui: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
   --fs: 12px;
   --fs-sm: 11px;
+  --accent-fg: #ffffff;
+
+  /* ---- LIGHT · Pine (default) ---- */
+  /* Surfaces */
+  --bg-app: #e7e3d8; /* window chrome behind panels */
+  --bg-0: #faf8f2; /* primary content surface (work area, lists) */
+  --bg-1: #eeebe2; /* sidebar / header chrome */
+  --bg-2: #e9e5da; /* raised / inset (inputs, table head, segmented) */
+  --bg-3: #e0dccd; /* hover */
+  --bg-elevated: #fcfaf5; /* menus, modal, active segment */
+  --bg-sel: rgba(29, 122, 74, 0.12); /* selected row tint */
+  --bg-editor: #fbf9f3;
+
+  /* Borders + the editorial ink rule */
+  --border: #e1dccf;
+  --border-strong: #d2cbba;
+  --rule: #1e231f; /* near-black hairline under title bars / column heads */
+
+  /* Text */
+  --fg-0: #1e231f;
+  --fg-1: #414940;
+  --fg-2: #6a7062; /* muted */
+  --fg-3: #a6a99c; /* very muted */
+
+  /* Accent — pine green */
+  --accent: #1d7a4a;
+  --accent-hover: #186540;
+  --accent-soft: rgba(29, 122, 74, 0.1);
+  --accent-soft-strong: rgba(29, 122, 74, 0.18);
+
+  /* Status */
+  --ok: #1f9d57;
+  --warn: #c2701a;
+  --err: #c0432f;
+  --err-bg: rgba(192, 67, 47, 0.09);
+
+  /* Value type colors (Tree/Table/JSON) — warm Pine syntax */
+  --t-string: #5f7a2c;
+  --t-number: #b15a1e;
+  --t-boolean: #7c5aa0;
+  --t-null: #a6a99c;
+  --t-objectId: #9a6a2d;
+  --t-date: #5f7a2c;
+  --t-key: #3f463c;
+  --t-binary: #b15a1e;
+  --t-regex: #7c5aa0;
+  --t-special: #9a6a2d;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(50, 45, 25, 0.07), 0 1px 1px rgba(50, 45, 25, 0.05);
+  --shadow-md: 0 4px 12px rgba(50, 45, 25, 0.1), 0 1px 3px rgba(50, 45, 25, 0.07);
+  --shadow-lg: 0 18px 48px rgba(40, 36, 18, 0.2), 0 4px 12px rgba(40, 36, 18, 0.12);
+
+  /* Dot halos (status glow) */
+  --halo-ok: rgba(34, 197, 94, 0.18);
+  --halo-warn: rgba(245, 158, 11, 0.18);
+  --halo-err: rgba(220, 38, 38, 0.16);
+}
+
+/* ---- DARK · Pine Night ---- */
+[data-theme='dark'] {
+  --bg-app: #100f0b;
+  --bg-0: #131210;
+  --bg-1: #16140f;
+  --bg-2: #201e17;
+  --bg-3: #262318;
+  --bg-elevated: #211f18;
+  --bg-sel: rgba(70, 184, 122, 0.18);
+  --bg-editor: #0f0e0a;
+
+  --border: #2a2820;
+  --border-strong: #3a372d;
+  --rule: #4a463a;
+
+  --fg-0: #e9e4d6;
+  --fg-1: #cfcab8;
+  --fg-2: #a39c8a;
+  --fg-3: #5b5547;
+
+  --accent: #46b87a;
+  --accent-hover: #5cc78c;
+  --accent-soft: rgba(70, 184, 122, 0.15);
+  --accent-soft-strong: rgba(70, 184, 122, 0.24);
+
+  --ok: #46b87a;
+  --warn: #e3a35b;
+  --err: #e06a52;
+  --err-bg: rgba(224, 106, 82, 0.13);
+
+  --t-string: #9fc26a;
+  --t-number: #d99a52;
+  --t-boolean: #b89ad0;
+  --t-null: #5b5547;
+  --t-objectId: #c99a5a;
+  --t-date: #9fc26a;
+  --t-key: #cfcab8;
+  --t-binary: #d99a52;
+  --t-regex: #b89ad0;
+  --t-special: #c99a5a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.66), 0 6px 16px rgba(0, 0, 0, 0.55);
+
+  --halo-ok: rgba(70, 184, 122, 0.22);
+  --halo-warn: rgba(227, 163, 91, 0.22);
+  --halo-err: rgba(224, 106, 82, 0.22);
 }
 
 * {
@@ -1304,4 +1384,264 @@ label {
 .catalog-sort.active {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* ============================================================================
+   Pine theme — structural touches & component polish
+   Appended last so these win at equal specificity over the base rules above.
+   ============================================================================ */
+
+/* App chrome shows behind the panels at the window edges. */
+body {
+  background: var(--bg-app);
+  text-rendering: optimizeLegibility;
+}
+
+/* Inset form fields with a pine focus ring. */
+input,
+select,
+textarea {
+  background: var(--bg-2);
+  border-radius: var(--radius);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Buttons: elevated surface; pine primary with a subtle lift. */
+button {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+button.primary {
+  color: var(--accent-fg);
+  box-shadow: 0 1px 2px rgba(20, 80, 50, 0.22);
+}
+button.ghost {
+  background: transparent;
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Scrollbars — track blends into the surface; thumb is a soft hairline. */
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-3);
+  background-clip: padding-box;
+}
+::selection {
+  background: var(--accent-soft-strong);
+}
+
+/* ---- Editorial ink rule under the top title bars ---- */
+.explorer-header,
+.work-header,
+.work-titlebar {
+  border-bottom: 1.5px solid var(--rule);
+}
+.explorer-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+/* ---- Connection rows: status-dot glow + active accent outline ---- */
+.conn-item {
+  border-radius: var(--radius-sm);
+}
+.conn-item.active {
+  box-shadow: inset 0 0 0 1px var(--accent-soft-strong);
+}
+.state-dot.connected {
+  box-shadow: 0 0 0 3px var(--halo-ok);
+}
+.state-dot.connecting {
+  box-shadow: 0 0 0 3px var(--halo-warn);
+}
+.state-dot.error {
+  box-shadow: 0 0 0 3px var(--halo-err);
+}
+
+/* ---- Catalog tree rows ---- */
+.tree-node {
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Result view switcher → segmented control ---- */
+.view-switch {
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  border-radius: var(--radius);
+  overflow: visible;
+  padding: 2px;
+  gap: 2px;
+}
+.view-switch button {
+  font-weight: 600;
+  color: var(--fg-2);
+  border-radius: var(--radius-sm);
+  padding: 3px 13px;
+  background: transparent;
+}
+.view-switch button:hover {
+  color: var(--fg-0);
+  background: transparent;
+}
+.view-switch button.active {
+  background: var(--bg-elevated);
+  color: var(--fg-0);
+  box-shadow: var(--shadow-sm);
+}
+[data-theme='dark'] .view-switch button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  box-shadow: none;
+}
+
+/* ---- Result meta: warm "truncated" amber ---- */
+.result-meta .truncated {
+  color: var(--warn);
+}
+
+/* ---- Table: editorial uppercase column heads with an ink underline ---- */
+.tbl-head {
+  background: var(--bg-2);
+  border-bottom: 1.5px solid var(--rule);
+}
+.tbl-th {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.tbl-th.idx {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- Empty state: soft accent halo + editorial heading ---- */
+.empty-state {
+  background:
+    radial-gradient(58% 48% at 50% 40%, var(--accent-soft) 0%, transparent 70%),
+    var(--bg-0);
+}
+.empty-state h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg-0);
+}
+
+/* ---- Modal: light paper, soft border, large radius + shadow ---- */
+.modal-backdrop {
+  background: rgba(40, 36, 22, 0.34);
+  backdrop-filter: blur(3px);
+}
+[data-theme='dark'] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.modal-header {
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.tabs button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---- Sidebar footer: app-level theme toggle (Pine sun/moon switch) ---- */
+.side-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.side-foot .spacer {
+  flex: 1;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-1);
+}
+.theme-toggle:hover {
+  background: var(--bg-3);
+}
+.tt-track {
+  position: relative;
+  width: 38px;
+  height: 21px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  transition:
+    background 0.18s,
+    border-color 0.18s;
+  flex: 0 0 auto;
+}
+.tt-track.dark {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.tt-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+  color: #f59e0b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.tt-track.dark .tt-knob {
+  transform: translateX(17px);
+  color: var(--accent);
+}
+.tt-text {
+  font-size: var(--fs);
+  font-weight: 600;
+  color: var(--fg-1);
 }

@@ -292,11 +292,17 @@ export interface ToolStatus {
 /** How databases/collections are ordered in the catalog tree. */
 export type CollectionSort = 'natural' | 'alpha'
 
+/** UI color theme. Light-first (the "Pine" palette), with a warm dark mode. */
+export type ThemeMode = 'light' | 'dark'
+
 export interface AppSettings {
   /** 'natural' = server order; 'alpha' = A→Z by name. */
   collectionSort: CollectionSort
+  /** 'light' = Pine (default); 'dark' = Pine Night. */
+  theme: ThemeMode
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  collectionSort: 'natural'
+  collectionSort: 'natural',
+  theme: 'light'
 }

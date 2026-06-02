@@ -13,10 +13,17 @@ export default function App(): JSX.Element {
   const bootstrap = useAppStore((s) => s.bootstrap)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const statuses = useAppStore((s) => s.statuses)
+  const theme = useAppStore((s) => s.settings.theme)
 
   useEffect(() => {
     void bootstrap()
   }, [bootstrap])
+
+  // Reflect the persisted Pine light/dark preference onto the document root,
+  // which drives the `[data-theme]` token cascade in styles.css.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   const activeConnected =
     activeConnectionId !== null && statuses[activeConnectionId]?.state === 'connected'

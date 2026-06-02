@@ -73,6 +73,7 @@ export function Explorer(): JSX.Element {
   const expandedConnections = useAppStore((s) => s.expandedConnections)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
+  const theme = useAppStore((s) => s.settings.theme)
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -177,6 +178,24 @@ export function Explorer(): JSX.Element {
             <CatalogRow key={row.id} row={row} onOpenIo={setIoModal} />
           )
         )}
+      </div>
+
+      {/* App-level controls live in the sidebar footer (VS Code pattern), out of
+          the way of the query actions. The theme is a persisted preference. */}
+      <div className="side-foot">
+        <button
+          className="theme-toggle"
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          onClick={() =>
+            void updateSettings({ theme: theme === 'light' ? 'dark' : 'light' })
+          }
+        >
+          <span className={theme === 'dark' ? 'tt-track dark' : 'tt-track'}>
+            <span className="tt-knob">{theme === 'light' ? '☀' : '☾'}</span>
+          </span>
+          <span className="tt-text">{theme === 'light' ? 'Light' : 'Dark'}</span>
+        </button>
+        <span className="spacer" />
       </div>
 
       {connForm.open && (

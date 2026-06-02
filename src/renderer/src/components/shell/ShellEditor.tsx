@@ -2,6 +2,8 @@ import { Suspense, lazy, useMemo, type KeyboardEvent } from 'react'
 import { javascript } from '@codemirror/lang-javascript'
 import { autocompletion } from '@codemirror/autocomplete'
 import { mongoCompletionSource } from '@renderer/lib/mongoCompletion'
+import { useAppStore } from '@renderer/store/useAppStore'
+import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 
 /**
  * CodeMirror is heavy, so we lazy-load it (ADR-0004 rule 7) — it stays out of
@@ -21,6 +23,9 @@ interface ShellEditorProps {
 }
 
 export function ShellEditor({ value, onChange, onRun }: ShellEditorProps): JSX.Element {
+  // Follow the app's Pine light/dark preference so the editor reads as part of
+  // the same surface (custom Pine themes, not CodeMirror's generic defaults).
+  const theme = useAppStore((s) => s.settings.theme)
   const extensions = useMemo(
     () => [javascript({ typescript: false }), autocompletion({ override: [mongoCompletionSource] })],
     []
@@ -40,7 +45,7 @@ export function ShellEditor({ value, onChange, onRun }: ShellEditorProps): JSX.E
         <CodeMirror
           value={value}
           height="160px"
-          theme="dark"
+          theme={theme === 'dark' ? pineDark : pineLight}
           extensions={extensions}
           onChange={onChange}
           basicSetup={{
