@@ -12,7 +12,12 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') }
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          // Emitted as out/main/serializer.worker.js; loaded by serializerPool
+          // via new Worker(join(__dirname, 'serializer.worker.js')).
+          'serializer.worker': resolve(__dirname, 'src/main/workers/serializer.worker.ts')
+        }
       }
     }
   },

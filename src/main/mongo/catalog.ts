@@ -1,6 +1,7 @@
 import { EJSON } from 'bson'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import { sessionManager } from './sessionManager'
+import { serializerPool } from '../workers/serializerPool'
 
 function toPlain(value: unknown): Record<string, unknown> {
   return JSON.parse(EJSON.stringify(value, { relaxed: false })) as Record<string, unknown>
@@ -52,31 +53,13 @@ export async function listIndexes(
 // --- field sampling for autocomplete (ADR-0004 rule 4: bounded + cached) ---
 
 const SAMPLE_LIMIT = 50
-const MAX_FIELDS = 500
 const fieldCache = new Map<string, string[]>()
-
-function isBsonLike(v: unknown): boolean {
-  return (
-    v instanceof Date ||
-    (typeof v === 'object' && v !== null && '_bsontype' in (v as Record<string, unknown>))
-  )
-}
-
-function collectPaths(obj: Record<string, unknown>, prefix: string, out: Set<string>, depth: number): void {
-  for (const [k, v] of Object.entries(obj)) {
-    if (out.size >= MAX_FIELDS) return
-    const path = prefix ? `${prefix}.${k}` : k
-    out.add(path)
-    if (depth < 2 && v && typeof v === 'object' && !Array.isArray(v) && !isBsonLike(v)) {
-      collectPaths(v as Record<string, unknown>, path, out, depth + 1)
-    }
-  }
-}
 
 /**
  * Sample a bounded number of documents and return their (dot-pathed) field
  * names for autocomplete. Cached per connection+namespace for the session.
- * TODO(perf, ADR-0004): move the extraction to a worker if limits grow.
+ * The field extraction runs off the main thread via the serializer worker
+ * (ADR-0004 rules 3 & 4).
  */
 export async function sampleFields(
   connectionId: string,
@@ -94,9 +77,7 @@ export async function sampleFields(
     .find({}, { limit: SAMPLE_LIMIT })
     .toArray()
 
-  const out = new Set<string>()
-  for (const d of docs) collectPaths(d as Record<string, unknown>, '', out, 0)
-  const fields = [...out].sort()
+  const fields = await serializerPool.extractFields(docs)
   fieldCache.set(cacheKey, fields)
   return fields
 }

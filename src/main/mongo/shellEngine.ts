@@ -1,8 +1,9 @@
 import vm from 'node:vm'
-import { EJSON, ObjectId, Long, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
+import { ObjectId, Long, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
 import type { Db } from 'mongodb'
 import type { ShellRequest, ShellResult } from '../../shared/types'
 import { sessionManager } from './sessionManager'
+import { serializerPool } from '../workers/serializerPool'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
@@ -80,11 +81,6 @@ async function drainCursor(
   return { docs, truncated }
 }
 
-/** EJSON-canonical → plain JSON-cloneable (safe to send over IPC). */
-function serialize(value: unknown): unknown {
-  return JSON.parse(EJSON.stringify(value, { relaxed: false }))
-}
-
 interface Explainable {
   explain(verbosity: string): Promise<unknown>
 }
@@ -143,7 +139,12 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
     if (req.explain) {
       if (isExplainable(result)) {
         const plan = await result.explain('executionStats')
-        return { kind: 'explain', data: serialize(plan), collection, elapsedMs: Date.now() - started }
+        return {
+          kind: 'explain',
+          data: await serializerPool.serializeOne(plan),
+          collection,
+          elapsedMs: Date.now() - started
+        }
       }
       return {
         kind: 'error',
@@ -160,7 +161,7 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
       const { docs, truncated } = await drainCursor(result, limit)
       return {
         kind: 'documents',
-        data: docs.map((d) => serialize(d)),
+        data: await serializerPool.serialize(docs),
         count: docs.length,
         truncated,
         collection,
@@ -171,7 +172,7 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
     if (Array.isArray(result)) {
       return {
         kind: 'documents',
-        data: result.map((d) => serialize(d)),
+        data: await serializerPool.serialize(result),
         count: result.length,
         truncated: false,
         collection,
@@ -180,10 +181,15 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
     }
 
     if (result && typeof result === 'object' && 'acknowledged' in result) {
-      return { kind: 'ack', data: serialize(result), collection, elapsedMs }
+      return { kind: 'ack', data: await serializerPool.serializeOne(result), collection, elapsedMs }
     }
 
-    return { kind: 'value', data: serialize(result ?? null), collection, elapsedMs }
+    return {
+      kind: 'value',
+      data: await serializerPool.serializeOne(result ?? null),
+      collection,
+      elapsedMs
+    }
   } catch (err) {
     return {
       kind: 'error',

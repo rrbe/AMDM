@@ -91,4 +91,7 @@
   导入导出(JSON/CSV/XLSX 原生 + BSON 包裹官方 mongodump/mongorestore,见 ADR-0005)。
   入口:目录树集合节点 hover 的 Export/Import 按钮 → 弹窗选格式/过滤/limit。
   (连接颜色已改为每连接直选,Group 概念移除,见 CONTEXT.md。)
-  遗留待办:补全的字段采样/序列化挪到 Worker;官方工具的按需下载;BSON 导入的目标命名空间重映射;表格内联单元格编辑。
+
+- **性能加固** ✅ 已完成
+  序列化(BSON→EJSON 编码)与 schema 字段采样提取已挪到主进程的 **worker_thread 序列化池**(`src/main/workers/`),不再堵主进程事件循环(ADR-0004 第 3、4 条)。主线程只做很快的二进制 `BSON.serialize`,重活在 worker 里;worker 起不来或崩溃时自动**内联降级**,保证不影响功能。退出时随会话清理。
+  遗留待办:官方工具(mongodump/mongorestore)的按需下载;BSON 导入的目标命名空间重映射;表格内联单元格编辑;连接配置导出/备份;保存查询的文件夹/两级组织 UI。

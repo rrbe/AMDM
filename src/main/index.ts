@@ -4,6 +4,7 @@ import { connectionStore } from './store/connectionStore'
 import { queryStore } from './store/queryStore'
 import { settingsStore } from './store/settingsStore'
 import { sessionManager } from './mongo/sessionManager'
+import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
 
 function createWindow(): void {
@@ -72,7 +73,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-// Clean up all clients + SSH tunnels on quit (ADR-0004: no zombie processes).
+// Clean up all clients + SSH tunnels + the serializer worker on quit
+// (ADR-0004: no zombie processes / threads).
 app.on('will-quit', () => {
   void sessionManager.closeAll()
+  serializerPool.dispose()
 })
