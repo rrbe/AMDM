@@ -338,13 +338,6 @@ label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.color-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-
 .conn-item {
   display: flex;
   align-items: center;
@@ -386,30 +379,54 @@ label {
   display: flex;
 }
 
-.state-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+/* Connection status icon (replaces the old state + color dots) */
+.conn-status {
+  width: 16px;
   flex: 0 0 auto;
-  background: var(--fg-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.state-dot.connecting {
-  background: var(--warn);
-  animation: pulse 1s infinite;
+.conn-status .ok {
+  color: var(--ok);
 }
-.state-dot.connected {
-  background: var(--ok);
+.conn-status .err {
+  color: var(--err);
 }
-.state-dot.error {
-  background: var(--err);
+
+/* Quiet delete: muted by default, danger-red only on hover */
+.conn-row-actions button.danger {
+  color: var(--fg-3);
 }
-.state-dot.disconnected {
-  background: var(--fg-3);
+.conn-row-actions button.danger:hover:not(:disabled) {
+  color: var(--err);
 }
-@keyframes pulse {
-  50% {
-    opacity: 0.35;
+
+/* Expand chevron — rotates 90° when the node is open */
+.twisty-icon {
+  color: var(--fg-3);
+  transition: transform 0.12s ease;
+}
+.twisty-icon.open {
+  transform: rotate(90deg);
+}
+
+/* Spinning loader (connecting / lazy-loading rows) */
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
+}
+
+/* lucide glyphs sit as blocks inside icon slots + action buttons */
+.tree-twisty svg,
+.tree-icon svg,
+.conn-status svg,
+.conn-row-actions button svg {
+  display: block;
 }
 
 /* --------------------------------------------------------------- catalog tree */
@@ -428,11 +445,12 @@ label {
   background: var(--bg-2);
 }
 .tree-twisty {
-  width: 12px;
+  width: 16px;
   flex: 0 0 auto;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--fg-2);
-  font-size: 9px;
 }
 .tree-icon {
   flex: 0 0 auto;
@@ -1284,16 +1302,53 @@ label {
 
 /* ============================================================ Phase 3 styles */
 
-/* ---- Catalog collection hover actions (Export / Import) ---- */
-.tree-row-actions {
-  display: none;
-  gap: 2px;
-  margin-left: auto;
-  padding-left: 8px;
-  flex: 0 0 auto;
+/* ---- Right-click context menu (catalog collection actions) ---- */
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
 }
-.tree-node:hover .tree-row-actions {
-  display: inline-flex;
+.ctx-menu {
+  position: fixed;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--fg-1);
+  font-size: var(--fs);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.ctx-item:hover {
+  background: var(--bg-3);
+}
+.ctx-item.danger {
+  color: var(--err);
+}
+.ctx-icon {
+  display: flex;
+  align-items: center;
+  color: var(--fg-3);
+}
+.ctx-item:hover .ctx-icon {
+  color: inherit;
+}
+.ctx-item svg {
+  display: block;
 }
 
 /* ---- Import/Export modals (ExportModal / ImportModal) ---- */
@@ -1465,21 +1520,12 @@ button:focus-visible {
   color: var(--fg-2);
 }
 
-/* ---- Connection rows: status-dot glow + active accent outline ---- */
+/* ---- Connection rows: active accent outline ---- */
 .conn-item {
   border-radius: var(--radius-sm);
 }
 .conn-item.active {
   box-shadow: inset 0 0 0 1px var(--accent-soft-strong);
-}
-.state-dot.connected {
-  box-shadow: 0 0 0 3px var(--halo-ok);
-}
-.state-dot.connecting {
-  box-shadow: 0 0 0 3px var(--halo-warn);
-}
-.state-dot.error {
-  box-shadow: 0 0 0 3px var(--halo-err);
 }
 
 /* ---- Catalog tree rows ---- */

@@ -26,6 +26,7 @@
     "@uiw/react-codemirror": "^4.23.6",
     "bson": "^6.9.0",
     "exceljs": "^4.4.0",
+    "lucide-react": "^1.17.0",
     "mongodb": "^6.10.0",
     "ssh2": "^1.16.0"
   },

@@ -1,4 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
+import {
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Database,
+  Download,
+  Eye,
+  Key,
+  KeyRound,
+  Loader2,
+  Pencil,
+  Plug,
+  Table2,
+  Trash2,
+  Unplug,
+  Upload,
+  User as UserIcon,
+  Users as UsersIcon,
+  XCircle
+} from 'lucide-react'
 import type { CollectionSort, ConnectionConfig, ConnectionState } from '@shared/types'
 import {
   useAppStore,
@@ -8,8 +28,33 @@ import {
 } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
+import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
+
+/** Maps a catalog row's semantic icon key to a lucide glyph. */
+function TreeIcon({ name }: { name: string }): JSX.Element | null {
+  switch (name) {
+    case 'database':
+      return <Database size={15} />
+    case 'users':
+      return <UsersIcon size={15} />
+    case 'user':
+      return <UserIcon size={14} />
+    case 'collection':
+      return <Table2 size={15} />
+    case 'view':
+      return <Eye size={15} />
+    case 'timeseries':
+      return <Clock size={15} />
+    case 'indexes':
+      return <KeyRound size={15} />
+    case 'index':
+      return <Key size={13} />
+    default:
+      return null
+  }
+}
 
 /**
  * Unified left panel: a single tree that merges connections and their catalogs.
@@ -89,6 +134,36 @@ export function Explorer(): JSX.Element {
     open: false
   })
   const [ioModal, setIoModal] = useState<IoModal>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(
+    null
+  )
+
+  // Right-click a collection → Export / Import live here (not as hover buttons).
+  const openCollMenu = (
+    e: MouseEvent,
+    coll: { db: string; name: string },
+    connId: string
+  ): void => {
+    e.preventDefault()
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Export collection…',
+          icon: <Download size={14} />,
+          onClick: () =>
+            setIoModal({ mode: 'export', connId, db: coll.db, collection: coll.name })
+        },
+        {
+          label: 'Import into collection…',
+          icon: <Upload size={14} />,
+          onClick: () =>
+            setIoModal({ mode: 'import', connId, db: coll.db, collection: coll.name })
+        }
+      ]
+    })
+  }
 
   // Build the flat visible-row list. Connections sit at depth 0; each connected
   // + expanded connection contributes its database subtree starting at depth 1.
@@ -175,7 +250,7 @@ export function Explorer(): JSX.Element {
               }}
             />
           ) : (
-            <CatalogRow key={row.id} row={row} onOpenIo={setIoModal} />
+            <CatalogRow key={row.id} row={row} onContextMenu={openCollMenu} />
           )
         )}
       </div>
@@ -216,6 +291,14 @@ export function Explorer(): JSX.Element {
           database={ioModal.db}
           collection={ioModal.collection}
           onClose={() => setIoModal(null)}
+        />
+      )}
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={ctxMenu.items}
+          onClose={() => setCtxMenu(null)}
         />
       )}
     </div>
@@ -262,10 +345,19 @@ function ConnectionRow({
           }
         }}
       >
-        {expandable ? (expanded ? '▾' : '▸') : ''}
+        {expandable ? (
+          <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} />
+        ) : null}
       </span>
-      <span className={`state-dot ${state}`} />
-      {conn.color && <span className="color-dot" style={{ background: conn.color }} />}
+      <span className="conn-status">
+        {state === 'connected' ? (
+          <CheckCircle2 size={15} className="ok" />
+        ) : state === 'error' ? (
+          <XCircle size={15} className="err" />
+        ) : state === 'connecting' ? (
+          <Loader2 size={15} className="spin" />
+        ) : null}
+      </span>
       <div className="conn-text">
         <div className="conn-name">{conn.name}</div>
         <div className="conn-sub">{sub}</div>
@@ -280,7 +372,7 @@ function ConnectionRow({
               onDisconnect()
             }}
           >
-            ⏏
+            <Unplug size={14} />
           </button>
         ) : (
           <button
@@ -291,7 +383,7 @@ function ConnectionRow({
               onConnect()
             }}
           >
-            ▶
+            <Plug size={14} />
           </button>
         )}
         <button
@@ -302,7 +394,7 @@ function ConnectionRow({
             onEdit()
           }}
         >
-          ✎
+          <Pencil size={14} />
         </button>
         <button
           className="ghost danger"
@@ -312,7 +404,7 @@ function ConnectionRow({
             onDelete()
           }}
         >
-          ✕
+          <Trash2 size={14} />
         </button>
       </div>
     </div>
@@ -321,10 +413,10 @@ function ConnectionRow({
 
 function CatalogRow({
   row,
-  onOpenIo
+  onContextMenu
 }: {
   row: TreeRow
-  onOpenIo: (m: IoModal) => void
+  onContextMenu: (e: MouseEvent, coll: { db: string; name: string }, connId: string) => void
 }): JSX.Element {
   const coll = row.collection
   return (
@@ -332,6 +424,7 @@ function CatalogRow({
       className="tree-node"
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
+      onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
       title={row.label}
     >
       <span
@@ -343,34 +436,20 @@ function CatalogRow({
           }
         }}
       >
-        {row.expandable ? (row.expanded ? '▾' : '▸') : ''}
+        {row.expandable ? (
+          <ChevronRight size={14} className={row.expanded ? 'twisty-icon open' : 'twisty-icon'} />
+        ) : null}
       </span>
-      <span className="tree-icon">{row.icon}</span>
+      {row.icon !== '' && (
+        <span className="tree-icon">
+          <TreeIcon name={row.icon} />
+        </span>
+      )}
       <span className="tree-label">{row.label}</span>
       {typeof row.count === 'number' && <span className="tree-count">{row.count}</span>}
-      {row.loading && <span className="tree-spinner">…</span>}
-      {coll && (
-        <span className="tree-row-actions">
-          <button
-            className="row-act"
-            title="Export collection"
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenIo({ mode: 'export', connId: row.connId, db: coll.db, collection: coll.name })
-            }}
-          >
-            ⤓
-          </button>
-          <button
-            className="row-act"
-            title="Import into collection"
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenIo({ mode: 'import', connId: row.connId, db: coll.db, collection: coll.name })
-            }}
-          >
-            ⤒
-          </button>
+      {row.loading && (
+        <span className="tree-spinner">
+          <Loader2 size={12} className="spin" />
         </span>
       )}
     </div>
@@ -414,7 +493,7 @@ function flattenCatalog(
       connId,
       depth: 1,
       label: db.name,
-      icon: '🗄',
+      icon: 'database',
       kind: 'database',
       expandable: true,
       expanded: dbExpanded,
@@ -435,7 +514,7 @@ function flattenCatalog(
       connId,
       depth: 2,
       label: 'Users',
-      icon: '👤',
+      icon: 'users',
       kind: 'users',
       expandable: true,
       expanded: usersExpanded,
@@ -452,7 +531,7 @@ function flattenCatalog(
           connId,
           depth: 3,
           label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || 'no roles'})`,
-          icon: '·',
+          icon: 'user',
           kind: 'leaf',
           expandable: false,
           expanded: false,
@@ -477,7 +556,8 @@ function flattenCatalog(
         connId,
         depth: 2,
         label: coll.name,
-        icon: coll.type === 'view' ? '👁' : coll.type === 'timeseries' ? '⏱' : '▦',
+        icon:
+          coll.type === 'view' ? 'view' : coll.type === 'timeseries' ? 'timeseries' : 'collection',
         kind: 'collection',
         expandable: true,
         expanded: collExpanded,
@@ -503,7 +583,7 @@ function flattenCatalog(
         connId,
         depth: 3,
         label: 'Indexes',
-        icon: '🔑',
+        icon: 'indexes',
         kind: 'indexes',
         expandable: true,
         expanded: idxExpanded,
@@ -525,7 +605,7 @@ function flattenCatalog(
             connId,
             depth: 4,
             label: `${ix.name} { ${keySpec} }${ix.unique ? ' · unique' : ''}`,
-            icon: '·',
+            icon: 'index',
             kind: 'leaf',
             expandable: false,
             expanded: false,
