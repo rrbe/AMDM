@@ -699,6 +699,19 @@ label {
 .tree-node:hover {
   background: var(--bg-2);
 }
+/* Empty database (sharded-empty, or authorized but not yet created): muted
+   label + dashed icon outline, mirroring Compass's dashed database marker.
+   lucide glyphs are stroke-based, so stroke-dasharray draws the dashes. */
+.tree-node--empty {
+  color: var(--fg-3);
+}
+.tree-node--empty .tree-icon {
+  opacity: 1;
+}
+.tree-node--empty .tree-icon svg {
+  stroke-dasharray: 2 1.6;
+  color: var(--fg-3);
+}
 .tree-twisty {
   width: 16px;
   flex: 0 0 auto;

@@ -86,6 +86,9 @@ interface TreeRow {
   expandable: boolean
   expanded: boolean
   loading: boolean
+  /** Database has no data (sharded-empty or authorized-but-uncreated) — drawn
+      dashed/muted, mirroring Compass. */
+  empty?: boolean
   count?: number
   /** Present on collection rows: enables the Export/Import hover actions. */
   collection?: { db: string; name: string }
@@ -442,11 +445,11 @@ function CatalogRow({
   const coll = row.collection
   return (
     <div
-      className="tree-node"
+      className={row.empty ? 'tree-node tree-node--empty' : 'tree-node'}
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
       onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
-      title={row.label}
+      title={row.empty ? `${row.label} — empty (no collections yet)` : row.label}
     >
       <span
         className="tree-twisty"
@@ -516,6 +519,7 @@ function flattenCatalog(
       label: db.name,
       icon: 'database',
       kind: 'database',
+      empty: db.empty === true,
       expandable: true,
       expanded: dbExpanded,
       loading: cat.loading.has(dbNodeId),

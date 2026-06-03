@@ -1,4 +1,5 @@
 import { EJSON } from 'bson'
+import type { MongoClient } from 'mongodb'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import { sessionManager } from './sessionManager'
 import { serializerPool } from '../workers/serializerPool'
@@ -41,12 +42,55 @@ export async function listDatabases(connectionId: string): Promise<DatabaseInfo[
   return guardClosed(async () => {
     const client = sessionManager.getClient(connectionId)
     const res = await client.db('admin').admin().listDatabases()
-    return res.databases.map((d) => ({
-      name: d.name,
-      sizeOnDisk: typeof d.sizeOnDisk === 'number' ? d.sizeOnDisk : undefined,
-      empty: d.empty
-    }))
+    const byName = new Map<string, DatabaseInfo>()
+    for (const d of res.databases) {
+      byName.set(d.name, {
+        name: d.name,
+        sizeOnDisk: typeof d.sizeOnDisk === 'number' ? d.sizeOnDisk : undefined,
+        empty: d.empty
+      })
+    }
+    // Compass parity: a database the user is authorized on but that holds no
+    // data yet is NOT returned by listDatabases. Surface those too (as empty),
+    // derived from the authenticated user's privileges, so the tree matches
+    // what Compass shows (dashed/empty databases).
+    for (const name of await authorizedDatabaseNames(client)) {
+      if (!byName.has(name)) byName.set(name, { name, empty: true })
+    }
+    return [...byName.values()]
   }, [])
+}
+
+/**
+ * Database names the current user is explicitly authorized on, taken from the
+ * privileges that `connectionStatus` reports (each privilege's `resource.db`).
+ * `showPrivileges: true` flattens every granted role into concrete privileges,
+ * so a `readWrite@somedb` grant surfaces `somedb` even when it has no data.
+ * Cluster-wide privileges (`resource.db === ''`) are skipped — they target "any
+ * database", not a specific one. Never throws: a probe failure (e.g. a user
+ * without permission to read its own status) just yields no extra databases.
+ */
+async function authorizedDatabaseNames(client: MongoClient): Promise<string[]> {
+  try {
+    const status = (await client
+      .db('admin')
+      .command({ connectionStatus: 1, showPrivileges: true })) as ConnectionStatus
+    const privileges = status.authInfo?.authenticatedUserPrivileges ?? []
+    const names = new Set<string>()
+    for (const p of privileges) {
+      const db = p.resource?.db
+      if (typeof db === 'string' && db !== '') names.add(db)
+    }
+    return [...names]
+  } catch {
+    return []
+  }
+}
+
+interface ConnectionStatus {
+  authInfo?: {
+    authenticatedUserPrivileges?: { resource?: { db?: string } }[]
+  }
 }
 
 export async function listCollections(
