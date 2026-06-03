@@ -19,6 +19,9 @@
   --radius-sm: 4px;
   --radius-lg: 9px;
   --row-h: 24px;
+  /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
+  --sidebar-width: 300px;
+  --editor-height: 160px;
   --font-ui: 'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'Source Code Pro', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
   --fs: 12px;
@@ -246,6 +249,45 @@ label {
   flex: 0 0 auto;
 }
 
+/* ---- Drag-to-resize dividers ----
+   A wide invisible grab strip that overlaps the panel's hairline border via
+   negative margins (so it adds no layout width/height). On hover/drag a 1px
+   accent line lights up. Not part of the macOS window-drag region. */
+.resize-handle {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 5;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+.resize-handle--col {
+  width: 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+}
+.resize-handle--row {
+  height: 7px;
+  margin: -3px 0;
+  cursor: row-resize;
+}
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.resize-handle--col::before {
+  inset: 0 3px; /* 1px-wide centered vertical line */
+}
+.resize-handle--row::before {
+  inset: 3px 0; /* 1px-tall centered horizontal line */
+}
+.resize-handle:hover::before,
+.resize-handle.dragging::before {
+  opacity: 0.6;
+}
+
 /* ---- Window drag (macOS frameless titleBarStyle: hiddenInset) ----
    Header strips act as the window's drag handle; interactive children opt
    back out so clicks still register. Scoped to macOS — other platforms keep
@@ -274,8 +316,11 @@ label {
 
 /* ----------------------------------------------------------------- explorer */
 .explorer {
-  width: 300px;
-  min-width: 220px;
+  width: var(--sidebar-width, 300px);
+  min-width: 200px;
+  /* Always leave the work area ≥480px even on small windows / huge persisted
+     widths — the CSS net mirrors the JS drag clamp in App.tsx. */
+  max-width: calc(100vw - 480px);
   flex: 0 0 auto;
   background: var(--bg-1);
   border-right: 1px solid var(--border);
@@ -695,7 +740,10 @@ label {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
+  /* Fixed 38px to match .explorer-header / .work-titlebar so the two header
+     bottom-borders line up; controls vertical-center via align-items. */
+  height: 38px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-1);
   flex: 0 0 auto;
@@ -714,12 +762,23 @@ label {
 
 .editor-wrap {
   flex: 0 0 auto;
+  height: var(--editor-height, 160px);
   border-bottom: 1px solid var(--border);
   position: relative;
-  min-height: 120px;
-  max-height: 45%;
+  min-height: 80px;
+  /* Keep the result panel usable; mirrors the JS drag clamp in ShellWorkspace. */
+  max-height: calc(100vh - 300px);
   overflow: hidden;
   background: var(--bg-0);
+}
+/* CodeMirror (height="100%") fills the resizable wrap and scrolls internally.
+   The react-codemirror container div is auto-height by default, so 100% would
+   otherwise resolve against shrink-wrapped content — pin the whole chain. */
+.editor-wrap > * {
+  height: 100%;
+}
+.editor-wrap .cm-editor {
+  height: 100%;
 }
 .editor-loading {
   padding: 14px;

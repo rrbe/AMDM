@@ -3,6 +3,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { Explorer } from '@renderer/components/explorer/Explorer'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
 import { ErrorToast } from '@renderer/components/common/ErrorToast'
+import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 
 /**
  * Top-level 2-pane layout:
@@ -14,6 +15,8 @@ export default function App(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const statuses = useAppStore((s) => s.statuses)
   const theme = useAppStore((s) => s.settings.theme)
+  const sidebarWidth = useAppStore((s) => s.settings.sidebarWidth)
+  const updateSettings = useAppStore((s) => s.updateSettings)
 
   useEffect(() => {
     void bootstrap()
@@ -40,6 +43,17 @@ export default function App(): JSX.Element {
   return (
     <div className="app">
       <Explorer />
+      <ResizeHandle
+        axis="x"
+        cssVar="--sidebar-width"
+        className="resize-handle--col"
+        value={sidebarWidth}
+        min={200}
+        // Always leave the work area at least ~480px; mirrors the CSS calc cap.
+        getMax={() => Math.max(200, window.innerWidth - 480)}
+        onCommit={(px) => void updateSettings({ sidebarWidth: px })}
+        ariaLabel="Resize sidebar"
+      />
       {activeConnected ? <ShellWorkspace /> : <WorkspaceEmptyState />}
       <ErrorToast />
     </div>

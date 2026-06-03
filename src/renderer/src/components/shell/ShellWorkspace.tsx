@@ -3,6 +3,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { ShellEditor } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
+import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 
 /**
  * The main work area: header (active connection + db selector + Run), the lazy
@@ -20,6 +21,8 @@ export function ShellWorkspace(): JSX.Element {
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const runShell = useAppStore((s) => s.runShell)
   const runExplain = useAppStore((s) => s.runExplain)
+  const editorHeight = useAppStore((s) => s.settings.editorHeight)
+  const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [showSave, setShowSave] = useState(false)
 
@@ -75,6 +78,18 @@ export function ShellWorkspace(): JSX.Element {
         onExplain={() => void runExplain()}
         onFormat={() => void formatCode()}
         busy={busy}
+      />
+
+      <ResizeHandle
+        axis="y"
+        cssVar="--editor-height"
+        className="resize-handle--row"
+        value={editorHeight}
+        min={80}
+        // Keep the result panel usable (≥~180px); mirrors the CSS calc cap.
+        getMax={() => Math.max(80, window.innerHeight - 300)}
+        onCommit={(px) => void updateSettings({ editorHeight: px })}
+        ariaLabel="Resize editor"
       />
 
       <ResultPanel />

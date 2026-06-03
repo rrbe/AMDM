@@ -100,7 +100,7 @@ export function ShellEditor({
       <Suspense fallback={<div className="editor-loading">Loading editor…</div>}>
         <CodeMirror
           value={value}
-          height="160px"
+          height="100%"
           theme={isDark ? pineDark : pineLight}
           extensions={extensions}
           indentWithTab={false}

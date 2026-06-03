@@ -303,9 +303,15 @@ export interface AppSettings {
   collectionSort: CollectionSort
   /** 'system' = follow OS (default); 'light' = Pine; 'dark' = Pine Night. */
   theme: ThemeMode
+  /** Explorer sidebar width in px (drag-resizable; clamped at the UI). */
+  sidebarWidth: number
+  /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
+  editorHeight: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   collectionSort: 'natural',
-  theme: 'system'
+  theme: 'system',
+  sidebarWidth: 300,
+  editorHeight: 160
 }
