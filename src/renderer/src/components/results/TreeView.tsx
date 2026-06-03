@@ -69,7 +69,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   // Inline edit: which leaf node is being edited, and whether the last commit
   // failed validation (red border).
   const [editing, setEditing] = useState<{ id: string } | null>(null)
-  const [editError, setEditError] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   // Expanded paths. Top-level docs start collapsed except the first (for
   // context); nested containers always start collapsed.
   const [expanded, setExpanded] = useState<Set<string>>(() =>
@@ -171,7 +171,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     docHasId(rootDocOf(node))
 
   const startEdit = (node: FlatNode): void => {
-    setEditError(false)
+    setEditError(null)
     setEditing({ id: node.id })
   }
 
@@ -180,7 +180,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     if (!docCtx || !docHasId(rootDoc)) return
     const coerced = coerceEdit(node.value, text)
     if ('error' in coerced) {
-      setEditError(true)
+      setEditError(coerced.error)
       return
     }
     const res = await setDocumentField({
@@ -193,9 +193,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     })
     if (res.ok) {
       setEditing(null)
-      setEditError(false)
+      setEditError(null)
     } else {
-      setEditError(true)
+      setEditError(res.error ?? '保存失败')
     }
   }
 
@@ -273,11 +273,11 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
                 {isEditing ? (
                   <CellInput
                     initial={editableText(node.value) ?? ''}
-                    invalid={editError}
+                    error={editError}
                     onCommit={(text) => void commitEdit(node, text)}
                     onCancel={() => {
                       setEditing(null)
-                      setEditError(false)
+                      setEditError(null)
                     }}
                   />
                 ) : (

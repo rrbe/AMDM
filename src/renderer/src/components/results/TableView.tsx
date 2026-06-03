@@ -56,7 +56,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const [editIndex, setEditIndex] = useState<number | null>(null)
   // Inline edit: which cell, and whether the last commit failed validation.
   const [editing, setEditing] = useState<{ row: number; col: string } | null>(null)
-  const [editError, setEditError] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   // Per-column widths (column name → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
@@ -140,7 +140,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     return present && editableText(value) != null
   }
   const startEditCell = (row: number, col: string): void => {
-    setEditError(false)
+    setEditError(null)
     setEditing({ row, col })
   }
   const commitCell = async (row: number, col: string, text: string): Promise<void> => {
@@ -150,7 +150,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     if (!present) return
     const coerced = coerceEdit(value, text)
     if ('error' in coerced) {
-      setEditError(true)
+      setEditError(coerced.error)
       return
     }
     const res = await setDocumentField({
@@ -163,9 +163,9 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     })
     if (res.ok) {
       setEditing(null)
-      setEditError(false)
+      setEditError(null)
     } else {
-      setEditError(true)
+      setEditError(res.error ?? '保存失败')
     }
   }
 
@@ -247,13 +247,13 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                   width={widthOf(col)}
                   selected={selectedCell?.row === vi.index && selectedCell?.col === col}
                   editing={editing?.row === vi.index && editing?.col === col}
-                  editInvalid={editError}
+                  editError={editError}
                   onClick={() => selectCell(vi.index, col)}
                   onDoubleClick={() => canEditCell(vi.index, col) && startEditCell(vi.index, col)}
                   onCommit={(text) => void commitCell(vi.index, col, text)}
                   onCancel={() => {
                     setEditing(null)
-                    setEditError(false)
+                    setEditError(null)
                   }}
                   onContextMenu={(e) => openMenu(e, vi.index, col)}
                 />
@@ -310,7 +310,7 @@ function Cell({
   width,
   selected,
   editing,
-  editInvalid,
+  editError,
   onClick,
   onDoubleClick,
   onCommit,
@@ -322,7 +322,7 @@ function Cell({
   width: number
   selected: boolean
   editing: boolean
-  editInvalid: boolean
+  editError: string | null
   onClick: () => void
   onDoubleClick: () => void
   onCommit: (text: string) => void
@@ -337,7 +337,7 @@ function Cell({
       <div className={cellCls} style={{ width }}>
         <CellInput
           initial={editableText(value) ?? ''}
-          invalid={editInvalid}
+          error={editError}
           onCommit={onCommit}
           onCancel={onCancel}
         />
