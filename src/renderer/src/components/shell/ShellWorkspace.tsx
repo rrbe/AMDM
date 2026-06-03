@@ -74,6 +74,7 @@ export function ShellWorkspace(): JSX.Element {
         value={code}
         onChange={setCode}
         onRun={() => void runShell()}
+        onRunStatement={(c) => void runShell(c)}
         onSave={() => setShowSave(true)}
         onExplain={() => void runExplain()}
         onFormat={() => void formatCode()}

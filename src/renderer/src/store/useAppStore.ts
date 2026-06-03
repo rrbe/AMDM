@@ -130,7 +130,9 @@ interface AppState {
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
   insertSnippet(db: string, coll: string): void
-  runShell(): Promise<void>
+  /** Run the editor's script, or `codeOverride` when given (e.g. the current
+      statement / selection from the right-click menu). */
+  runShell(codeOverride?: string): Promise<void>
   runExplain(): Promise<void>
   refreshResult(): Promise<void>
   clearError(): void
@@ -488,8 +490,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ activeDatabase: db, code: `db.${coll}.find({})` })
   },
 
-  async runShell() {
-    const { activeConnectionId, activeDatabase, code } = get()
+  async runShell(codeOverride) {
+    const { activeConnectionId, activeDatabase, code: editorCode } = get()
+    const code = codeOverride ?? editorCode
     if (!activeConnectionId) {
       set({ lastError: 'No active connection.' })
       return
