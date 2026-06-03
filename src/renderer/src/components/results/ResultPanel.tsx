@@ -122,10 +122,7 @@ export function ResultPanel(): JSX.Element {
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            {
-              label: '复制全部 (Plain JSON)',
-              onClick: () => void copyText(toPlainJson(docs), `已复制全部 ${docs.length} 文档`)
-            },
+            { label: '复制全部 (Plain JSON)', onClick: () => void copyText(toPlainJson(docs)) },
             { label: '复制全部 (Shell 风格)', onClick: () => void copyText(toShellText(docs)) },
             { label: '复制全部 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(docs)) }
           ]}

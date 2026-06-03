@@ -64,19 +64,14 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  useCopyHotkey(() =>
-    allSelected ? { text: toPlainJson(docs), notice: `已复制全部 ${docs.length} 文档` } : null
-  )
+  useCopyHotkey(() => (allSelected ? toPlainJson(docs) : null))
 
   const openMenu = (e: MouseEvent): void => {
     e.preventDefault()
     const sel = window.getSelection()
     const selText = sel && !sel.isCollapsed ? sel.toString() : ''
     const items: ContextMenuItem[] = [
-      {
-        label: '复制全部 (Plain JSON)',
-        onClick: () => void copyText(toPlainJson(docs), `已复制全部 ${docs.length} 文档`)
-      },
+      { label: '复制全部 (Plain JSON)', onClick: () => void copyText(toPlainJson(docs)) },
       { label: '复制全部 (Shell 风格)', onClick: () => void copyText(toShellText(docs)) },
       { label: '复制全部 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(docs)) }
     ]
@@ -90,11 +85,6 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
 
   return (
     <div className="json-view-wrap">
-      {allSelected && (
-        <div className="json-allsel-hint">
-          已全选 · ⌘/Ctrl+C 复制全部（{docs.length} 文档，Plain JSON）
-        </div>
-      )}
       <div
         ref={parentRef}
         className={`virtual-scroller json-body${allSelected ? ' all-selected' : ''}`}

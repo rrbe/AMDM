@@ -3,7 +3,6 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { Explorer } from '@renderer/components/explorer/Explorer'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
 import { ErrorToast } from '@renderer/components/common/ErrorToast'
-import { NoticeToast } from '@renderer/components/common/NoticeToast'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 
 /**
@@ -57,7 +56,6 @@ export default function App(): JSX.Element {
       />
       {activeConnected ? <ShellWorkspace /> : <WorkspaceEmptyState />}
       <ErrorToast />
-      <NoticeToast />
     </div>
   )
 }

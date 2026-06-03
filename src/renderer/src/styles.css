@@ -1186,26 +1186,8 @@ label {
   min-height: 0;
   height: auto;
 }
-.json-allsel-hint {
-  flex: 0 0 auto;
-  padding: 2px 10px;
-  font-size: var(--fs-sm);
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-bottom: 1px solid var(--border);
-}
 .json-body.all-selected .json-line {
   background: var(--accent-soft);
-}
-
-/* Success toast variant (copy confirmations) — centered along the bottom so it
-   never overlaps the bottom-right error toast. */
-.toast--ok {
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-elevated);
-  border-color: var(--ok);
 }
 
 /* ------------------------------------------------------------- empty state */

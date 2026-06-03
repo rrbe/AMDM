@@ -99,8 +99,6 @@ interface AppState {
   // ---- ui ----
   initializing: boolean
   lastError: string | null
-  /** Transient success/confirmation toast (e.g. "已复制"); auto-clears. */
-  notice: string | null
 
   // ---- actions: bootstrap ----
   bootstrap(): Promise<void>
@@ -135,8 +133,6 @@ interface AppState {
   runExplain(): Promise<void>
   refreshResult(): Promise<void>
   clearError(): void
-  /** Show a transient confirmation toast (auto-clears after a short delay). */
-  flashNotice(message: string): void
 
   // ---- actions: saved queries + history (Phase 2) ----
   loadQueries(): Promise<void>
@@ -183,10 +179,6 @@ function errMessage(e: unknown): string {
   return 'Unknown error'
 }
 
-/** Pending auto-clear timer for `notice` (module-level so `flashNotice` can
-    debounce rapid copies without holding it in state). */
-let noticeTimer: ReturnType<typeof setTimeout> | null = null
-
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -212,7 +204,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   initializing: true,
   lastError: null,
-  notice: null,
 
   // --------------------------------------------------------------------- boot
   async bootstrap() {
@@ -557,15 +548,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearError() {
     set({ lastError: null })
-  },
-
-  flashNotice(message) {
-    if (noticeTimer) clearTimeout(noticeTimer)
-    set({ notice: message })
-    noticeTimer = setTimeout(() => {
-      noticeTimer = null
-      set({ notice: null })
-    }, 1400)
   },
 
   // ----------------------------------------------------- saved queries + history

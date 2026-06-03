@@ -125,13 +125,12 @@ export function plainScalarText(value: unknown): string {
 }
 
 /**
- * Write `text` to the clipboard and flash a confirmation toast. Failures (e.g.
- * clipboard permission denied) surface via `lastError` rather than throwing.
+ * Write `text` to the clipboard, silently on success. Only failures (e.g.
+ * clipboard permission denied) surface — via `lastError` — rather than throwing.
  */
-export async function copyText(text: string, noticeMsg = '已复制'): Promise<void> {
+export async function copyText(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text)
-    useAppStore.getState().flashNotice(noticeMsg)
   } catch {
     useAppStore.setState({ lastError: '复制失败：剪贴板不可用' })
   }
