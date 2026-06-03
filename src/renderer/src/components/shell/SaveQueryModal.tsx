@@ -4,6 +4,7 @@
  */
 import { useState } from 'react'
 import { Modal } from '@renderer/components/common/Modal'
+import { BusyButton } from '@renderer/components/common/BusyButton'
 import { useAppStore } from '@renderer/store/useAppStore'
 
 interface SaveQueryModalProps {
@@ -43,9 +44,9 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
         <>
           <span className="spacer" />
           <button onClick={onClose}>Cancel</button>
-          <button className="primary" disabled={!canSave} onClick={() => void onSave()}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <BusyButton className="primary" busy={saving} disabled={!canSave} onClick={() => void onSave()}>
+            Save
+          </BusyButton>
         </>
       }
     >

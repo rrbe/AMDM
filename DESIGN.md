@@ -143,6 +143,7 @@ Shadows use a navy-tinted rgba in light and deep black in dark. Most surfaces ar
 - **`.btn`** — neutral: `--bg-elevated` + `--border-strong`, hover lifts to `--bg-hover`.
 - **`.btn.ghost`** — transparent until hover. Toolbar actions (Save, Explain, Library).
 - **`.icon-btn`** — square 26–30px hit area, transparent → `--bg-hover`. Add `.danger` for destructive (red on hover).
+- **Stable width across states.** A button's label is fixed — it must **not** change between idle and in-flight (no `Run → Running…`, `Save → Saving…`). A text swap changes the button's width, which nudges neighbours and reads as a flicker. Show progress with a *state*, not new text: the `BusyButton` component (`common/BusyButton.tsx`) keeps the label in flow but invisible and overlays a centered spinner (`.busy-btn` + `.busy-btn-spinner`, `currentColor` so it adapts per variant), auto-disabling while busy. Use it for any action that runs async (Run, Save, Test connection, Import/Export, edit-doc Save). A genuine *semantic* change after completion (e.g. Cancel → Close once an import succeeds) is fine — that's a one-time meaning change, not transient click feedback.
 
 ### Connection rows & tree
 - Active connection / selected collection: `--bg-active` fill + a **3px accent left bar** (`box-shadow: inset 3px 0 0 var(--accent)` for tree nodes; `.accent-rail` element for connection rows, tinted with the connection's own color).
@@ -177,6 +178,7 @@ Shadows use a navy-tinted rgba in light and deep black in dark. Most surfaces ar
 - **Accent is structural, not decorative.** It marks the primary action and the current selection. Avoid accent-colored text runs, gradients, or large accent fills.
 - **Clean, never warm.** If a neutral looks beige or yellow, it's wrong — keep surfaces pure-white (light) / LeafyGreen-navy (dark). Content lives on the brightest plane.
 - **Compact first.** Default to dense layouts; `comfy` is the opt-in.
+- **No layout shift from feedback.** Controls keep their size while acting — never communicate a click/in-flight/hover state by changing text, font-weight, or padding that resizes the element. Use color, a spinner overlay, or disabled state instead. (Buttons: use `BusyButton`.)
 - **No emoji, no gradients-as-decoration, no rounded "card with left accent bar" tropes.**
 - **Light-first.** Design and verify in light, then confirm dark via the toggle. (Dark mode is correct in-app even though the screenshot tool renders the `data-theme` cascade unreliably.)
 

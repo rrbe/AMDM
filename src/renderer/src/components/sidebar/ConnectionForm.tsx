@@ -8,6 +8,7 @@ import type {
 } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Modal } from '@renderer/components/common/Modal'
+import { BusyButton } from '@renderer/components/common/BusyButton'
 import { buildMongoUri, parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
@@ -246,9 +247,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       onClose={onClose}
       footer={
         <>
-          <button className="ghost" disabled={testing} onClick={() => void runTest()}>
-            {testing ? 'Testing…' : 'Test connection'}
-          </button>
+          <BusyButton className="ghost" busy={testing} onClick={() => void runTest()}>
+            Test connection
+          </BusyButton>
           {test && (
             <span
               className={test.ok ? 'test-result ok' : 'test-result err'}
@@ -263,9 +264,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           <button className="ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary" disabled={saving || !host.trim()} onClick={() => void submit()}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <BusyButton className="primary" busy={saving} disabled={!host.trim()} onClick={() => void submit()}>
+            Save
+          </BusyButton>
         </>
       }
     >

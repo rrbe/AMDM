@@ -15,6 +15,7 @@
  */
 import { useState } from 'react'
 import { Modal } from '@renderer/components/common/Modal'
+import { BusyButton } from '@renderer/components/common/BusyButton'
 import { useAppStore } from '@renderer/store/useAppStore'
 import type { DataFormat, DataOpResult } from '@shared/types'
 
@@ -66,13 +67,14 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
           <span className="spacer" />
           <button onClick={onClose}>{success ? 'Close' : 'Cancel'}</button>
           {!success && (
-            <button
+            <BusyButton
               className="primary"
-              disabled={running || (isBson && !bsonReady)}
+              busy={running}
+              disabled={isBson && !bsonReady}
               onClick={() => void onImport()}
             >
-              {running ? 'Importing…' : 'Import'}
-            </button>
+              Import
+            </BusyButton>
           )}
         </>
       }

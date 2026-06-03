@@ -11,6 +11,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Modal } from '@renderer/components/common/Modal'
+import { BusyButton } from '@renderer/components/common/BusyButton'
 import { toJsonLines, indentFor } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
 
@@ -74,9 +75,9 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
           {error && <span className="doc-edit-error">{error}</span>}
           <span className="spacer" />
           <button onClick={onClose}>Cancel</button>
-          <button className="primary" disabled={saving} onClick={() => void onSave()}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <BusyButton className="primary" busy={saving} onClick={() => void onSave()}>
+            Save
+          </BusyButton>
         </>
       }
     >

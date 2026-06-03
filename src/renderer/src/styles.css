@@ -195,6 +195,33 @@ button.danger {
   color: var(--err);
 }
 
+/* Busy state (BusyButton): the label stays in flow but hidden so the width
+   never changes between idle and in-flight; a spinner overlays it instead of
+   swapping the text. See DESIGN.md §4 (Buttons). currentColor adapts the
+   spinner to each variant (white on primary, ink on neutral/ghost). */
+.busy-btn {
+  position: relative;
+}
+.busy-btn.is-busy .busy-btn-label {
+  visibility: hidden;
+}
+.busy-btn-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: busy-spin 0.7s linear infinite;
+}
+@keyframes busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 input,
 select,
 textarea {
