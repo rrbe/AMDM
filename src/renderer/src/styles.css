@@ -1383,25 +1383,89 @@ label {
   border: 1px solid var(--err);
 }
 
-.toast {
+.toast-stack {
   position: fixed;
   bottom: 16px;
   right: 16px;
-  background: var(--err-bg);
-  border: 1px solid var(--err);
-  color: var(--fg-0);
-  padding: 10px 14px;
-  border-radius: 8px;
-  max-width: 420px;
   z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.toast {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* Opaque elevated surface — a floating toast must NOT use the translucent
+     --err-bg tint, or the content behind it bleeds through. Severity is carried
+     by the colored left bar + icon, not a wash over the whole panel. */
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  color: var(--fg-0);
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in 0.18s ease-out;
+}
+.toast-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 .toast .toast-msg {
   flex: 1;
   font-size: var(--fs);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.toast-close {
+  flex: 0 0 auto;
+  margin: -3px -4px 0 0;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  color: var(--fg-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.toast-close:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.toast-error {
+  border-left-color: var(--err);
+}
+.toast-error .toast-icon {
+  color: var(--err);
+}
+.toast-success {
+  border-left-color: var(--ok);
+}
+.toast-success .toast-icon {
+  color: var(--ok);
+}
+.toast-warn {
+  border-left-color: var(--warn);
+}
+.toast-warn .toast-icon {
+  color: var(--warn);
+}
+.toast-info {
+  border-left-color: var(--accent);
+}
+.toast-info .toast-icon {
+  color: var(--accent);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .muted {

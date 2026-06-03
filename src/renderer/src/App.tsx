@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Explorer } from '@renderer/components/explorer/Explorer'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
-import { ErrorToast } from '@renderer/components/common/ErrorToast'
+import { Toaster } from '@renderer/components/common/Toaster'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 
 /**
@@ -55,7 +55,7 @@ export default function App(): JSX.Element {
         ariaLabel="Resize sidebar"
       />
       {activeConnected ? <ShellWorkspace /> : <WorkspaceEmptyState />}
-      <ErrorToast />
+      <Toaster />
     </div>
   )
 }

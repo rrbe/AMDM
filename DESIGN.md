@@ -164,6 +164,10 @@ Shadows use a navy-tinted rgba in light and deep black in dark. Most surfaces ar
 ### Context menu (`.ctx-menu`)
 - `--bg-elevated`, `--shadow-lg`, 5px padding, items at `--radius-sm`. Hover-expand submenus (`.ctx-sub`). Right-click a database for Sort ▸ Default / A–Z. Closes on outside-click / Escape, clamps on-screen.
 
+### Toasts (`.toast` / `<Toast>` + `<Toaster>`)
+- Bottom-right stack. **Opaque elevated surface** (`--bg-elevated`) + `--shadow-lg` — never a translucent tint (the old toast used `--err-bg` at ~8–13% alpha, so the content behind it bled through). Severity is the **colored 3px left bar + icon**, not a wash over the panel: `error` → `--err`, `success` → `--ok`, `warn` → `--warn`, `info` → `--accent`.
+- Two channels: errors (`lastError`, persist until dismissed) and transient notices (`notify(kind, msg)` → success/info auto-dismiss ~4s, warnings persist). Slide-in `.18s`.
+
 ### Result table (`.res-table`)
 - Sticky uppercase headers with the ink underline; sticky index column; hover row tint via `--row-stripe`; mono cells colored by the syntax palette.
 

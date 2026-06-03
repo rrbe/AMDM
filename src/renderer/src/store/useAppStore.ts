@@ -37,6 +37,17 @@ import type {
 
 export type ResultView = 'tree' | 'json' | 'table'
 
+export type NoticeKind = 'success' | 'info' | 'warn'
+
+/** A transient, non-error notification shown as a toast. Errors keep using
+    `lastError` (their own channel); this carries success / info / warning. */
+export interface Notice {
+  kind: NoticeKind
+  message: string
+  /** Bumped per emit so React remounts the toast and restarts auto-dismiss. */
+  key: number
+}
+
 /** Loaded children for a catalog node, keyed by a synthetic node id. */
 export interface CatalogState {
   /** db name -> collections (undefined = not loaded yet). */
@@ -100,6 +111,7 @@ interface AppState {
   // ---- ui ----
   initializing: boolean
   lastError: string | null
+  notice: Notice | null
 
   // ---- actions: bootstrap ----
   bootstrap(): Promise<void>
@@ -136,6 +148,9 @@ interface AppState {
   runExplain(): Promise<void>
   refreshResult(): Promise<void>
   clearError(): void
+  /** Show a transient success/info/warning toast (errors use `lastError`). */
+  notify(kind: NoticeKind, message: string): void
+  dismissNotice(): void
 
   // ---- actions: saved queries + history (Phase 2) ----
   loadQueries(): Promise<void>
@@ -208,6 +223,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   initializing: true,
   lastError: null,
+  notice: null,
 
   // --------------------------------------------------------------------- boot
   async bootstrap() {
@@ -555,6 +571,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ lastError: null })
   },
 
+  notify(kind, message) {
+    set({ notice: { kind, message, key: Date.now() } })
+  },
+
+  dismissNotice() {
+    set({ notice: null })
+  },
+
   // ----------------------------------------------------- saved queries + history
   async loadQueries() {
     try {
@@ -568,6 +592,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const saved = await window.api.queries.save(input)
       await get().loadQueries()
+      get().notify('success', `Saved query “${saved.name}”`)
       return saved
     } catch (e) {
       set({ lastError: `Failed to save query: ${errMessage(e)}` })
