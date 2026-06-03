@@ -1,10 +1,10 @@
 # Mongo Shell GUI — Design System
 
-**Codename: Pine.** A warm, editorial take on a developer database tool. Light-first, with a warm dark counterpart. The goal is to feel *crafted and intentional* — not the default "AI SaaS" template (generic blue, Inter, soft rounded cards on cold gray).
+**Codename: Compass.** Modeled directly on MongoDB Compass and its LeafyGreen design language. Light-first — pure white content on light LeafyGreen-gray chrome, dark-navy ink text, MongoDB-green primary — with a navy dark counterpart. The goal is crisp readability for data work: strong plane separation, calm chrome, and color reserved for the things that carry meaning (the green primary action, and the document syntax palette).
 
 Three principles drive every decision:
 
-1. **Warm neutrals, not cold.** Backgrounds carry a paper/parchment warmth in light and a warm-charcoal warmth in dark. No pure `#fff`, no pure `#000`.
+1. **Pure white content, LeafyGreen gray chrome.** Content surfaces are `#ffffff` in light and dark-navy `#001e2b` in dark; chrome steps down through LeafyGreen grays. No parchment, no yellow cast, no cement-gray mid-tones — content sits on the brightest plane so text and data read sharp.
 2. **Editorial structure.** Strong typographic hierarchy, an ink hairline rule under the title bar and table headers, uppercase letter-spaced labels. Sharp-ish corners (4px), flat surfaces, restraint over decoration.
 3. **Readability for data work.** Compact density, a true monospace for all data/code, and a syntax palette tuned for scanning — not a rainbow.
 
@@ -14,80 +14,86 @@ Three principles drive every decision:
 
 All color is expressed as CSS custom properties scoped to `[data-theme="light"]` / `[data-theme="dark"]` (see `styles.css`). Never hard-code a hex in a component — reference a token.
 
-### Accent — Pine green
+### Accent — MongoDB green
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--accent` | `#1d7a4a` | `#46b87a` | Primary actions (Run), active states, selection, links |
-| `--accent-hover` | `#186540` | `#5cc78c` | Hover on accent surfaces |
-| `--accent-soft` | `rgba(29,122,74,.10)` | `rgba(70,184,122,.15)` | Active row/tab backgrounds |
-| `--accent-soft-strong` | `rgba(29,122,74,.17)` | `rgba(70,184,122,.24)` | Selection highlight, focus ring |
-| `--accent-fg` | `#ffffff` | `#ffffff` | Text/icons on an accent fill |
+| `--accent` | `#00684a` | `#00ed64` | Primary actions (Run), active states, selection, links |
+| `--accent-hover` | `#004d37` | `#00c257` | Hover on accent surfaces |
+| `--accent-soft` | `rgba(0,104,74,.08)` | `rgba(0,237,100,.15)` | Active row/tab backgrounds |
+| `--accent-soft-strong` | `rgba(0,104,74,.16)` | `rgba(0,237,100,.26)` | Selection highlight, focus ring |
+| `--accent-fg` | `#ffffff` | `#001e2b` | Text/icons on an accent fill |
 
-> The accent **brightens in dark mode**. When a custom accent is chosen via Tweaks, `app.jsx` lightens it ~34% for dark so it stays legible on charcoal — light-mode hex is never shown directly on a dark background.
+> Light uses LeafyGreen's deep `green.dark2` (`#00684a`, the Compass "Find" button) with **white** text. Dark flips to the bright `green.base` (`#00ed64`) with **dark-navy** text — that's why `--accent-fg` itself changes per theme. When a custom accent is chosen via Tweaks, `app.jsx` lightens it ~34% for dark so it stays legible on navy.
 
 ### Surfaces
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--bg-app` | `#e7e3d8` | `#100f0b` | Window chrome / behind panels |
-| `--bg-sidebar` | `#eeebe2` | `#100f0b` | Sidebar, footers |
-| `--bg-panel` | `#faf8f2` | `#131210` | Main content surface |
-| `--bg-editor` | `#fbf9f3` | `#0f0e0a` | Query editor |
-| `--bg-inset` | `#e9e5da` | `#201e17` | Inputs, segmented controls, table headers |
-| `--bg-elevated` | `#fcfaf5` | `#201e17` | Modals, menus, popovers |
-| `--bg-hover` | `rgba(40,44,28,.05)` | `rgba(255,250,235,.05)` | Row/button hover |
+| `--bg-app` | `#f2f4f5` | `#00141d` | Window chrome / behind panels |
+| `--bg-sidebar` | `#f9fbfa` | `#0c2330` | Sidebar, footers |
+| `--bg-panel` | `#ffffff` | `#001e2b` | Main content surface |
+| `--bg-editor` | `#ffffff` | `#001a26` | Query editor |
+| `--bg-inset` | `#e8edeb` | `#112733` | Inputs, segmented controls, table headers |
+| `--bg-elevated` | `#ffffff` | `#112733` | Modals, menus, popovers |
+| `--bg-hover` | `#e1e7e5` | `#1c2d38` | Row/button hover |
 | `--bg-active` | `var(--accent-soft)` | `var(--accent-soft)` | Selected rows |
+
+> Light **content** is intentionally pure `#ffffff` (Compass-style): the brightest plane gives data the most contrast. Chrome (app frame, sidebar, header, inset) steps down through LeafyGreen grays (`gray.light3 → light2`) so panels separate cleanly. Dark is LeafyGreen navy — `black (#001e2b)` content on `gray.dark4/dark3` chrome — never neutral gray or brown.
 
 ### Borders & ink rule
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--border` | `#e1dccf` | `#2a2820` | Default dividers |
-| `--border-soft` | `#ebe6da` | `#211f18` | Subtle/inner dividers |
-| `--border-strong` | `#d2cbba` | `#3a372d` | Control outlines |
-| `--rule` | `#1e231f` | `#34312a` | **Editorial ink rule** — under the title bar and table headers only |
+| `--border` | `#e8edeb` | `#1c2d38` | Default dividers (gray.light2 / gray.dark3) |
+| `--border-soft` | `#eef1f0` | `#16242f` | Subtle/inner dividers |
+| `--border-strong` | `#c1c7c6` | `#3d4f58` | Control outlines (gray.light1 / gray.dark2) |
+| `--rule` | `#c1c7c6` | `#3d4f58` | Hairline under the title bar and table headers |
 
-The **ink rule** is the signature editorial gesture. Use it sparingly: the title bar bottom border and the table header underline. Don't sprinkle thick rules everywhere — that's what made earlier explorations feel heavy.
+Compass is **airy** — dividers are light hairlines, not heavy ink bars. The `--rule` is just a touch stronger than `--border` to define the title-bar bottom and the table-header underline; the active gesture that carries hierarchy is the **green** tab/selection accent, not a black rule.
 
 ### Text
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--text` | `#1e231f` | `#e9e4d6` | Primary text |
-| `--text-2` | `#565c50` | `#a39c8a` | Secondary labels, body |
-| `--text-3` | `#6a7062` | `#968f7d` | Tertiary, captions |
-| `--text-faint` | `#a6a99c` | `#5b5547` | Disabled, line numbers, placeholders |
+| `--text` | `#001e2b` | `#e8edeb` | Primary text (LeafyGreen `black` / `gray.light2`) |
+| `--text-2` | `#3d4f58` | `#c1c7c6` | Secondary labels, body |
+| `--text-3` | `#5c6c75` | `#889397` | Tertiary, captions |
+| `--text-faint` | `#889397` | `#5c6c75` | Disabled, line numbers, placeholders |
 
 ### Syntax / data palette
 
-Warm and scan-friendly. Shared names cover both the query editor and result cells.
+Lifted straight from the Compass document view. Shared names cover both the query editor and result cells.
 
 | Token | Light | Dark | Applies to |
 |---|---|---|---|
-| `--syn-key` | `#3f463c` | `#cfcab8` | Object keys |
-| `--syn-string` | `#5f7a2c` | `#9fc26a` | Strings (olive) |
-| `--syn-number` | `#b15a1e` | `#d99a52` | Numbers (rust) |
-| `--syn-bool` | `#7c5aa0` | `#b89ad0` | Booleans (plum) |
-| `--syn-objectid` | `#9a6a2d` | `#c99a5a` | ObjectId (bronze) |
-| `--syn-date` | `#5f7a2c` | `#9fc26a` | ISODate |
-| `--syn-fn` | `#1d7a4a` | `#46b87a` | Collection / method calls (pine) |
-| `--syn-keyword` | `#b15a1e` | `#d99a52` | `db`, operators |
-| `--syn-null` / `--syn-punct` | `#a6a99c` | `#5b5547` | null, punctuation |
+| `--syn-key` | `#001e2b` | `#e8edeb` | Object keys (dark-navy ink, bold) |
+| `--syn-string` | `#12824d` | `#35de7e` | Strings (green) |
+| `--syn-number` | `#1254b7` | `#6ca8ff` | Numbers (blue) |
+| `--syn-bool` | `#883ea8` | `#c39bf3` | Booleans (purple) |
+| `--syn-objectid` | `#c2371a` | `#ff6f4d` | ObjectId (coral-red) |
+| `--syn-date` | `#1254b7` | `#6ca8ff` | ISODate (blue, like numbers) |
+| `--syn-fn` | `#00684a` | `#00ed64` | Collection / method calls (green) |
+| `--syn-keyword` | `#883ea8` | `#c39bf3` | `db`, operators (purple) |
+| `--syn-null` / `--syn-punct` | `#889397` | `#889397` | null, punctuation (gray) |
+
+> This is the recognizable Compass document coloring: **navy bold keys, green strings, blue numbers/dates, coral-red ObjectId, purple booleans, gray null.** The query editor (CodeMirror) reuses the same assignments, with method calls (`db.coll.find`) in MongoDB green.
 
 ---
 
 ## 2. Typography
 
+Matched to MongoDB Compass / LeafyGreen.
+
 ```
---font-ui:   "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
---font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+--font-ui:   'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+--font-mono: 'Source Code Pro', ui-monospace, 'SF Mono', Menlo, Monaco, monospace;
 ```
 
-- **Space Grotesk** — all UI chrome: labels, buttons, headings, the wordmark. Its slightly mechanical grotesk character is what makes the tool feel "designed" rather than generic.
-- **IBM Plex Mono** — *everything that is data or code*: query editor, result tables, ObjectIds, hostnames, index specs, the database chip.
+- **Euclid Circular A** — LeafyGreen's UI typeface for all chrome (labels, buttons, headings, the wordmark). It's **proprietary and cannot be bundled**, so the stack falls back to **Helvetica Neue** (macOS) — exactly what Compass renders for anyone without the licensed font. No UI webfont ships with the app.
+- **Source Code Pro** — Compass's data/code typeface: *everything that is data or code* (query editor, result tables, ObjectIds, hostnames, index specs, the database chip). Bundled offline via `@fontsource` because the renderer CSP forbids remote font CDNs.
 
-Mono font is user-swappable via Tweaks (IBM Plex Mono · JetBrains Mono · SF Mono). UI font is fixed.
+> If a cross-platform, bundled UI font is ever wanted (e.g. for non-macOS), Inter is the closest free stand-in — but on this macOS-first build the Helvetica Neue fallback is the more faithful Compass match.
 
 ### Scale & treatment
 
@@ -112,13 +118,13 @@ Uppercase + letter-spacing on small labels is a core part of the editorial voice
 --radius-lg: 8px;   /* modals, the empty-state logo tile */
 ```
 
-Corners are **sharp-ish** — present but restrained. Pine is not a "pill" UI.
+Corners are **sharp-ish** — present but restrained. Compass is not a "pill" UI.
 
 **Density** is a multiplier (`--density`) on row paddings: `compact` = `1`, `comfy` = `1.22`. Compact is the default — this is a tool for people who want a lot of data on screen.
 
 **Spacing** follows a loose 4px rhythm. Common values: row padding `~5–9px × density` vertical / `8–14px` horizontal; panel padding `11–14px`; modal padding `18–20px`.
 
-**Elevation** is warm-tinted and soft — depth, never drama:
+**Elevation** is neutral and soft — depth, never drama:
 
 ```
 --shadow-sm  small lift (segmented "on" state, primary button)
@@ -126,14 +132,14 @@ Corners are **sharp-ish** — present but restrained. Pine is not a "pill" UI.
 --shadow-lg  modals and popovers
 ```
 
-Shadows use warm-brown rgba in light and deep black in dark. Most surfaces are flat and rely on borders; reserve shadows for things that genuinely float (menus, modals).
+Shadows use a navy-tinted rgba in light and deep black in dark. Most surfaces are flat and rely on borders; reserve shadows for things that genuinely float (menus, modals).
 
 ---
 
 ## 4. Components
 
 ### Buttons
-- **`.btn.primary`** — pine fill, `--accent-fg` text, subtle green-tinted shadow. The Run button.
+- **`.btn.primary`** — MongoDB-green fill, `--accent-fg` text, subtle green-tinted shadow. The Run button.
 - **`.btn`** — neutral: `--bg-elevated` + `--border-strong`, hover lifts to `--bg-hover`.
 - **`.btn.ghost`** — transparent until hover. Toolbar actions (Save, Explain, Library).
 - **`.icon-btn`** — square 26–30px hit area, transparent → `--bg-hover`. Add `.danger` for destructive (red on hover).
@@ -167,9 +173,9 @@ Shadows use warm-brown rgba in light and deep black in dark. Most surfaces are f
 
 - **Tokens only.** No raw hex in components. New color? Add a token in both themes.
 - **One ink rule, used twice.** Title bar + table headers. Don't proliferate heavy rules.
-- **Mono = data, Space Grotesk = chrome.** Don't render UI labels in mono or data in the sans.
+- **Mono = data, the UI sans = chrome.** Don't render UI labels in mono or data in the sans.
 - **Accent is structural, not decorative.** It marks the primary action and the current selection. Avoid accent-colored text runs, gradients, or large accent fills.
-- **Warm, never cold.** If a neutral looks gray-blue, it's wrong — nudge it toward the paper/charcoal warmth.
+- **Clean, never warm.** If a neutral looks beige or yellow, it's wrong — keep surfaces pure-white (light) / LeafyGreen-navy (dark). Content lives on the brightest plane.
 - **Compact first.** Default to dense layouts; `comfy` is the opt-in.
 - **No emoji, no gradients-as-decoration, no rounded "card with left accent bar" tropes.**
 - **Light-first.** Design and verify in light, then confirm dark via the toggle. (Dark mode is correct in-app even though the screenshot tool renders the `data-theme` cascade unreliably.)

@@ -1,13 +1,14 @@
 /**
- * Pine CodeMirror themes — light + dark variants that match the app's "Pine"
- * design system (see styles.css). We build them with @uiw/codemirror-themes'
- * `createTheme` so the editor reads as part of the same surface rather than
- * CodeMirror's generic light/dark defaults.
+ * Compass CodeMirror themes — light + dark variants that match the app's
+ * "Compass" design system (see styles.css), modeled on MongoDB Compass /
+ * LeafyGreen. We build them with @uiw/codemirror-themes' `createTheme` so the
+ * editor reads as part of the same surface rather than CodeMirror's generic
+ * light/dark defaults.
  *
  * Two explicit themes (resolved hex, not CSS vars) keep rendering predictable:
  * ShellEditor swaps between them on the persisted `theme` preference. Colors
- * mirror the warm Pine syntax palette — pine props, olive strings, rust
- * numbers/keywords, plum booleans, brown ObjectId/types.
+ * mirror the Compass document palette — green method calls, green strings,
+ * blue numbers, purple booleans/keywords, coral ObjectId/types.
  */
 import { createTheme } from '@uiw/codemirror-themes'
 import { tags as t } from '@lezer/highlight'
@@ -34,40 +35,40 @@ interface PinePalette {
 
 const LIGHT: PinePalette = {
   base: 'light',
-  bg: '#fbf9f3',
-  text: '#1e231f',
-  caret: '#1d7a4a',
-  selection: 'rgba(29, 122, 74, 0.18)',
-  lineHighlight: 'rgba(40, 44, 28, 0.05)',
-  gutterFg: '#a6a99c',
-  keyword: '#b15a1e',
-  string: '#5f7a2c',
-  number: '#b15a1e',
-  bool: '#7c5aa0',
-  property: '#1d7a4a',
-  punct: '#9a9d90',
-  comment: '#a6a99c',
-  type: '#9a6a2d',
-  regexp: '#7c5aa0'
+  bg: '#ffffff',
+  text: '#001e2b',
+  caret: '#00684a',
+  selection: 'rgba(0, 104, 74, 0.16)',
+  lineHighlight: 'rgba(0, 30, 43, 0.04)',
+  gutterFg: '#889397',
+  keyword: '#883ea8',
+  string: '#12824d',
+  number: '#1254b7',
+  bool: '#883ea8',
+  property: '#00684a',
+  punct: '#5c6c75',
+  comment: '#889397',
+  type: '#c2371a',
+  regexp: '#883ea8'
 }
 
 const DARK: PinePalette = {
   base: 'dark',
-  bg: '#0f0e0a',
-  text: '#e9e4d6',
-  caret: '#46b87a',
-  selection: 'rgba(70, 184, 122, 0.24)',
-  lineHighlight: 'rgba(255, 250, 235, 0.05)',
-  gutterFg: '#5b5547',
-  keyword: '#d99a52',
-  string: '#9fc26a',
-  number: '#d99a52',
-  bool: '#b89ad0',
-  property: '#46b87a',
-  punct: '#6b6657',
-  comment: '#5b5547',
-  type: '#c99a5a',
-  regexp: '#b89ad0'
+  bg: '#001a26',
+  text: '#e8edeb',
+  caret: '#00ed64',
+  selection: 'rgba(0, 237, 100, 0.22)',
+  lineHighlight: 'rgba(255, 255, 255, 0.04)',
+  gutterFg: '#5c6c75',
+  keyword: '#c39bf3',
+  string: '#35de7e',
+  number: '#6ca8ff',
+  bool: '#c39bf3',
+  property: '#00ed64',
+  punct: '#889397',
+  comment: '#5c6c75',
+  type: '#ff6f4d',
+  regexp: '#c39bf3'
 }
 
 function build(p: PinePalette): ReturnType<typeof createTheme> {

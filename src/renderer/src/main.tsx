@@ -2,15 +2,14 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from '@renderer/App'
 import { ErrorBoundary } from '@renderer/components/common/ErrorBoundary'
-// Bundled fonts (offline-safe; the renderer CSP forbids remote font CDNs):
-// Space Grotesk for UI, IBM Plex Mono for code/data — the "Pine" design system.
-import '@fontsource/space-grotesk/400.css'
-import '@fontsource/space-grotesk/500.css'
-import '@fontsource/space-grotesk/600.css'
-import '@fontsource/space-grotesk/700.css'
-import '@fontsource/ibm-plex-mono/400.css'
-import '@fontsource/ibm-plex-mono/500.css'
-import '@fontsource/ibm-plex-mono/600.css'
+// Fonts — matched to MongoDB Compass / LeafyGreen.
+// UI uses LeafyGreen's system stack (Euclid Circular A if installed, else
+// Helvetica Neue) so no UI webfont is bundled — proprietary, can't ship it.
+// Source Code Pro is Compass's data/code font; bundled offline via @fontsource
+// because the renderer CSP forbids remote font CDNs.
+import '@fontsource/source-code-pro/400.css'
+import '@fontsource/source-code-pro/500.css'
+import '@fontsource/source-code-pro/600.css'
 import './styles.css'
 
 // macOS uses a frameless window (titleBarStyle: hiddenInset); this flag drives
