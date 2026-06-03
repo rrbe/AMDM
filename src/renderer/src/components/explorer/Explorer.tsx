@@ -9,8 +9,11 @@ import {
   Key,
   KeyRound,
   Loader2,
+  Monitor,
+  Moon,
   Pencil,
   Plug,
+  Sun,
   Table2,
   Trash2,
   Unplug,
@@ -206,7 +209,7 @@ export function Explorer(): JSX.Element {
   return (
     <div className="explorer">
       <div className="explorer-header app-drag">
-        <span className="explorer-title">CONNECTIONS</span>
+        <span className="explorer-title">Mongo Shell GUI</span>
         <div className="explorer-actions">
           <button
             className={`catalog-sort${collectionSort === 'alpha' ? ' active' : ''}`}
@@ -259,16 +262,27 @@ export function Explorer(): JSX.Element {
           the way of the query actions. The theme is a persisted preference. */}
       <div className="side-foot">
         <button
-          className="theme-toggle"
-          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          className="theme-cycle"
+          title={
+            theme === 'system'
+              ? 'Theme: System — click for Light'
+              : theme === 'light'
+                ? 'Theme: Light — click for Dark'
+                : 'Theme: Dark — click for System'
+          }
           onClick={() =>
-            void updateSettings({ theme: theme === 'light' ? 'dark' : 'light' })
+            void updateSettings({
+              theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
+            })
           }
         >
-          <span className={theme === 'dark' ? 'tt-track dark' : 'tt-track'}>
-            <span className="tt-knob">{theme === 'light' ? '☀' : '☾'}</span>
-          </span>
-          <span className="tt-text">{theme === 'light' ? 'Light' : 'Dark'}</span>
+          {theme === 'system' ? (
+            <Monitor size={16} />
+          ) : theme === 'light' ? (
+            <Sun size={16} />
+          ) : (
+            <Moon size={16} />
+          )}
         </button>
         <span className="spacer" />
       </div>

@@ -18,9 +18,11 @@ if (navigator.platform.toLowerCase().includes('mac')) {
   document.body.classList.add('is-mac')
 }
 
-// Light-first: paint the default theme before React mounts so there's no flash.
-// App.tsx re-syncs this to the persisted preference once settings load.
-document.documentElement.setAttribute('data-theme', 'light')
+// Paint the resolved theme before React mounts so there's no flash. The default
+// preference is 'system', so resolve it from the OS here; App.tsx re-syncs to
+// the persisted preference (and keeps following the OS) once settings load.
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
 
 const container = document.getElementById('root')
 if (!container) {

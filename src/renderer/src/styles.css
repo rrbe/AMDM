@@ -1626,11 +1626,10 @@ button:focus-visible {
   border-bottom: 1.5px solid var(--rule);
 }
 .explorer-title {
-  font-size: var(--fs-sm);
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-2);
+  letter-spacing: -0.01em;
+  color: var(--fg-1);
 }
 
 /* ---- Connection rows: active accent outline ---- */
@@ -1737,7 +1736,7 @@ button:focus-visible {
   border-bottom-color: var(--accent);
 }
 
-/* ---- Sidebar footer: app-level theme toggle (Pine sun/moon switch) ---- */
+/* ---- Sidebar footer: app-level theme cycle (System / Light / Dark icon) ---- */
 .side-foot {
   flex: 0 0 auto;
   display: flex;
@@ -1750,57 +1749,24 @@ button:focus-visible {
 .side-foot .spacer {
   flex: 1;
 }
-.theme-toggle {
+/* App-level theme control: a single icon button cycling System → Light → Dark. */
+.theme-cycle {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border: none;
   background: transparent;
-  padding: 4px 6px;
+  padding: 0;
   border-radius: var(--radius-sm);
   color: var(--fg-1);
+  cursor: pointer;
 }
-.theme-toggle:hover {
+.theme-cycle:hover {
   background: var(--bg-3);
+  color: var(--fg-0);
 }
-.tt-track {
-  position: relative;
-  width: 38px;
-  height: 21px;
-  border-radius: 999px;
-  background: var(--bg-2);
-  border: 1px solid var(--border-strong);
-  transition:
-    background 0.18s,
-    border-color 0.18s;
-  flex: 0 0 auto;
-}
-.tt-track.dark {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.tt-knob {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 10px;
-  line-height: 1;
-  color: #f59e0b;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: transform 0.18s cubic-bezier(0.3, 0.7, 0.3, 1);
-}
-.tt-track.dark .tt-knob {
-  transform: translateX(17px);
-  color: var(--accent);
-}
-.tt-text {
-  font-size: var(--fs);
-  font-weight: 600;
-  color: var(--fg-1);
+.theme-cycle svg {
+  display: block;
 }

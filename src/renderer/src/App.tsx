@@ -19,10 +19,19 @@ export default function App(): JSX.Element {
     void bootstrap()
   }, [bootstrap])
 
-  // Reflect the persisted Pine light/dark preference onto the document root,
-  // which drives the `[data-theme]` token cascade in styles.css.
+  // Reflect the persisted theme onto the document root, which drives the
+  // `[data-theme]` token cascade in styles.css. 'system' resolves to the OS
+  // appearance and re-resolves live when the OS toggles light/dark.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
+    const mql = window.matchMedia('(prefers-color-scheme: dark)')
+    const apply = (): void => {
+      const resolved = theme === 'system' ? (mql.matches ? 'dark' : 'light') : theme
+      document.documentElement.setAttribute('data-theme', resolved)
+    }
+    apply()
+    if (theme !== 'system') return
+    mql.addEventListener('change', apply)
+    return () => mql.removeEventListener('change', apply)
   }, [theme])
 
   const activeConnected =
