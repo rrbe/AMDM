@@ -4,7 +4,7 @@ import { ShellEditor } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
-import { BusyButton } from '@renderer/components/common/BusyButton'
+import { Button } from '@renderer/components/common/Button'
 
 /**
  * The main work area: header (active connection + db selector + Run), the lazy
@@ -57,15 +57,15 @@ export function ShellWorkspace(): JSX.Element {
           ))}
         </select>
         <span className="spacer" />
-        <button disabled={busy} onClick={() => setShowSave(true)} title="Save current query">
+        <Button disabled={busy} onClick={() => setShowSave(true)} title="Save current query">
           Save
-        </button>
-        <button disabled={busy} onClick={() => void runExplain()} title="Run explain('executionStats')">
+        </Button>
+        <Button disabled={busy} onClick={() => void runExplain()} title="Run explain('executionStats')">
           Explain
-        </button>
-        <BusyButton className="primary" busy={running} disabled={busy} onClick={() => void runShell()}>
+        </Button>
+        <Button variant="primary" busy={running} disabled={busy} onClick={() => void runShell()}>
           ▶ Run
-        </BusyButton>
+        </Button>
       </div>
 
       <ShellEditor

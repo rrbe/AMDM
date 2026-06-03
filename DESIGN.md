@@ -139,11 +139,13 @@ Shadows use a navy-tinted rgba in light and deep black in dark. Most surfaces ar
 ## 4. Components
 
 ### Buttons
-- **`.btn.primary`** — MongoDB-green fill, `--accent-fg` text, subtle green-tinted shadow. The Run button.
-- **`.btn`** — neutral: `--bg-elevated` + `--border-strong`, hover lifts to `--bg-hover`.
-- **`.btn.ghost`** — transparent until hover. Toolbar actions (Save, Explain, Library).
+- **Component: `<Button>`** (`common/Button.tsx`) is the standard **text action** button — toolbar actions and dialog footers. A thin typed wrapper over `<button>` + the classes below: `variant` = `default | primary | ghost | danger`, plus `busy` (spinner) and any native button prop. The CSS stays the single source of visual truth; the component just consolidates the variant API and the busy state. Compose extras via `className` (e.g. `variant="ghost" className="danger"`).
+  - **Not** for icon-only buttons (`.icon-btn`), segmented toggles (`.seg` / `.active` / `.selected`), or context-menu items — those are distinct patterns and stay as raw `<button>`.
+- **`.primary`** — MongoDB-green fill, white text, subtle green-tinted shadow. The Run button.
+- neutral (no variant) — `--bg-2` + `--border`, hover lifts to `--bg-3`.
+- **`.ghost`** — transparent until hover. Toolbar actions (Save, Explain, Library).
 - **`.icon-btn`** — square 26–30px hit area, transparent → `--bg-hover`. Add `.danger` for destructive (red on hover).
-- **Stable width across states.** A button's label is fixed — it must **not** change between idle and in-flight (no `Run → Running…`, `Save → Saving…`). A text swap changes the button's width, which nudges neighbours and reads as a flicker. Show progress with a *state*, not new text: the `BusyButton` component (`common/BusyButton.tsx`) keeps the label in flow but invisible and overlays a centered spinner (`.busy-btn` + `.busy-btn-spinner`, `currentColor` so it adapts per variant), auto-disabling while busy. Use it for any action that runs async (Run, Save, Test connection, Import/Export, edit-doc Save). A genuine *semantic* change after completion (e.g. Cancel → Close once an import succeeds) is fine — that's a one-time meaning change, not transient click feedback.
+- **Stable width across states.** A button's label is fixed — it must **not** change between idle and in-flight (no `Run → Running…`, `Save → Saving…`). A text swap changes the button's width, which nudges neighbours and reads as a flicker. Show progress with a *state*, not new text: `<Button busy>` keeps the label in flow but invisible and overlays a centered spinner (`.busy-btn` + `.busy-btn-spinner`, `currentColor` so it adapts per variant), auto-disabling while busy. Use it for any action that runs async (Run, Save, Test connection, Import/Export, edit-doc Save). A genuine *semantic* change after completion (e.g. Cancel → Close once an import succeeds) is fine — that's a one-time meaning change, not transient click feedback.
 
 ### Connection rows & tree
 - Active connection / selected collection: `--bg-active` fill + a **3px accent left bar** (`box-shadow: inset 3px 0 0 var(--accent)` for tree nodes; `.accent-rail` element for connection rows, tinted with the connection's own color).

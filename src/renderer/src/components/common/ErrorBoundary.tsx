@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button } from '@renderer/components/common/Button'
 
 interface Props {
   children: ReactNode
@@ -34,9 +35,9 @@ export class ErrorBoundary extends Component<Props, State> {
         <pre className="fatal-msg">{error.message}</pre>
         {error.stack && <pre className="fatal-stack">{error.stack}</pre>}
         {info && <pre className="fatal-stack">{info}</pre>}
-        <button className="primary" onClick={() => this.setState({ error: null, info: '' })}>
+        <Button variant="primary" onClick={() => this.setState({ error: null, info: '' })}>
           Try again
-        </button>
+        </Button>
       </div>
     )
   }

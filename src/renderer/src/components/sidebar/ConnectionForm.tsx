@@ -8,7 +8,7 @@ import type {
 } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Modal } from '@renderer/components/common/Modal'
-import { BusyButton } from '@renderer/components/common/BusyButton'
+import { Button } from '@renderer/components/common/Button'
 import { buildMongoUri, parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
@@ -247,9 +247,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       onClose={onClose}
       footer={
         <>
-          <BusyButton className="ghost" busy={testing} onClick={() => void runTest()}>
+          <Button variant="ghost" busy={testing} onClick={() => void runTest()}>
             Test connection
-          </BusyButton>
+          </Button>
           {test && (
             <span
               className={test.ok ? 'test-result ok' : 'test-result err'}
@@ -261,12 +261,12 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             </span>
           )}
           <span className="spacer" />
-          <button className="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <BusyButton className="primary" busy={saving} disabled={!host.trim()} onClick={() => void submit()}>
+          </Button>
+          <Button variant="primary" busy={saving} disabled={!host.trim()} onClick={() => void submit()}>
             Save
-          </BusyButton>
+          </Button>
         </>
       }
     >
@@ -277,12 +277,12 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           onChange={(e) => setUriText(e.target.value)}
           placeholder="mongodb://user:pass@host:27017/db?replicaSet=rs0 — paste, then “From URI”"
         />
-        <button className="ghost" type="button" disabled={!uriText.trim()} onClick={applyUri}>
+        <Button variant="ghost" type="button" disabled={!uriText.trim()} onClick={applyUri}>
           From URI
-        </button>
-        <button className="ghost" type="button" onClick={() => void toUri()}>
+        </Button>
+        <Button variant="ghost" type="button" onClick={() => void toUri()}>
           To URI
-        </button>
+        </Button>
       </div>
       {uriError && (
         <div className="hint" style={{ color: 'var(--danger, #ef4444)' }}>

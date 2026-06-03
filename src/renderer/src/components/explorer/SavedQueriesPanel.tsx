@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react'
 import { ChevronRight, Trash2 } from 'lucide-react'
 import type { HistoryEntry, SavedQuery } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { Button } from '@renderer/components/common/Button'
 
 type Tab = 'saved' | 'history'
 
@@ -151,9 +152,9 @@ function HistoryTab({
     <>
       <div className="sq-toolbar">
         <span className="spacer" />
-        <button className="ghost danger" onClick={onClear}>
+        <Button variant="ghost" className="danger" onClick={onClear}>
           Clear
-        </button>
+        </Button>
       </div>
       <div className="sq-list">
         {entries.map((h) => (
