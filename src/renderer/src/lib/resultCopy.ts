@@ -15,6 +15,7 @@
  */
 import { isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
+import { cellValue, deriveColumns } from './tableShape'
 import { useAppStore } from '@renderer/store/useAppStore'
 
 type Dict = Record<string, unknown>
@@ -122,6 +123,47 @@ export function plainScalarText(value: unknown): string {
   if (typeof p === 'string') return p
   if (typeof p === 'number' || typeof p === 'boolean') return String(p)
   return JSON.stringify(p, null, 2)
+}
+
+// ----------------------------------------------------------------- CSV / TSV
+
+/** Quote a field (doubling internal quotes) only when it contains the delimiter,
+    a quote, or a newline — standard RFC-4180-style escaping. */
+function escapeField(text: string, delimiter: string): string {
+  if (text.includes(delimiter) || text.includes('"') || text.includes('\n')) {
+    return `"${text.replace(/"/g, '""')}"`
+  }
+  return text
+}
+
+/** One cell's text: scalars plain, nested objects/arrays as compact JSON. */
+function cellText(doc: unknown, column: string): string {
+  const { present, value } = cellValue(doc, column)
+  if (!present) return ''
+  const p = toPlainValue(value)
+  if (p === null) return ''
+  return typeof p === 'object' ? JSON.stringify(p) : String(p)
+}
+
+/** Serialize docs as a delimited table (header row + one row per doc), using the
+    same column derivation as the Table view. */
+function toDelimited(docs: unknown[], delimiter: string): string {
+  const cols = deriveColumns(docs)
+  const header = cols.map((c) => escapeField(c, delimiter)).join(delimiter)
+  const rows = docs.map((doc) =>
+    cols.map((c) => escapeField(cellText(doc, c), delimiter)).join(delimiter)
+  )
+  return [header, ...rows].join('\n')
+}
+
+/** Comma-separated table with a header row. */
+export function toCsv(docs: unknown[]): string {
+  return toDelimited(docs, ',')
+}
+
+/** Tab-separated table with a header row (pastes cleanly into Excel/Sheets). */
+export function toTsv(docs: unknown[]): string {
+  return toDelimited(docs, '\t')
 }
 
 /**

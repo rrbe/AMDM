@@ -1,14 +1,17 @@
 import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
+import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import {
   copyText,
   plainScalarText,
+  toCsv,
   toPlainJson,
   toShellText,
-  toStrictEjson
+  toStrictEjson,
+  toTsv
 } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import { DocEditor } from './DocEditor'
@@ -44,32 +47,6 @@ const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 const ACTIONS_COL_WIDTH = 72
 
-type Dict = Record<string, unknown>
-
-function isPlainObject(value: unknown): value is Dict {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-/** Compute the value for `column` from a document, one-level dot-flattened. */
-function cellValue(doc: unknown, column: string): { present: boolean; value: unknown } {
-  if (!isPlainObject(doc)) {
-    return column === '(value)' ? { present: true, value: doc } : { present: false, value: undefined }
-  }
-  const dot = column.indexOf('.')
-  if (dot === -1) {
-    if (!Object.prototype.hasOwnProperty.call(doc, column)) return { present: false, value: undefined }
-    return { present: true, value: doc[column] }
-  }
-  const parent = column.slice(0, dot)
-  const child = column.slice(dot + 1)
-  const parentVal = doc[parent]
-  if (isPlainObject(parentVal) && !isExtended(parentVal)) {
-    if (!Object.prototype.hasOwnProperty.call(parentVal, child)) return { present: false, value: undefined }
-    return { present: true, value: parentVal[child] }
-  }
-  return { present: false, value: undefined }
-}
-
 export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const parentRef = useRef<HTMLDivElement>(null)
   const [editIndex, setEditIndex] = useState<number | null>(null)
@@ -102,42 +79,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     window.addEventListener('mouseup', onUp)
   }
 
-  const columns = useMemo<string[]>(() => {
-    const seen = new Set<string>()
-    const cols: string[] = []
-    let sawNonObject = false
-    for (const doc of docs) {
-      if (!isPlainObject(doc)) {
-        sawNonObject = true
-        continue
-      }
-      for (const [key, val] of Object.entries(doc)) {
-        if (isPlainObject(val) && !isExtended(val)) {
-          // One-level flatten of nested plain objects.
-          const childKeys = Object.keys(val)
-          if (childKeys.length === 0) {
-            if (!seen.has(key)) {
-              seen.add(key)
-              cols.push(key)
-            }
-          } else {
-            for (const ck of childKeys) {
-              const col = `${key}.${ck}`
-              if (!seen.has(col)) {
-                seen.add(col)
-                cols.push(col)
-              }
-            }
-          }
-        } else if (!seen.has(key)) {
-          seen.add(key)
-          cols.push(key)
-        }
-      }
-    }
-    if (sawNonObject && cols.length === 0) cols.push('(value)')
-    return cols
-  }, [docs])
+  const columns = useMemo<string[]>(() => deriveColumns(docs), [docs])
 
   const rowVirtualizer = useVirtualizer({
     count: docs.length,
@@ -316,13 +258,13 @@ function tableMenuItems(
     items.push({ label: '复制单元格', onClick: () => void copyText(present ? plainScalarText(value) : '') })
   }
   const single = docs[row]
-  items.push({ label: '复制行 (文档)', onClick: () => void copyText(toPlainJson(single)) })
-  if (rows.length > 1) {
-    const sel = rows.map((i) => docs[i])
-    items.push({ label: `复制 ${rows.length} 行`, onClick: () => void copyText(toPlainJson(sel)) })
-  }
-  items.push({ label: '复制行 (Shell 风格)', onClick: () => void copyText(toShellText(single)) })
-  items.push({ label: '复制行 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(single)) })
+  const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
+  const many = rows.length > 1
+  items.push({ label: many ? `复制 ${rows.length} 行 (Pure JSON)` : '复制行 (Pure JSON)', onClick: () => void copyText(many ? toPlainJson(sel) : toPlainJson(single)) })
+  items.push({ label: '复制行 (MongoShell JS)', onClick: () => void copyText(many ? toShellText(sel) : toShellText(single)) })
+  items.push({ label: '复制行 (Extended JSON)', onClick: () => void copyText(many ? toStrictEjson(sel) : toStrictEjson(single)) })
+  items.push({ label: '复制为 CSV', onClick: () => void copyText(toCsv(sel)) })
+  items.push({ label: '复制为 TSV', onClick: () => void copyText(toTsv(sel)) })
   return items
 }
 

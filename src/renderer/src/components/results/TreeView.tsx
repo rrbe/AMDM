@@ -259,9 +259,9 @@ function treeMenuItems(node: FlatNode, docs: unknown[]): ContextMenuItem[] {
   const rootDoc = docs[Number(node.id.split('.')[0])]
   if (node.depth === 0) {
     return [
-      { label: '复制文档', onClick: () => void copyText(toPlainJson(node.value)) },
-      { label: '复制文档 (Shell 风格)', onClick: () => void copyText(toShellText(node.value)) },
-      { label: '复制文档 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(node.value)) }
+      { label: '复制文档 (Pure JSON)', onClick: () => void copyText(toPlainJson(node.value)) },
+      { label: '复制文档 (MongoShell JS)', onClick: () => void copyText(toShellText(node.value)) },
+      { label: '复制文档 (Extended JSON)', onClick: () => void copyText(toStrictEjson(node.value)) }
     ]
   }
   const valueText = node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
@@ -270,9 +270,9 @@ function treeMenuItems(node: FlatNode, docs: unknown[]): ContextMenuItem[] {
     { label: '复制值', onClick: () => void copyText(valueText) },
     { label: '复制键', onClick: () => void copyText(node.keyLabel) },
     { label: '复制字段', onClick: () => void copyText(`${JSON.stringify(node.keyLabel)}: ${fieldJson}`) },
-    { label: '复制所在文档', onClick: () => void copyText(toPlainJson(rootDoc)) },
-    { label: '复制所在文档 (Shell 风格)', onClick: () => void copyText(toShellText(rootDoc)) },
-    { label: '复制所在文档 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(rootDoc)) }
+    { label: '复制所在文档 (Pure JSON)', onClick: () => void copyText(toPlainJson(rootDoc)) },
+    { label: '复制所在文档 (MongoShell JS)', onClick: () => void copyText(toShellText(rootDoc)) },
+    { label: '复制所在文档 (Extended JSON)', onClick: () => void copyText(toStrictEjson(rootDoc)) }
   ]
 }
 

@@ -3,7 +3,7 @@ import { Copy } from 'lucide-react'
 import type { ShellResult } from '@shared/types'
 import { useAppStore, type ResultView } from '@renderer/store/useAppStore'
 import { docActionContext } from '@renderer/lib/docActions'
-import { copyText, toPlainJson, toShellText, toStrictEjson } from '@renderer/lib/resultCopy'
+import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
@@ -122,9 +122,11 @@ export function ResultPanel(): JSX.Element {
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            { label: '复制全部 (Plain JSON)', onClick: () => void copyText(toPlainJson(docs)) },
-            { label: '复制全部 (Shell 风格)', onClick: () => void copyText(toShellText(docs)) },
-            { label: '复制全部 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(docs)) }
+            { label: '复制全部 (Pure JSON)', onClick: () => void copyText(toPlainJson(docs)) },
+            { label: '复制全部 (MongoShell JS)', onClick: () => void copyText(toShellText(docs)) },
+            { label: '复制全部 (Extended JSON)', onClick: () => void copyText(toStrictEjson(docs)) },
+            { label: '复制全部为 CSV', onClick: () => void copyText(toCsv(docs)) },
+            { label: '复制全部为 TSV', onClick: () => void copyText(toTsv(docs)) }
           ]}
         />
       )}

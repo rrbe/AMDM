@@ -71,9 +71,9 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
     const sel = window.getSelection()
     const selText = sel && !sel.isCollapsed ? sel.toString() : ''
     const items: ContextMenuItem[] = [
-      { label: '复制全部 (Plain JSON)', onClick: () => void copyText(toPlainJson(docs)) },
-      { label: '复制全部 (Shell 风格)', onClick: () => void copyText(toShellText(docs)) },
-      { label: '复制全部 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(docs)) }
+      { label: '复制全部 (Pure JSON)', onClick: () => void copyText(toPlainJson(docs)) },
+      { label: '复制全部 (MongoShell JS)', onClick: () => void copyText(toShellText(docs)) },
+      { label: '复制全部 (Extended JSON)', onClick: () => void copyText(toStrictEjson(docs)) }
     ]
     if (selText) items.unshift({ label: '复制选区', onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })
