@@ -1,12 +1,24 @@
 import vm from 'node:vm'
 import { ObjectId, Long, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
-import type { Db } from 'mongodb'
+import { FindCursor } from 'mongodb'
+import type { Db, Document } from 'mongodb'
 import type { ShellRequest, ShellResult } from '../../shared/types'
 import { sessionManager } from './sessionManager'
 import { serializerPool } from '../workers/serializerPool'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
+
+// mongosh / NoSQLBooster expose `cursor.projection(spec)`, but the Node driver's
+// FindCursor only has `project(spec)`. Add the alias once (idempotent) so shell
+// snippets copied from those tools run unchanged. Chaining stays intact because
+// it's a real prototype method that returns `this` like the others.
+const findCursorProto = FindCursor.prototype as unknown as Record<string, unknown>
+if (typeof findCursorProto.projection !== 'function') {
+  findCursorProto.projection = function (this: FindCursor, spec: Document): FindCursor {
+    return this.project(spec)
+  }
+}
 
 /**
  * Build the sandbox `db` object. `db.<name>` resolves to a real Collection
@@ -30,10 +42,23 @@ function makeDbProxy(db: Db): Db {
   })
 }
 
+/**
+ * Wrap a BSON class so it can be invoked both as `ObjectId("…")` (mongo-shell
+ * style, no `new`) and as `new ObjectId("…")`. Modern bson constructors are ES
+ * classes that throw "Class constructor … cannot be invoked without 'new'" when
+ * called plainly; the Proxy's apply trap bridges that, while statics
+ * (`ObjectId.isValid`, …) and `instanceof` pass straight through to the class.
+ */
+function callableCtor<T extends new (...args: never[]) => unknown>(Ctor: T): T {
+  return new Proxy(Ctor, {
+    apply: (target, _thisArg, args) => Reflect.construct(target, args as never[])
+  })
+}
+
 function makeSandbox(db: Db): Record<string, unknown> {
   return {
     db: makeDbProxy(db),
-    ObjectId,
+    ObjectId: callableCtor(ObjectId),
     ISODate: (s?: string) => (s ? new Date(s) : new Date()),
     Date,
     NumberLong: (v: string | number) => Long.fromString(String(v)),
@@ -42,9 +67,9 @@ function makeSandbox(db: Db): Record<string, unknown> {
     UUID: (s?: string) => (s ? new UUID(s) : new UUID()),
     BinData: (subtype: number, base64: string) =>
       new Binary(Buffer.from(base64, 'base64'), subtype),
-    Timestamp,
-    MinKey,
-    MaxKey,
+    Timestamp: callableCtor(Timestamp),
+    MinKey: callableCtor(MinKey),
+    MaxKey: callableCtor(MaxKey),
     // Shell print helpers are no-ops here; the result is the completion value.
     print: () => undefined,
     printjson: () => undefined,
