@@ -1,0 +1,394 @@
+/**
+ * Shell-on-driver core (ADR-0003) — the part that turns a user's JavaScript
+ * snippet into a typed-BSON {@link ShellResult}, with NO Electron/session
+ * dependencies so it can be exercised in isolation against a real `Db`.
+ *
+ * `executeShell` (shellEngine.ts) is a thin wrapper that resolves the live
+ * MongoClient and delegates here. Keeping this module free of `sessionManager`
+ * (which pulls in Electron `safeStorage`) is what makes the shell testable.
+ *
+ * We intentionally implement only the focused subset of the mongosh /
+ * NoSQLBooster surface the user actually needs; gaps should surface as clear
+ * errors, never silent wrong behavior (ADR-0003).
+ */
+import vm from 'node:vm'
+import { ObjectId, Long, Int32, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
+import { FindCursor, AggregationCursor } from 'mongodb'
+import type { Collection, Db, Document, FindOptions } from 'mongodb'
+import type { ShellResult } from '../../shared/types'
+import { serializerPool } from '../workers/serializerPool'
+
+const DEFAULT_LIMIT = 50
+const EXEC_TIMEOUT_MS = 30_000
+
+// ---------------------------------------------------------------------------
+// Cursor prototype shims — mongosh / NoSQLBooster compatibility
+// ---------------------------------------------------------------------------
+// The Node driver's cursors lack a few helpers shell users reach for. We add
+// them once, idempotently, on the prototypes. They return `this` (chainable) or
+// a value, matching shell semantics. Patching the prototype (vs. wrapping each
+// cursor) keeps chaining intact and costs nothing per query.
+
+function patchSharedCursorMethods(proto: Record<string, unknown>): void {
+  // `.pretty()` is a display affordance in the shell; here rendering is the
+  // GUI's job, so it's a chainable no-op.
+  if (typeof proto.pretty !== 'function') {
+    proto.pretty = function pretty(this: unknown): unknown {
+      return this
+    }
+  }
+  // `.itcount()` / `.size()` materialize the cursor and report the count. The
+  // user asked for this explicitly (unlike a bare cursor, which stays bounded).
+  if (typeof proto.itcount !== 'function') {
+    proto.itcount = async function itcount(
+      this: { toArray(): Promise<unknown[]> }
+    ): Promise<number> {
+      return (await this.toArray()).length
+    }
+  }
+  if (typeof proto.size !== 'function') {
+    proto.size = function size(this: { itcount(): Promise<number> }): Promise<number> {
+      return this.itcount()
+    }
+  }
+}
+
+const findCursorProto = FindCursor.prototype as unknown as Record<string, unknown>
+// mongosh / NoSQLBooster expose `cursor.projection(spec)`; the driver only has
+// `project(spec)`. Alias it so copied snippets run unchanged.
+if (typeof findCursorProto.projection !== 'function') {
+  findCursorProto.projection = function projection(this: FindCursor, spec: Document): FindCursor {
+    return this.project(spec)
+  }
+}
+patchSharedCursorMethods(findCursorProto)
+patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string, unknown>)
+
+// ---------------------------------------------------------------------------
+// Collection proxy — adapts shell-flavored calls to the driver
+// ---------------------------------------------------------------------------
+
+/**
+ * mongosh's `find(query, projection)` / `findOne(query, projection)` take the
+ * projection as the SECOND POSITIONAL argument, whereas the driver's second arg
+ * is a `FindOptions` object. Translate so the common shell idiom
+ * `db.coll.find({}, { name: 1, _id: 0 })` projects instead of silently
+ * returning whole documents. An optional third arg is merged as driver options.
+ */
+function buildFindOptions(projection?: Document, options?: Document): FindOptions | undefined {
+  if (!projection && !options) return undefined
+  return { ...(options ?? {}), ...(projection ? { projection } : {}) } as FindOptions
+}
+
+/**
+ * Wrap a Collection so a handful of shell-only spellings work, while every
+ * other method/property passes straight through to the real driver Collection.
+ */
+function makeCollProxy(coll: Collection): Collection {
+  return new Proxy(coll, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
+      switch (prop) {
+        case 'find':
+          return (filter?: Document, projection?: Document, options?: Document) =>
+            target.find(filter ?? {}, buildFindOptions(projection, options))
+        case 'findOne':
+          return (filter?: Document, projection?: Document, options?: Document) =>
+            target.findOne(filter ?? {}, buildFindOptions(projection, options))
+        // mongosh `getIndexes()` → driver `indexes()`.
+        case 'getIndexes':
+          return () => target.indexes()
+      }
+      const val = (target as unknown as Record<string, unknown>)[prop]
+      return typeof val === 'function' ? (val as (...a: unknown[]) => unknown).bind(target) : val
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// db proxy (ADR-0003)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the sandbox `db` object. `db.<name>` resolves to a (wrapped) real
+ * Collection (so `db.lives.find()` works), genuine Db methods pass through, and
+ * a set of mongosh-only `db` helpers are shimmed onto driver equivalents so
+ * snippets copied from mongosh / NoSQLBooster run unchanged. Anything genuinely
+ * unsupported surfaces as an error rather than silent wrong behavior.
+ */
+export function makeDbProxy(db: Db): Db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
+      switch (prop) {
+        case 'getCollection':
+          return (name: string) => makeCollProxy(target.collection(name))
+        // Driver `db.collection(name)` also yields a wrapped collection so the
+        // find/findOne projection shim applies regardless of spelling.
+        case 'collection':
+          return (name: string) => makeCollProxy(target.collection(name))
+        case 'getSiblingDB':
+          return (name: string) => makeDbProxy(target.client.db(name))
+        // mongosh `db.runCommand(cmd)` → driver `db.command(cmd)`.
+        case 'runCommand':
+          return (cmd: Document) => target.command(cmd)
+        // mongosh `db.adminCommand(cmd)` → `db.admin().command(cmd)`.
+        case 'adminCommand':
+          return (cmd: Document) => target.admin().command(cmd)
+        case 'getCollectionNames':
+          return () =>
+            target
+              .listCollections({}, { nameOnly: true })
+              .toArray()
+              .then((cs) => cs.map((c) => c.name))
+        case 'getCollectionInfos':
+          return (filter?: Document) => target.listCollections(filter ?? {}).toArray()
+        case 'getName':
+          return () => target.databaseName
+        case 'version':
+          return () =>
+            target
+              .admin()
+              .command({ buildInfo: 1 })
+              .then((r: Document) => r.version)
+      }
+      if (prop in target) {
+        const val = (target as unknown as Record<string, unknown>)[prop]
+        return typeof val === 'function' ? (val as (...a: unknown[]) => unknown).bind(target) : val
+      }
+      // Unknown property → treat as a collection name (mongosh: `db.<coll>`).
+      return makeCollProxy(target.collection(prop))
+    }
+  })
+}
+
+/**
+ * Wrap a BSON class so it works both as `ObjectId("…")` (mongo-shell style, no
+ * `new`) and as `new ObjectId("…")`. Modern bson constructors are ES classes
+ * that throw when called without `new`; the apply trap bridges that, while
+ * statics (`ObjectId.isValid`, …) and `instanceof` pass through to the class.
+ */
+function callableCtor<T extends new (...args: never[]) => unknown>(Ctor: T): T {
+  return new Proxy(Ctor, {
+    apply: (target, _thisArg, args) => Reflect.construct(target, args as never[])
+  })
+}
+
+export function makeSandbox(db: Db): Record<string, unknown> {
+  return {
+    db: makeDbProxy(db),
+    ObjectId: callableCtor(ObjectId),
+    ISODate: (s?: string) => (s ? new Date(s) : new Date()),
+    Date,
+    NumberLong: (v: string | number) => Long.fromString(String(v)),
+    // Shell `NumberInt` is a true 32-bit int, not a JS double.
+    NumberInt: (v: string | number) => new Int32(parseInt(String(v), 10)),
+    NumberDecimal: (v: string | number) => Decimal128.fromString(String(v)),
+    UUID: (s?: string) => (s ? new UUID(s) : new UUID()),
+    BinData: (subtype: number, base64: string) =>
+      new Binary(Buffer.from(base64, 'base64'), subtype),
+    // mongosh `Timestamp(t, i)` passes two numbers; bson's class wants a single
+    // `{ t, i }` / Long / bigint. Bridge the two-arg form, default to (0, 0).
+    Timestamp: (t?: number | Long | bigint | { t: number; i: number }, i?: number) => {
+      if (t === undefined) return new Timestamp({ t: 0, i: 0 })
+      if (typeof t === 'number') return new Timestamp({ t, i: i ?? 0 })
+      if (typeof t === 'bigint') return new Timestamp(t)
+      if (t instanceof Long) return new Timestamp(t)
+      return new Timestamp(t)
+    },
+    MinKey: callableCtor(MinKey),
+    MaxKey: callableCtor(MaxKey),
+    // Shell print helpers are no-ops here; the result is the completion value.
+    print: () => undefined,
+    printjson: () => undefined,
+    console: { log: () => undefined, error: () => undefined, warn: () => undefined }
+  }
+}
+
+interface CursorLike {
+  [Symbol.asyncIterator](): AsyncIterator<unknown>
+  close?: () => Promise<void>
+}
+
+function isCursor(v: unknown): v is CursorLike {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    typeof (v as { toArray?: unknown }).toArray === 'function' &&
+    typeof (v as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === 'function'
+  )
+}
+
+async function drainCursor(
+  cursor: CursorLike,
+  limit: number
+): Promise<{ docs: unknown[]; truncated: boolean }> {
+  const docs: unknown[] = []
+  for await (const doc of cursor) {
+    docs.push(doc)
+    if (docs.length > limit) break // fetch one extra to detect truncation
+  }
+  const truncated = docs.length > limit
+  if (truncated) docs.pop()
+  await cursor.close?.().catch(() => {})
+  return { docs, truncated }
+}
+
+/** A driver write result (insert/update/delete/replace/bulkWrite). */
+function isWriteAck(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false
+  if ('acknowledged' in v) return true
+  // BulkWriteResult carries no `acknowledged` field but is still a write summary.
+  return (v as { constructor?: { name?: string } }).constructor?.name === 'BulkWriteResult'
+}
+
+/**
+ * Errors thrown inside the `vm` sandbox come from a different realm, so
+ * `instanceof Error` is false for them even though they carry the real
+ * `name`/`message` (TypeError, ReferenceError, …). Duck-type instead, so the
+ * renderer shows the true error name rather than a flattened "Error".
+ */
+function describeError(err: unknown): { error: string; errorName: string } {
+  if (err && typeof err === 'object') {
+    const e = err as { name?: unknown; message?: unknown }
+    const message = typeof e.message === 'string' ? e.message : undefined
+    const name = typeof e.name === 'string' ? e.name : undefined
+    if (message !== undefined || name !== undefined) {
+      return { error: message ?? String(err), errorName: name ?? 'Error' }
+    }
+  }
+  return { error: String(err), errorName: 'Error' }
+}
+
+interface Explainable {
+  explain(verbosity: string): Promise<unknown>
+}
+
+function isExplainable(v: unknown): v is Explainable {
+  return !!v && typeof v === 'object' && typeof (v as { explain?: unknown }).explain === 'function'
+}
+
+const DB_METHODS = new Set([
+  'getCollection',
+  'getSiblingDB',
+  'getCollectionNames',
+  'getCollectionInfos',
+  'getName',
+  'version',
+  'runCommand',
+  'adminCommand',
+  'aggregate',
+  'command',
+  'stats',
+  'listCollections',
+  'admin',
+  'collection',
+  'dropDatabase',
+  'createCollection',
+  'watch'
+])
+
+/** Best-effort: which collection does this code target (for doc edit/delete)? */
+export function detectCollection(code: string): string | undefined {
+  const getColl = /\bdb\.getCollection\(\s*['"]([^'"]+)['"]\s*\)/.exec(code)
+  if (getColl) return getColl[1]
+  const bracket = /\bdb\[\s*['"]([^'"]+)['"]\s*\]/.exec(code)
+  if (bracket) return bracket[1]
+  const dot = /\bdb\.([A-Za-z_$][\w$]*)/.exec(code)
+  if (dot && !DB_METHODS.has(dot[1])) return dot[1]
+  return undefined
+}
+
+export interface RunShellOptions {
+  /** Default page size applied to bare cursors (ADR-0004 rule 2). */
+  limit?: number
+  /** Run the query under explain('executionStats') instead of fetching docs. */
+  explain?: boolean
+}
+
+/**
+ * Execute `code` against `db` in a `vm` sandbox and shape the completion value
+ * into a {@link ShellResult}. The completion value of the script is the value
+ * of its last expression (REPL semantics), so `db.coll.find({})` yields the
+ * cursor, which we then drain to a bounded page.
+ */
+export async function runShellOnDb(
+  db: Db,
+  code: string,
+  options: RunShellOptions = {}
+): Promise<ShellResult> {
+  const limit = options.limit ?? DEFAULT_LIMIT
+  const started = Date.now()
+  const collection = detectCollection(code)
+
+  try {
+    const sandbox = makeSandbox(db)
+    const context = vm.createContext(sandbox)
+    const script = new vm.Script(code, { filename: 'shell.js' })
+    let result: unknown = script.runInContext(context, { timeout: EXEC_TIMEOUT_MS })
+
+    // Unwrap a returned promise (findOne, updateOne, countDocuments, …).
+    if (result && typeof (result as { then?: unknown }).then === 'function') {
+      result = await result
+    }
+
+    // Explain path: don't fetch — run explain('executionStats') on the cursor.
+    if (options.explain) {
+      if (isExplainable(result)) {
+        const plan = await result.explain('executionStats')
+        return {
+          kind: 'explain',
+          data: await serializerPool.serializeOne(plan),
+          collection,
+          elapsedMs: Date.now() - started
+        }
+      }
+      return {
+        kind: 'error',
+        error: 'Explain is only supported for find()/aggregate() queries.',
+        errorName: 'ExplainError',
+        collection,
+        elapsedMs: Date.now() - started
+      }
+    }
+
+    const elapsedMs = Date.now() - started
+
+    if (isCursor(result)) {
+      const { docs, truncated } = await drainCursor(result, limit)
+      return {
+        kind: 'documents',
+        data: await serializerPool.serialize(docs),
+        count: docs.length,
+        truncated,
+        collection,
+        elapsedMs: Date.now() - started
+      }
+    }
+
+    if (Array.isArray(result)) {
+      return {
+        kind: 'documents',
+        data: await serializerPool.serialize(result),
+        count: result.length,
+        truncated: false,
+        collection,
+        elapsedMs
+      }
+    }
+
+    if (isWriteAck(result)) {
+      return { kind: 'ack', data: await serializerPool.serializeOne(result), collection, elapsedMs }
+    }
+
+    return {
+      kind: 'value',
+      data: await serializerPool.serializeOne(result ?? null),
+      collection,
+      elapsedMs
+    }
+  } catch (err) {
+    const { error, errorName } = describeError(err)
+    return { kind: 'error', error, errorName, collection, elapsedMs: Date.now() - started }
+  }
+}

@@ -23,9 +23,11 @@ pnpm dev          # 启动应用 + 热重载（electron-vite dev）
 pnpm typecheck    # 类型检查 main + renderer —— 这是唯一的校验闸门
 pnpm build        # 生产构建到 ./out
 pnpm start        # 预览已构建的应用（electron-vite preview）
+pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 ```
 
-- **没有测试框架,也没有配置 linter。** `pnpm typecheck`（先 `typecheck:node` 再 `typecheck:web`,分别对应两个 tsconfig）是唯一的自动化校验——改完务必跑一次。不要臆造 `pnpm test` / `pnpm lint`。
+- **类型检查是主校验闸门，但 shell 引擎有测试。** `pnpm typecheck`（先 `typecheck:node` 再 `typecheck:web`,分别对应两个 tsconfig）覆盖全量类型——改完务必跑一次。`pnpm test`（Vitest）目前覆盖**核心 shell 引擎**（`test/shellCore.test.ts`），用 `mongodb-memory-server` 起真实 MongoDB 跑集成测试，断言 EJSON-canonical 线格式。**没有 linter；除 shell 引擎外大部分代码暂无测试。** 测试细节见下方「Shell-on-driver」。
+- **`pnpm test` 怎么跑：** 测试放在 `test/`（**不在两个 tsconfig 的 include 里**,所以 `pnpm typecheck` 不会检查它们）。`test/helpers/mongo.ts` 优先复用 `~/.cache/mongodb-binaries` 里已缓存的 `mongod` 二进制（`systemBinary`,**零下载**）；本机没有缓存二进制时 mms 会尝试联网下载。`mongodb-memory-server` 的 postinstall 已被 pnpm v10 拦截（不在 `onlyBuiltDependencies`）,所以 `pnpm install` 不会触发下载。测试里 `serializerPool.dispose()` 强制走内联序列化（worker 产物在测试期未构建,内联用的是同一份 core,行为一致）。
 - **必须用 pnpm。** `.npmrc` 设了 `node-linker=hoisted`（Electron 不喜欢 pnpm 的软链接隔离布局）,且 `package.json#pnpm.onlyBuiltDependencies` 放行了 `electron`+`esbuild`,否则它们的二进制装不全——pnpm v10 默认拦截依赖的构建脚本。新增需要原生/下载二进制的依赖时,也要加进这里。
 
 ## 进程架构
@@ -42,7 +44,16 @@ pnpm start        # 预览已构建的应用（electron-vite preview）
 ## 跨文件的关键机制（需读多个文件才能理解）
 
 ### Shell-on-driver（ADR-0003）
-`main/mongo/shellEngine.ts` 在 Node `vm` 沙箱里执行用户的 JS,其中 `db` 是官方 driver `Db` 上的 `Proxy`：`db.<任意名>` 解析为真实的 `Collection`(所以 `db.lives.find()` 能用),真正的 `Db` 方法直接透传,`getSiblingDB`/`getCollection` 与 EJSON 构造器（`ObjectId`、`ISODate`、`NumberLong`…）则做了 shim。我们**有意只实现 shell API 的一个子集**——缺失的应当报错,绝不静默错。脚本的最后一个表达式的求值结果即为返回值（REPL 语义）；游标按有界页拉取（`DEFAULT_LIMIT = 50`,多取一条用于判断是否被截断）。绝不把整个集合塞进内存。
+拆成两层：**`main/mongo/shellCore.ts`** 是纯执行核心（不依赖 `sessionManager`/electron,所以能在 `vm` 里对真实 `Db` 单测,见 `test/shellCore.test.ts`）；**`main/mongo/shellEngine.ts`** 只是薄封装——从 `sessionManager` 取出活跃 client 再委托给 `runShellOnDb`。
+
+核心在 Node `vm` 沙箱里执行用户的 JS,其中 `db` 是官方 driver `Db` 上的 `Proxy`：`db.<任意名>` 解析为真实的 `Collection`(所以 `db.lives.find()` 能用),真正的 `Db` 方法直接透传。为兼容 mongosh / NoSQLBooster 复制来的片段,做了一批 shim：
+
+- **db 层**：`getCollection`、`getSiblingDB`、`getCollectionNames`、`getCollectionInfos`、`getName`、`version`、`runCommand`（→`db.command`）、`adminCommand`（→`db.admin().command`）。
+- **collection 层**（每个集合套一层 Proxy）：`find(q, projection)` / `findOne(q, projection)` 把**第二个位置参数当 projection**（mongosh 语义,而非 driver 的 options),`getIndexes()`（→`indexes()`）,其余方法原样透传。
+- **cursor 层**（patch 到 `FindCursor`/`AggregationCursor` 原型,幂等）：`projection()`（→`project()`）、`pretty()`（链式 no-op）、`itcount()`/`size()`（物化后计数）。
+- **EJSON 构造器**：`ObjectId`/`ISODate`/`NumberLong`/`NumberInt`(→真正的 `Int32`)/`NumberDecimal`/`UUID`/`BinData`/`Timestamp`(支持 mongosh 的 `Timestamp(t, i)` 两参形式)/`MinKey`/`MaxKey`；构造器都包了 `callableCtor`,可带/不带 `new` 调用。
+
+我们**有意只实现 shell API 的一个子集**——缺失的应当报错,绝不静默错（典型坑:从前 `db.runCommand(...)` 会被当成名为 "runCommand" 的集合,已修）。注意 `vm` 沙箱里抛出的错误来自**不同 realm**,`instanceof Error` 为 false——`describeError` 用 duck-typing 提取真实 `name`/`message`,否则错误名会被压平成 "Error"。脚本的最后一个表达式的求值结果即为返回值（REPL 语义,**只 await 末尾表达式的 promise**,因此多条 async 语句之间不会相互 await——批量操作应走服务端 aggregation/`bulkWrite`）；游标按有界页拉取（`DEFAULT_LIMIT = 50`,多取一条用于判断是否被截断）。绝不把整个集合塞进内存。
 
 ### 序列化下沉到 worker + 内联降级（ADR-0004 第 3、4 条）
 `main/workers/serializerPool.ts` 是单个常驻 worker（`serializer.worker.ts`,作为**独立的 rollup input** 构建为 `out/main/serializer.worker.js`）的主线程客户端。主线程只做开销小的二进制 `BSON.serialize`；worker 做昂贵的 EJSON 编码 + 字段提取。**关键健壮性契约：** worker 起不来或崩溃时,池会透明地降级为内联执行**同一份** core 帮助函数（`serialize-core.ts`）——绝不能因 worker 抖动而白屏或卡死。改动池时,务必保住这套降级逻辑和那条 "no transferList" 注释（转移 BSON buffer 可能误伤 Node 的共享分配池）。退出时（`will-quit`）销毁。
