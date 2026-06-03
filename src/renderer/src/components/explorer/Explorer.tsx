@@ -356,7 +356,9 @@ function ConnectionRow({
           <XCircle size={15} className="err" />
         ) : state === 'connecting' ? (
           <Loader2 size={15} className="spin" />
-        ) : null}
+        ) : (
+          <span className="conn-dot-off" />
+        )}
       </span>
       <div className="conn-text">
         <div className="conn-name">{conn.name}</div>

@@ -304,13 +304,24 @@ label {
 .explorer-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: 0 0 auto;
+}
+/* Compact, square-ish header buttons (the wide default padding looks bloated). */
+.explorer-actions .ghost {
+  padding: 2px 7px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--fg-2);
+  border-radius: var(--radius-sm);
+}
+.explorer-actions .ghost:hover:not(:disabled) {
+  color: var(--fg-0);
 }
 .explorer-body {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 6px 6px 8px;
   user-select: none;
 }
 .explorer-empty {
@@ -345,10 +356,15 @@ label {
 .conn-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 7px;
+  padding: 4px 7px;
+  margin: 1px 0;
   cursor: pointer;
   border-left: 2px solid transparent;
+}
+/* Top-level connections need a tighter twisty than deep catalog rows. */
+.conn-item .tree-twisty {
+  width: 14px;
 }
 .conn-item:hover {
   background: var(--bg-2);
@@ -360,16 +376,24 @@ label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  line-height: 1.3;
+  /* Side panel: connection name + host:port render in the code font
+     (Source Code Pro); the catalog tree (db / collection names) stays on the
+     UI font, and the editor / data views are untouched. */
+  font-family: var(--font-mono);
 }
 .conn-item .conn-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--fg-0);
+  font-weight: 600;
+  line-height: 1.35;
 }
 .conn-item .conn-sub {
   color: var(--fg-3);
   font-size: var(--fs-sm);
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -396,6 +420,14 @@ label {
 }
 .conn-status .err {
   color: var(--err);
+}
+/* Disconnected: a quiet hollow ring so the status column never reads as blank. */
+.conn-dot-off {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--fg-3);
+  opacity: 0.5;
 }
 
 /* Quiet delete: muted by default, danger-red only on hover */
