@@ -5,17 +5,13 @@
 
 ## P1 — 近期高价值（最常被硌到 / 真实功能缺口）
 
-### 1. 结果翻页 / 加载更多　`[难度: 中] [风险: 中]`　← 已选定为下一步
-现在结果只取前 50 条，UI 只显示一行灰字 `truncated — showing first 50`，想看后面得手动去编辑器改 `.skip().limit()`。对 NoSQLBooster 替代品这是最常见的限制。
-- **设计要点（已核对 `shellCore.ts`）**：脚本完成值是个**惰性 cursor**，`drainCursor` 多取一条判断截断。翻页对返回的 `FindCursor` 注入 `.skip(offset)` 再 drain 即可——`FindCursor` 有 `.skip()`，但 `AggregationCursor` **没有**。
-- **务实范围**：`FindCursor` → 真·上一页/下一页（重跑时注入 skip）；其余脚本（aggregate / 任意表达式）退化为「调大 limit 重取」。server 端在 `ShellResult` 多返回一个 `pageable` 标志，UI 据此决定是否显示翻页器。
-- 触链路：`shellCore.runShellOnDb`(加 `skip` option) → `ShellRequest`/`ShellResult` 类型 → `ipc`/`preload`/`registerIpc` → `shellEngine` → store(`runShell` 记住分页态 + `loadPage`) → `ResultPanel` 页脚翻页器。
-- 注意：动到**有测试的 shell 核心**，改完跑 `pnpm test`。
+### 1. 结果翻页 / 加载更多　✅ 已完成（2026-06-04）
+`FindCursor` 支持上一页/下一页（引擎注入 `skip`，`ShellResult.pageable` 标志），结果栏右侧出现翻页器 + 范围 `51–100`；聚合/脚本不可翻页时退化为调大每页条数。链路：`shellCore`（`skip` option + `pageable`）→ 类型/IPC → store（`resultSkip` + `loadPage`）→ `ResultPanel`。已补 3 个 shell 核心测试。
 
-### 2. 查询结果条数上限可配置　`[难度: 低] [风险: 低]`
-`DEFAULT_LIMIT = 50` 现在硬编码在 `shellCore.ts`。提升为 `AppSettings.queryLimit` + 编辑器头部可快速调整。与翻页天然配套，建议和 #1 一起做。
+### 2. 查询结果条数上限可配置　✅ 已完成（2026-06-04）
+`AppSettings.queryLimit`（默认 50，存量 settings.json 自动合并默认值）；结果栏「每页 [n]」控件，回车/失焦应用并从第一页重跑。`setQueryLimit` action。
 
-### 3. 停止执行 / Stop Script　`[难度: 中-高] [风险: 中]`
+### 3. 停止执行 / Stop Script　`[难度: 中-高] [风险: 中]`　← 建议的下一步
 `abort/cancel` 全代码库搜不到——跑飞的 find/aggregate 无法中断，对「性能优先」的工具是真实痛点。
 - 思路：执行时持有可取消句柄；优先用 driver 的 `AbortSignal`（近版本各操作支持）或 `maxTimeMS`；新增 `shell:abort` IPC 通道 + store action + 编辑器「停止」入口（右键菜单已留了 Stop Script 的位置）。
 - 难点：`vm` 跑的是任意 JS，信号注入不通用；先覆盖 find/aggregate 主路径。

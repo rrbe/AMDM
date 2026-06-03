@@ -299,6 +299,28 @@ describe('collection queries', () => {
     expect(r.count).toBe(50)
     expect(r.truncated).toBe(true)
   })
+
+  it('FindCursor is pageable; skip fetches the next page', async () => {
+    await db.collection('paged').insertMany(Array.from({ length: 60 }, (_, i) => ({ i })))
+    const p1 = await run('db.paged.find({}).sort({ i: 1 })', { limit: 50, skip: 0 })
+    expect(p1.pageable).toBe(true)
+    expect(p1.skip).toBe(0)
+    expect(p1.count).toBe(50)
+    expect(p1.truncated).toBe(true)
+    expect(Number((p1.data as any[])[0].i.$numberInt)).toBe(0)
+
+    const p2 = await run('db.paged.find({}).sort({ i: 1 })', { limit: 50, skip: 50 })
+    expect(p2.skip).toBe(50)
+    expect(p2.count).toBe(10)
+    expect(p2.truncated).toBe(false)
+    expect(Number((p2.data as any[])[0].i.$numberInt)).toBe(50)
+  })
+
+  it('AggregationCursor is not pageable', async () => {
+    const r = await run('db.nums.aggregate([{ $match: {} }])')
+    expect(r.kind).toBe('documents')
+    expect(r.pageable).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------

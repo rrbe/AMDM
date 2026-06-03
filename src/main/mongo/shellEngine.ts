@@ -14,5 +14,5 @@ import { runShellOnDb } from './shellCore'
 export async function executeShell(req: ShellRequest): Promise<ShellResult> {
   const client = sessionManager.getClient(req.connectionId)
   const db = client.db(req.database)
-  return runShellOnDb(db, req.code, { limit: req.limit, explain: req.explain })
+  return runShellOnDb(db, req.code, { limit: req.limit, skip: req.skip, explain: req.explain })
 }

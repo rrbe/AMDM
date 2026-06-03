@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
 import type { ShellResult } from '@shared/types'
 import { useAppStore, type ResultView } from '@renderer/store/useAppStore'
 import { docActionContext } from '@renderer/lib/docActions'
@@ -98,6 +98,8 @@ export function ResultPanel(): JSX.Element {
         </div>
         <ResultMeta result={result} docCount={docs.length} />
         <span className="result-bar-spacer" />
+        {result.kind === 'documents' && <PageSizeControl />}
+        {result.kind === 'documents' && <ResultPager result={result} />}
         <button
           className="ghost result-copy"
           title="复制全部结果"
@@ -148,11 +150,11 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
     const out: { text: string; cls?: string }[] = []
     if (result.kind === 'documents') {
       out.push({ text: `${result.count ?? docCount} doc${(result.count ?? docCount) === 1 ? '' : 's'}` })
-      if (result.truncated) {
-        out.push({
-          text: `truncated — showing first ${result.count ?? docCount}`,
-          cls: 'truncated'
-        })
+      // For pageable results the pager shows the range + a next button, so the
+      // "truncated" badge would be redundant. Keep it for non-pageable cursors
+      // (aggregate / scripts), where raising the page size is the only way on.
+      if (result.truncated && !result.pageable) {
+        out.push({ text: 'truncated — raise page size to see more', cls: 'truncated' })
       }
     } else if (result.kind === 'value') {
       out.push({ text: 'value' })
@@ -173,6 +175,79 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
         </span>
       ))}
     </div>
+  )
+}
+
+/**
+ * Prev/next pager. Only a FindCursor is pageable (the engine injects skip);
+ * aggregation/script results render no pager (the page-size control is their
+ * way to see more). Next is enabled only while the page is truncated.
+ */
+function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
+  const skip = useAppStore((s) => s.resultSkip)
+  const limit = useAppStore((s) => s.settings.queryLimit)
+  const running = useAppStore((s) => s.running)
+  const loadPage = useAppStore((s) => s.loadPage)
+
+  if (!result.pageable) return null
+
+  const count = result.count ?? 0
+  const from = count === 0 ? 0 : skip + 1
+  const to = skip + count
+  return (
+    <div className="result-pager">
+      <button
+        className="ghost"
+        disabled={skip === 0 || running}
+        title="上一页"
+        onClick={() => void loadPage(Math.max(0, skip - limit))}
+      >
+        <ChevronLeft size={15} />
+      </button>
+      <span className="result-range">
+        {from}–{to}
+      </span>
+      <button
+        className="ghost"
+        disabled={!result.truncated || running}
+        title="下一页"
+        onClick={() => void loadPage(skip + limit)}
+      >
+        <ChevronRight size={15} />
+      </button>
+    </div>
+  )
+}
+
+/** Page-size (per-page doc count) control; commits on blur / Enter, then re-runs. */
+function PageSizeControl(): JSX.Element {
+  const limit = useAppStore((s) => s.settings.queryLimit)
+  const setQueryLimit = useAppStore((s) => s.setQueryLimit)
+  const running = useAppStore((s) => s.running)
+  const [val, setVal] = useState(String(limit))
+  useEffect(() => setVal(String(limit)), [limit])
+
+  const commit = (): void => {
+    const n = Math.min(1000, Math.max(1, parseInt(val, 10) || limit))
+    setVal(String(n))
+    if (n !== limit) void setQueryLimit(n)
+  }
+  return (
+    <label className="page-size" title="每页条数（回车应用）">
+      <span>每页</span>
+      <input
+        type="number"
+        min={1}
+        max={1000}
+        value={val}
+        disabled={running}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        }}
+      />
+    </label>
   )
 }
 

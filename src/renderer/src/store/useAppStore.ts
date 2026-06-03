@@ -94,6 +94,8 @@ interface AppState {
   running: boolean
   /** The query that produced the current result (for refresh after edit/delete). */
   lastQuery: { connectionId: string; database: string; code: string } | null
+  /** Page offset of the current result (0 = first page). Driven by loadPage. */
+  resultSkip: number
 
   // ---- saved queries + history + autocomplete (Phase 2) ----
   savedQueries: SavedQuery[]
@@ -147,6 +149,11 @@ interface AppState {
   runShell(codeOverride?: string): Promise<void>
   runExplain(): Promise<void>
   refreshResult(): Promise<void>
+  /** Re-run the last query at a new page offset (prev/next). Only meaningful
+      when the current result is `pageable` (a FindCursor). */
+  loadPage(skip: number): Promise<void>
+  /** Change the page size and re-run the current query from the first page. */
+  setQueryLimit(n: number): Promise<void>
   clearError(): void
   /** Show a transient success/info/warning toast (errors use `lastError`). */
   notify(kind: NoticeKind, message: string): void
@@ -212,6 +219,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   resultView: 'tree',
   running: false,
   lastQuery: null,
+  resultSkip: 0,
 
   savedQueries: [],
   history: [],
@@ -515,16 +523,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (!code.trim()) return
     const database = activeDatabase || 'test'
+    const limit = get().settings.queryLimit
     set({ running: true, lastError: null })
     try {
-      const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code })
-      set({ result, lastQuery: { connectionId: activeConnectionId, database, code } })
+      // A fresh run always starts at page 0.
+      const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code, limit, skip: 0 })
+      set({ result, lastQuery: { connectionId: activeConnectionId, database, code }, resultSkip: 0 })
     } catch (e) {
       set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
     } finally {
       set({ running: false })
     }
     void get().loadHistory()
+  },
+
+  async loadPage(skip) {
+    const lq = get().lastQuery
+    if (!lq || skip < 0) return
+    const limit = get().settings.queryLimit
+    set({ running: true, lastError: null })
+    try {
+      const result = await window.api.shell.execute({ ...lq, limit, skip })
+      set({ result, resultSkip: skip })
+    } catch (e) {
+      set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+    } finally {
+      set({ running: false })
+    }
+  },
+
+  async setQueryLimit(n) {
+    const limit = Math.min(1000, Math.max(1, Math.floor(n) || 1))
+    await get().updateSettings({ queryLimit: limit })
+    // Re-run the current query from the first page with the new page size.
+    if (get().lastQuery) await get().loadPage(0)
   },
 
   async runExplain() {
@@ -556,10 +588,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const lq = get().lastQuery
     if (!lq) return
     try {
+      // Refresh in place — keep the current page offset and size.
       const result = await window.api.shell.execute({
         connectionId: lq.connectionId,
         database: lq.database,
-        code: lq.code
+        code: lq.code,
+        limit: get().settings.queryLimit,
+        skip: get().resultSkip
       })
       set({ result })
     } catch (e) {

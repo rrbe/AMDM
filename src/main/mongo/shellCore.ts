@@ -302,6 +302,9 @@ export function detectCollection(code: string): string | undefined {
 export interface RunShellOptions {
   /** Default page size applied to bare cursors (ADR-0004 rule 2). */
   limit?: number
+  /** Page offset injected into a FindCursor (prev/next paging). Ignored for
+      non-find cursors — they can't skip without a pipeline stage. */
+  skip?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
 }
@@ -355,12 +358,20 @@ export async function runShellOnDb(
     const elapsedMs = Date.now() - started
 
     if (isCursor(result)) {
+      // Only a FindCursor can be re-paged via skip; aggregation/command cursors
+      // can't (skip would need a $skip stage). For those we just report
+      // pageable: false and the UI falls back to raising the page size.
+      const pageable = result instanceof FindCursor
+      const skip = options.skip ?? 0
+      if (pageable && skip > 0) (result as FindCursor).skip(skip)
       const { docs, truncated } = await drainCursor(result, limit)
       return {
         kind: 'documents',
         data: await serializerPool.serialize(docs),
         count: docs.length,
         truncated,
+        pageable,
+        skip,
         collection,
         elapsedMs: Date.now() - started
       }

@@ -1218,6 +1218,43 @@ label {
   color: var(--fg-0);
 }
 
+/* Result paging — prev/next + range, sits in the result bar near the right. */
+.result-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.result-pager button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-2);
+}
+.result-pager button:hover:not(:disabled) {
+  color: var(--fg-0);
+  background: var(--bg-3);
+}
+.result-range {
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: center;
+  color: var(--fg-1);
+}
+/* Per-page doc count. */
+.page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.page-size input {
+  width: 56px;
+  padding: 2px 6px;
+  font-size: var(--fs-sm);
+}
+
 /* JSON view: a wrapper hosts the optional "all selected" hint above the
    scroller; the scroller flexes to fill the rest (overrides the base 100%). */
 .json-view-wrap {

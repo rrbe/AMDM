@@ -152,6 +152,9 @@ export interface ShellRequest {
   code: string
   /** Default page size applied to bare cursors (ADR-0004 rule 2). */
   limit?: number
+  /** Page offset injected into a `find()` cursor for prev/next paging. Only
+      honored when the script's result is a FindCursor (see `pageable`). */
+  skip?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
 }
@@ -171,6 +174,11 @@ export interface ShellResult {
   count?: number
   /** True if a default limit was auto-applied to a cursor (more may exist). */
   truncated?: boolean
+  /** True when the result is a FindCursor, so prev/next paging (skip) is
+      supported. Aggregation cursors and arrays are not pageable. */
+  pageable?: boolean
+  /** Page offset that produced this result (echoes the request's skip). */
+  skip?: number
   /** Target collection parsed from the code (enables doc edit/delete). */
   collection?: string
   /** Server execution time in ms (best-effort). */
@@ -314,11 +322,15 @@ export interface AppSettings {
   sidebarWidth: number
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
   editorHeight: number
+  /** Page size for query results — how many docs a cursor fetches per page
+      (ADR-0004 rule 2: bounded; never the whole collection). */
+  queryLimit: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   collectionSort: 'natural',
   theme: 'system',
   sidebarWidth: 300,
-  editorHeight: 160
+  editorHeight: 160,
+  queryLimit: 50
 }
