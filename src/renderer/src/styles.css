@@ -957,6 +957,19 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Third column: the value's BSON type, right-aligned and muted. */
+.kv-type {
+  flex: 0 0 auto;
+  width: 96px;
+  padding: 0 10px;
+  text-align: right;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 1px dashed var(--border);
+}
 /* Full-height draggable divider at the key/value boundary. */
 .kv-resizer {
   position: absolute;

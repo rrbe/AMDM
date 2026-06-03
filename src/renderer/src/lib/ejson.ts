@@ -225,6 +225,36 @@ export function valueType(value: unknown): ValueType {
   return 'string'
 }
 
+/** BSON type display labels (the names Compass/the shell use). */
+const TYPE_LABELS: Record<ValueType, string> = {
+  objectId: 'ObjectId',
+  date: 'Date',
+  number: 'Double',
+  long: 'Int64',
+  int: 'Int32',
+  double: 'Double',
+  decimal: 'Decimal128',
+  string: 'String',
+  boolean: 'Boolean',
+  null: 'Null',
+  undefined: 'Undefined',
+  array: 'Array',
+  object: 'Object',
+  binary: 'Binary',
+  regex: 'Regex',
+  timestamp: 'Timestamp',
+  minKey: 'MinKey',
+  maxKey: 'MaxKey',
+  code: 'Code',
+  dbref: 'DBRef',
+  symbol: 'Symbol'
+}
+
+/** Human BSON-type label for a value (e.g. "ObjectId", "Int32", "Array"). */
+export function typeLabel(value: unknown): string {
+  return TYPE_LABELS[valueType(value)]
+}
+
 /** A value is expandable in the tree iff it's a plain array or plain object. */
 export function isExpandable(value: unknown): boolean {
   if (Array.isArray(value)) return value.length > 0
