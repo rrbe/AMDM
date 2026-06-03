@@ -1,7 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Copy } from 'lucide-react'
 import type { ShellResult } from '@shared/types'
 import { useAppStore, type ResultView } from '@renderer/store/useAppStore'
 import { docActionContext } from '@renderer/lib/docActions'
+import { copyText, toPlainJson, toShellText, toStrictEjson } from '@renderer/lib/resultCopy'
+import { ContextMenu } from '@renderer/components/ContextMenu'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
 import { TableView } from './TableView'
@@ -17,6 +20,8 @@ export function ResultPanel(): JSX.Element {
   const setView = useAppStore((s) => s.setResultView)
   const lastQuery = useAppStore((s) => s.lastQuery)
   const docCtx = docActionContext(result, lastQuery)
+  // Anchor for the "copy all" format dropdown (null = closed).
+  const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
 
   // Cmd/Ctrl+1/2/3 switch Tree/JSON/Table — only while the switcher is showing
   // (a documents/value result, not error/explain/empty).
@@ -92,6 +97,17 @@ export function ResultPanel(): JSX.Element {
           })}
         </div>
         <ResultMeta result={result} docCount={docs.length} />
+        <span className="result-bar-spacer" />
+        <button
+          className="ghost result-copy"
+          title="复制全部结果"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            setCopyMenu({ x: r.left, y: r.bottom + 4 })
+          }}
+        >
+          <Copy size={14} />
+        </button>
       </div>
 
       <div className="result-body">
@@ -99,6 +115,22 @@ export function ResultPanel(): JSX.Element {
         {view === 'json' && <JsonView docs={docs} />}
         {view === 'table' && <TableView docs={docs} docCtx={docCtx} />}
       </div>
+
+      {copyMenu && (
+        <ContextMenu
+          x={copyMenu.x}
+          y={copyMenu.y}
+          onClose={() => setCopyMenu(null)}
+          items={[
+            {
+              label: '复制全部 (Plain JSON)',
+              onClick: () => void copyText(toPlainJson(docs), `已复制全部 ${docs.length} 文档`)
+            },
+            { label: '复制全部 (Shell 风格)', onClick: () => void copyText(toShellText(docs)) },
+            { label: '复制全部 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(docs)) }
+          ]}
+        />
+      )}
     </div>
   )
 }

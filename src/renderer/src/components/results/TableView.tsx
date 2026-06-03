@@ -2,6 +2,15 @@ import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
+import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
+import {
+  copyText,
+  plainScalarText,
+  toPlainJson,
+  toShellText,
+  toStrictEjson
+} from '@renderer/lib/resultCopy'
+import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import { DocEditor } from './DocEditor'
 
 /**
@@ -69,6 +78,13 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
 
+  // Selection: a single cell, OR a set of whole rows (multi-select via the #
+  // column). The two are mutually exclusive — selecting one clears the other.
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: string } | null>(null)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(() => new Set())
+  const [anchorRow, setAnchorRow] = useState<number | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+
   // Drag a header cell's right-edge handle to resize that column.
   const startColResize = (col: string, e: MouseEvent): void => {
     e.preventDefault()
@@ -130,6 +146,57 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     overscan: 12
   })
 
+  // Cmd/Ctrl+C: selected rows → a plain-JSON array; else the selected cell.
+  useCopyHotkey(() => {
+    if (selectedRows.size > 0) {
+      return toPlainJson([...selectedRows].sort((a, b) => a - b).map((i) => docs[i]))
+    }
+    if (selectedCell) {
+      const { present, value } = cellValue(docs[selectedCell.row], selectedCell.col)
+      return present ? plainScalarText(value) : ''
+    }
+    return null
+  })
+
+  const selectCell = (row: number, col: string): void => {
+    setSelectedRows(new Set())
+    setSelectedCell({ row, col })
+  }
+  const selectRow = (row: number, e: MouseEvent): void => {
+    setSelectedCell(null)
+    if (e.shiftKey && anchorRow !== null) {
+      const [a, b] = anchorRow <= row ? [anchorRow, row] : [row, anchorRow]
+      const next = new Set<number>()
+      for (let i = a; i <= b; i++) next.add(i)
+      setSelectedRows(next)
+    } else if (e.metaKey || e.ctrlKey) {
+      setSelectedRows((prev) => {
+        const next = new Set(prev)
+        if (next.has(row)) next.delete(row)
+        else next.add(row)
+        return next
+      })
+      setAnchorRow(row)
+    } else {
+      setSelectedRows(new Set([row]))
+      setAnchorRow(row)
+    }
+  }
+  const openMenu = (e: MouseEvent, row: number, col: string | null): void => {
+    e.preventDefault()
+    // Right-clicking inside a multi-selection keeps it; otherwise focus this row.
+    const rows = selectedRows.has(row) ? [...selectedRows].sort((a, b) => a - b) : [row]
+    if (!selectedRows.has(row)) {
+      if (col) selectCell(row, col)
+      else {
+        setSelectedRows(new Set([row]))
+        setSelectedCell(null)
+        setAnchorRow(row)
+      }
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items: tableMenuItems(rows, row, col, docs) })
+  }
+
   if (docs.length === 0) {
     return <div className="center-msg muted">No documents.</div>
   }
@@ -172,14 +239,28 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
           return (
             <div
               key={vi.index}
-              className="tbl-row"
+              className={`tbl-row${selectedRows.has(vi.index) ? ' selected' : ''}`}
               style={{ transform: `translateY(${vi.start + ROW_HEIGHT}px)`, width: totalWidth }}
             >
-              <div className="tbl-td idx" style={{ width: INDEX_COL_WIDTH }}>
+              <div
+                className="tbl-td idx idx-select"
+                style={{ width: INDEX_COL_WIDTH }}
+                onClick={(e) => selectRow(vi.index, e)}
+                onContextMenu={(e) => openMenu(e, vi.index, null)}
+                title="点击选中整行（Shift / ⌘ 多选）"
+              >
                 {vi.index + 1}
               </div>
               {columns.map((col) => (
-                <Cell key={col} doc={doc} column={col} width={widthOf(col)} />
+                <Cell
+                  key={col}
+                  doc={doc}
+                  column={col}
+                  width={widthOf(col)}
+                  selected={selectedCell?.row === vi.index && selectedCell?.col === col}
+                  onClick={() => selectCell(vi.index, col)}
+                  onContextMenu={(e) => openMenu(e, vi.index, col)}
+                />
               ))}
               {showActions && (
                 <div className="tbl-td tbl-actions" style={{ width: ACTIONS_COL_WIDTH }}>
@@ -214,23 +295,57 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
           onClose={() => setEditIndex(null)}
         />
       )}
+
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
+      )}
     </div>
   )
+}
+
+/** Right-click copy menu for a table cell / row(s). */
+function tableMenuItems(
+  rows: number[],
+  row: number,
+  col: string | null,
+  docs: unknown[]
+): ContextMenuItem[] {
+  const items: ContextMenuItem[] = []
+  if (col) {
+    const { present, value } = cellValue(docs[row], col)
+    items.push({ label: '复制单元格', onClick: () => void copyText(present ? plainScalarText(value) : '') })
+  }
+  const single = docs[row]
+  items.push({ label: '复制行 (文档)', onClick: () => void copyText(toPlainJson(single)) })
+  if (rows.length > 1) {
+    const sel = rows.map((i) => docs[i])
+    items.push({ label: `复制 ${rows.length} 行`, onClick: () => void copyText(toPlainJson(sel)) })
+  }
+  items.push({ label: '复制行 (Shell 风格)', onClick: () => void copyText(toShellText(single)) })
+  items.push({ label: '复制行 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(single)) })
+  return items
 }
 
 function Cell({
   doc,
   column,
-  width
+  width,
+  selected,
+  onClick,
+  onContextMenu
 }: {
   doc: unknown
   column: string
   width: number
+  selected: boolean
+  onClick: () => void
+  onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
   const { present, value } = cellValue(doc, column)
+  const cellCls = `tbl-td${selected ? ' selected' : ''}`
   if (!present) {
     return (
-      <div className="tbl-td" style={{ width }}>
+      <div className={cellCls} style={{ width }} onClick={onClick} onContextMenu={onContextMenu}>
         <span className="empty">—</span>
       </div>
     )
@@ -245,7 +360,7 @@ function Cell({
   const text = typeof display === 'string' ? display : display.text
   const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
   return (
-    <div className="tbl-td" style={{ width }} title={text}>
+    <div className={cellCls} style={{ width }} title={text} onClick={onClick} onContextMenu={onContextMenu}>
       <span className={cls}>{text}</span>
     </div>
   )

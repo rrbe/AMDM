@@ -3,6 +3,16 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Pencil, Trash2 } from 'lucide-react'
 import { entriesOf, formatScalar, isExpandable, summarize } from '@renderer/lib/ejson'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
+import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
+import {
+  copyText,
+  plainScalarText,
+  toPlainJson,
+  toPlainValue,
+  toShellText,
+  toStrictEjson
+} from '@renderer/lib/resultCopy'
+import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import { DocEditor } from './DocEditor'
 
 /**
@@ -59,6 +69,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     docs.length > 0 ? new Set(['0']) : new Set()
   )
   const [keyWidth, setKeyWidth] = useState(DEFAULT_KEY_WIDTH)
+  // Click-to-select: the selected node is highlighted and is what Cmd+C copies.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   const toggle = (id: string): void => {
     setExpanded((prev) => {
@@ -129,6 +142,21 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     [keyWidth]
   )
 
+  // Cmd/Ctrl+C copies the selected node: a leaf's value (plain), or an
+  // expandable node / whole document as plain JSON.
+  useCopyHotkey(() => {
+    if (!selectedId) return null
+    const node = flat.find((n) => n.id === selectedId)
+    if (!node) return null
+    return node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
+  })
+
+  const openMenu = (e: MouseEvent, node: FlatNode): void => {
+    e.preventDefault()
+    setSelectedId(node.id)
+    setMenu({ x: e.clientX, y: e.clientY, items: treeMenuItems(node, docs) })
+  }
+
   if (docs.length === 0) {
     return <div className="center-msg muted">No documents.</div>
   }
@@ -147,9 +175,13 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
           return (
             <div
               key={node.id}
-              className={node.expandable ? 'kv-row expandable' : 'kv-row'}
+              className={`kv-row${node.expandable ? ' expandable' : ''}${
+                node.id === selectedId ? ' selected' : ''
+              }`}
               style={{ transform: `translateY(${vi.start}px)` }}
+              onClick={() => setSelectedId(node.id)}
               onDoubleClick={() => node.expandable && toggle(node.id)}
+              onContextMenu={(e) => openMenu(e, node)}
             >
               <div className="kv-key" style={{ width: keyWidth, paddingLeft: 6 + node.depth * 14 }}>
                 <span
@@ -214,8 +246,34 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
           onClose={() => setEditIndex(null)}
         />
       )}
+
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
+      )}
     </div>
   )
+}
+
+/** Right-click copy menu for a tree node (value / key / field / document). */
+function treeMenuItems(node: FlatNode, docs: unknown[]): ContextMenuItem[] {
+  const rootDoc = docs[Number(node.id.split('.')[0])]
+  if (node.depth === 0) {
+    return [
+      { label: '复制文档', onClick: () => void copyText(toPlainJson(node.value)) },
+      { label: '复制文档 (Shell 风格)', onClick: () => void copyText(toShellText(node.value)) },
+      { label: '复制文档 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(node.value)) }
+    ]
+  }
+  const valueText = node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
+  const fieldJson = node.expandable ? toPlainJson(node.value) : JSON.stringify(toPlainValue(node.value))
+  return [
+    { label: '复制值', onClick: () => void copyText(valueText) },
+    { label: '复制键', onClick: () => void copyText(node.keyLabel) },
+    { label: '复制字段', onClick: () => void copyText(`${JSON.stringify(node.keyLabel)}: ${fieldJson}`) },
+    { label: '复制所在文档', onClick: () => void copyText(toPlainJson(rootDoc)) },
+    { label: '复制所在文档 (Shell 风格)', onClick: () => void copyText(toShellText(rootDoc)) },
+    { label: '复制所在文档 (严格 EJSON)', onClick: () => void copyText(toStrictEjson(rootDoc)) }
+  ]
 }
 
 function ValueCell({ node }: { node: FlatNode }): JSX.Element {
