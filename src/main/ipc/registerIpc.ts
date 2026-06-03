@@ -5,6 +5,7 @@ import type {
   ConnectionConfig,
   ConnectionInput,
   DocMutateRequest,
+  DocSetFieldRequest,
   DocUpdateRequest,
   ExportRequest,
   ImportRequest,
@@ -18,7 +19,7 @@ import { sessionManager } from '../mongo/sessionManager'
 import type { DecryptedConnection } from '../mongo/uri'
 import { listCollections, listDatabases, listIndexes, listUsers, sampleFields } from '../mongo/catalog'
 import { executeShell } from '../mongo/shellEngine'
-import { deleteDocument, updateDocument } from '../mongo/docOps'
+import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
 import { getToolStatus } from '../io/tools'
@@ -114,6 +115,7 @@ export function registerIpc(): void {
 
   // document edit/delete
   ipcMain.handle(IPC.docUpdate, (_e, req: DocUpdateRequest) => updateDocument(req))
+  ipcMain.handle(IPC.docSetField, (_e, req: DocSetFieldRequest) => setDocumentField(req))
   ipcMain.handle(IPC.docDelete, (_e, req: DocMutateRequest) => deleteDocument(req))
 
   // import / export

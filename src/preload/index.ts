@@ -42,6 +42,7 @@ const api: Api = {
   },
   docs: {
     update: (request) => ipcRenderer.invoke(IPC.docUpdate, request),
+    setField: (request) => ipcRenderer.invoke(IPC.docSetField, request),
     delete: (request) => ipcRenderer.invoke(IPC.docDelete, request)
   },
   io: {

@@ -2,7 +2,9 @@ import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
+import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
+import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import {
   copyText,
@@ -14,6 +16,7 @@ import {
   toTsv
 } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 
 /**
@@ -45,12 +48,15 @@ const ROW_HEIGHT = 24
 const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
-const ACTIONS_COL_WIDTH = 72
 
 export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const parentRef = useRef<HTMLDivElement>(null)
+  const setDocumentField = useAppStore((s) => s.setDocumentField)
+  // Document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
-  const showActions = docCtx != null
+  // Inline edit: which cell, and whether the last commit failed validation.
+  const [editing, setEditing] = useState<{ row: number; col: string } | null>(null)
+  const [editError, setEditError] = useState(false)
   // Per-column widths (column name → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
@@ -124,6 +130,45 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       setAnchorRow(row)
     }
   }
+  // A cell is inline-editable when we know the collection, the row's doc has an
+  // _id, the column isn't _id, and the value is a supported scalar.
+  const canEditCell = (row: number, col: string): boolean => {
+    if (!docCtx || col === '_id') return false
+    const doc = docs[row]
+    if (!docHasId(doc)) return false
+    const { present, value } = cellValue(doc, col)
+    return present && editableText(value) != null
+  }
+  const startEditCell = (row: number, col: string): void => {
+    setEditError(false)
+    setEditing({ row, col })
+  }
+  const commitCell = async (row: number, col: string, text: string): Promise<void> => {
+    const doc = docs[row]
+    if (!docCtx || !docHasId(doc)) return
+    const { present, value } = cellValue(doc, col)
+    if (!present) return
+    const coerced = coerceEdit(value, text)
+    if ('error' in coerced) {
+      setEditError(true)
+      return
+    }
+    const res = await setDocumentField({
+      connectionId: docCtx.connectionId,
+      database: docCtx.database,
+      collection: docCtx.collection,
+      id: doc._id,
+      path: col,
+      valueEjson: JSON.stringify(coerced.value)
+    })
+    if (res.ok) {
+      setEditing(null)
+      setEditError(false)
+    } else {
+      setEditError(true)
+    }
+  }
+
   const openMenu = (e: MouseEvent, row: number, col: string | null): void => {
     e.preventDefault()
     // Right-clicking inside a multi-selection keeps it; otherwise focus this row.
@@ -136,17 +181,24 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
         setAnchorRow(row)
       }
     }
-    setMenu({ x: e.clientX, y: e.clientY, items: tableMenuItems(rows, row, col, docs) })
+    const items = tableMenuItems(rows, row, col, docs)
+    const doc = docs[row]
+    if (docCtx && docHasId(doc)) {
+      items.push({ label: '编辑文档…', onClick: () => setEditIndex(row) })
+      items.push({
+        label: '删除文档',
+        danger: true,
+        onClick: () => void confirmDeleteDoc(docCtx, doc._id)
+      })
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
   if (docs.length === 0) {
     return <div className="center-msg muted">No documents.</div>
   }
 
-  const totalWidth =
-    INDEX_COL_WIDTH +
-    columns.reduce((sum, c) => sum + widthOf(c), 0) +
-    (showActions ? ACTIONS_COL_WIDTH : 0)
+  const totalWidth = INDEX_COL_WIDTH + columns.reduce((sum, c) => sum + widthOf(c), 0)
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
@@ -167,17 +219,11 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
               />
             </div>
           ))}
-          {showActions && (
-            <div className="tbl-th idx" style={{ width: ACTIONS_COL_WIDTH }}>
-              actions
-            </div>
-          )}
         </div>
 
         {/* Virtualized rows */}
         {rowVirtualizer.getVirtualItems().map((vi) => {
           const doc = docs[vi.index]
-          const rowId = docHasId(doc) ? doc._id : undefined
           return (
             <div
               key={vi.index}
@@ -200,28 +246,18 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                   column={col}
                   width={widthOf(col)}
                   selected={selectedCell?.row === vi.index && selectedCell?.col === col}
+                  editing={editing?.row === vi.index && editing?.col === col}
+                  editInvalid={editError}
                   onClick={() => selectCell(vi.index, col)}
+                  onDoubleClick={() => canEditCell(vi.index, col) && startEditCell(vi.index, col)}
+                  onCommit={(text) => void commitCell(vi.index, col, text)}
+                  onCancel={() => {
+                    setEditing(null)
+                    setEditError(false)
+                  }}
                   onContextMenu={(e) => openMenu(e, vi.index, col)}
                 />
               ))}
-              {showActions && (
-                <div className="tbl-td tbl-actions" style={{ width: ACTIONS_COL_WIDTH }}>
-                  {docCtx && docHasId(doc) && (
-                    <>
-                      <button className="ghost row-act" title="Edit document" onClick={() => setEditIndex(vi.index)}>
-                        ✎
-                      </button>
-                      <button
-                        className="ghost row-act danger"
-                        title="Delete document"
-                        onClick={() => void confirmDeleteDoc(docCtx, rowId)}
-                      >
-                        🗑
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           )
         })}
@@ -273,21 +309,51 @@ function Cell({
   column,
   width,
   selected,
+  editing,
+  editInvalid,
   onClick,
+  onDoubleClick,
+  onCommit,
+  onCancel,
   onContextMenu
 }: {
   doc: unknown
   column: string
   width: number
   selected: boolean
+  editing: boolean
+  editInvalid: boolean
   onClick: () => void
+  onDoubleClick: () => void
+  onCommit: (text: string) => void
+  onCancel: () => void
   onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
   const { present, value } = cellValue(doc, column)
   const cellCls = `tbl-td${selected ? ' selected' : ''}`
+
+  if (editing) {
+    return (
+      <div className={cellCls} style={{ width }}>
+        <CellInput
+          initial={editableText(value) ?? ''}
+          invalid={editInvalid}
+          onCommit={onCommit}
+          onCancel={onCancel}
+        />
+      </div>
+    )
+  }
+
   if (!present) {
     return (
-      <div className={cellCls} style={{ width }} onClick={onClick} onContextMenu={onContextMenu}>
+      <div
+        className={cellCls}
+        style={{ width }}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+      >
         <span className="empty">—</span>
       </div>
     )
@@ -302,7 +368,14 @@ function Cell({
   const text = typeof display === 'string' ? display : display.text
   const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
   return (
-    <div className={cellCls} style={{ width }} title={text} onClick={onClick} onContextMenu={onContextMenu}>
+    <div
+      className={cellCls}
+      style={{ width }}
+      title={text}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
+    >
       <span className={cls}>{text}</span>
     </div>
   )

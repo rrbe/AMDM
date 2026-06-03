@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Pencil, Trash2 } from 'lucide-react'
 import { entriesOf, formatScalar, isExpandable, summarize } from '@renderer/lib/ejson'
+import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
+import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import {
   copyText,
@@ -13,6 +14,7 @@ import {
   toStrictEjson
 } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 
 /**
@@ -61,8 +63,13 @@ const MAX_KEY_WIDTH = 680
 
 export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   const parentRef = useRef<HTMLDivElement>(null)
-  // Index of the document currently being edited (null = none).
+  const setDocumentField = useAppStore((s) => s.setDocumentField)
+  // Index of the document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
+  // Inline edit: which leaf node is being edited, and whether the last commit
+  // failed validation (red border).
+  const [editing, setEditing] = useState<{ id: string } | null>(null)
+  const [editError, setEditError] = useState(false)
   // Expanded paths. Top-level docs start collapsed except the first (for
   // context); nested containers always start collapsed.
   const [expanded, setExpanded] = useState<Set<string>>(() =>
@@ -151,10 +158,62 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     return node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
   })
 
+  const rootDocOf = (node: FlatNode): unknown => docs[Number(node.id.split('.')[0])]
+  const fieldPathOf = (node: FlatNode): string => node.id.split('.').slice(1).join('.')
+
+  // A leaf is inline-editable when we know the collection, the doc has an _id,
+  // the field isn't _id, and the value is a supported scalar type.
+  const canEditNode = (node: FlatNode): boolean =>
+    docCtx != null &&
+    node.depth > 0 &&
+    fieldPathOf(node) !== '_id' &&
+    editableText(node.value) != null &&
+    docHasId(rootDocOf(node))
+
+  const startEdit = (node: FlatNode): void => {
+    setEditError(false)
+    setEditing({ id: node.id })
+  }
+
+  const commitEdit = async (node: FlatNode, text: string): Promise<void> => {
+    const rootDoc = rootDocOf(node)
+    if (!docCtx || !docHasId(rootDoc)) return
+    const coerced = coerceEdit(node.value, text)
+    if ('error' in coerced) {
+      setEditError(true)
+      return
+    }
+    const res = await setDocumentField({
+      connectionId: docCtx.connectionId,
+      database: docCtx.database,
+      collection: docCtx.collection,
+      id: rootDoc._id,
+      path: fieldPathOf(node),
+      valueEjson: JSON.stringify(coerced.value)
+    })
+    if (res.ok) {
+      setEditing(null)
+      setEditError(false)
+    } else {
+      setEditError(true)
+    }
+  }
+
   const openMenu = (e: MouseEvent, node: FlatNode): void => {
     e.preventDefault()
     setSelectedId(node.id)
-    setMenu({ x: e.clientX, y: e.clientY, items: treeMenuItems(node, docs) })
+    const items = treeMenuItems(node, docs)
+    const rootDoc = rootDocOf(node)
+    if (docCtx && docHasId(rootDoc)) {
+      const rootIndex = Number(node.id.split('.')[0])
+      items.push({ label: '编辑文档…', onClick: () => setEditIndex(rootIndex) })
+      items.push({
+        label: '删除文档',
+        danger: true,
+        onClick: () => void confirmDeleteDoc(docCtx, rootDoc._id)
+      })
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
   if (docs.length === 0) {
@@ -162,7 +221,6 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   }
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
-  const canEdit = docCtx != null
 
   return (
     <div ref={parentRef} className="virtual-scroller">
@@ -170,8 +228,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
         <div className="kv-resizer" style={{ left: keyWidth }} onMouseDown={startResize} />
         {rowVirtualizer.getVirtualItems().map((vi) => {
           const node = flat[vi.index]
-          const showActions =
-            canEdit && node.depth === 0 && node.docIndex !== undefined && docHasId(node.value)
+          const isEditing = editing?.id === node.id
           return (
             <div
               key={node.id}
@@ -204,33 +261,29 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
                   </span>
                 )}
               </div>
-              <div className="kv-val">
-                <ValueCell node={node} />
+              <div
+                className="kv-val"
+                onDoubleClick={(e) => {
+                  if (canEditNode(node)) {
+                    e.stopPropagation()
+                    startEdit(node)
+                  }
+                }}
+              >
+                {isEditing ? (
+                  <CellInput
+                    initial={editableText(node.value) ?? ''}
+                    invalid={editError}
+                    onCommit={(text) => void commitEdit(node, text)}
+                    onCancel={() => {
+                      setEditing(null)
+                      setEditError(false)
+                    }}
+                  />
+                ) : (
+                  <ValueCell node={node} />
+                )}
               </div>
-              {showActions && docCtx && (
-                <span className="kv-actions">
-                  <button
-                    className="ghost row-act"
-                    title="Edit document"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setEditIndex(node.docIndex ?? null)
-                    }}
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    className="ghost row-act danger"
-                    title="Delete document"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void confirmDeleteDoc(docCtx, (node.value as { _id: unknown })._id)
-                    }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </span>
-              )}
             </div>
           )
         })}

@@ -980,19 +980,24 @@ label {
   border-left: 2px solid var(--accent);
 }
 /* Per-doc edit/delete, revealed on row hover at the right edge. */
-.kv-actions {
-  position: absolute;
-  right: 8px;
-  display: none;
-  gap: 2px;
-  background: var(--bg-2);
-  padding-left: 6px;
+/* Inline cell editor (Tree value cell + Table data cell). Fills the cell,
+   monospace, accent ring; red ring when the last commit failed validation. */
+.cell-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: calc(var(--row-h) - 4px);
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+  color: var(--fg-0);
+  background: var(--bg-0);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  outline: none;
 }
-.kv-row:hover .kv-actions {
-  display: flex;
-}
-.kv-actions button svg {
-  display: block;
+.cell-edit-input.invalid {
+  border-color: var(--err);
+  background: var(--err-bg);
 }
 .tree-val {
   overflow: hidden;
@@ -1636,34 +1641,6 @@ label {
   white-space: pre;
   line-height: 1.45;
   color: var(--fg-1);
-}
-
-/* ---- Document edit/delete row actions (Tree/Table) ---- */
-.tree-row .row-actions {
-  display: none;
-  gap: 2px;
-  margin-left: auto;
-  padding-left: 8px;
-}
-.tree-row:hover .row-actions {
-  display: inline-flex;
-}
-.row-act {
-  padding: 0 6px;
-  font-size: var(--fs-sm);
-  line-height: 1.6;
-}
-.tbl-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  justify-content: center;
-}
-.tbl-row .tbl-actions .row-act {
-  visibility: hidden;
-}
-.tbl-row:hover .tbl-actions .row-act {
-  visibility: visible;
 }
 
 /* ---- Document editor (DocEditor) ---- */

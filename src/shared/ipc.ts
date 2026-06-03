@@ -13,6 +13,7 @@ import type {
   DataOpResult,
   DocMutateRequest,
   DocMutateResult,
+  DocSetFieldRequest,
   DocUpdateRequest,
   ExportRequest,
   HistoryEntry,
@@ -53,6 +54,7 @@ export const IPC = {
   historyClear: 'history:clear',
 
   docUpdate: 'doc:update',
+  docSetField: 'doc:setField',
   docDelete: 'doc:delete',
 
   ioExport: 'io:export',
@@ -98,6 +100,7 @@ export interface Api {
   }
   docs: {
     update(request: DocUpdateRequest): Promise<DocMutateResult>
+    setField(request: DocSetFieldRequest): Promise<DocMutateResult>
     delete(request: DocMutateRequest): Promise<DocMutateResult>
   }
   io: {

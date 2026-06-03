@@ -21,6 +21,7 @@ import type {
   DataOpResult,
   DocMutateRequest,
   DocMutateResult,
+  DocSetFieldRequest,
   DocUpdateRequest,
   ExportRequest,
   HistoryEntry,
@@ -151,6 +152,7 @@ interface AppState {
 
   // ---- actions: document edit/delete (Phase 2) ----
   updateDocument(req: DocUpdateRequest): Promise<DocMutateResult>
+  setDocumentField(req: DocSetFieldRequest): Promise<DocMutateResult>
   deleteDocument(req: DocMutateRequest): Promise<DocMutateResult>
 
   // ---- actions: import/export (Phase 3) ----
@@ -623,6 +625,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   async updateDocument(req) {
     try {
       const res = await window.api.docs.update(req)
+      if (res.ok) await get().refreshResult()
+      else set({ lastError: `Update failed: ${res.error ?? 'unknown'}` })
+      return res
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: `Update failed: ${error}` })
+      return { ok: false, error }
+    }
+  },
+
+  async setDocumentField(req) {
+    try {
+      const res = await window.api.docs.setField(req)
       if (res.ok) await get().refreshResult()
       else set({ lastError: `Update failed: ${res.error ?? 'unknown'}` })
       return res

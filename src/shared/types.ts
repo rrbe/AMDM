@@ -232,6 +232,13 @@ export interface DocUpdateRequest extends DocMutateRequest {
   documentEjson: string
 }
 
+export interface DocSetFieldRequest extends DocMutateRequest {
+  /** Dot-path of the field to set (e.g. "address.city", "tags.0"). */
+  path: string
+  /** New value as an EJSON string (parsed back to BSON on the main side). */
+  valueEjson: string
+}
+
 export interface DocMutateResult {
   ok: boolean
   error?: string
