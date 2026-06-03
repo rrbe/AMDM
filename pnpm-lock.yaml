@@ -11,9 +11,18 @@ importers:
       '@codemirror/autocomplete':
         specifier: ^6.20.2
         version: 6.20.2
+      '@codemirror/commands':
+        specifier: ^6.10.3
+        version: 6.10.3
       '@codemirror/lang-javascript':
         specifier: ^6.2.2
         version: 6.2.5
+      '@codemirror/state':
+        specifier: ^6.6.0
+        version: 6.6.0
+      '@codemirror/view':
+        specifier: ^6.43.0
+        version: 6.43.0
       '@fontsource/source-code-pro':
         specifier: ^5.2.7
         version: 5.2.7
@@ -38,6 +47,9 @@ importers:
       mongodb:
         specifier: ^6.10.0
         version: 6.21.0
+      prettier:
+        specifier: ^3.8.3
+        version: 3.8.3
       ssh2:
         specifier: ^1.16.0
         version: 1.17.0
@@ -1162,6 +1174,11 @@ packages:
   postcss@8.5.15:
     resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
+
+  prettier@3.8.3:
+    resolution: {integrity: sha512-7igPTM53cGHMW8xWuVTydi2KO233VFiTNyF5hLJqpilHfmn8C8gPf+PS7dUT64YcXFbiMGZxS9pCSxL/Dxm/Jw==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
@@ -2506,6 +2523,8 @@ snapshots:
       nanoid: 3.3.12
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  prettier@3.8.3: {}
 
   process-nextick-args@2.0.1: {}
 

@@ -17,6 +17,7 @@ export function ShellWorkspace(): JSX.Element {
   const code = useAppStore((s) => s.code)
   const running = useAppStore((s) => s.running)
   const setCode = useAppStore((s) => s.setCode)
+  const formatCode = useAppStore((s) => s.formatCode)
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const runShell = useAppStore((s) => s.runShell)
   const runExplain = useAppStore((s) => s.runExplain)
@@ -71,7 +72,15 @@ export function ShellWorkspace(): JSX.Element {
         </button>
       </div>
 
-      <ShellEditor value={code} onChange={setCode} onRun={() => void runShell()} />
+      <ShellEditor
+        value={code}
+        onChange={setCode}
+        onRun={() => void runShell()}
+        onSave={() => setShowSave(true)}
+        onExplain={() => void runExplain()}
+        onFormat={() => void formatCode()}
+        busy={busy}
+      />
 
       <ResultPanel />
 

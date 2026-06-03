@@ -125,6 +125,7 @@ interface AppState {
 
   // ---- actions: shell ----
   setCode(code: string): void
+  formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
   insertSnippet(db: string, coll: string): void
@@ -456,6 +457,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --------------------------------------------------------------------- shell
   setCode(code) {
     set({ code })
+  },
+
+  // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
+  // surfaces as `lastError` like any other failure rather than throwing into UI.
+  async formatCode() {
+    const { code } = get()
+    if (!code.trim()) return
+    try {
+      const { formatJs } = await import('@renderer/lib/formatJs')
+      const formatted = await formatJs(code)
+      if (formatted !== code) set({ code: formatted })
+    } catch (e) {
+      set({ lastError: `Format failed: ${errMessage(e)}` })
+    }
   },
 
   setActiveDatabase(db) {

@@ -18,7 +18,10 @@
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
     "@fontsource/source-code-pro": "^5.2.7",
     "@tanstack/react-virtual": "^3.10.9",
     "@uiw/codemirror-themes": "^4.25.10",
@@ -27,6 +30,7 @@
     "exceljs": "^4.4.0",
     "lucide-react": "^1.17.0",
     "mongodb": "^6.10.0",
+    "prettier": "^3.8.3",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {
