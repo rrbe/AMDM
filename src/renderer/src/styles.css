@@ -957,13 +957,13 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Third column: the value's BSON type, right-aligned and muted. */
+/* Third column: the value's BSON type, right-aligned. Color comes from the
+   `v-<type>` class (same palette as the value), so e.g. Date reads blue. */
 .kv-type {
   flex: 0 0 auto;
   width: 96px;
   padding: 0 10px;
   text-align: right;
-  color: var(--fg-3);
   font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;

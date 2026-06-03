@@ -1,6 +1,13 @@
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { entriesOf, formatScalar, isExpandable, summarize, typeLabel } from '@renderer/lib/ejson'
+import {
+  entriesOf,
+  formatScalar,
+  isExpandable,
+  summarize,
+  typeLabel,
+  valueType
+} from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -284,7 +291,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
                   <ValueCell node={node} />
                 )}
               </div>
-              <div className="kv-type">{node.depth === 0 ? 'Document' : typeLabel(node.value)}</div>
+              <div className={`kv-type v-${valueType(node.value)}`}>
+                {node.depth === 0 ? 'Document' : typeLabel(node.value)}
+              </div>
             </div>
           )
         })}
