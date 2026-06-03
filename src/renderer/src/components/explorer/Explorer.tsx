@@ -13,6 +13,7 @@ import {
   Moon,
   Pencil,
   Plug,
+  Plus,
   Sun,
   Table2,
   Trash2,
@@ -34,6 +35,7 @@ import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
+import { SavedQueriesPanel } from '@renderer/components/explorer/SavedQueriesPanel'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
 function TreeIcon({ name }: { name: string }): JSX.Element | null {
@@ -133,6 +135,8 @@ export function Explorer(): JSX.Element {
   const insertSnippet = useAppStore((s) => s.insertSnippet)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
+  // Saved Queries lives in a bottom drawer, collapsed by default.
+  const [savedOpen, setSavedOpen] = useState(false)
   const [connForm, setConnForm] = useState<{ open: boolean; editing?: ConnectionConfig }>({
     open: false
   })
@@ -210,52 +214,53 @@ export function Explorer(): JSX.Element {
     <div className="explorer">
       <div className="explorer-header app-drag">
         <span className="explorer-title">Mongo Shell GUI</span>
-        <div className="explorer-actions">
+      </div>
+
+      {/* Connections fills the remaining height; its header carries the
+          prominent "New connection" action. */}
+      <div className="side-section side-section--conns">
+        <div className="side-section-head">
+          <span className="side-section-title">Connections</span>
           <button
-            className={`catalog-sort${collectionSort === 'alpha' ? ' active' : ''}`}
-            title={
-              collectionSort === 'alpha'
-                ? 'Sorted A–Z — click for natural (server) order'
-                : 'Natural (server) order — click to sort A–Z'
-            }
-            onClick={() =>
-              void updateSettings({
-                collectionSort: collectionSort === 'alpha' ? 'natural' : 'alpha'
-              })
-            }
+            className="primary btn-new-conn"
+            title="New connection"
+            onClick={() => setConnForm({ open: true })}
           >
-            A–Z
+            <Plus size={15} />
+            <span>New</span>
           </button>
-          <button className="ghost" title="New connection" onClick={() => setConnForm({ open: true })}>
-            +
-          </button>
+        </div>
+        <div className="explorer-body">
+          {connections.length === 0 && (
+            <div className="explorer-empty">No connections. Click “New” to add one.</div>
+          )}
+
+          {rows.map((row) =>
+            row.type === 'connection' ? (
+              <ConnectionRow
+                key={row.id}
+                row={row}
+                isActive={activeConnectionId === row.id}
+                onSelect={() => setActiveConnection(row.id)}
+                onToggle={() => toggleConnectionExpanded(row.id)}
+                onConnect={() => void connect(row.id)}
+                onDisconnect={() => void disconnect(row.id)}
+                onEdit={() => setConnForm({ open: true, editing: row.conn })}
+                onDelete={() => {
+                  if (confirm(`Delete connection "${row.conn.name}"?`)) void deleteConnection(row.id)
+                }}
+              />
+            ) : (
+              <CatalogRow key={row.id} row={row} onContextMenu={openCollMenu} />
+            )
+          )}
         </div>
       </div>
 
-      <div className="explorer-body">
-        {connections.length === 0 && (
-          <div className="explorer-empty">No connections. Click + to add one.</div>
-        )}
-
-        {rows.map((row) =>
-          row.type === 'connection' ? (
-            <ConnectionRow
-              key={row.id}
-              row={row}
-              isActive={activeConnectionId === row.id}
-              onSelect={() => setActiveConnection(row.id)}
-              onToggle={() => toggleConnectionExpanded(row.id)}
-              onConnect={() => void connect(row.id)}
-              onDisconnect={() => void disconnect(row.id)}
-              onEdit={() => setConnForm({ open: true, editing: row.conn })}
-              onDelete={() => {
-                if (confirm(`Delete connection "${row.conn.name}"?`)) void deleteConnection(row.id)
-              }}
-            />
-          ) : (
-            <CatalogRow key={row.id} row={row} onContextMenu={openCollMenu} />
-          )
-        )}
+      {/* Saved Queries: a collapsible drawer pinned to the bottom (collapsed by
+          default). The light rule above it separates it from Connections. */}
+      <div className="side-section side-section--saved">
+        <SavedQueriesPanel open={savedOpen} onToggle={() => setSavedOpen((v) => !v)} />
       </div>
 
       {/* App-level controls live in the sidebar footer (VS Code pattern), out of

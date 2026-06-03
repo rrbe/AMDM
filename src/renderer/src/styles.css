@@ -330,6 +330,180 @@ label {
   font-size: var(--fs-sm);
 }
 
+/* Prominent "New connection" action in the explorer header. */
+.btn-new-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1;
+}
+.btn-new-conn svg {
+  display: block;
+}
+
+/* Two stacked side-panel sections: Connections (top, fills space) and a
+   collapsible Saved Queries drawer (bottom), split by a light horizontal rule. */
+.side-section--conns {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.side-section--saved {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+}
+.side-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 8px 8px 5px 10px;
+}
+.side-section-title {
+  flex: 1;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Saved Queries drawer (sidebar): clickable head + bounded body ---- */
+.sq-panel {
+  display: block;
+}
+/* The head is the collapse toggle: click anywhere (but the switch) to fold. */
+.sq-head {
+  padding-left: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.sq-head:hover {
+  background: var(--bg-2);
+}
+.sq-twisty {
+  width: 16px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sq-twisty svg {
+  display: block;
+}
+/* Expanded list is capped so the drawer never crowds out Connections. */
+.sq-body {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+.sq-switch {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.sq-switch button {
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  font-size: var(--fs-xs, 11px);
+  font-weight: 600;
+  color: var(--fg-3);
+}
+.sq-switch button:hover:not(.active) {
+  color: var(--fg-0);
+}
+.sq-switch button.active {
+  background: var(--bg-sel);
+  color: var(--fg-0);
+}
+[data-theme='dark'] .sq-switch button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.sq-toolbar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 8px 4px;
+}
+.sq-toolbar .spacer {
+  flex: 1;
+}
+.sq-empty {
+  padding: 18px 14px;
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.sq-list {
+  padding: 2px 6px 8px;
+}
+.sq-row {
+  position: relative;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sq-row:hover {
+  background: var(--bg-2);
+}
+.sq-name {
+  font-weight: 600;
+  color: var(--fg-0);
+  font-size: var(--fs-sm);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 20px;
+}
+.sq-code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--t-string);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-sub {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: var(--fs-xs, 11px);
+}
+.sq-sub .lib-ok {
+  color: var(--ok);
+}
+.sq-sub .lib-err {
+  color: var(--err);
+}
+.sq-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 3px;
+  line-height: 1;
+  color: var(--fg-3);
+  opacity: 0;
+}
+.sq-row:hover .sq-del {
+  opacity: 1;
+}
+.sq-del:hover {
+  color: var(--err);
+}
+
 .group {
   margin-bottom: 2px;
 }

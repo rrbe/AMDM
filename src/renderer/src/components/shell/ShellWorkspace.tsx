@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { ShellEditor } from './ShellEditor'
-import { QueryLibrary } from './QueryLibrary'
 import { SaveQueryModal } from './SaveQueryModal'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 
@@ -22,7 +21,6 @@ export function ShellWorkspace(): JSX.Element {
   const runShell = useAppStore((s) => s.runShell)
   const runExplain = useAppStore((s) => s.runExplain)
 
-  const [showLibrary, setShowLibrary] = useState(false)
   const [showSave, setShowSave] = useState(false)
 
   const conn = connections.find((c) => c.id === activeConnectionId)
@@ -58,9 +56,6 @@ export function ShellWorkspace(): JSX.Element {
         <span className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
           ⌘/Ctrl + Enter to run
         </span>
-        <button onClick={() => setShowLibrary(true)} title="Saved queries & history">
-          Library
-        </button>
         <button disabled={busy} onClick={() => setShowSave(true)} title="Save current query">
           Save
         </button>
@@ -84,7 +79,6 @@ export function ShellWorkspace(): JSX.Element {
 
       <ResultPanel />
 
-      {showLibrary && <QueryLibrary onClose={() => setShowLibrary(false)} />}
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
     </div>
   )
