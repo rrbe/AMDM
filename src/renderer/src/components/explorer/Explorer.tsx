@@ -443,13 +443,18 @@ function CatalogRow({
   onContextMenu: (e: MouseEvent, coll: { db: string; name: string }, connId: string) => void
 }): JSX.Element {
   const coll = row.collection
+  const isNote = row.kind === 'leaf'
+  const className =
+    'tree-node' +
+    (row.empty ? ' tree-node--empty' : '') +
+    (isNote ? ' tree-node--note' : '')
   return (
     <div
-      className={row.empty ? 'tree-node tree-node--empty' : 'tree-node'}
+      className={className}
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
       onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
-      title={row.empty ? `${row.label} — empty (no collections yet)` : row.label}
+      title={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
     >
       <span
         className="tree-twisty"

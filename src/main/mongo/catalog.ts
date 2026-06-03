@@ -41,7 +41,14 @@ async function guardClosed<T>(op: () => Promise<T>, fallback: T): Promise<T> {
 export async function listDatabases(connectionId: string): Promise<DatabaseInfo[]> {
   return guardClosed(async () => {
     const client = sessionManager.getClient(connectionId)
-    const res = await client.db('admin').admin().listDatabases()
+    // Two independent admin commands — fire them concurrently so the
+    // Compass-parity privilege probe adds no latency on top of listDatabases.
+    // authorizedDatabaseNames swallows its own errors, so Promise.all only
+    // rejects if listDatabases itself fails (handled by guardClosed).
+    const [res, authorizedNames] = await Promise.all([
+      client.db('admin').admin().listDatabases(),
+      authorizedDatabaseNames(client)
+    ])
     const byName = new Map<string, DatabaseInfo>()
     for (const d of res.databases) {
       byName.set(d.name, {
@@ -54,7 +61,7 @@ export async function listDatabases(connectionId: string): Promise<DatabaseInfo[
     // data yet is NOT returned by listDatabases. Surface those too (as empty),
     // derived from the authenticated user's privileges, so the tree matches
     // what Compass shows (dashed/empty databases).
-    for (const name of await authorizedDatabaseNames(client)) {
+    for (const name of authorizedNames) {
       if (!byName.has(name)) byName.set(name, { name, empty: true })
     }
     return [...byName.values()]

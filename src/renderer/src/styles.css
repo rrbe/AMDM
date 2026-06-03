@@ -712,6 +712,17 @@ label {
   stroke-dasharray: 2 1.6;
   color: var(--fg-3);
 }
+/* Placeholder note ("no collections" / "no users" / "no indexes") — a hint, not
+   a selectable item: muted italic, smaller, and inert (no hover, no pointer). */
+.tree-node--note {
+  color: var(--fg-3);
+  font-style: italic;
+  font-size: var(--fs-sm);
+  cursor: default;
+}
+.tree-node--note:hover {
+  background: transparent;
+}
 .tree-twisty {
   width: 16px;
   flex: 0 0 auto;
