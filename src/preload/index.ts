@@ -29,7 +29,8 @@ const api: Api = {
       ipcRenderer.invoke(IPC.catalogSampleFields, connectionId, database, collection)
   },
   shell: {
-    execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request)
+    execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request),
+    abort: (execId) => ipcRenderer.invoke(IPC.shellAbort, execId)
   },
   queries: {
     list: () => ipcRenderer.invoke(IPC.queriesList),

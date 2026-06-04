@@ -45,6 +45,7 @@ export const IPC = {
   catalogSampleFields: 'catalog:sampleFields',
 
   shellExecute: 'shell:execute',
+  shellAbort: 'shell:abort',
 
   queriesList: 'queries:list',
   queriesSave: 'queries:save',
@@ -88,6 +89,9 @@ export interface Api {
   }
   shell: {
     execute(request: ShellRequest): Promise<ShellResult>
+    /** Cancel an in-flight run by its `execId`. Resolves true if a matching
+        run was found and signalled, false if it had already finished. */
+    abort(execId: string): Promise<boolean>
   }
   queries: {
     list(): Promise<SavedQuery[]>

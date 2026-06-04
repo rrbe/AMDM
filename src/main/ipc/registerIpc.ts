@@ -18,7 +18,7 @@ import { settingsStore } from '../store/settingsStore'
 import { sessionManager } from '../mongo/sessionManager'
 import type { DecryptedConnection } from '../mongo/uri'
 import { listCollections, listDatabases, listIndexes, listUsers, sampleFields } from '../mongo/catalog'
-import { executeShell } from '../mongo/shellEngine'
+import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
@@ -103,6 +103,9 @@ export function registerIpc(): void {
     })
     return result
   })
+  // Cancel an in-flight run (slow find/aggregate). Returns false if it already
+  // finished — the renderer just clears its spinner either way.
+  ipcMain.handle(IPC.shellAbort, (_e, execId: string) => abortShell(execId))
 
   // saved queries
   ipcMain.handle(IPC.queriesList, () => queryStore.listQueries())

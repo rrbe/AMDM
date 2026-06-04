@@ -21,6 +21,7 @@ export function ShellWorkspace(): JSX.Element {
   const formatCode = useAppStore((s) => s.formatCode)
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const runShell = useAppStore((s) => s.runShell)
+  const stopShell = useAppStore((s) => s.stopShell)
   const runExplain = useAppStore((s) => s.runExplain)
   const editorHeight = useAppStore((s) => s.settings.editorHeight)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -63,9 +64,17 @@ export function ShellWorkspace(): JSX.Element {
         <Button disabled={busy} onClick={() => void runExplain()} title="Run explain('executionStats')">
           Explain
         </Button>
-        <Button variant="primary" busy={running} disabled={busy} onClick={() => void runShell()}>
-          ▶ Run
-        </Button>
+        {running ? (
+          // Swap Run → Stop while a query is in flight, so a runaway
+          // find/aggregate can be cancelled server-side (driver AbortSignal).
+          <Button variant="danger" onClick={() => void stopShell()} title="停止执行">
+            ■ 停止
+          </Button>
+        ) : (
+          <Button variant="primary" disabled={busy} onClick={() => void runShell()}>
+            ▶ Run
+          </Button>
+        )}
       </div>
 
       <ShellEditor
@@ -76,6 +85,8 @@ export function ShellWorkspace(): JSX.Element {
         onSave={() => setShowSave(true)}
         onExplain={() => void runExplain()}
         onFormat={() => void formatCode()}
+        onStop={() => void stopShell()}
+        running={running}
         busy={busy}
       />
 

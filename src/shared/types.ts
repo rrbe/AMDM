@@ -157,6 +157,9 @@ export interface ShellRequest {
   skip?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
+  /** Opaque per-run id. When present the main process registers an
+      AbortController under it so the run can be cancelled via `shell.abort`. */
+  execId?: string
 }
 
 export type ShellResultKind = 'documents' | 'value' | 'ack' | 'explain' | 'error'

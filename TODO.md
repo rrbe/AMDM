@@ -11,10 +11,10 @@
 ### 2. 查询结果条数上限可配置　✅ 已完成（2026-06-04）
 `AppSettings.queryLimit`（默认 50，存量 settings.json 自动合并默认值）；结果栏「每页 [n]」控件，回车/失焦应用并从第一页重跑。`setQueryLimit` action。
 
-### 3. 停止执行 / Stop Script　`[难度: 中-高] [风险: 中]`　← 建议的下一步
-`abort/cancel` 全代码库搜不到——跑飞的 find/aggregate 无法中断，对「性能优先」的工具是真实痛点。
-- 思路：执行时持有可取消句柄；优先用 driver 的 `AbortSignal`（近版本各操作支持）或 `maxTimeMS`；新增 `shell:abort` IPC 通道 + store action + 编辑器「停止」入口（右键菜单已留了 Stop Script 的位置）。
-- 难点：`vm` 跑的是任意 JS，信号注入不通用；先覆盖 find/aggregate 主路径。
+### 3. 停止执行 / Stop Script　✅ 已完成（2026-06-04）
+每次执行在渲染层生成 `execId` 随请求带上；主进程为它建 `AbortController` 注册进 `shellEngine` 的 `inFlight` registry，把 `signal` 注入 driver 的 `find`/`findOne`/`aggregate`/`runCommand`/`command` 主路径（v6.10 原生 `AbortSignal`，真正服务端取消游标/操作）。`await result`、explain、`drainCursor` 额外做 abort 竞速 / 关游标兜底，保证不识别 signal 的操作 UI 也能立即解锁；中断统一收敛为一个干净的 `kind:'error' / errorName:'Aborted'` 结果。新增 `shell:abort` IPC（→ `abortShell`）；工具栏 Run 运行时切换为「■ 停止」(danger)，右键菜单加「停止执行」(仅运行时可点)。
+- 链路：`shellCore`（`signal` option + sandbox 注入 + drain 兜底）→ `shellEngine`（registry + `abortShell`）→ 类型/IPC/preload/registerIpc → store（`runningExecId` + `stopShell`）→ `ShellWorkspace`/`ShellEditor`。已补 5 个 shell 核心 abort 测试（cursor / aggregate / promise(count) / explain / 无回归）。
+- 已知边界：`vm` 同步死循环（如 `while(true){}`）仍由 30s vm timeout 兜底，signal 无法中断不让出事件循环的同步代码——符合「先覆盖 find/aggregate 主路径」的范围。
 
 ## P2 — 中期（体验 / 完整度）
 

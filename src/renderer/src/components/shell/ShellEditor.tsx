@@ -36,6 +36,10 @@ interface ShellEditorProps {
   onExplain: () => void
   /** Pretty-print the editor (Shift+Alt+F) — independent of `busy`. */
   onFormat: () => void
+  /** Cancel the in-flight run (the "停止执行" menu item / toolbar Stop). */
+  onStop: () => void
+  /** True while a query is running — enables Stop, disables the run actions. */
+  running: boolean
   /** When true (a query is running, or the editor is empty) run/save/explain
       keys are swallowed without acting — mirroring the disabled toolbar buttons. */
   busy: boolean
@@ -49,6 +53,8 @@ export function ShellEditor({
   onSave,
   onExplain,
   onFormat,
+  onStop,
+  running,
   busy
 }: ShellEditorProps): JSX.Element {
   // Follow the app's Pine light/dark preference so the editor reads as part of
@@ -78,8 +84,8 @@ export function ShellEditor({
   // Hold the latest callbacks in a ref so the keymap extension can stay a stable
   // reference — recreating `extensions` would reconfigure CodeMirror on every
   // keystroke (ADR-0004). The bindings read fresh props through this ref.
-  const handlers = useRef({ onRun, onRunStatement, onSave, onExplain, onFormat, busy })
-  handlers.current = { onRun, onRunStatement, onSave, onExplain, onFormat, busy }
+  const handlers = useRef({ onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy })
+  handlers.current = { onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy }
 
   const extensions = useMemo(
     () => [
@@ -188,7 +194,7 @@ export function ShellEditor({
   }
 
   function buildMenu(): ContextMenuEntry[] {
-    const { busy: isBusy } = handlers.current
+    const { busy: isBusy, running: isRunning } = handlers.current
     const hasSel = viewRef.current ? !viewRef.current.state.selection.main.empty : false
     return [
       { label: '运行脚本', shortcut: '⌘↵', disabled: isBusy, onClick: () => runIfReady() },
@@ -199,6 +205,8 @@ export function ShellEditor({
         onClick: () => runStatementIfReady()
       },
       { label: 'Explain', shortcut: '⌘E', disabled: isBusy, onClick: () => explainIfReady() },
+      // Enabled only mid-run; cancels the in-flight find/aggregate server-side.
+      { label: '停止执行', disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',
       { label: '格式化代码', shortcut: '⌥⇧F', onClick: () => formatNow() },
       { label: '切换注释', shortcut: '⌘/', onClick: () => withView((v) => toggleComment(v)) },

@@ -92,6 +92,9 @@ interface AppState {
   result: ShellResult | null
   resultView: ResultView
   running: boolean
+  /** Id of the in-flight run, so the Stop button can target `shell.abort`.
+      Null whenever nothing is running. */
+  runningExecId: string | null
   /** The query that produced the current result (for refresh after edit/delete). */
   lastQuery: { connectionId: string; database: string; code: string } | null
   /** Page offset of the current result (0 = first page). Driven by loadPage. */
@@ -147,6 +150,8 @@ interface AppState {
   /** Run the editor's script, or `codeOverride` when given (e.g. the current
       statement / selection from the right-click menu). */
   runShell(codeOverride?: string): Promise<void>
+  /** Cancel the in-flight run (the Stop button / menu item). No-op when idle. */
+  stopShell(): Promise<void>
   runExplain(): Promise<void>
   refreshResult(): Promise<void>
   /** Re-run the last query at a new page offset (prev/next). Only meaningful
@@ -205,6 +210,11 @@ function errMessage(e: unknown): string {
   return 'Unknown error'
 }
 
+/** Opaque per-run id so a run can be cancelled via `shell.abort` (Stop). */
+function newExecId(): string {
+  return crypto.randomUUID()
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -218,6 +228,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   result: null,
   resultView: 'tree',
   running: false,
+  runningExecId: null,
   lastQuery: null,
   resultSkip: 0,
 
@@ -524,31 +535,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!code.trim()) return
     const database = activeDatabase || 'test'
     const limit = get().settings.queryLimit
-    set({ running: true, lastError: null })
+    const execId = newExecId()
+    set({ running: true, runningExecId: execId, lastError: null })
     try {
       // A fresh run always starts at page 0.
-      const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code, limit, skip: 0 })
+      const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code, limit, skip: 0, execId })
       set({ result, lastQuery: { connectionId: activeConnectionId, database, code }, resultSkip: 0 })
     } catch (e) {
       set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
     } finally {
-      set({ running: false })
+      set({ running: false, runningExecId: null })
     }
     void get().loadHistory()
+  },
+
+  async stopShell() {
+    const execId = get().runningExecId
+    if (!execId) return
+    // Best-effort: the run's own `finally` clears the spinner even if abort
+    // races past it (the run already finished).
+    try {
+      await window.api.shell.abort(execId)
+    } catch {
+      /* ignore — nothing actionable if the abort call itself fails */
+    }
   },
 
   async loadPage(skip) {
     const lq = get().lastQuery
     if (!lq || skip < 0) return
     const limit = get().settings.queryLimit
-    set({ running: true, lastError: null })
+    const execId = newExecId()
+    set({ running: true, runningExecId: execId, lastError: null })
     try {
-      const result = await window.api.shell.execute({ ...lq, limit, skip })
+      const result = await window.api.shell.execute({ ...lq, limit, skip, execId })
       set({ result, resultSkip: skip })
     } catch (e) {
       set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
     } finally {
-      set({ running: false })
+      set({ running: false, runningExecId: null })
     }
   },
 
@@ -567,19 +592,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (!code.trim()) return
     const database = activeDatabase || 'test'
-    set({ running: true, lastError: null })
+    const execId = newExecId()
+    set({ running: true, runningExecId: execId, lastError: null })
     try {
       const result = await window.api.shell.execute({
         connectionId: activeConnectionId,
         database,
         code,
-        explain: true
+        explain: true,
+        execId
       })
       set({ result, lastQuery: { connectionId: activeConnectionId, database, code } })
     } catch (e) {
       set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
     } finally {
-      set({ running: false })
+      set({ running: false, runningExecId: null })
     }
     void get().loadHistory()
   },

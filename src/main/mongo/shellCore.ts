@@ -75,26 +75,50 @@ patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string
  * `db.coll.find({}, { name: 1, _id: 0 })` projects instead of silently
  * returning whole documents. An optional third arg is merged as driver options.
  */
-function buildFindOptions(projection?: Document, options?: Document): FindOptions | undefined {
-  if (!projection && !options) return undefined
-  return { ...(options ?? {}), ...(projection ? { projection } : {}) } as FindOptions
+function buildFindOptions(
+  projection?: Document,
+  options?: Document,
+  signal?: AbortSignal
+): FindOptions | undefined {
+  if (!projection && !options && !signal) return undefined
+  return {
+    ...(options ?? {}),
+    ...(projection ? { projection } : {}),
+    ...(signal ? { signal } : {})
+  } as FindOptions
+}
+
+/**
+ * Merge an `AbortSignal` into an operation's options object (for cancellable
+ * aggregate/command calls). A no-op when no signal is active, so non-cancellable
+ * runs keep passing exactly what they passed before.
+ */
+function withSignal(options: Document | undefined, signal?: AbortSignal): Document | undefined {
+  if (!signal) return options
+  return { ...(options ?? {}), signal }
 }
 
 /**
  * Wrap a Collection so a handful of shell-only spellings work, while every
  * other method/property passes straight through to the real driver Collection.
+ * `signal`, when present, is injected into the cursor-producing ops so a slow
+ * find/aggregate can be cancelled server-side (the "Stop" button).
  */
-function makeCollProxy(coll: Collection): Collection {
+function makeCollProxy(coll: Collection, signal?: AbortSignal): Collection {
   return new Proxy(coll, {
     get(target, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
       switch (prop) {
         case 'find':
           return (filter?: Document, projection?: Document, options?: Document) =>
-            target.find(filter ?? {}, buildFindOptions(projection, options))
+            target.find(filter ?? {}, buildFindOptions(projection, options, signal))
         case 'findOne':
           return (filter?: Document, projection?: Document, options?: Document) =>
-            target.findOne(filter ?? {}, buildFindOptions(projection, options))
+            target.findOne(filter ?? {}, buildFindOptions(projection, options, signal))
+        // Inject the signal so a runaway aggregation can be cancelled mid-flight.
+        case 'aggregate':
+          return (pipeline?: Document[], options?: Document) =>
+            target.aggregate(pipeline ?? [], withSignal(options, signal))
         // mongosh `getIndexes()` → driver `indexes()`.
         case 'getIndexes':
           return () => target.indexes()
@@ -116,25 +140,29 @@ function makeCollProxy(coll: Collection): Collection {
  * snippets copied from mongosh / NoSQLBooster run unchanged. Anything genuinely
  * unsupported surfaces as an error rather than silent wrong behavior.
  */
-export function makeDbProxy(db: Db): Db {
+export function makeDbProxy(db: Db, signal?: AbortSignal): Db {
   return new Proxy(db, {
     get(target, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
       switch (prop) {
         case 'getCollection':
-          return (name: string) => makeCollProxy(target.collection(name))
+          return (name: string) => makeCollProxy(target.collection(name), signal)
         // Driver `db.collection(name)` also yields a wrapped collection so the
         // find/findOne projection shim applies regardless of spelling.
         case 'collection':
-          return (name: string) => makeCollProxy(target.collection(name))
+          return (name: string) => makeCollProxy(target.collection(name), signal)
         case 'getSiblingDB':
-          return (name: string) => makeDbProxy(target.client.db(name))
+          return (name: string) => makeDbProxy(target.client.db(name), signal)
+        // db-level aggregation (`db.aggregate([...])`) — cancellable too.
+        case 'aggregate':
+          return (pipeline?: Document[], options?: Document) =>
+            target.aggregate(pipeline ?? [], withSignal(options, signal))
         // mongosh `db.runCommand(cmd)` → driver `db.command(cmd)`.
         case 'runCommand':
-          return (cmd: Document) => target.command(cmd)
+          return (cmd: Document) => target.command(cmd, withSignal(undefined, signal))
         // mongosh `db.adminCommand(cmd)` → `db.admin().command(cmd)`.
         case 'adminCommand':
-          return (cmd: Document) => target.admin().command(cmd)
+          return (cmd: Document) => target.admin().command(cmd, withSignal(undefined, signal))
         case 'getCollectionNames':
           return () =>
             target
@@ -174,9 +202,9 @@ function callableCtor<T extends new (...args: never[]) => unknown>(Ctor: T): T {
   })
 }
 
-export function makeSandbox(db: Db): Record<string, unknown> {
+export function makeSandbox(db: Db, signal?: AbortSignal): Record<string, unknown> {
   return {
-    db: makeDbProxy(db),
+    db: makeDbProxy(db, signal),
     ObjectId: callableCtor(ObjectId),
     ISODate: (s?: string) => (s ? new Date(s) : new Date()),
     Date,
@@ -221,17 +249,56 @@ function isCursor(v: unknown): v is CursorLike {
 
 async function drainCursor(
   cursor: CursorLike,
-  limit: number
+  limit: number,
+  signal?: AbortSignal
 ): Promise<{ docs: unknown[]; truncated: boolean }> {
   const docs: unknown[] = []
-  for await (const doc of cursor) {
-    docs.push(doc)
-    if (docs.length > limit) break // fetch one extra to detect truncation
+  // Belt-and-suspenders cancellation: the signal is already threaded into the
+  // find/aggregate op (so the driver rejects the in-flight getMore on abort),
+  // but closing the cursor here also unblocks any op that ignored the signal —
+  // the pending `next()` then rejects and we fall through to the abort branch.
+  const onAbort = (): void => {
+    void cursor.close?.().catch(() => {})
+  }
+  if (signal) signal.addEventListener('abort', onAbort, { once: true })
+  try {
+    if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
+    for await (const doc of cursor) {
+      // Guard between batches: an abort that lands here (rather than mid-getMore,
+      // which the driver signal / cursor close handle) bails immediately.
+      if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
+      docs.push(doc)
+      if (docs.length > limit) break // fetch one extra to detect truncation
+    }
+  } finally {
+    if (signal) signal.removeEventListener('abort', onAbort)
   }
   const truncated = docs.length > limit
   if (truncated) docs.pop()
   await cursor.close?.().catch(() => {})
   return { docs, truncated }
+}
+
+/**
+ * Reject as soon as `signal` aborts. Used to race a pending `await` so the UI
+ * unblocks even for driver ops that don't honor the signal natively; the
+ * orphaned operation settles later and its result is discarded.
+ */
+function abortRace(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    const fail = (): void => reject(signal.reason ?? new Error('Aborted'))
+    if (signal.aborted) return fail()
+    signal.addEventListener('abort', fail, { once: true })
+  })
+}
+
+/** Await `p`, but bail out the moment `signal` aborts. */
+function withAbort<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return p
+  // Keep the original promise's eventual rejection handled so racing past it
+  // doesn't surface as an unhandledRejection.
+  p.catch(() => {})
+  return Promise.race([p, abortRace(signal)])
 }
 
 /** A driver write result (insert/update/delete/replace/bulkWrite). */
@@ -307,6 +374,10 @@ export interface RunShellOptions {
   skip?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
+  /** Cancellation handle. Threaded into find/aggregate/command ops for true
+      server-side cancellation, and raced against pending awaits so the run
+      bails promptly when the user hits "Stop". */
+  signal?: AbortSignal
 }
 
 /**
@@ -321,24 +392,27 @@ export async function runShellOnDb(
   options: RunShellOptions = {}
 ): Promise<ShellResult> {
   const limit = options.limit ?? DEFAULT_LIMIT
+  const signal = options.signal
   const started = Date.now()
   const collection = detectCollection(code)
 
   try {
-    const sandbox = makeSandbox(db)
+    const sandbox = makeSandbox(db, signal)
     const context = vm.createContext(sandbox)
     const script = new vm.Script(code, { filename: 'shell.js' })
+    // The synchronous body is bounded by the vm timeout; a runaway sync loop
+    // can't be interrupted by the signal (it never yields to the event loop).
     let result: unknown = script.runInContext(context, { timeout: EXEC_TIMEOUT_MS })
 
     // Unwrap a returned promise (findOne, updateOne, countDocuments, …).
     if (result && typeof (result as { then?: unknown }).then === 'function') {
-      result = await result
+      result = await withAbort(result as Promise<unknown>, signal)
     }
 
     // Explain path: don't fetch — run explain('executionStats') on the cursor.
     if (options.explain) {
       if (isExplainable(result)) {
-        const plan = await result.explain('executionStats')
+        const plan = await withAbort(result.explain('executionStats'), signal)
         return {
           kind: 'explain',
           data: await serializerPool.serializeOne(plan),
@@ -364,7 +438,7 @@ export async function runShellOnDb(
       const pageable = result instanceof FindCursor
       const skip = options.skip ?? 0
       if (pageable && skip > 0) (result as FindCursor).skip(skip)
-      const { docs, truncated } = await drainCursor(result, limit)
+      const { docs, truncated } = await drainCursor(result, limit, signal)
       return {
         kind: 'documents',
         data: await serializerPool.serialize(docs),
@@ -399,6 +473,17 @@ export async function runShellOnDb(
       elapsedMs
     }
   } catch (err) {
+    // A user-initiated stop surfaces as whatever the driver/race threw; collapse
+    // all of them to one clean "Aborted" result rather than a scary stack.
+    if (signal?.aborted) {
+      return {
+        kind: 'error',
+        error: '执行已停止',
+        errorName: 'Aborted',
+        collection,
+        elapsedMs: Date.now() - started
+      }
+    }
     const { error, errorName } = describeError(err)
     return { kind: 'error', error, errorName, collection, elapsedMs: Date.now() - started }
   }

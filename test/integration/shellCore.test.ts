@@ -507,6 +507,45 @@ describe('errors surface (never silent)', () => {
 })
 
 // ---------------------------------------------------------------------------
+describe('abort / stop (AbortSignal cancellation)', () => {
+  const abortedSignal = (): AbortSignal => {
+    const c = new AbortController()
+    c.abort()
+    return c.signal
+  }
+
+  it('a pre-aborted find returns a clean Aborted result (cursor path)', async () => {
+    const r = await run('db.nums.find({})', { signal: abortedSignal() })
+    expect(r.kind).toBe('error')
+    expect(r.errorName).toBe('Aborted')
+  })
+
+  it('a pre-aborted aggregate returns Aborted (cursor path)', async () => {
+    const r = await run('db.nums.aggregate([{ $match: {} }])', { signal: abortedSignal() })
+    expect(r.kind).toBe('error')
+    expect(r.errorName).toBe('Aborted')
+  })
+
+  it('a pre-aborted promise op bails via the abort race (countDocuments)', async () => {
+    const r = await run('db.nums.countDocuments({})', { signal: abortedSignal() })
+    expect(r.kind).toBe('error')
+    expect(r.errorName).toBe('Aborted')
+  })
+
+  it('a pre-aborted explain returns Aborted', async () => {
+    const r = await run('db.nums.find({})', { signal: abortedSignal(), explain: true })
+    expect(r.kind).toBe('error')
+    expect(r.errorName).toBe('Aborted')
+  })
+
+  it('an un-aborted signal leaves normal queries untouched (no regression)', async () => {
+    const r = await run('db.nums.find({})', { signal: new AbortController().signal })
+    expect(r.kind).toBe('documents')
+    expect(r.count).toBe(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
 describe('collection detection (drives doc edit/delete)', () => {
   it('detects via dot, getCollection, and bracket; ignores db methods', () => {
     expect(detectCollection('db.lives.find({})')).toBe('lives')
