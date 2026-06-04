@@ -952,6 +952,11 @@ label {
   height: var(--row-h);
   white-space: nowrap;
   border-bottom: 1px dashed var(--border);
+  /* DESIGN.md §5: data grids own selection via click-to-select + ⌘C, not native
+     text selection — native rubber-banding scatters ::selection tint across the
+     row's short tokens (badge / summary / type). The inline edit input opts back
+     in below. */
+  user-select: none;
 }
 .kv-row:hover {
   background: var(--bg-2);
@@ -1034,6 +1039,9 @@ label {
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   outline: none;
+  /* Opt back into text selection: the grid row/table disables it, but you must
+     be able to select/edit text while inline-editing a cell. */
+  user-select: text;
 }
 .cell-edit-input.invalid {
   border-color: var(--err);
@@ -1115,6 +1123,10 @@ label {
   height: 100%;
   width: 100%;
   overflow: auto;
+  /* DESIGN.md §5: same as the Tree — the Table owns selection (row handle +
+     ⌘/Shift multi-select, cell select, ⌘C). Native text selection is suppressed
+     across header and cells; the inline edit input opts back in below. */
+  user-select: none;
 }
 .tbl {
   position: relative;
