@@ -61,8 +61,11 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
 
-  // Selection: a single cell, OR a set of whole rows (multi-select via the #
-  // column). The two are mutually exclusive — selecting one clears the other.
+  // Selection: a set of whole rows, plus the one "focused" cell that gets an
+  // extra overlay highlight on top of its (already selected) row. A single click
+  // on any cell selects that whole row and focuses the cell; the # handle selects
+  // a row without focusing a cell. Shift extends a row range, ⌘/Ctrl toggles —
+  // but no modifier is needed: a plain click already selects the row.
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: string } | null>(null)
   const [selectedRows, setSelectedRows] = useState<Set<number>>(() => new Set())
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
@@ -97,7 +100,8 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   // Cmd/Ctrl+C: selected rows → a plain-JSON array; else the selected cell.
   useCopyHotkey(() => {
     if (selectedRows.size > 0) {
-      return toPlainJson([...selectedRows].sort((a, b) => a - b).map((i) => docs[i]))
+      const picked = [...selectedRows].sort((a, b) => a - b).map((i) => docs[i])
+      return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
     }
     if (selectedCell) {
       const { present, value } = cellValue(docs[selectedCell.row], selectedCell.col)
@@ -106,12 +110,9 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     return null
   })
 
-  const selectCell = (row: number, col: string): void => {
-    setSelectedRows(new Set())
-    setSelectedCell({ row, col })
-  }
-  const selectRow = (row: number, e: MouseEvent): void => {
-    setSelectedCell(null)
+  // Core row-selection logic shared by cell clicks and the # handle: plain = just
+  // this row, Shift = range from the anchor, ⌘/Ctrl = toggle.
+  const applyRowSelection = (row: number, e: MouseEvent): void => {
     if (e.shiftKey && anchorRow !== null) {
       const [a, b] = anchorRow <= row ? [anchorRow, row] : [row, anchorRow]
       const next = new Set<number>()
@@ -129,6 +130,17 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       setSelectedRows(new Set([row]))
       setAnchorRow(row)
     }
+  }
+  // Single-click a cell: select its whole row AND focus that cell (cell overlay).
+  // Double-click edits (see the Cell handlers) — no modifier key needed here.
+  const clickCell = (row: number, col: string, e: MouseEvent): void => {
+    setSelectedCell({ row, col })
+    applyRowSelection(row, e)
+  }
+  // The # column selects the row without focusing any cell.
+  const clickHandle = (row: number, e: MouseEvent): void => {
+    setSelectedCell(null)
+    applyRowSelection(row, e)
   }
   // A cell is inline-editable when we know the collection, the row's doc has an
   // _id, the column isn't _id, and the value is a supported scalar.
@@ -171,15 +183,13 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
 
   const openMenu = (e: MouseEvent, row: number, col: string | null): void => {
     e.preventDefault()
-    // Right-clicking inside a multi-selection keeps it; otherwise focus this row.
+    // Right-clicking inside a multi-selection keeps it; otherwise focus this row
+    // (and the cell under the cursor, if any).
     const rows = selectedRows.has(row) ? [...selectedRows].sort((a, b) => a - b) : [row]
     if (!selectedRows.has(row)) {
-      if (col) selectCell(row, col)
-      else {
-        setSelectedRows(new Set([row]))
-        setSelectedCell(null)
-        setAnchorRow(row)
-      }
+      setSelectedRows(new Set([row]))
+      setSelectedCell(col ? { row, col } : null)
+      setAnchorRow(row)
     }
     const items = tableMenuItems(rows, row, col, docs)
     const doc = docs[row]
@@ -233,7 +243,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
               <div
                 className="tbl-td idx idx-select"
                 style={{ width: INDEX_COL_WIDTH }}
-                onClick={(e) => selectRow(vi.index, e)}
+                onClick={(e) => clickHandle(vi.index, e)}
                 onContextMenu={(e) => openMenu(e, vi.index, null)}
                 title="点击选中整行（Shift / ⌘ 多选）"
               >
@@ -248,7 +258,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                   selected={selectedCell?.row === vi.index && selectedCell?.col === col}
                   editing={editing?.row === vi.index && editing?.col === col}
                   editError={editError}
-                  onClick={() => selectCell(vi.index, col)}
+                  onClick={(e) => clickCell(vi.index, col, e)}
                   onDoubleClick={() => canEditCell(vi.index, col) && startEditCell(vi.index, col)}
                   onCommit={(text) => void commitCell(vi.index, col, text)}
                   onCancel={() => {
@@ -323,7 +333,7 @@ function Cell({
   selected: boolean
   editing: boolean
   editError: string | null
-  onClick: () => void
+  onClick: (e: MouseEvent) => void
   onDoubleClick: () => void
   onCommit: (text: string) => void
   onCancel: () => void

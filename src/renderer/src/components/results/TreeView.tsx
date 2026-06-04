@@ -85,6 +85,11 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   const [keyWidth, setKeyWidth] = useState(DEFAULT_KEY_WIDTH)
   // Click-to-select: the selected node is highlighted and is what Cmd+C copies.
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Multi-select of TOP-LEVEL documents (depth-0 rows), mirroring the Table's
+  // row multi-select: Shift = range, ⌘/Ctrl = toggle. Mutually exclusive with
+  // the single-node `selectedId` — selecting one clears the other.
+  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(() => new Set())
+  const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   const toggle = (id: string): void => {
@@ -159,6 +164,10 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   // Cmd/Ctrl+C copies the selected node: a leaf's value (plain), or an
   // expandable node / whole document as plain JSON.
   useCopyHotkey(() => {
+    if (selectedDocs.size > 0) {
+      const picked = [...selectedDocs].sort((a, b) => a - b).map((i) => docs[i])
+      return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
+    }
     if (!selectedId) return null
     const node = flat.find((n) => n.id === selectedId)
     if (!node) return null
@@ -167,6 +176,44 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
 
   const rootDocOf = (node: FlatNode): unknown => docs[Number(node.id.split('.')[0])]
   const fieldPathOf = (node: FlatNode): string => node.id.split('.').slice(1).join('.')
+
+  // A row is highlighted when its top-level doc is in the multi-doc selection
+  // (depth-0 rows only), or when it's the single selected nested node.
+  const isRowSelected = (node: FlatNode): boolean =>
+    node.depth === 0
+      ? node.docIndex !== undefined && selectedDocs.has(node.docIndex)
+      : node.id === selectedId
+
+  // Click a row. Top-level document rows drive the multi-doc selection: plain =
+  // just this doc, Shift = range from the anchor, ⌘/Ctrl = toggle. Clicking any
+  // nested node falls back to single-node selection.
+  const onRowClick = (node: FlatNode, e: MouseEvent): void => {
+    if (node.depth === 0 && node.docIndex !== undefined) {
+      const i = node.docIndex
+      setSelectedId(null)
+      if (e.shiftKey && anchorDoc !== null) {
+        const [a, b] = anchorDoc <= i ? [anchorDoc, i] : [i, anchorDoc]
+        const next = new Set<number>()
+        for (let k = a; k <= b; k++) next.add(k)
+        setSelectedDocs(next)
+      } else if (e.metaKey || e.ctrlKey) {
+        setSelectedDocs((prev) => {
+          const next = new Set(prev)
+          if (next.has(i)) next.delete(i)
+          else next.add(i)
+          return next
+        })
+        setAnchorDoc(i)
+      } else {
+        setSelectedDocs(new Set([i]))
+        setAnchorDoc(i)
+      }
+    } else {
+      setSelectedId(node.id)
+      setSelectedDocs(new Set())
+      setAnchorDoc(null)
+    }
+  }
 
   // A leaf is inline-editable when we know the collection, the doc has an _id,
   // the field isn't _id, and the value is a supported scalar type.
@@ -208,8 +255,26 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
 
   const openMenu = (e: MouseEvent, node: FlatNode): void => {
     e.preventDefault()
-    setSelectedId(node.id)
-    const items = treeMenuItems(node, docs)
+    const isDocRow = node.depth === 0 && node.docIndex !== undefined
+    const inMultiDoc = isDocRow && selectedDocs.has(node.docIndex as number)
+    // Right-clicking outside the current selection refocuses on this node/doc;
+    // right-clicking inside a multi-doc selection keeps it (for a bulk copy).
+    if (!inMultiDoc) {
+      if (isDocRow) {
+        setSelectedDocs(new Set([node.docIndex as number]))
+        setSelectedId(null)
+        setAnchorDoc(node.docIndex as number)
+      } else {
+        setSelectedId(node.id)
+        setSelectedDocs(new Set())
+        setAnchorDoc(null)
+      }
+    }
+    const picked = [...selectedDocs].sort((a, b) => a - b)
+    const items =
+      inMultiDoc && picked.length > 1
+        ? bulkDocMenuItems(picked.map((i) => docs[i]))
+        : treeMenuItems(node, docs)
     const rootDoc = rootDocOf(node)
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
@@ -240,10 +305,10 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
             <div
               key={node.id}
               className={`kv-row${node.expandable ? ' expandable' : ''}${
-                node.id === selectedId ? ' selected' : ''
+                isRowSelected(node) ? ' selected' : ''
               }`}
               style={{ transform: `translateY(${vi.start}px)` }}
-              onClick={() => setSelectedId(node.id)}
+              onClick={(e) => onRowClick(node, e)}
               onDoubleClick={() => node.expandable && toggle(node.id)}
               onContextMenu={(e) => openMenu(e, node)}
             >
@@ -315,6 +380,16 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
       )}
     </div>
   )
+}
+
+/** Right-click copy menu when several top-level documents are multi-selected. */
+function bulkDocMenuItems(picked: unknown[]): ContextMenuItem[] {
+  const n = picked.length
+  return [
+    { label: `复制 ${n} 个文档 (Pure JSON)`, onClick: () => void copyText(toPlainJson(picked)) },
+    { label: `复制 ${n} 个文档 (MongoShell JS)`, onClick: () => void copyText(toShellText(picked)) },
+    { label: `复制 ${n} 个文档 (Extended JSON)`, onClick: () => void copyText(toStrictEjson(picked)) }
+  ]
 }
 
 /** Right-click copy menu for a tree node (value / key / field / document). */
