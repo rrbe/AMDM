@@ -88,6 +88,7 @@ export function isExtended(value: unknown): boolean {
       case '$maxKey':
       case '$undefined':
       case '$symbol':
+      case '$code': // bare Code (no scope) — canonical EJSON is single-key
         return true
       default:
         return false

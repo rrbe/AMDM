@@ -8,7 +8,7 @@
  * for very large results (we never build one giant string and hand it to the
  * DOM).
  */
-import { entriesOf, formatScalar, isExpandable } from './ejson'
+import { entriesOf, formatScalar, isExtended } from './ejson'
 
 /** A colored segment of a JSON line (key, scalar value, or punctuation). */
 export interface JsonToken {
@@ -73,7 +73,14 @@ function pushLines(
     keyText === null ? [] : [{ text: keyText, cls: 'json-key' }, punct(': ')]
   const commaToks: JsonToken[] = comma ? [punct(comma)] : []
 
-  if (!isExpandable(value)) {
+  // A plain array or plain (non-extended) object is a container — even when
+  // empty (it renders as `{}` / `[]`). Everything else (scalars, extended EJSON
+  // wrappers like {$oid}) is a leaf rendered via formatScalar.
+  const isArray = Array.isArray(value)
+  const isContainer =
+    isArray || (typeof value === 'object' && value !== null && !isExtended(value))
+
+  if (!isContainer) {
     const { type } = formatScalar(value)
     const valText = scalarText(value)
     out.push({
@@ -84,7 +91,6 @@ function pushLines(
     return
   }
 
-  const isArray = Array.isArray(value)
   const open = isArray ? '[' : '{'
   const close = isArray ? ']' : '}'
   const entries = entriesOf(value)
