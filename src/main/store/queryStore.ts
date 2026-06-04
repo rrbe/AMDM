@@ -46,12 +46,14 @@ class QueryStore {
     const now = Date.now()
     const id = input.id || randomUUID()
     const existing = this.data.queries.find((q) => q.id === id)
+    const folder = input.folder?.trim()
     const q: SavedQuery = {
       id,
       name: input.name,
       code: input.code,
       connectionId: input.connectionId,
       database: input.database,
+      folder: folder || undefined,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
     }

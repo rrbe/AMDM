@@ -202,6 +202,9 @@ export interface SavedQuery {
   /** Optional binding to a connection + database. */
   connectionId?: string
   database?: string
+  /** Optional folder name for two-level organization in the sidebar. Empty /
+      undefined = ungrouped. */
+  folder?: string
   createdAt: number
   updatedAt: number
 }
@@ -213,6 +216,7 @@ export interface SavedQueryInput {
   code: string
   connectionId?: string
   database?: string
+  folder?: string
 }
 
 export interface HistoryEntry {

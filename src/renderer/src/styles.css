@@ -519,6 +519,37 @@ label {
 .sq-list {
   padding: 2px 6px 8px;
 }
+/* Folder grouping (two-level saved-query organization). */
+.sq-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin-top: 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  color: var(--fg-1);
+}
+.sq-folder-head:hover {
+  background: var(--bg-2);
+}
+.sq-folder-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-folder-count {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+/* Rows nested under a folder header get a little indent. */
+.sq-folder .sq-row {
+  margin-left: 10px;
+}
 .sq-row {
   position: relative;
   padding: 6px 8px;
