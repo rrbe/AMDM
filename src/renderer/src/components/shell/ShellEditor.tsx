@@ -2,10 +2,10 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { javascript } from '@codemirror/lang-javascript'
 import { acceptCompletion, autocompletion } from '@codemirror/autocomplete'
 import { EditorView, keymap } from '@codemirror/view'
-import { Prec } from '@codemirror/state'
+import { Prec, EditorState } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
-import { syntaxTree } from '@codemirror/language'
+import { syntaxTree, indentUnit } from '@codemirror/language'
 import { mongoCompletionSource } from '@renderer/lib/mongoCompletion'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
@@ -25,6 +25,30 @@ import { ContextMenu, type ContextMenuEntry } from '@renderer/components/Context
  * word/line motion, etc.) stays intact.
  */
 const CodeMirror = lazy(() => import('@uiw/react-codemirror'))
+
+const FONT_MIN = 10
+const FONT_MAX = 24
+const FONT_DEFAULT = 13
+
+// Editor-preference mutators (font size / word wrap / tab width). Kept at module
+// scope and reading fresh store state via getState() so the CodeMirror keymap can
+// call them without capturing stale closures; each persists to AppSettings.
+function adjustFontSize(delta: number): void {
+  const store = useAppStore.getState()
+  const next = Math.min(FONT_MAX, Math.max(FONT_MIN, store.settings.editorFontSize + delta))
+  if (next !== store.settings.editorFontSize) void store.updateSettings({ editorFontSize: next })
+}
+function resetFontSize(): void {
+  void useAppStore.getState().updateSettings({ editorFontSize: FONT_DEFAULT })
+}
+function toggleWordWrap(): void {
+  const store = useAppStore.getState()
+  void store.updateSettings({ editorWordWrap: !store.settings.editorWordWrap })
+}
+function cycleTabSize(): void {
+  const store = useAppStore.getState()
+  void store.updateSettings({ editorTabSize: store.settings.editorTabSize === 2 ? 4 : 2 })
+}
 
 interface ShellEditorProps {
   value: string
@@ -75,6 +99,13 @@ export function ShellEditor({
   }, [theme])
   const isDark = theme === 'dark' || (theme === 'system' && systemDark)
 
+  // Editor preferences (persisted to AppSettings; see the right-click menu and
+  // ⌘+/⌘−/⌘0). These feed the extensions memo below, so a change reconfigures
+  // CodeMirror — infrequent enough that the rebuild cost is irrelevant.
+  const fontSize = useAppStore((s) => s.settings.editorFontSize)
+  const wordWrap = useAppStore((s) => s.settings.editorWordWrap)
+  const tabSize = useAppStore((s) => s.settings.editorTabSize)
+
   // The live EditorView, captured on mount. The right-click menu needs it to
   // drive native commands (undo/redo/select-all, toggle-comment, search) and to
   // read the selection / locate the current statement for "Run Current Statement".
@@ -93,8 +124,20 @@ export function ShellEditor({
       autocompletion({ override: [mongoCompletionSource] }),
       // Provides the Find/Replace panel that ⌘F and the menu's openSearchPanel open.
       search({ top: true }),
+      // Editor preferences applied as extensions: font size cascades from the
+      // editor root; tab width drives both the visual tab + the spaces Tab inserts.
+      EditorView.theme({ '&': { fontSize: `${fontSize}px` } }),
+      EditorState.tabSize.of(tabSize),
+      indentUnit.of(' '.repeat(tabSize)),
+      ...(wordWrap ? [EditorView.lineWrapping] : []),
       Prec.highest(
         keymap.of([
+          // ⌘+ / ⌘− / ⌘0 resize the editor font (preventDefault stops Electron's
+          // window-zoom from also firing). Available even while a query runs.
+          { key: 'Mod-=', preventDefault: true, run: () => bumpFont(1) },
+          { key: 'Mod-+', preventDefault: true, run: () => bumpFont(1) },
+          { key: 'Mod--', preventDefault: true, run: () => bumpFont(-1) },
+          { key: 'Mod-0', preventDefault: true, run: () => bumpFont(0) },
           // Cmd+Enter and Ctrl+Enter both run. Returning true consumes the key
           // (no blank line); plain Enter is left to CodeMirror as a newline.
           { key: 'Mod-Enter', run: () => runIfReady() },
@@ -112,13 +155,15 @@ export function ShellEditor({
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
           // here so it works regardless of basicSetup defaults).
           { key: 'Mod-/', run: (view) => toggleComment(view) },
-          // Tab: accept the open completion, else insert one indent unit (2
-          // spaces via basicSetup.tabSize, or indent a multi-line selection).
+          // Tab: accept the open completion, else insert one indent unit (the
+          // configured tab width in spaces, or indent a multi-line selection).
           { key: 'Tab', run: (view) => acceptCompletion(view) || insertTab(view), shift: indentLess }
         ])
       )
     ],
-    []
+    // Rebuild only when an editor preference changes (not per keystroke — the
+    // run/save/explain callbacks are read through `handlers` ref).
+    [fontSize, wordWrap, tabSize]
   )
 
   return (
@@ -145,8 +190,8 @@ export function ShellEditor({
             lineNumbers: true,
             highlightActiveLine: true,
             foldGutter: false,
-            autocompletion: false,
-            tabSize: 2
+            autocompletion: false
+            // tabSize is set via the EditorState.tabSize extension (configurable).
           }}
         />
       </Suspense>
@@ -183,6 +228,12 @@ export function ShellEditor({
     handlers.current.onFormat()
     return true
   }
+  // Font size: delta > 0 grows, < 0 shrinks, 0 resets. Always consumes the key.
+  function bumpFont(delta: number): boolean {
+    if (delta === 0) resetFontSize()
+    else adjustFontSize(delta)
+    return true
+  }
 
   // Focus the editor first so native clipboard ops (execCommand) and CodeMirror
   // commands act on the editor's selection rather than the menu button.
@@ -210,6 +261,13 @@ export function ShellEditor({
       'separator',
       { label: '格式化代码', shortcut: '⌥⇧F', onClick: () => formatNow() },
       { label: '切换注释', shortcut: '⌘/', onClick: () => withView((v) => toggleComment(v)) },
+      'separator',
+      // Editor preferences (persisted): the `：值` labels show current state,
+      // since the menu closes on click (no live checkmark column).
+      { label: `自动换行：${wordWrap ? '开' : '关'}`, onClick: () => toggleWordWrap() },
+      { label: `Tab 宽度：${tabSize}`, onClick: () => cycleTabSize() },
+      { label: '增大字号', shortcut: '⌘+', onClick: () => bumpFont(1) },
+      { label: '减小字号', shortcut: '⌘−', onClick: () => bumpFont(-1) },
       'separator',
       { label: '查找 / 替换', shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       'separator',

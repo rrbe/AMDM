@@ -328,6 +328,12 @@ export interface AppSettings {
   /** Page size for query results — how many docs a cursor fetches per page
       (ADR-0004 rule 2: bounded; never the whole collection). */
   queryLimit: number
+  /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
+  editorFontSize: number
+  /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
+  editorWordWrap: boolean
+  /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
+  editorTabSize: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -335,5 +341,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   sidebarWidth: 300,
   editorHeight: 160,
-  queryLimit: 50
+  queryLimit: 50,
+  editorFontSize: 13,
+  editorWordWrap: false,
+  editorTabSize: 2
 }

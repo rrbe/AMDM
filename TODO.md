@@ -30,8 +30,9 @@ SPEC §4 遗留。保存查询数量上来后需要分组/文件夹。
 ### 7. 连接配置导出 / 备份　`[难度: 中] [风险: 中]`
 SPEC §4 遗留。导出连接配置以便迁移/备份——**密钥不导出**（在 Keychain，见 ADR-0006），导入后需重新输入密码。
 
-### 8. Editor Settings　`[难度: 低-中] [风险: 低]`
-右键菜单里当前置灰的那项。字号、自动换行、tab 宽度等编辑器偏好，落到 `AppSettings`，作用于 CodeMirror。
+### 8. Editor Settings　✅ 已完成（2026-06-04）
+编辑器偏好落到 `AppSettings`（`editorFontSize`/`editorWordWrap`/`editorTabSize`，默认 13 / false / 2，存量 settings.json 自动合并默认值），作用于 CodeMirror：字号经 `EditorView.theme` 注入、tab 宽度经 `EditorState.tabSize`+`indentUnit` facet、自动换行经 `EditorView.lineWrapping`。入口沿用本项目「就地上下文控件」的设计语言——编辑器右键菜单新增「自动换行：开/关」「Tab 宽度：n」(循环) 「增大/减小字号」，外加键位 ⌘+/⌘−/⌘0（`preventDefault` 压掉 Electron 窗口缩放）。注：SPEC/TODO 说的「右键菜单置灰项」是过时记述，实际并无该项。
+- 链路：`types`（AppSettings+默认值）→ `ShellEditor`（selector 读偏好 + extensions 注入 + 键位/菜单）。无新增 `lib/`/`*Core` 纯函数，故按约定不配单测（与 theme/editorHeight 一致）。
 
 ## P3 — 投资 / 按需（ROI 取决于你是否在意，不急）
 
