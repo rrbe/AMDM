@@ -1,12 +1,7 @@
-import { EJSON } from 'bson'
 import type { MongoClient } from 'mongodb'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import { sessionManager } from './sessionManager'
-import { serializerPool } from '../workers/serializerPool'
-
-function toPlain(value: unknown): Record<string, unknown> {
-  return JSON.parse(EJSON.stringify(value, { relaxed: false })) as Record<string, unknown>
-}
+import { listCollectionsOnDb, listIndexesOnDb, sampleFieldsOnDb } from './catalogCore'
 
 /**
  * True when an error is the benign result of a concurrent disconnect: a lazy
@@ -16,7 +11,7 @@ function toPlain(value: unknown): Record<string, unknown> {
  * longer needed, so callers swallow these and return an empty result instead
  * of rejecting the IPC handler (which Electron would log as an error).
  */
-function isClientClosed(err: unknown): boolean {
+export function isClientClosed(err: unknown): boolean {
   if (!(err instanceof Error)) return false
   const closedNames = new Set([
     'MongoClientClosedError',
@@ -29,7 +24,7 @@ function isClientClosed(err: unknown): boolean {
 }
 
 /** Run a catalog op, treating a concurrent-disconnect race as an empty result. */
-async function guardClosed<T>(op: () => Promise<T>, fallback: T): Promise<T> {
+export async function guardClosed<T>(op: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await op()
   } catch (err) {
@@ -104,16 +99,10 @@ export async function listCollections(
   connectionId: string,
   database: string
 ): Promise<CollectionInfo[]> {
-  return guardClosed(async () => {
-    const client = sessionManager.getClient(connectionId)
-    // nameOnly keeps this cheap — we deliberately do NOT fetch per-collection
-    // counts here (ADR-0004: that's what froze NoSQLBooster on big servers).
-    const cols = await client.db(database).listCollections({}, { nameOnly: false }).toArray()
-    return cols.map((c) => ({
-      name: c.name,
-      type: (c.type as CollectionInfo['type']) || 'collection'
-    }))
-  }, [])
+  return guardClosed(
+    () => listCollectionsOnDb(sessionManager.getClient(connectionId).db(database)),
+    []
+  )
 }
 
 export async function listIndexes(
@@ -121,20 +110,10 @@ export async function listIndexes(
   database: string,
   collection: string
 ): Promise<IndexInfo[]> {
-  return guardClosed(async () => {
-    const client = sessionManager.getClient(connectionId)
-    const idx = await client.db(database).collection(collection).indexes()
-    return idx.map((i) => {
-      const raw = i as Record<string, unknown>
-      return {
-        name: String(raw.name),
-        key: toPlain(raw.key),
-        unique: raw.unique === true,
-        sparse: raw.sparse === true,
-        ttlSeconds: typeof raw.expireAfterSeconds === 'number' ? raw.expireAfterSeconds : undefined
-      }
-    })
-  }, [])
+  return guardClosed(
+    () => listIndexesOnDb(sessionManager.getClient(connectionId).db(database), collection),
+    []
+  )
 }
 
 // --- field sampling for autocomplete (ADR-0004 rule 4: bounded + cached) ---
@@ -159,14 +138,8 @@ export async function sampleFields(
 
   // On a disconnect race, return [] WITHOUT caching, so a later reconnect re-samples.
   return guardClosed(async () => {
-    const client = sessionManager.getClient(connectionId)
-    const docs = await client
-      .db(database)
-      .collection(collection)
-      .find({}, { limit: SAMPLE_LIMIT })
-      .toArray()
-
-    const fields = await serializerPool.extractFields(docs)
+    const db = sessionManager.getClient(connectionId).db(database)
+    const fields = await sampleFieldsOnDb(db, collection, SAMPLE_LIMIT)
     fieldCache.set(cacheKey, fields)
     return fields
   }, [])

@@ -248,7 +248,7 @@ function isWriteAck(v: unknown): boolean {
  * `name`/`message` (TypeError, ReferenceError, …). Duck-type instead, so the
  * renderer shows the true error name rather than a flattened "Error".
  */
-function describeError(err: unknown): { error: string; errorName: string } {
+export function describeError(err: unknown): { error: string; errorName: string } {
   if (err && typeof err === 'object') {
     const e = err as { name?: unknown; message?: unknown }
     const message = typeof e.message === 'string' ? e.message : undefined
