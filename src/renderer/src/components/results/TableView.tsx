@@ -213,7 +213,19 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
   return (
-    <div ref={parentRef} className="table-scroller">
+    <div
+      ref={parentRef}
+      className="table-scroller"
+      // Focusable so a grid click moves focus off the query editor — otherwise
+      // ⌘C stays "in" the editor and useCopyHotkey defers to native copy instead
+      // of copying the selected row(s). Skip when the mousedown lands in the
+      // inline cell editor so editing keeps focus.
+      tabIndex={-1}
+      onMouseDown={(e) => {
+        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
+          parentRef.current?.focus({ preventScroll: true })
+      }}
+    >
       <div className="tbl" style={{ width: totalWidth, height: rowVirtualizer.getTotalSize() + ROW_HEIGHT }}>
         {/* Sticky header */}
         <div className="tbl-head" style={{ width: totalWidth }}>

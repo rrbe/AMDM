@@ -295,7 +295,19 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
   return (
-    <div ref={parentRef} className="virtual-scroller">
+    <div
+      ref={parentRef}
+      className="virtual-scroller"
+      // Focusable so a grid click moves focus off the query editor — otherwise
+      // ⌘C stays "in" the editor and useCopyHotkey defers to native copy instead
+      // of copying the selected doc(s). Skip when the mousedown lands in the
+      // inline cell editor so editing keeps focus.
+      tabIndex={-1}
+      onMouseDown={(e) => {
+        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
+          parentRef.current?.focus({ preventScroll: true })
+      }}
+    >
       <div className="virtual-inner" style={{ height: rowVirtualizer.getTotalSize() }}>
         <div className="kv-resizer" style={{ left: keyWidth }} onMouseDown={startResize} />
         {rowVirtualizer.getVirtualItems().map((vi) => {

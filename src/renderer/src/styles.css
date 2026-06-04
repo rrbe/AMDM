@@ -925,6 +925,12 @@ label {
   width: 100%;
   overflow: auto;
 }
+/* These scrollers are programmatically focusable (tabIndex=-1) so a grid click
+   claims focus — see TreeView/TableView. Never draw a focus ring around them. */
+.virtual-scroller:focus,
+.table-scroller:focus {
+  outline: none;
+}
 .virtual-inner {
   position: relative;
   width: 100%;
