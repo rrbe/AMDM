@@ -34,6 +34,9 @@ import type {
   ToolStatus,
   UserInfo
 } from '@shared/types'
+import { createTab, patchTab, pickActiveAfterClose, type QueryTab } from '@renderer/lib/tabs'
+
+export type { QueryTab }
 
 export type ResultView = 'tree' | 'json' | 'table'
 
@@ -86,19 +89,13 @@ interface AppState {
   /** Connection ids whose database subtree is expanded in the unified explorer. */
   expandedConnections: Set<string>
 
-  // ---- shell workspace ----
-  activeDatabase: string
-  code: string
-  result: ShellResult | null
+  // ---- shell workspace (multi-tab) ----
+  /** Open query tabs; each carries its own code/result/db/paging/run state. */
+  tabs: QueryTab[]
+  /** Id of the focused tab (always references an existing tab; ≥1 tab exists). */
+  activeTabId: string
+  /** Result view (Tree/JSON/Table) — a global UI preference, not per-tab. */
   resultView: ResultView
-  running: boolean
-  /** Id of the in-flight run, so the Stop button can target `shell.abort`.
-      Null whenever nothing is running. */
-  runningExecId: string | null
-  /** The query that produced the current result (for refresh after edit/delete). */
-  lastQuery: { connectionId: string; database: string; code: string } | null
-  /** Page offset of the current result (0 = first page). Driven by loadPage. */
-  resultSkip: number
 
   // ---- saved queries + history + autocomplete (Phase 2) ----
   savedQueries: SavedQuery[]
@@ -145,7 +142,15 @@ interface AppState {
   loadIndexes(connId: string, db: string, coll: string): Promise<void>
   loadUsers(connId: string, db: string): Promise<void>
 
-  // ---- actions: shell ----
+  // ---- actions: tabs ----
+  /** Open a new empty query tab and focus it. */
+  newTab(): void
+  /** Focus an existing tab. */
+  setActiveTab(id: string): void
+  /** Close a tab (aborts its run if any); always leaves ≥1 tab open. */
+  closeTab(id: string): void
+
+  // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
@@ -219,6 +224,20 @@ function newExecId(): string {
   return crypto.randomUUID()
 }
 
+/** Stable id for a new tab. */
+function newTabId(): string {
+  return crypto.randomUUID()
+}
+
+/** The focused tab. Always defined — the store guarantees ≥1 tab exists; the
+    `?? tabs[0]` is just a belt-and-suspenders for a stale activeTabId. */
+export function getActiveTab(s: { tabs: QueryTab[]; activeTabId: string }): QueryTab {
+  return s.tabs.find((t) => t.id === s.activeTabId) ?? s.tabs[0]
+}
+
+/** The tab present at first render (so init can point activeTabId at it). */
+const INITIAL_TAB = createTab(newTabId())
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -227,14 +246,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   catalogs: {},
   expandedConnections: new Set(),
 
-  activeDatabase: '',
-  code: '',
-  result: null,
+  tabs: [INITIAL_TAB],
+  activeTabId: INITIAL_TAB.id,
   resultView: 'tree',
-  running: false,
-  runningExecId: null,
-  lastQuery: null,
-  resultSkip: 0,
 
   savedQueries: [],
   history: [],
@@ -354,10 +368,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
       if (status.state === 'connected') {
-        // Default the active database to the connection's preferred db, if any.
+        // Default the active tab's database to the connection's preferred db,
+        // unless that tab already has one chosen (don't clobber an explicit pick).
         const conn = get().connections.find((c) => c.id === id)
-        if (conn?.defaultDatabase && get().activeConnectionId === id) {
-          set({ activeDatabase: conn.defaultDatabase })
+        const db = conn?.defaultDatabase
+        if (db && get().activeConnectionId === id) {
+          set((s) =>
+            getActiveTab(s).activeDatabase
+              ? {}
+              : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
+          )
         }
         await get().loadDatabases(id)
       }
@@ -521,27 +541,56 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------------------- tabs
+  newTab() {
+    const tab = createTab(newTabId())
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+  },
+
+  setActiveTab(id) {
+    set({ activeTabId: id })
+  },
+
+  closeTab(id) {
+    const closing = get().tabs.find((t) => t.id === id)
+    // Free a server-side run the closed tab may have had in flight.
+    if (closing?.runningExecId) void window.api.shell.abort(closing.runningExecId).catch(() => {})
+    set((s) => {
+      const remaining = s.tabs.filter((t) => t.id !== id)
+      if (remaining.length === 0) {
+        const fresh = createTab(newTabId())
+        return { tabs: [fresh], activeTabId: fresh.id }
+      }
+      const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
+      return { tabs: remaining, activeTabId: nextActive }
+    })
+  },
+
   // --------------------------------------------------------------------- shell
+  // All shell actions read/write the *active* tab. Async runs capture their
+  // tab id up front and patch THAT tab on completion, so switching tabs (or
+  // running another) mid-flight stays correct and tabs run independently.
   setCode(code) {
-    set({ code })
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code }) }))
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
   // surfaces as `lastError` like any other failure rather than throwing into UI.
   async formatCode() {
-    const { code } = get()
+    const tab = getActiveTab(get())
+    const code = tab.code
     if (!code.trim()) return
     try {
       const { formatJs } = await import('@renderer/lib/formatJs')
       const formatted = await formatJs(code)
-      if (formatted !== code) set({ code: formatted })
+      if (formatted !== code) set((s) => ({ tabs: patchTab(s.tabs, tab.id, { code: formatted }) }))
     } catch (e) {
       set({ lastError: `Format failed: ${errMessage(e)}` })
     }
   },
 
   setActiveDatabase(db) {
-    set({ activeDatabase: db })
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }))
   },
 
   setResultView(view) {
@@ -550,35 +599,52 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   insertSnippet(db, coll) {
     // ADR-0004 rule 5: never auto-run. We only seed the editor.
-    set({ activeDatabase: db, code: `db.${coll}.find({})` })
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db, code: `db.${coll}.find({})` })
+    }))
   },
 
   async runShell(codeOverride) {
-    const { activeConnectionId, activeDatabase, code: editorCode } = get()
-    const code = codeOverride ?? editorCode
+    const { activeConnectionId } = get()
+    const tab = getActiveTab(get())
+    const tabId = tab.id
+    const code = codeOverride ?? tab.code
     if (!activeConnectionId) {
       set({ lastError: 'No active connection.' })
       return
     }
     if (!code.trim()) return
-    const database = activeDatabase || 'test'
+    const database = tab.activeDatabase || 'test'
     const limit = get().settings.queryLimit
     const execId = newExecId()
-    set({ running: true, runningExecId: execId, lastError: null })
+    set((s) => ({
+      tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
+      lastError: null
+    }))
     try {
       // A fresh run always starts at page 0.
       const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code, limit, skip: 0, execId })
-      set({ result, lastQuery: { connectionId: activeConnectionId, database, code }, resultSkip: 0 })
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, {
+          result,
+          lastQuery: { connectionId: activeConnectionId, database, code },
+          resultSkip: 0
+        })
+      }))
     } catch (e) {
-      set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, {
+          result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' }
+        })
+      }))
     } finally {
-      set({ running: false, runningExecId: null })
+      set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
     }
     void get().loadHistory()
   },
 
   async stopShell() {
-    const execId = get().runningExecId
+    const execId = getActiveTab(get()).runningExecId
     if (!execId) return
     // Best-effort: the run's own `finally` clears the spinner even if abort
     // races past it (the run already finished).
@@ -590,18 +656,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async loadPage(skip) {
-    const lq = get().lastQuery
+    const tab = getActiveTab(get())
+    const tabId = tab.id
+    const lq = tab.lastQuery
     if (!lq || skip < 0) return
     const limit = get().settings.queryLimit
     const execId = newExecId()
-    set({ running: true, runningExecId: execId, lastError: null })
+    set((s) => ({
+      tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
+      lastError: null
+    }))
     try {
       const result = await window.api.shell.execute({ ...lq, limit, skip, execId })
-      set({ result, resultSkip: skip })
+      set((s) => ({ tabs: patchTab(s.tabs, tabId, { result, resultSkip: skip }) }))
     } catch (e) {
-      set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, {
+          result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' }
+        })
+      }))
     } finally {
-      set({ running: false, runningExecId: null })
+      set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
     }
   },
 
@@ -609,19 +684,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     const limit = Math.min(1000, Math.max(1, Math.floor(n) || 1))
     await get().updateSettings({ queryLimit: limit })
     // Re-run the current query from the first page with the new page size.
-    if (get().lastQuery) await get().loadPage(0)
+    if (getActiveTab(get()).lastQuery) await get().loadPage(0)
   },
 
   async runExplain() {
-    const { activeConnectionId, activeDatabase, code } = get()
+    const { activeConnectionId } = get()
+    const tab = getActiveTab(get())
+    const tabId = tab.id
+    const code = tab.code
     if (!activeConnectionId) {
       set({ lastError: 'No active connection.' })
       return
     }
     if (!code.trim()) return
-    const database = activeDatabase || 'test'
+    const database = tab.activeDatabase || 'test'
     const execId = newExecId()
-    set({ running: true, runningExecId: execId, lastError: null })
+    set((s) => ({
+      tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
+      lastError: null
+    }))
     try {
       const result = await window.api.shell.execute({
         connectionId: activeConnectionId,
@@ -630,17 +711,28 @@ export const useAppStore = create<AppState>((set, get) => ({
         explain: true,
         execId
       })
-      set({ result, lastQuery: { connectionId: activeConnectionId, database, code } })
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, {
+          result,
+          lastQuery: { connectionId: activeConnectionId, database, code }
+        })
+      }))
     } catch (e) {
-      set({ result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, {
+          result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' }
+        })
+      }))
     } finally {
-      set({ running: false, runningExecId: null })
+      set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
     }
     void get().loadHistory()
   },
 
   async refreshResult() {
-    const lq = get().lastQuery
+    const tab = getActiveTab(get())
+    const tabId = tab.id
+    const lq = tab.lastQuery
     if (!lq) return
     try {
       // Refresh in place — keep the current page offset and size.
@@ -649,9 +741,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         database: lq.database,
         code: lq.code,
         limit: get().settings.queryLimit,
-        skip: get().resultSkip
+        skip: getActiveTab(get()).resultSkip
       })
-      set({ result })
+      set((s) => ({ tabs: patchTab(s.tabs, tabId, { result }) }))
     } catch (e) {
       set({ lastError: `Refresh failed: ${errMessage(e)}` })
     }
@@ -717,8 +809,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   applyQuery(code, database) {
-    // Never auto-run (ADR-0004 rule 5) — just load into the editor.
-    set((s) => ({ code, activeDatabase: database || s.activeDatabase }))
+    // Never auto-run (ADR-0004 rule 5) — just load into the active tab's editor.
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, {
+        code,
+        activeDatabase: database || getActiveTab(s).activeDatabase
+      })
+    }))
   },
 
   // ---------------------------------------------------------------- autocomplete

@@ -13,7 +13,7 @@
  * Robustness: reads the live store outside React; never throws (returns null).
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
-import { useAppStore } from '@renderer/store/useAppStore'
+import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 
 // --------------------------------------------------------------------------
 // Static vocabularies
@@ -156,8 +156,9 @@ function operatorCompletions(before: string): Completion[] {
 
 function activeContext(): { connId: string; db: string } | null {
   const s = useAppStore.getState()
-  if (!s.activeConnectionId || !s.activeDatabase) return null
-  return { connId: s.activeConnectionId, db: s.activeDatabase }
+  const db = getActiveTab(s).activeDatabase
+  if (!s.activeConnectionId || !db) return null
+  return { connId: s.activeConnectionId, db }
 }
 
 function collectionNames(connId: string, db: string): string[] {

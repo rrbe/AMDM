@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
-import { useAppStore } from '@renderer/store/useAppStore'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, X } from 'lucide-react'
+import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
+import { tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
@@ -7,16 +9,18 @@ import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
 
 /**
- * The main work area: header (active connection + db selector + Run), the lazy
- * CodeMirror editor, and the result panel below.
+ * The main work area: a tab strip, header (active connection + db selector +
+ * Run), the lazy CodeMirror editor, and the result panel below. Each tab owns
+ * its own code/result/db/run state (see the store's `tabs`).
  */
 export function ShellWorkspace(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connections = useAppStore((s) => s.connections)
   const catalogs = useAppStore((s) => s.catalogs)
-  const activeDatabase = useAppStore((s) => s.activeDatabase)
-  const code = useAppStore((s) => s.code)
-  const running = useAppStore((s) => s.running)
+  const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
+  const code = useAppStore((s) => getActiveTab(s).code)
+  const running = useAppStore((s) => getActiveTab(s).running)
+  const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
   const formatCode = useAppStore((s) => s.formatCode)
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
@@ -41,6 +45,7 @@ export function ShellWorkspace(): JSX.Element {
 
   return (
     <div className="work">
+      <TabBar />
       <div className="work-header app-drag">
         <span className="conn-title">{conn?.name ?? 'Shell'}</span>
         <select
@@ -77,7 +82,10 @@ export function ShellWorkspace(): JSX.Element {
         )}
       </div>
 
+      {/* Key by tab id so each tab gets its own CodeMirror instance (isolated
+          undo history / selection); switching tabs swaps in that tab's editor. */}
       <ShellEditor
+        key={activeTabId}
         value={code}
         onChange={setCode}
         onRun={() => void runShell()}
@@ -105,6 +113,69 @@ export function ShellWorkspace(): JSX.Element {
       <ResultPanel />
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
+    </div>
+  )
+}
+
+/**
+ * The query-tab strip: one chip per open tab (label derived from its code), a
+ * running dot while it executes, a close ✕, and a trailing "+" to open a tab.
+ */
+function TabBar(): JSX.Element {
+  const tabs = useAppStore((s) => s.tabs)
+  const activeTabId = useAppStore((s) => s.activeTabId)
+  const setActiveTab = useAppStore((s) => s.setActiveTab)
+  const closeTab = useAppStore((s) => s.closeTab)
+  const newTab = useAppStore((s) => s.newTab)
+
+  // ⌘T / Ctrl+T opens a new query tab (reads the action via getState to keep
+  // this listener stable). ⌘W is left alone — it's Electron's window close.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        useAppStore.getState().newTab()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  return (
+    <div className="tab-bar">
+      <div className="tab-strip">
+        {tabs.map((tab, i) => (
+          <div
+            key={tab.id}
+            className={tab.id === activeTabId ? 'qtab active' : 'qtab'}
+            onClick={() => setActiveTab(tab.id)}
+            onAuxClick={(e) => {
+              // Middle-click closes, matching browser tab convention.
+              if (e.button === 1) {
+                e.preventDefault()
+                closeTab(tab.id)
+              }
+            }}
+            data-tip={tabLabel(tab, i)}
+          >
+            {tab.running && <span className="qtab-dot" aria-hidden />}
+            <span className="qtab-label">{tabLabel(tab, i)}</span>
+            <button
+              className="qtab-close"
+              aria-label="关闭标签页"
+              onClick={(e) => {
+                e.stopPropagation()
+                closeTab(tab.id)
+              }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button className="qtab-new" data-tip="新建查询标签页 (⌘T)" aria-label="新建查询标签页" onClick={() => newTab()}>
+        <Plus size={14} />
+      </button>
     </div>
   )
 }

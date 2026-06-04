@@ -5,16 +5,16 @@
 import { useMemo, useState } from 'react'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
-import { useAppStore } from '@renderer/store/useAppStore'
+import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 
 interface SaveQueryModalProps {
   onClose: () => void
 }
 
 export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
-  const code = useAppStore((s) => s.code)
+  const code = useAppStore((s) => getActiveTab(s).code)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
-  const activeDatabase = useAppStore((s) => s.activeDatabase)
+  const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
   const savedQueries = useAppStore((s) => s.savedQueries)
   const saveQuery = useAppStore((s) => s.saveQuery)
 

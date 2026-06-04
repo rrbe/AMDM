@@ -830,6 +830,93 @@ label {
   overflow: hidden;
 }
 
+/* ---- query tab strip (multi-tab workspace) ---- */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: 32px;
+  padding: 4px 6px 0;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.tab-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-strip::-webkit-scrollbar {
+  display: none;
+}
+.qtab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 200px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.qtab:hover {
+  background: var(--bg-3);
+}
+.qtab.active {
+  background: var(--bg-0);
+  color: var(--fg-0);
+}
+.qtab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qtab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+.qtab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-3);
+  opacity: 0.65;
+}
+.qtab:hover .qtab-close,
+.qtab.active .qtab-close {
+  opacity: 1;
+}
+.qtab-close:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.qtab-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  flex: 0 0 auto;
+}
+.qtab-new:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+
 .work-header {
   display: flex;
   align-items: center;

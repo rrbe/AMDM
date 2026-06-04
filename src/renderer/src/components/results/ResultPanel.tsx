@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
 import type { ShellResult } from '@shared/types'
-import { useAppStore, type ResultView } from '@renderer/store/useAppStore'
+import { useAppStore, getActiveTab, type ResultView } from '@renderer/store/useAppStore'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { ContextMenu } from '@renderer/components/ContextMenu'
@@ -15,10 +15,10 @@ import { ExplainView } from './ExplainView'
  * ShellResult.kind: 'documents' (array), 'value', 'ack', 'error'.
  */
 export function ResultPanel(): JSX.Element {
-  const result = useAppStore((s) => s.result)
+  const result = useAppStore((s) => getActiveTab(s).result)
   const view = useAppStore((s) => s.resultView)
   const setView = useAppStore((s) => s.setResultView)
-  const lastQuery = useAppStore((s) => s.lastQuery)
+  const lastQuery = useAppStore((s) => getActiveTab(s).lastQuery)
   const docCtx = docActionContext(result, lastQuery)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
@@ -185,9 +185,9 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
  * way to see more). Next is enabled only while the page is truncated.
  */
 function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
-  const skip = useAppStore((s) => s.resultSkip)
+  const skip = useAppStore((s) => getActiveTab(s).resultSkip)
   const limit = useAppStore((s) => s.settings.queryLimit)
-  const running = useAppStore((s) => s.running)
+  const running = useAppStore((s) => getActiveTab(s).running)
   const loadPage = useAppStore((s) => s.loadPage)
 
   if (!result.pageable) return null
@@ -226,7 +226,7 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
 function PageSizeControl(): JSX.Element {
   const limit = useAppStore((s) => s.settings.queryLimit)
   const setQueryLimit = useAppStore((s) => s.setQueryLimit)
-  const running = useAppStore((s) => s.running)
+  const running = useAppStore((s) => getActiveTab(s).running)
   const [val, setVal] = useState(String(limit))
   useEffect(() => setVal(String(limit)), [limit])
 

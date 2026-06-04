@@ -21,8 +21,9 @@
 ### 4. Tooltip 统一　✅ 已完成（2026-06-04）
 全局委托式 `TooltipLayer`（挂 App 根，监听 `mouseover`/`mouseout`，读元素 `data-tip` 属性，延迟 350ms，portal 到 `<body>` 避免裁剪，测量后夹取视口内定位，主题变量配色 z 3000）。采用方式即把 `title=` 改名为 `data-tip=`——共替换 30 处（排除 5 处其实是 `<Modal title>` 组件 prop），icon-only 按钮补 `aria-label` 防 a11y 回归。`Button` 新增 `'data-tip'?` prop 转发。这是「是否引组件库」验证的第一个手写原语。
 
-### 5. 多查询标签页　`[难度: 中-高] [风险: 中]`
-现在是单编辑器 + 单结果。NoSQLBooster 支持多 tab。涉及 store 从「单 code/result」改为「tab 数组 + activeTab」，影响面较大。
+### 5. 多查询标签页　✅ 已完成（2026-06-04）
+store 从「单 code/result」改为 `tabs: QueryTab[]` + `activeTabId`；每个 tab 自带 code/result/activeDatabase/lastQuery/resultSkip/running/runningExecId，独立运行（一个 tab 跑查询时另一个可编辑/也可并发跑）。**异步运行按发起时的 tabId 回填**，切 tab 或并发跑都不串。`resultView`(Tree/JSON/Table) 仍为全局偏好。纯逻辑（`createTab`/`patchTab` 保持未改 tab 的引用稳定→规避 zustand 白屏雷区 / `pickActiveAfterClose` / `tabLabel`）抽到 `lib/tabs.ts` 并配 11 个单测。组件统一经 `getActiveTab(s)` selector 读活动 tab（返回基元或已存引用，引用稳定）。UI：顶部 tab 条（标签取目标集合名、运行小圆点、关闭 ✕、`+` 新建、⌘T、中键关闭），编辑器 `key={activeTabId}` 隔离各 tab 的 undo 历史。
+- 已 Playwright 真机验证：连真实 mongod → tab 条出现、`+` 建 tab、切 tab、关 tab 全部正确，无白屏（连 main↔renderer 全链路）。
 
 ### 6. 保存查询的文件夹 / 两级组织 UI　✅ 已完成（2026-06-04）
 `SavedQuery`/`SavedQueryInput` 加可选 `folder` 字段（空=未分组，`queryStore` trim 落盘，存量自动兼容）。保存弹窗加 Folder 输入框 + `<datalist>` 列出已有文件夹（输入新名即建新文件夹）。`SavedQueriesPanel` 的 Saved 子页按文件夹分组（文件夹 A→Z、「未分组」垫底）、可折叠（本地状态），全部未分组时退化为旧的扁平列表。行右键菜单：加载 / 移动到「X」/ 移出文件夹 / 删除——移动复用 `saveQuery(id=…)` 原地改 folder。
