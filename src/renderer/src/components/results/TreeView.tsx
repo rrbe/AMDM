@@ -10,6 +10,7 @@ import {
 } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
+import { computeSelection } from '@renderer/lib/selection'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import {
@@ -191,23 +192,13 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     if (node.depth === 0 && node.docIndex !== undefined) {
       const i = node.docIndex
       setSelectedId(null)
-      if (e.shiftKey && anchorDoc !== null) {
-        const [a, b] = anchorDoc <= i ? [anchorDoc, i] : [i, anchorDoc]
-        const next = new Set<number>()
-        for (let k = a; k <= b; k++) next.add(k)
-        setSelectedDocs(next)
-      } else if (e.metaKey || e.ctrlKey) {
-        setSelectedDocs((prev) => {
-          const next = new Set(prev)
-          if (next.has(i)) next.delete(i)
-          else next.add(i)
-          return next
-        })
-        setAnchorDoc(i)
-      } else {
-        setSelectedDocs(new Set([i]))
-        setAnchorDoc(i)
-      }
+      const { selection, anchor } = computeSelection(selectedDocs, i, anchorDoc, {
+        shift: e.shiftKey,
+        meta: e.metaKey,
+        ctrl: e.ctrlKey
+      })
+      setSelectedDocs(selection)
+      setAnchorDoc(anchor)
     } else {
       setSelectedId(node.id)
       setSelectedDocs(new Set())

@@ -4,6 +4,7 @@ import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
+import { computeSelection } from '@renderer/lib/selection'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import {
@@ -111,25 +112,15 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   })
 
   // Core row-selection logic shared by cell clicks and the # handle: plain = just
-  // this row, Shift = range from the anchor, ⌘/Ctrl = toggle.
+  // this row, Shift = range from the anchor, ⌘/Ctrl = toggle (see selection.ts).
   const applyRowSelection = (row: number, e: MouseEvent): void => {
-    if (e.shiftKey && anchorRow !== null) {
-      const [a, b] = anchorRow <= row ? [anchorRow, row] : [row, anchorRow]
-      const next = new Set<number>()
-      for (let i = a; i <= b; i++) next.add(i)
-      setSelectedRows(next)
-    } else if (e.metaKey || e.ctrlKey) {
-      setSelectedRows((prev) => {
-        const next = new Set(prev)
-        if (next.has(row)) next.delete(row)
-        else next.add(row)
-        return next
-      })
-      setAnchorRow(row)
-    } else {
-      setSelectedRows(new Set([row]))
-      setAnchorRow(row)
-    }
+    const { selection, anchor } = computeSelection(selectedRows, row, anchorRow, {
+      shift: e.shiftKey,
+      meta: e.metaKey,
+      ctrl: e.ctrlKey
+    })
+    setSelectedRows(selection)
+    setAnchorRow(anchor)
   }
   // Single-click a cell: select its whole row AND focus that cell (cell overlay).
   // Double-click edits (see the Cell handlers) — no modifier key needed here.
