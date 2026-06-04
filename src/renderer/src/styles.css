@@ -415,6 +415,18 @@ label {
 .btn-new-conn svg {
   display: block;
 }
+/* Compact "backup/restore" overflow button in the Connections header. */
+.side-section-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+}
+.side-section-more svg {
+  display: block;
+}
 
 /* Two stacked side-panel sections: Connections (top, fills space) and a
    collapsible Saved Queries drawer (bottom), split by a light horizontal rule. */

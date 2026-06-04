@@ -22,6 +22,7 @@ import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
+import { exportConnections, importConnections } from '../io/connectionBackup'
 import { getToolStatus } from '../io/tools'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
@@ -73,6 +74,12 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
+  )
+  ipcMain.handle(IPC.connectionsExport, () =>
+    exportConnections(BrowserWindow.getFocusedWindow())
+  )
+  ipcMain.handle(IPC.connectionsImport, () =>
+    importConnections(BrowserWindow.getFocusedWindow())
   )
 
   // session

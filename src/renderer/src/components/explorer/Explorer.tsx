@@ -11,6 +11,7 @@ import {
   Loader2,
   Monitor,
   Moon,
+  MoreVertical,
   Pencil,
   Plug,
   Plus,
@@ -134,6 +135,8 @@ export function Explorer(): JSX.Element {
   const toggleConnectionExpanded = useAppStore((s) => s.toggleConnectionExpanded)
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const deleteConnection = useAppStore((s) => s.deleteConnection)
+  const exportConnections = useAppStore((s) => s.exportConnections)
+  const importConnections = useAppStore((s) => s.importConnections)
   const toggleNode = useAppStore((s) => s.toggleNode)
   const insertSnippet = useAppStore((s) => s.insertSnippet)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -224,6 +227,32 @@ export function Explorer(): JSX.Element {
       <div className="side-section side-section--conns">
         <div className="side-section-head">
           <span className="side-section-title">Connections</span>
+          <button
+            className="ghost side-section-more"
+            data-tip="备份 / 恢复连接配置"
+            aria-label="备份 / 恢复连接配置"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setCtxMenu({
+                x: r.left,
+                y: r.bottom + 4,
+                items: [
+                  {
+                    label: '导出连接配置…',
+                    icon: <Download size={14} />,
+                    onClick: () => void exportConnections()
+                  },
+                  {
+                    label: '导入连接配置…',
+                    icon: <Upload size={14} />,
+                    onClick: () => void importConnections()
+                  }
+                ]
+              })
+            }}
+          >
+            <MoreVertical size={15} />
+          </button>
           <button
             className="primary btn-new-conn"
             data-tip="New connection"

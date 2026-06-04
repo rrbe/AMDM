@@ -11,7 +11,9 @@ const api: Api = {
     list: () => ipcRenderer.invoke(IPC.connectionsList),
     save: (input) => ipcRenderer.invoke(IPC.connectionsSave, input),
     delete: (id) => ipcRenderer.invoke(IPC.connectionsDelete, id),
-    test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input)
+    test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input),
+    export: () => ipcRenderer.invoke(IPC.connectionsExport),
+    import: () => ipcRenderer.invoke(IPC.connectionsImport)
   },
   session: {
     connect: (connectionId) => ipcRenderer.invoke(IPC.sessionConnect, connectionId),

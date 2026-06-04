@@ -27,8 +27,8 @@
 ### 6. 保存查询的文件夹 / 两级组织 UI　✅ 已完成（2026-06-04）
 `SavedQuery`/`SavedQueryInput` 加可选 `folder` 字段（空=未分组，`queryStore` trim 落盘，存量自动兼容）。保存弹窗加 Folder 输入框 + `<datalist>` 列出已有文件夹（输入新名即建新文件夹）。`SavedQueriesPanel` 的 Saved 子页按文件夹分组（文件夹 A→Z、「未分组」垫底）、可折叠（本地状态），全部未分组时退化为旧的扁平列表。行右键菜单：加载 / 移动到「X」/ 移出文件夹 / 删除——移动复用 `saveQuery(id=…)` 原地改 folder。
 
-### 7. 连接配置导出 / 备份　`[难度: 中] [风险: 中]`
-SPEC §4 遗留。导出连接配置以便迁移/备份——**密钥不导出**（在 Keychain，见 ADR-0006），导入后需重新输入密码。
+### 7. 连接配置导出 / 备份　✅ 已完成（2026-06-04）
+导出全部连接为 JSON 备份、从备份恢复——**密钥不导出**（在 Keychain，ADR-0006；`ConnectionConfig` 本就只含 `hasPassword` 指示位，无明文），导入后需重新输入密码/SSH 口令。导入**总是分配新 id**（恢复只新增，绝不覆盖现有连接）。纯逻辑（`buildBackup`/`parseBackupConnections`：跳过非法项、剥离任何混入的密钥字段、兼容 wrapper 或裸数组）抽到 `connectionBackupCore.ts` 并配 7 个单测；effectful 壳 `connectionBackup.ts` 管原生对话框/fs/store。链路：core+壳 → IPC（`connections:export`/`import`）→ preload/registerIpc → store（`exportConnections`/`importConnections`）→ Connections 头部「⋮」菜单。
 
 ### 8. Editor Settings　✅ 已完成（2026-06-04）
 编辑器偏好落到 `AppSettings`（`editorFontSize`/`editorWordWrap`/`editorTabSize`，默认 13 / false / 2，存量 settings.json 自动合并默认值），作用于 CodeMirror：字号经 `EditorView.theme` 注入、tab 宽度经 `EditorState.tabSize`+`indentUnit` facet、自动换行经 `EditorView.lineWrapping`。入口沿用本项目「就地上下文控件」的设计语言——编辑器右键菜单新增「自动换行：开/关」「Tab 宽度：n」(循环) 「增大/减小字号」，外加键位 ⌘+/⌘−/⌘0（`preventDefault` 压掉 Electron 窗口缩放）。注：SPEC/TODO 说的「右键菜单置灰项」是过时记述，实际并无该项。

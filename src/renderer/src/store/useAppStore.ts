@@ -126,6 +126,10 @@ interface AppState {
   saveConnection(input: ConnectionInput): Promise<ConnectionConfig | null>
   deleteConnection(id: string): Promise<void>
   testConnection(input: ConnectionInput): Promise<TestResult>
+  /** Back up all connections to a JSON file (secrets excluded). */
+  exportConnections(): Promise<void>
+  /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
+  importConnections(): Promise<void>
 
   // ---- actions: session ----
   connect(id: string): Promise<void>
@@ -304,6 +308,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       return await window.api.connections.test(input)
     } catch (e) {
       return { ok: false, error: errMessage(e) }
+    }
+  },
+
+  async exportConnections() {
+    try {
+      const res = await window.api.connections.export()
+      if (res.ok) get().notify('success', `已导出 ${res.count ?? 0} 个连接配置（不含密钥）`)
+      else if (!res.cancelled) set({ lastError: `导出连接失败：${res.error ?? 'unknown'}` })
+    } catch (e) {
+      set({ lastError: `导出连接失败：${errMessage(e)}` })
+    }
+  },
+
+  async importConnections() {
+    try {
+      const res = await window.api.connections.import()
+      if (res.ok) {
+        await get().loadConnections()
+        get().notify('success', `已导入 ${res.count ?? 0} 个连接 · ${res.warning ?? '请重新输入密码'}`)
+      } else if (!res.cancelled) {
+        set({ lastError: `导入连接失败：${res.error ?? 'unknown'}` })
+      }
+    } catch (e) {
+      set({ lastError: `导入连接失败：${errMessage(e)}` })
     }
   },
 

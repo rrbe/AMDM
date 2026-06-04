@@ -33,6 +33,8 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsExport: 'connections:export',
+  connectionsImport: 'connections:import',
 
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
@@ -73,6 +75,10 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    /** Back up all connections to a JSON file (secrets excluded). */
+    export(): Promise<DataOpResult>
+    /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
+    import(): Promise<DataOpResult>
   }
   session: {
     connect(connectionId: string): Promise<ConnectionStatus>
