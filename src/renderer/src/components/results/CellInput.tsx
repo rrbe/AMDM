@@ -35,7 +35,7 @@ export function CellInput({ initial, error, onCommit, onCancel }: CellInputProps
     <input
       ref={ref}
       className={error ? 'cell-edit-input invalid' : 'cell-edit-input'}
-      title={error ?? undefined}
+      data-tip={error ?? undefined}
       defaultValue={initial}
       spellCheck={false}
       onKeyDown={(e) => {

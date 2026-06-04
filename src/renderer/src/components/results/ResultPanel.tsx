@@ -88,7 +88,7 @@ export function ResultPanel(): JSX.Element {
               <button
                 key={v}
                 className={view === v ? 'active' : ''}
-                title={`${label} (⌘${i + 1})`}
+                data-tip={`${label} (⌘${i + 1})`}
                 onClick={() => setView(v)}
               >
                 {label}
@@ -102,7 +102,8 @@ export function ResultPanel(): JSX.Element {
         {result.kind === 'documents' && <ResultPager result={result} />}
         <button
           className="ghost result-copy"
-          title="复制全部结果"
+          data-tip="复制全部结果"
+          aria-label="复制全部结果"
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
             setCopyMenu({ x: r.left, y: r.bottom + 4 })
@@ -199,7 +200,8 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
       <button
         className="ghost"
         disabled={skip === 0 || running}
-        title="上一页"
+        data-tip="上一页"
+        aria-label="上一页"
         onClick={() => void loadPage(Math.max(0, skip - limit))}
       >
         <ChevronLeft size={15} />
@@ -210,7 +212,8 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
       <button
         className="ghost"
         disabled={!result.truncated || running}
-        title="下一页"
+        data-tip="下一页"
+        aria-label="下一页"
         onClick={() => void loadPage(skip + limit)}
       >
         <ChevronRight size={15} />
@@ -233,7 +236,7 @@ function PageSizeControl(): JSX.Element {
     if (n !== limit) void setQueryLimit(n)
   }
   return (
-    <label className="page-size" title="每页条数（回车应用）">
+    <label className="page-size" data-tip="每页条数（回车应用）">
       <span>每页</span>
       <input
         type="number"

@@ -18,8 +18,8 @@
 
 ## P2 — 中期（体验 / 完整度）
 
-### 4. Tooltip 统一　`[难度: 低] [风险: 低]`
-现有 29 处用原生 `title=`（延迟、丑、不可定制、深色模式不统一）。做一个轻量样式化 tooltip 组件替换。顺便为「是否引组件库」验证第一个原语。
+### 4. Tooltip 统一　✅ 已完成（2026-06-04）
+全局委托式 `TooltipLayer`（挂 App 根，监听 `mouseover`/`mouseout`，读元素 `data-tip` 属性，延迟 350ms，portal 到 `<body>` 避免裁剪，测量后夹取视口内定位，主题变量配色 z 3000）。采用方式即把 `title=` 改名为 `data-tip=`——共替换 30 处（排除 5 处其实是 `<Modal title>` 组件 prop），icon-only 按钮补 `aria-label` 防 a11y 回归。`Button` 新增 `'data-tip'?` prop 转发。这是「是否引组件库」验证的第一个手写原语。
 
 ### 5. 多查询标签页　`[难度: 中-高] [风险: 中]`
 现在是单编辑器 + 单结果。NoSQLBooster 支持多 tab。涉及 store 从「单 code/result」改为「tab 数组 + activeTab」，影响面较大。

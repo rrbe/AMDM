@@ -47,7 +47,7 @@ export function ShellWorkspace(): JSX.Element {
           className="db-select"
           value={activeDatabase}
           onChange={(e) => setActiveDatabase(e.target.value)}
-          title="Active database"
+          data-tip="Active database"
         >
           {dbOptions.length === 0 && <option value="">(no database)</option>}
           {activeDatabase === '' && dbOptions.length > 0 && <option value="">Select database…</option>}
@@ -58,16 +58,16 @@ export function ShellWorkspace(): JSX.Element {
           ))}
         </select>
         <span className="spacer" />
-        <Button disabled={busy} onClick={() => setShowSave(true)} title="Save current query">
+        <Button disabled={busy} onClick={() => setShowSave(true)} data-tip="Save current query">
           Save
         </Button>
-        <Button disabled={busy} onClick={() => void runExplain()} title="Run explain('executionStats')">
+        <Button disabled={busy} onClick={() => void runExplain()} data-tip="Run explain('executionStats')">
           Explain
         </Button>
         {running ? (
           // Swap Run → Stop while a query is in flight, so a runaway
           // find/aggregate can be cancelled server-side (driver AbortSignal).
-          <Button variant="danger" onClick={() => void stopShell()} title="停止执行">
+          <Button variant="danger" onClick={() => void stopShell()} data-tip="停止执行">
             ■ 停止
           </Button>
         ) : (

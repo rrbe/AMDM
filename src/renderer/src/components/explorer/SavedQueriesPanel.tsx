@@ -115,14 +115,15 @@ function SavedTab({
           key={q.id}
           className="sq-row"
           onClick={() => onLoad(q.code, q.database)}
-          title={q.code}
+          data-tip={q.code}
         >
           <div className="sq-name">{q.name}</div>
           <code className="sq-code">{codePreview(q.code)}</code>
           <div className="sq-sub muted">{q.database ? `db: ${q.database}` : 'no db'}</div>
           <button
             className="ghost sq-del"
-            title="Delete"
+            data-tip="Delete"
+            aria-label="Delete"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(q.id)
@@ -162,7 +163,7 @@ function HistoryTab({
             key={h.id}
             className="sq-row"
             onClick={() => onLoad(h.code, h.database)}
-            title={h.code}
+            data-tip={h.code}
           >
             <code className="sq-code">{codePreview(h.code)}</code>
             <div className="sq-sub muted">

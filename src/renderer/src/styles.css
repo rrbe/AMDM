@@ -2237,3 +2237,32 @@ button:focus-visible {
 .theme-cycle svg {
   display: block;
 }
+
+/* --------------------------------------------------------------- tooltip
+   App-wide styled tooltip (TooltipLayer) — replaces native title=. Portaled to
+   <body>, positioned via inline top/left, sits above modals/menus (z 3000). */
+.app-tooltip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 360px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--fg-0);
+  color: var(--bg-0);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+  animation: tip-in 90ms ease-out;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

@@ -226,7 +226,7 @@ export function Explorer(): JSX.Element {
           <span className="side-section-title">Connections</span>
           <button
             className="primary btn-new-conn"
-            title="New connection"
+            data-tip="New connection"
             onClick={() => setConnForm({ open: true })}
           >
             <Plus size={15} />
@@ -271,13 +271,14 @@ export function Explorer(): JSX.Element {
       <div className="side-foot">
         <button
           className="theme-cycle"
-          title={
+          data-tip={
             theme === 'system'
               ? 'Theme: System — click for Light'
               : theme === 'light'
                 ? 'Theme: Light — click for Dark'
                 : 'Theme: Dark — click for System'
           }
+          aria-label="Toggle color theme"
           onClick={() =>
             void updateSettings({
               theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
@@ -353,7 +354,7 @@ function ConnectionRow({
   return (
     <div
       className={isActive ? 'conn-item active' : 'conn-item'}
-      title={sub}
+      data-tip={sub}
       onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : onConnect())}
       style={conn.color ? { borderLeft: `3px solid ${conn.color}` } : undefined}
@@ -390,7 +391,8 @@ function ConnectionRow({
         {isConnected ? (
           <button
             className="ghost"
-            title="Disconnect"
+            data-tip="Disconnect"
+            aria-label="Disconnect"
             onClick={(e) => {
               e.stopPropagation()
               onDisconnect()
@@ -401,7 +403,8 @@ function ConnectionRow({
         ) : (
           <button
             className="ghost"
-            title="Connect"
+            data-tip="Connect"
+            aria-label="Connect"
             onClick={(e) => {
               e.stopPropagation()
               onConnect()
@@ -412,7 +415,8 @@ function ConnectionRow({
         )}
         <button
           className="ghost"
-          title="Edit"
+          data-tip="Edit"
+          aria-label="Edit"
           onClick={(e) => {
             e.stopPropagation()
             onEdit()
@@ -422,7 +426,8 @@ function ConnectionRow({
         </button>
         <button
           className="ghost danger"
-          title="Delete"
+          data-tip="Delete"
+          aria-label="Delete"
           onClick={(e) => {
             e.stopPropagation()
             onDelete()
@@ -454,7 +459,7 @@ function CatalogRow({
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
       onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
-      title={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
+      data-tip={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
     >
       <span
         className="tree-twisty"

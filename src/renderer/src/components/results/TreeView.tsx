@@ -331,7 +331,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
                 {node.depth === 0 ? (
                   <span className="doc-badge">{node.keyLabel}</span>
                 ) : (
-                  <span className="kv-key-name" title={node.keyLabel}>
+                  <span className="kv-key-name" data-tip={node.keyLabel}>
                     {node.keyLabel}
                   </span>
                 )}
@@ -426,7 +426,7 @@ function ValueCell({ node }: { node: FlatNode }): JSX.Element {
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
   const { text, type } = formatScalar(node.value)
   return (
-    <span className={`tree-val v-${type}`} title={text}>
+    <span className={`tree-val v-${type}`} data-tip={text}>
       {text}
     </span>
   )

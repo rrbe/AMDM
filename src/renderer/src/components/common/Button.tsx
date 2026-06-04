@@ -3,6 +3,8 @@ import { type ButtonHTMLAttributes, type ReactNode } from 'react'
 export type ButtonVariant = 'default' | 'primary' | 'ghost' | 'danger'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Styled tooltip text (forwarded as a `data-tip` attr; see TooltipLayer). */
+  'data-tip'?: string
   variant?: ButtonVariant
   /** While true the label is kept in the layout (preserving width) but hidden,
       a spinner overlays it, and the button auto-disables (DESIGN.md §4). */

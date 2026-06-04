@@ -3,6 +3,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { Explorer } from '@renderer/components/explorer/Explorer'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
 import { Toaster } from '@renderer/components/common/Toaster'
+import { TooltipLayer } from '@renderer/components/common/TooltipLayer'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 
 /**
@@ -56,6 +57,7 @@ export default function App(): JSX.Element {
       />
       {activeConnected ? <ShellWorkspace /> : <WorkspaceEmptyState />}
       <Toaster />
+      <TooltipLayer />
     </div>
   )
 }

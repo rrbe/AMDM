@@ -224,7 +224,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
             #
           </div>
           {columns.map((col) => (
-            <div key={col} className="tbl-th" style={{ width: widthOf(col) }} title={col}>
+            <div key={col} className="tbl-th" style={{ width: widthOf(col) }} data-tip={col}>
               {col}
               <span
                 className="tbl-col-resizer"
@@ -248,7 +248,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                 style={{ width: INDEX_COL_WIDTH }}
                 onClick={(e) => clickHandle(vi.index, e)}
                 onContextMenu={(e) => openMenu(e, vi.index, null)}
-                title="点击选中整行（Shift / ⌘ 多选）"
+                data-tip="点击选中整行（Shift / ⌘ 多选）"
               >
                 {vi.index + 1}
               </div>
@@ -384,7 +384,7 @@ function Cell({
     <div
       className={cellCls}
       style={{ width }}
-      title={text}
+      data-tip={text}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}

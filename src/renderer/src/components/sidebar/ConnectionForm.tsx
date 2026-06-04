@@ -312,7 +312,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 <button
                   type="button"
                   className={`color-swatch none ${color === '' ? 'selected' : ''}`}
-                  title="No color"
+                  data-tip="No color"
+                  aria-label="No color"
                   onClick={() => setColor('')}
                 />
                 {PRESET_COLORS.map((c) => (
@@ -321,7 +322,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     key={c}
                     className={`color-swatch ${color === c ? 'selected' : ''}`}
                     style={{ background: c }}
-                    title={c}
+                    data-tip={c}
+                    aria-label={c}
                     onClick={() => setColor(c)}
                   />
                 ))}
