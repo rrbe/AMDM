@@ -1,0 +1,37 @@
+name: CI
+
+# Quality gate: typecheck + fast unit/contract tests on every push and PR.
+# Integration tests are NOT run here — mongodb-memory-server would download a
+# mongod binary over the network (slow, flaky on CI). They run locally against
+# the cached binary in ~/.cache/mongodb-binaries.
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # mongodb-memory-server's postinstall is intentionally not allowed
+      # (onlyBuiltDependencies); it would otherwise try to download mongod.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit + contract tests
+        run: pnpm test:unit

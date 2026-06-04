@@ -12,11 +12,11 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { Db } from 'mongodb'
-import { runShellOnDb, detectCollection } from '../src/main/mongo/shellCore'
-import type { RunShellOptions } from '../src/main/mongo/shellCore'
-import type { ShellResult } from '../src/shared/types'
-import { serializerPool } from '../src/main/workers/serializerPool'
-import { startMongo, type MongoHarness } from './helpers/mongo'
+import { runShellOnDb, detectCollection } from '../../src/main/mongo/shellCore'
+import type { RunShellOptions } from '../../src/main/mongo/shellCore'
+import type { ShellResult } from '../../src/shared/types'
+import { serializerPool } from '../../src/main/workers/serializerPool'
+import { startMongo, type MongoHarness } from '../helpers/mongo'
 
 let harness: MongoHarness
 let db: Db

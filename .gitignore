@@ -5,3 +5,6 @@ dist/
 .DS_Store
 .vite/
 *.tsbuildinfo
+
+# Test coverage reports
+coverage/

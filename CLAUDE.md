@@ -26,8 +26,9 @@ pnpm start        # 预览已构建的应用（electron-vite preview）
 pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 ```
 
-- **类型检查是主校验闸门，但 shell 引擎有测试。** `pnpm typecheck`（先 `typecheck:node` 再 `typecheck:web`,分别对应两个 tsconfig）覆盖全量类型——改完务必跑一次。`pnpm test`（Vitest）目前覆盖**核心 shell 引擎**（`test/shellCore.test.ts`），用 `mongodb-memory-server` 起真实 MongoDB 跑集成测试，断言 EJSON-canonical 线格式。**没有 linter；除 shell 引擎外大部分代码暂无测试。** 测试细节见下方「Shell-on-driver」。
-- **`pnpm test` 怎么跑：** 测试放在 `test/`（**不在两个 tsconfig 的 include 里**,所以 `pnpm typecheck` 不会检查它们）。`test/helpers/mongo.ts` 优先复用 `~/.cache/mongodb-binaries` 里已缓存的 `mongod` 二进制（`systemBinary`,**零下载**）；本机没有缓存二进制时 mms 会尝试联网下载。`mongodb-memory-server` 的 postinstall 已被 pnpm v10 拦截（不在 `onlyBuiltDependencies`）,所以 `pnpm install` 不会触发下载。测试里 `serializerPool.dispose()` 强制走内联序列化（worker 产物在测试期未构建,内联用的是同一份 core,行为一致）。
+- **类型检查 + 单测是校验闸门。** `pnpm typecheck`（先 `typecheck:node` 再 `typecheck:web`,分别对应两个 tsconfig）覆盖全量类型——改完务必跑一次。测试分三层（详见 `test/README.md`）：**unit**（`test/unit/**`,纯逻辑,无 mongo,秒级）、**contract**（`test/contract/**`,BSON↔EJSON 跨层往返）、**integration**（`test/integration/**`,用 `mongodb-memory-server` 起真实 MongoDB,断言 EJSON-canonical 线格式）。`pnpm test:unit`（unit+contract）是 CI 闸门;`pnpm test:integration` 本地跑;`pnpm test` 全跑。**没有 linter。**
+- **可测性是硬约定（写新代码时照做）：** 纯逻辑与副作用分离——渲染层纯逻辑放 `src/renderer/src/lib/`,主进程纯逻辑放 `*Core.ts`,需要活连接/特权 API 的部分只做薄封装（`shellEngine` 式,见下「Shell-on-driver」）。**新增 `lib/` 纯函数或 `*Core` 内核 → 必须配 unit 测试;新增写路径（doc 改/删）或 IPC handler → 配 integration 测试;新增 BSON 类型 → 同步改 `serialize-core.ts`+`ejson.ts` 并扩 `test/fixtures/bson-corpus.ts`。**
+- **`pnpm test` 怎么跑：** 测试放在 `test/`（**不在两个 tsconfig 的 include 里**,所以 `pnpm typecheck` 不会检查它们）。`test/helpers/mongo.ts` 优先复用 `~/.cache/mongodb-binaries` 里已缓存的 `mongod` 二进制（`systemBinary`,**零下载**）；本机没有缓存二进制时 mms 会尝试联网下载。`mongodb-memory-server` 的 postinstall 已被 pnpm v10 拦截（不在 `onlyBuiltDependencies`）,所以 `pnpm install` 不会触发下载。集成测试里 `serializerPool.dispose()` 强制走内联序列化（worker 产物在测试期未构建,内联用的是同一份 core,行为一致）。
 - **必须用 pnpm。** `.npmrc` 设了 `node-linker=hoisted`（Electron 不喜欢 pnpm 的软链接隔离布局）,且 `package.json#pnpm.onlyBuiltDependencies` 放行了 `electron`+`esbuild`,否则它们的二进制装不全——pnpm v10 默认拦截依赖的构建脚本。新增需要原生/下载二进制的依赖时,也要加进这里。
 
 ## 进程架构
@@ -44,7 +45,7 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 ## 跨文件的关键机制（需读多个文件才能理解）
 
 ### Shell-on-driver（ADR-0003）
-拆成两层：**`main/mongo/shellCore.ts`** 是纯执行核心（不依赖 `sessionManager`/electron,所以能在 `vm` 里对真实 `Db` 单测,见 `test/shellCore.test.ts`）；**`main/mongo/shellEngine.ts`** 只是薄封装——从 `sessionManager` 取出活跃 client 再委托给 `runShellOnDb`。
+拆成两层：**`main/mongo/shellCore.ts`** 是纯执行核心（不依赖 `sessionManager`/electron,所以能在 `vm` 里对真实 `Db` 单测,见 `test/integration/shellCore.test.ts`）；**`main/mongo/shellEngine.ts`** 只是薄封装——从 `sessionManager` 取出活跃 client 再委托给 `runShellOnDb`。这套「纯 core + 薄 session 封装」是全项目可测性约定的范本（见上「可测性是硬约定」）。
 
 核心在 Node `vm` 沙箱里执行用户的 JS,其中 `db` 是官方 driver `Db` 上的 `Proxy`：`db.<任意名>` 解析为真实的 `Collection`(所以 `db.lives.find()` 能用),真正的 `Db` 方法直接透传。为兼容 mongosh / NoSQLBooster 复制来的片段,做了一批 shim：
 
