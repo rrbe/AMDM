@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Small-size variant (16/32px): bolder braces, larger, single dot.
+       Three dots would muddy at tray size; one bold dot survives downscaling. -->
+  <defs>
+    <clipPath id="squircle"><rect x="100" y="100" width="824" height="824" rx="184" ry="184"/></clipPath>
+  </defs>
+  <g clip-path="url(#squircle)">
+    <rect x="100" y="100" width="824" height="824" fill="#0E1F17"/>
+    <!-- left brace { -->
+    <path d="M452 320 L404 320 L404 482 L348 512 L404 542 L404 704 L452 704"
+          fill="none" stroke="#37E08B" stroke-width="60" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- right brace } -->
+    <path d="M572 320 L620 320 L620 482 L676 512 L620 542 L620 704 L572 704"
+          fill="none" stroke="#37E08B" stroke-width="60" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- content · -->
+    <circle cx="512" cy="512" r="30" fill="#37E08B"/>
+  </g>
+</svg>

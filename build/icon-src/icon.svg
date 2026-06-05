@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Flat, pure-color icon: { ⋯ } = BSON document / JSON.
+       Tile #0E1F17 (deep green-black), mark #37E08B (emerald). No lighting. -->
+  <defs>
+    <clipPath id="squircle"><rect x="100" y="100" width="824" height="824" rx="184" ry="184"/></clipPath>
+  </defs>
+  <g clip-path="url(#squircle)">
+    <rect x="100" y="100" width="824" height="824" fill="#0E1F17"/>
+    <!-- left brace { -->
+    <path d="M432 330 L398 330 L398 488 L356 512 L398 536 L398 694 L432 694"
+          fill="none" stroke="#37E08B" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- right brace } -->
+    <path d="M592 330 L626 330 L626 488 L668 512 L626 536 L626 694 L592 694"
+          fill="none" stroke="#37E08B" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- content ⋯ -->
+    <circle cx="482" cy="512" r="18" fill="#37E08B"/>
+    <circle cx="512" cy="512" r="18" fill="#37E08B"/>
+    <circle cx="542" cy="512" r="18" fill="#37E08B"/>
+  </g>
+</svg>
