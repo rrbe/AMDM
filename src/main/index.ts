@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, nativeImage } from 'electron'
+import appIcon from '../../resources/icon.png?asset'
 import { connectionStore } from './store/connectionStore'
 import { queryStore } from './store/queryStore'
 import { settingsStore } from './store/settingsStore'
@@ -18,6 +19,8 @@ function createWindow(): void {
     // Vertically center the traffic lights within the 38px header strip.
     trafficLightPosition: process.platform === 'darwin' ? { x: 14, y: 12 } : undefined,
     backgroundColor: '#1e1e1e',
+    // Window/taskbar icon for Windows + Linux (macOS uses the .app bundle icon).
+    icon: appIcon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -60,6 +63,12 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Show our icon on the macOS dock during development (packaged builds use
+  // the .app bundle icon, whose file lives inside the asar — skip those).
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    app.dock?.setIcon(nativeImage.createFromPath(appIcon))
+  }
+
   connectionStore.init()
   queryStore.init()
   settingsStore.init()
