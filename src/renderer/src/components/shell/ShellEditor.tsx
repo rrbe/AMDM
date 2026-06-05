@@ -122,6 +122,15 @@ export function ShellEditor({
     () => [
       javascript({ typescript: false }),
       autocompletion({ override: [mongoCompletionSource] }),
+      // The CodeMirror content DOM is contenteditable, so macOS attaches its
+      // native autocorrect/spellcheck to it — typing then pressing Tab pops the
+      // phonetic suggestion box over the code. Code isn't prose; turn all of it
+      // off at the element level.
+      EditorView.contentAttributes.of({
+        autocorrect: 'off',
+        autocapitalize: 'off',
+        spellcheck: 'false'
+      }),
       // Provides the Find/Replace panel that ⌘F and the menu's openSearchPanel open.
       search({ top: true }),
       // Editor preferences applied as extensions: font size cascades from the
