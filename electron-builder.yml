@@ -1,0 +1,57 @@
+appId: live.ezze.mongo-shell-gui
+productName: Mongo Shell GUI
+copyright: Copyright © 2026 shawn
+
+directories:
+  buildResources: build   # icon.icns / icon.ico / icon.png live here
+  output: dist
+
+# Negation-only list → electron-builder keeps the default `**/*` (which includes
+# out/ + production node_modules) and just drops source / dev cruft.
+files:
+  - '!**/.vscode/**'
+  - '!src/**'
+  - '!test/**'
+  - '!docs/**'
+  - '!coverage/**'
+  - '!build/icon-src/**'
+  - '!**/*.map'
+  - '!electron.vite.config.*'
+  - '!vitest.config.*'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.npmrc,pnpm-lock.yaml,pnpm-workspace.yaml,.gitignore,.prettierrc,.prettierignore}'
+  - '!{CLAUDE.md,SPEC.md,CONTEXT.md,README.md}'
+
+# This project deliberately avoids native modules (see ADR-0006), so there is
+# nothing to rebuild against Electron's ABI.
+npmRebuild: false
+
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch: [arm64]      # native arm64 only (ADR-0004 perf rule #7)
+    - target: zip
+      arch: [arm64]
+
+dmg:
+  title: ${productName} ${version}
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  icon: build/icon.png
+  category: Development
+  maintainer: shawn <shawn@ezze.live>
+  target:
+    - AppImage
