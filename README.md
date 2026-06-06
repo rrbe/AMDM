@@ -22,7 +22,7 @@ pnpm build           # production build into ./out
 > and `esbuild` are allow-listed via `pnpm.onlyBuiltDependencies` in package.json
 > so their binaries install. `.npmrc` sets `node-linker=hoisted` for Electron.
 
-## Architecture (Phase 1)
+## Architecture
 
 ```
 src/
@@ -45,11 +45,22 @@ Virtualize every large list/tree/table · stream cursors with bounded pages ·
 heavy work off the main thread · lazy/bounded schema sampling · no auto-query on
 collection open · dispose editor models + result buffers on close.
 
-## Phase 1 scope
+## Features
 
 Connection management (SCRAM / SSH tunnel / TLS / replica set) · browse
-databases / collections / indexes / users · run `find` / `aggregate` in the shell
-· Tree / JSON / Table result views (virtualized).
+databases / collections / indexes / users · a `vm`-sandboxed shell that runs
+mongosh-style JS (`find` / `aggregate` / `runCommand` …) · Tree / JSON / Table
+result views (virtualized) with paging and a stop-script control · autocomplete ·
+saved queries (with folders) + history · visual explain · inline document / cell
+edit + delete · import / export (JSON / CSV / XLSX native, BSON via official
+tools) · multi-tab queries · per-connection color groups.
 
-> Phase 2: autocomplete, saved queries + history, visual explain, document edit/delete.
-> Phase 3: import/export (JSON/CSV/XLSX native + BSON via official tools), connection color groups, polish.
+> Roadmap / remaining backlog: [TODO.md](./TODO.md) (code-verified) and SPEC.md §4.
+
+## License
+
+MIT © 2026 shawn — see [LICENSE](./LICENSE).
+
+> AMDM is an independent, unofficial project. It is **not** affiliated with,
+> sponsored by, or endorsed by MongoDB, Inc. "MongoDB" and "Mongo" are
+> trademarks of MongoDB, Inc., used here only to describe compatibility.
