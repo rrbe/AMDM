@@ -3,6 +3,7 @@
  * SavedQuery (bound to the active connection/database when available).
  */
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
@@ -12,6 +13,7 @@ interface SaveQueryModalProps {
 }
 
 export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
+  const { t } = useTranslation()
   const code = useAppStore((s) => getActiveTab(s).code)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
@@ -46,26 +48,26 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
 
   return (
     <Modal
-      title="Save Query"
+      title={t('saveQuery.title')}
       small
       onClose={onClose}
       footer={
         <>
           <span className="spacer" />
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('saveQuery.cancel')}</Button>
           <Button variant="primary" busy={saving} disabled={!canSave} onClick={() => void onSave()}>
-            Save
+            {t('saveQuery.save')}
           </Button>
         </>
       }
     >
       <div className="form-row">
-        <label htmlFor="save-query-name">Name</label>
+        <label htmlFor="save-query-name">{t('saveQuery.name')}</label>
         <input
           id="save-query-name"
           autoFocus
           value={name}
-          placeholder="e.g. active users"
+          placeholder={t('saveQuery.namePlaceholder')}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void onSave()
@@ -73,12 +75,12 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
         />
       </div>
       <div className="form-row">
-        <label htmlFor="save-query-folder">Folder</label>
+        <label htmlFor="save-query-folder">{t('saveQuery.folder')}</label>
         <input
           id="save-query-folder"
           list="save-query-folders"
           value={folder}
-          placeholder="（可选）分组文件夹"
+          placeholder={t('saveQuery.folderPlaceholder')}
           onChange={(e) => setFolder(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void onSave()
@@ -90,7 +92,7 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
           ))}
         </datalist>
       </div>
-      <code className="lib-code">{code.split('\n')[0]?.slice(0, 100) || '(empty)'}</code>
+      <code className="lib-code">{code.split('\n')[0]?.slice(0, 100) || t('saveQuery.empty')}</code>
     </Modal>
   )
 }

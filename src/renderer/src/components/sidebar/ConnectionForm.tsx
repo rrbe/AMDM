@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   ConnectionConfig,
   ConnectionInput,
@@ -32,6 +33,7 @@ interface ConnectionFormProps {
  * into the fields) and exporting the current fields ("To URI").
  */
 export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.Element {
+  const { t: tFn } = useTranslation()
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
 
@@ -109,11 +111,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       setAllowInvalid(p.tlsAllowInvalid)
       setOptions(p.extraOptions)
       setUriError(null)
-      setUriNote('Parsed into the form below.')
+      setUriNote(tFn('connection.uri.parsedNote'))
       setTab('general')
     } catch (e) {
       setUriNote(null)
-      setUriError(e instanceof Error ? e.message : 'Parse failed')
+      setUriError(e instanceof Error ? e.message : tFn('connection.uri.parseFailed'))
     }
   }
 
@@ -143,8 +145,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     }
     const pwOmitted = authType === 'scram' && !passwordTouched && editing?.hasPassword
     setUriNote(
-      `${copied ? 'Built URI · copied to clipboard.' : 'Built URI.'}${
-        pwOmitted ? ' (password omitted — re-type to include)' : ''
+      `${copied ? tFn('connection.uri.builtCopied') : tFn('connection.uri.built')}${
+        pwOmitted ? tFn('connection.uri.passwordOmitted') : ''
       }`
     )
   }
@@ -239,16 +241,16 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   }
 
   const secretPlaceholder = (has?: boolean): string =>
-    has ? '•••••••• (unchanged — leave blank to keep)' : ''
+    has ? tFn('connection.secret.placeholder') : ''
 
   return (
     <Modal
-      title={editing ? 'Edit Connection' : 'New Connection'}
+      title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" busy={testing} onClick={() => void runTest()}>
-            Test connection
+            {tFn('connection.action.test')}
           </Button>
           {test && (
             <span
@@ -256,16 +258,20 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               style={{ marginTop: 0, padding: '4px 8px' }}
             >
               {test.ok
-                ? `OK${test.serverVersion ? ` · v${test.serverVersion}` : ''}${test.topology ? ` · ${test.topology}` : ''}`
-                : `Failed: ${test.error ?? 'unknown'}`}
+                ? [
+                    tFn('connection.testResult.okPrefix'),
+                    ...(test.serverVersion ? [`v${test.serverVersion}`] : []),
+                    ...(test.topology ? [test.topology] : [])
+                  ].join(' · ')
+                : tFn('connection.testResult.failed', { error: test.error ?? 'unknown' })}
             </span>
           )}
           <span className="spacer" />
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {tFn('connection.action.cancel')}
           </Button>
           <Button variant="primary" busy={saving} disabled={!host.trim()} onClick={() => void submit()}>
-            Save
+            {tFn('connection.action.save')}
           </Button>
         </>
       }
@@ -275,13 +281,13 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         <input
           value={uriText}
           onChange={(e) => setUriText(e.target.value)}
-          placeholder="mongodb://user:pass@host:27017/db?replicaSet=rs0 — paste, then “From URI”"
+          placeholder={tFn('connection.uri.placeholder')}
         />
         <Button variant="ghost" type="button" disabled={!uriText.trim()} onClick={applyUri}>
-          From URI
+          {tFn('connection.uri.fromUri')}
         </Button>
         <Button variant="ghost" type="button" onClick={() => void toUri()}>
-          To URI
+          {tFn('connection.uri.toUri')}
         </Button>
       </div>
       {uriError && (
@@ -294,7 +300,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       <div className="tabs">
         {(['general', 'auth', 'ssh', 'tls'] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-            {t === 'general' ? 'General' : t === 'auth' ? 'Auth' : t === 'ssh' ? 'SSH' : 'TLS'}
+            {t === 'general' ? tFn('connection.tab.general') : t === 'auth' ? tFn('connection.tab.auth') : t === 'ssh' ? 'SSH' : 'TLS'}
           </button>
         ))}
       </div>
@@ -303,17 +309,17 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         <>
           <div className="form-grid">
             <div>
-              <label>Name</label>
+              <label>{tFn('connection.general.name')}</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="My MongoDB" />
             </div>
             <div>
-              <label>Color</label>
+              <label>{tFn('connection.general.color')}</label>
               <div className="color-swatches">
                 <button
                   type="button"
                   className={`color-swatch none ${color === '' ? 'selected' : ''}`}
-                  data-tip="No color"
-                  aria-label="No color"
+                  data-tip={tFn('connection.general.noColor')}
+                  aria-label={tFn('connection.general.noColor')}
                   onClick={() => setColor('')}
                 />
                 {PRESET_COLORS.map((c) => (
@@ -339,18 +345,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 checked={useSrv}
                 onChange={(e) => setUseSrv(e.target.checked)}
               />
-              <label htmlFor="useSrv">Use SRV (mongodb+srv:// — Atlas)</label>
+              <label htmlFor="useSrv">{tFn('connection.general.useSrv')}</label>
             </div>
           </div>
 
           <div className="form-grid">
             <div style={{ gridColumn: useSrv ? '1 / span 2' : 'auto' }}>
-              <label>{useSrv ? 'SRV Host' : 'Host'}</label>
+              <label>{useSrv ? tFn('connection.general.srvHost') : tFn('connection.general.host')}</label>
               <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="localhost" />
             </div>
             {!useSrv && (
               <div>
-                <label>Port</label>
+                <label>{tFn('connection.general.port')}</label>
                 <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="27017" />
               </div>
             )}
@@ -358,26 +364,26 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
           <div className="form-grid">
             <div>
-              <label>Replica Set</label>
+              <label>{tFn('connection.general.replicaSet')}</label>
               <input
                 value={replicaSet}
                 onChange={(e) => setReplicaSet(e.target.value)}
-                placeholder="(optional)"
+                placeholder={tFn('connection.optional')}
               />
             </div>
             <div>
-              <label>Default Database</label>
+              <label>{tFn('connection.general.defaultDatabase')}</label>
               <input
                 value={defaultDatabase}
                 onChange={(e) => setDefaultDatabase(e.target.value)}
-                placeholder="(optional)"
+                placeholder={tFn('connection.optional')}
               />
             </div>
           </div>
 
           {Object.keys(options).length > 0 && (
             <div className="hint">
-              Extra options: {Object.entries(options).map(([k, v]) => `${k}=${v}`).join(' · ')}
+              {tFn('connection.general.extraOptions', { opts: Object.entries(options).map(([k, v]) => `${k}=${v}`).join(' · ') })}
             </div>
           )}
         </>
@@ -386,10 +392,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       {tab === 'auth' && (
         <>
           <div className="form-row">
-            <label>Authentication</label>
+            <label>{tFn('connection.auth.authentication')}</label>
             <select value={authType} onChange={(e) => setAuthType(e.target.value as 'none' | 'scram')}>
-              <option value="none">None</option>
-              <option value="scram">Username / Password (SCRAM)</option>
+              <option value="none">{tFn('connection.auth.none')}</option>
+              <option value="scram">{tFn('connection.auth.scram')}</option>
             </select>
           </div>
 
@@ -397,11 +403,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             <>
               <div className="form-grid">
                 <div>
-                  <label>Username</label>
+                  <label>{tFn('connection.auth.username')}</label>
                   <input value={username} onChange={(e) => setUsername(e.target.value)} />
                 </div>
                 <div>
-                  <label>Password</label>
+                  <label>{tFn('connection.auth.password')}</label>
                   <input
                     type="password"
                     value={password}
@@ -415,7 +421,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               </div>
               <div className="form-grid">
                 <div>
-                  <label>Auth Source</label>
+                  <label>{tFn('connection.auth.authSource')}</label>
                   <input
                     value={authSource}
                     onChange={(e) => setAuthSource(e.target.value)}
@@ -423,7 +429,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   />
                 </div>
                 <div>
-                  <label>Mechanism</label>
+                  <label>{tFn('connection.auth.mechanism')}</label>
                   <select
                     value={mechanism}
                     onChange={(e) => setMechanism(e.target.value as ScramMechanism)}
@@ -449,7 +455,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 checked={sshEnabled}
                 onChange={(e) => setSshEnabled(e.target.checked)}
               />
-              <label htmlFor="sshEnabled">Connect through an SSH tunnel</label>
+              <label htmlFor="sshEnabled">{tFn('connection.ssh.enableLabel')}</label>
             </div>
           </div>
 
@@ -457,34 +463,34 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             <>
               <div className="form-grid">
                 <div>
-                  <label>SSH Host</label>
+                  <label>{tFn('connection.ssh.host')}</label>
                   <input value={sshHost} onChange={(e) => setSshHost(e.target.value)} />
                 </div>
                 <div>
-                  <label>SSH Port</label>
+                  <label>{tFn('connection.ssh.port')}</label>
                   <input value={sshPort} onChange={(e) => setSshPort(e.target.value)} placeholder="22" />
                 </div>
               </div>
               <div className="form-grid">
                 <div>
-                  <label>SSH Username</label>
+                  <label>{tFn('connection.ssh.username')}</label>
                   <input value={sshUser} onChange={(e) => setSshUser(e.target.value)} />
                 </div>
                 <div>
-                  <label>Auth Method</label>
+                  <label>{tFn('connection.ssh.authMethod')}</label>
                   <select
                     value={sshAuthMethod}
                     onChange={(e) => setSshAuthMethod(e.target.value as SshAuthMethod)}
                   >
-                    <option value="password">Password</option>
-                    <option value="privateKey">Private Key</option>
+                    <option value="password">{tFn('connection.ssh.methodPassword')}</option>
+                    <option value="privateKey">{tFn('connection.ssh.methodPrivateKey')}</option>
                   </select>
                 </div>
               </div>
 
               {sshAuthMethod === 'password' ? (
                 <div className="form-row">
-                  <label>SSH Password</label>
+                  <label>{tFn('connection.ssh.password')}</label>
                   <input
                     type="password"
                     value={sshPassword}
@@ -498,7 +504,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               ) : (
                 <>
                   <div className="form-row">
-                    <label>Private Key Path</label>
+                    <label>{tFn('connection.ssh.privateKeyPath')}</label>
                     <input
                       value={privateKeyPath}
                       onChange={(e) => setPrivateKeyPath(e.target.value)}
@@ -506,7 +512,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     />
                   </div>
                   <div className="form-row">
-                    <label>Key Passphrase</label>
+                    <label>{tFn('connection.ssh.passphrase')}</label>
                     <input
                       type="password"
                       value={sshPassphrase}
@@ -516,7 +522,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                         setSshPassphraseTouched(true)
                       }}
                     />
-                    <div className="hint">Leave blank if the key has no passphrase.</div>
+                    <div className="hint">{tFn('connection.ssh.passphraseHint')}</div>
                   </div>
                 </>
               )}
@@ -535,7 +541,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 checked={tlsEnabled}
                 onChange={(e) => setTlsEnabled(e.target.checked)}
               />
-              <label htmlFor="tlsEnabled">Enable TLS/SSL</label>
+              <label htmlFor="tlsEnabled">{tFn('connection.tls.enableLabel')}</label>
             </div>
           </div>
 
@@ -550,21 +556,21 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     onChange={(e) => setAllowInvalid(e.target.checked)}
                   />
                   <label htmlFor="allowInvalid">
-                    Allow invalid certificates (self-signed / mismatched)
+                    {tFn('connection.tls.allowInvalid')}
                   </label>
                 </div>
-                <div className="hint">Insecure — only for trusted dev environments.</div>
+                <div className="hint">{tFn('connection.tls.allowInvalidHint')}</div>
               </div>
               <div className="form-row">
-                <label>CA File (.pem)</label>
-                <input value={caFile} onChange={(e) => setCaFile(e.target.value)} placeholder="(optional)" />
+                <label>{tFn('connection.tls.caFile')}</label>
+                <input value={caFile} onChange={(e) => setCaFile(e.target.value)} placeholder={tFn('connection.optional')} />
               </div>
               <div className="form-row">
-                <label>Client Cert + Key File (.pem)</label>
+                <label>{tFn('connection.tls.certKeyFile')}</label>
                 <input
                   value={certificateKeyFile}
                   onChange={(e) => setCertKeyFile(e.target.value)}
-                  placeholder="(optional)"
+                  placeholder={tFn('connection.optional')}
                 />
               </div>
             </>

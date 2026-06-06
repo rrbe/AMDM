@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { setLanguage } from '@renderer/i18n'
 import { Explorer } from '@renderer/components/explorer/Explorer'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
 import { Toaster } from '@renderer/components/common/Toaster'
@@ -16,12 +18,20 @@ export default function App(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const statuses = useAppStore((s) => s.statuses)
   const theme = useAppStore((s) => s.settings.theme)
+  const language = useAppStore((s) => s.settings.language)
   const sidebarWidth = useAppStore((s) => s.settings.sidebarWidth)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const { t } = useTranslation()
 
   useEffect(() => {
     void bootstrap()
   }, [bootstrap])
+
+  // Apply the persisted language preference (resolving 'system' to a locale).
+  // Mirrors the theme effect below; setLanguage handles the i18next swap.
+  useEffect(() => {
+    setLanguage(language)
+  }, [language])
 
   // Reflect the persisted theme onto the document root, which drives the
   // `[data-theme]` token cascade in styles.css. 'system' resolves to the OS
@@ -53,7 +63,7 @@ export default function App(): JSX.Element {
         // Always leave the work area at least ~480px; mirrors the CSS calc cap.
         getMax={() => Math.max(200, window.innerWidth - 480)}
         onCommit={(px) => void updateSettings({ sidebarWidth: px })}
-        ariaLabel="Resize sidebar"
+        ariaLabel={t('app.resizeSidebar')}
       />
       {activeConnected ? <ShellWorkspace /> : <WorkspaceEmptyState />}
       <Toaster />
@@ -64,22 +74,13 @@ export default function App(): JSX.Element {
 
 function WorkspaceEmptyState(): JSX.Element {
   const connections = useAppStore((s) => s.connections)
+  const { t } = useTranslation()
   return (
     <div className="work">
       <div className="work-titlebar app-drag" />
       <div className="empty-state">
         <h2>AMDM</h2>
-        {connections.length === 0 ? (
-          <p>
-            No connections yet. Use the <strong>+</strong> in the sidebar to create your first
-            MongoDB connection.
-          </p>
-        ) : (
-          <p>
-            Select a connection and <strong>double-click</strong> (or press Connect) to open a
-            shell. Browsing a collection inserts a starter query — it never auto-runs.
-          </p>
-        )}
+        <p>{connections.length === 0 ? t('app.emptyNoConn') : t('app.emptyHasConn')}</p>
       </div>
     </div>
   )

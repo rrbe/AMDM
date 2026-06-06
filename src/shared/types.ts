@@ -320,11 +320,19 @@ export type CollectionSort = 'natural' | 'alpha'
  */
 export type ThemeMode = 'light' | 'dark' | 'system'
 
+/**
+ * UI language. 'system' (default) resolves to the OS/app locale at startup
+ * (zh-CN / zh-TW / en), falling back to English; the others pin a locale.
+ */
+export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
+
 export interface AppSettings {
   /** 'natural' = server order; 'alpha' = A→Z by name. */
   collectionSort: CollectionSort
   /** 'system' = follow OS (default); 'light' = Pine; 'dark' = Pine Night. */
   theme: ThemeMode
+  /** UI language. 'system' (default) follows the OS/app locale. */
+  language: Language
   /** Explorer sidebar width in px (drag-resizable; clamped at the UI). */
   sidebarWidth: number
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
@@ -343,6 +351,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   collectionSort: 'natural',
   theme: 'system',
+  language: 'system',
   sidebarWidth: 300,
   editorHeight: 160,
   queryLimit: 50,

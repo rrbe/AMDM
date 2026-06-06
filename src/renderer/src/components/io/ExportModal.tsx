@@ -15,6 +15,7 @@
  *  - otherwise the error is shown in a red box.
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -35,6 +36,7 @@ const FORMATS: Array<{ value: DataFormat; label: string }> = [
 ]
 
 export function ExportModal({ connectionId, database, collection, onClose }: ExportModalProps): JSX.Element {
+  const { t } = useTranslation()
   const toolStatus = useAppStore((s) => s.toolStatus)
   const exportCollection = useAppStore((s) => s.exportCollection)
 
@@ -75,12 +77,12 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
 
   return (
     <Modal
-      title={`Export — ${database}.${collection}`}
+      title={t('io.exportTitle', { ns: `${database}.${collection}` })}
       onClose={onClose}
       footer={
         <>
           <span className="spacer" />
-          <Button onClick={onClose}>{success ? 'Close' : 'Cancel'}</Button>
+          <Button onClick={onClose}>{success ? t('io.close') : t('io.cancel')}</Button>
           {!success && (
             <Button
               variant="primary"
@@ -88,14 +90,14 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
               disabled={isBson && !bsonReady}
               onClick={() => void onExport()}
             >
-              Export
+              {t('io.exportBtn')}
             </Button>
           )}
         </>
       }
     >
       <div className="form-row">
-        <label>Format</label>
+        <label>{t('io.format')}</label>
         <div className="io-formats">
           {FORMATS.map((f) => {
             const disabled = f.value === 'bson' && !bsonReady
@@ -114,7 +116,7 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
         </div>
         {!bsonReady && (
           <div className="hint">
-            Install MongoDB Database Tools (brew install mongodb-database-tools) to enable BSON.
+            {t('io.bsonHint')}
           </div>
         )}
       </div>
@@ -127,13 +129,13 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
               checked={jsonArray}
               onChange={(e) => setJsonArray(e.target.checked)}
             />
-            <span>Array (otherwise NDJSON)</span>
+            <span>{t('io.jsonArray')}</span>
           </label>
         </div>
       )}
 
       <div className="form-row">
-        <label htmlFor="export-query">Query filter (EJSON, optional)</label>
+        <label htmlFor="export-query">{t('io.queryFilter')}</label>
         <textarea
           id="export-query"
           className="io-query"
@@ -146,12 +148,12 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
 
       {!isBson && (
         <div className="form-row">
-          <label htmlFor="export-limit">Limit (optional)</label>
+          <label htmlFor="export-limit">{t('io.limit')}</label>
           <input
             id="export-limit"
             type="number"
             min={1}
-            placeholder="all"
+            placeholder={t('io.limitPlaceholder')}
             value={limit}
             onChange={(e) => setLimit(e.target.value)}
           />
@@ -160,16 +162,16 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
 
       {isBson && (
         <div className="hint">
-          Uses mongodump (archive). The query filter applies; the limit / array options don&rsquo;t.
+          {t('io.bsonExportNote')}
         </div>
       )}
 
       {result && !result.ok && (
-        <div className="io-result err">{result.error ?? 'Export failed.'}</div>
+        <div className="io-result err">{result.error ?? t('io.exportFailed')}</div>
       )}
       {success && (
         <div className="io-result ok">
-          Exported {result?.count ?? 0} docs → {result?.filePath ?? '(unknown path)'}
+          {t('io.exportSuccess', { count: result?.count ?? 0, path: result?.filePath ?? '(unknown path)' })}
         </div>
       )}
     </Modal>

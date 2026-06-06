@@ -35,6 +35,10 @@ import type {
   UserInfo
 } from '@shared/types'
 import { createTab, patchTab, pickActiveAfterClose, type QueryTab } from '@renderer/lib/tabs'
+import i18n from '@renderer/i18n'
+
+/** Shorthand for translating notification / error strings in the store. */
+const tr = i18n.t.bind(i18n)
 
 export type { QueryTab }
 
@@ -280,7 +284,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const connections = await window.api.connections.list()
       set({ connections })
     } catch (e) {
-      set({ lastError: `Failed to load connections: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadConnectionsFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -291,7 +295,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().loadConnections()
       return saved
     } catch (e) {
-      set({ lastError: `Failed to save connection: ${errMessage(e)}` })
+      set({ lastError: tr('notify.saveConnectionFailed', { error: errMessage(e) }) })
       return null
     }
   },
@@ -313,7 +317,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       await get().loadConnections()
     } catch (e) {
-      set({ lastError: `Failed to delete connection: ${errMessage(e)}` })
+      set({ lastError: tr('notify.deleteConnectionFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -328,10 +332,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   async exportConnections() {
     try {
       const res = await window.api.connections.export()
-      if (res.ok) get().notify('success', `已导出 ${res.count ?? 0} 个连接配置（不含密钥）`)
-      else if (!res.cancelled) set({ lastError: `导出连接失败：${res.error ?? 'unknown'}` })
+      if (res.ok) get().notify('success', tr('notify.exportConnectionsSuccess', { count: res.count ?? 0 }))
+      else if (!res.cancelled)
+        set({ lastError: tr('notify.exportConnectionsFailed', { error: res.error ?? tr('notify.unknown') }) })
     } catch (e) {
-      set({ lastError: `导出连接失败：${errMessage(e)}` })
+      set({ lastError: tr('notify.exportConnectionsFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -340,12 +345,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       const res = await window.api.connections.import()
       if (res.ok) {
         await get().loadConnections()
-        get().notify('success', `已导入 ${res.count ?? 0} 个连接 · ${res.warning ?? '请重新输入密码'}`)
+        get().notify(
+          'success',
+          tr('notify.importConnectionsSuccess', {
+            count: res.count ?? 0,
+            warning: res.warning ?? tr('notify.reenterPasswords')
+          })
+        )
       } else if (!res.cancelled) {
-        set({ lastError: `导入连接失败：${res.error ?? 'unknown'}` })
+        set({ lastError: tr('notify.importConnectionsFailed', { error: res.error ?? tr('notify.unknown') }) })
       }
     } catch (e) {
-      set({ lastError: `导入连接失败：${errMessage(e)}` })
+      set({ lastError: tr('notify.importConnectionsFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -392,7 +403,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await window.api.session.disconnect(id)
     } catch (e) {
-      set({ lastError: `Failed to disconnect: ${errMessage(e)}` })
+      set({ lastError: tr('notify.disconnectFailed', { error: errMessage(e) }) })
     } finally {
       // Dispose catalog cache for this connection (ADR-0004 rule 6).
       set((s) => {
@@ -474,7 +485,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { catalogs: { ...s.catalogs, [connId]: { ...c, databases } } }
       })
     } catch (e) {
-      set({ lastError: `Failed to load databases: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadDatabasesFailed', { error: errMessage(e) }) })
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -495,7 +506,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: `Failed to load collections for ${db}: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadCollectionsFailed', { db, error: errMessage(e) }) })
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -517,7 +528,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: `Failed to load indexes for ${key}: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadIndexesFailed', { key, error: errMessage(e) }) })
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -535,7 +546,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: `Failed to load users for ${db}: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadUsersFailed', { db, error: errMessage(e) }) })
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -585,7 +596,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const formatted = await formatJs(code)
       if (formatted !== code) set((s) => ({ tabs: patchTab(s.tabs, tab.id, { code: formatted }) }))
     } catch (e) {
-      set({ lastError: `Format failed: ${errMessage(e)}` })
+      set({ lastError: tr('notify.formatFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -610,7 +621,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabId = tab.id
     const code = codeOverride ?? tab.code
     if (!activeConnectionId) {
-      set({ lastError: 'No active connection.' })
+      set({ lastError: tr('notify.noActiveConnection') })
       return
     }
     if (!code.trim()) return
@@ -693,7 +704,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabId = tab.id
     const code = tab.code
     if (!activeConnectionId) {
-      set({ lastError: 'No active connection.' })
+      set({ lastError: tr('notify.noActiveConnection') })
       return
     }
     if (!code.trim()) return
@@ -745,7 +756,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       set((s) => ({ tabs: patchTab(s.tabs, tabId, { result }) }))
     } catch (e) {
-      set({ lastError: `Refresh failed: ${errMessage(e)}` })
+      set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -766,7 +777,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ savedQueries: await window.api.queries.list() })
     } catch (e) {
-      set({ lastError: `Failed to load saved queries: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadSavedQueriesFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -774,10 +785,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const saved = await window.api.queries.save(input)
       await get().loadQueries()
-      get().notify('success', `Saved query “${saved.name}”`)
+      get().notify('success', tr('notify.saveQuerySuccess', { name: saved.name }))
       return saved
     } catch (e) {
-      set({ lastError: `Failed to save query: ${errMessage(e)}` })
+      set({ lastError: tr('notify.saveQueryFailed', { error: errMessage(e) }) })
       return null
     }
   },
@@ -787,7 +798,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.queries.delete(id)
       await get().loadQueries()
     } catch (e) {
-      set({ lastError: `Failed to delete query: ${errMessage(e)}` })
+      set({ lastError: tr('notify.deleteQueryFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -795,7 +806,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ history: await window.api.history.list() })
     } catch (e) {
-      set({ lastError: `Failed to load history: ${errMessage(e)}` })
+      set({ lastError: tr('notify.loadHistoryFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -804,7 +815,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.history.clear()
       set({ history: [] })
     } catch (e) {
-      set({ lastError: `Failed to clear history: ${errMessage(e)}` })
+      set({ lastError: tr('notify.clearHistoryFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -841,11 +852,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.update(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: `Update failed: ${res.error ?? 'unknown'}` })
+      else set({ lastError: tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }) })
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: `Update failed: ${error}` })
+      set({ lastError: tr('notify.updateFailed', { error }) })
       return { ok: false, error }
     }
   },
@@ -854,11 +865,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.setField(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: `Update failed: ${res.error ?? 'unknown'}` })
+      else set({ lastError: tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }) })
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: `Update failed: ${error}` })
+      set({ lastError: tr('notify.updateFailed', { error }) })
       return { ok: false, error }
     }
   },
@@ -867,11 +878,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.delete(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: `Delete failed: ${res.error ?? 'unknown'}` })
+      else set({ lastError: tr('notify.deleteFailed', { error: res.error ?? tr('notify.unknown') }) })
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: `Delete failed: ${error}` })
+      set({ lastError: tr('notify.deleteFailed', { error }) })
       return { ok: false, error }
     }
   },
@@ -888,11 +899,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   async exportCollection(req) {
     try {
       const res = await window.api.io.export(req)
-      if (!res.ok && !res.cancelled) set({ lastError: `Export failed: ${res.error ?? 'unknown'}` })
+      if (!res.ok && !res.cancelled) set({ lastError: tr('notify.exportFailed', { error: res.error ?? tr('notify.unknown') }) })
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: `Export failed: ${error}` })
+      set({ lastError: tr('notify.exportFailed', { error }) })
       return { ok: false, error }
     }
   },
@@ -900,11 +911,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   async importCollection(req) {
     try {
       const res = await window.api.io.import(req)
-      if (!res.ok && !res.cancelled) set({ lastError: `Import failed: ${res.error ?? 'unknown'}` })
+      if (!res.ok && !res.cancelled) set({ lastError: tr('notify.importFailed', { error: res.error ?? tr('notify.unknown') }) })
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: `Import failed: ${error}` })
+      set({ lastError: tr('notify.importFailed', { error }) })
       return { ok: false, error }
     }
   },
@@ -925,7 +936,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const saved = await window.api.settings.update(patch)
       set({ settings: saved })
     } catch (e) {
-      set({ lastError: `Failed to save settings: ${errMessage(e)}` })
+      set({ lastError: tr('notify.saveSettingsFailed', { error: errMessage(e) }) })
     }
   }
 }))

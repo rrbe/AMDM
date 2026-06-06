@@ -1531,6 +1531,27 @@ label {
   margin-top: 3px;
 }
 
+/* ---- Settings modal: grouped preference sections ---- */
+.settings-section {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.settings-section:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+.settings-section-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--fg-2);
+  margin-bottom: 10px;
+}
+.settings-section .form-row:last-child,
+.settings-section .form-grid:last-child {
+  margin-bottom: 0;
+}
+
 .swatches {
   display: flex;
   flex-wrap: wrap;

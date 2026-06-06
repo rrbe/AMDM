@@ -16,6 +16,7 @@
  * fall back to the raw JSON. Nothing here throws.
  */
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { indentFor, toJsonLines } from '@renderer/lib/format'
 
 interface ExplainViewProps {
@@ -162,6 +163,7 @@ function parseExplain(plan: unknown): ParsedExplain {
 }
 
 export function ExplainView({ plan }: ExplainViewProps): JSX.Element {
+  const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan), [plan])
 
@@ -169,19 +171,19 @@ export function ExplainView({ plan }: ExplainViewProps): JSX.Element {
     <div className="explain-view">
       <div className="explain-summary">
         <SummaryStat label="nReturned" value={fmtNum(parsed.summary.nReturned)} />
-        <SummaryStat label="docs examined" value={fmtNum(parsed.summary.docsExamined)} />
-        <SummaryStat label="keys examined" value={fmtNum(parsed.summary.keysExamined)} />
+        <SummaryStat label={t('explain.docsExamined')} value={fmtNum(parsed.summary.docsExamined)} />
+        <SummaryStat label={t('explain.keysExamined')} value={fmtNum(parsed.summary.keysExamined)} />
         <SummaryStat
-          label="time"
+          label={t('explain.time')}
           value={Number.isNaN(toNum(parsed.summary.timeMs)) ? '—' : `${toNum(parsed.summary.timeMs)} ms`}
         />
-        <SummaryStat label="index" value={parsed.winningIndex ?? 'none'} mono />
+        <SummaryStat label={t('explain.index')} value={parsed.winningIndex ?? t('explain.none')} mono />
       </div>
 
       <div className="explain-stages">
         {parsed.stages.length === 0 ? (
           <div className="muted explain-empty">
-            No execution stages found. The raw plan is shown below.
+            {t('explain.noStages')}
           </div>
         ) : (
           parsed.stages.map((node, i) => <StageRow key={i} node={node} />)
@@ -189,7 +191,7 @@ export function ExplainView({ plan }: ExplainViewProps): JSX.Element {
       </div>
 
       <details className="explain-raw">
-        <summary>Raw explain JSON</summary>
+        <summary>{t('explain.rawJson')}</summary>
         <div className="explain-raw-box">
           {rawLines.map((line, i) => (
             <pre key={i} className="explain-raw-line">
@@ -213,14 +215,15 @@ function SummaryStat({ label, value, mono }: { label: string; value: string; mon
 }
 
 function StageRow({ node }: { node: StageNode }): JSX.Element {
+  const { t } = useTranslation()
   const tone = stageTone(node.stage)
   return (
     <div className="explain-stage-row" style={{ paddingLeft: 8 + node.depth * 18 }}>
       <span className={`explain-stage-name tone-${tone}`}>{node.stage}</span>
       <span className="explain-stage-metrics">
-        <Metric label="n" value={fmtNum(node.nReturned)} />
-        {node.docsExamined !== undefined && <Metric label="docs" value={fmtNum(node.docsExamined)} />}
-        {node.keysExamined !== undefined && <Metric label="keys" value={fmtNum(node.keysExamined)} />}
+        <Metric label={t('explain.metricN')} value={fmtNum(node.nReturned)} />
+        {node.docsExamined !== undefined && <Metric label={t('explain.metricDocs')} value={fmtNum(node.docsExamined)} />}
+        {node.keysExamined !== undefined && <Metric label={t('explain.metricKeys')} value={fmtNum(node.keysExamined)} />}
         {node.indexName && <span className="explain-stage-index">{node.indexName}</span>}
         {!node.indexName && node.keyPattern && <span className="explain-stage-index">{node.keyPattern}</span>}
       </span>

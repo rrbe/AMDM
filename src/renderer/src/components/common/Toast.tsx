@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
 
 export type ToastVariant = 'error' | 'success' | 'info' | 'warn'
@@ -27,6 +28,7 @@ export function Toast({
   onDismiss: () => void
   autoDismissMs?: number
 }): JSX.Element {
+  const { t } = useTranslation()
   useEffect(() => {
     if (!autoDismissMs) return
     const t = window.setTimeout(onDismiss, autoDismissMs)
@@ -38,7 +40,7 @@ export function Toast({
     <div className={`toast toast-${variant}`} role={variant === 'error' ? 'alert' : 'status'}>
       <Icon className="toast-icon" size={16} aria-hidden />
       <div className="toast-msg">{message}</div>
-      <button className="toast-close" onClick={onDismiss} aria-label="Dismiss">
+      <button className="toast-close" onClick={onDismiss} aria-label={t('common.dismiss')}>
         <X size={14} />
       </button>
     </div>

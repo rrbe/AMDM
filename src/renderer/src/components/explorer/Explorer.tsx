@@ -1,4 +1,6 @@
-import { useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '@renderer/i18n'
 import {
   CheckCircle2,
   ChevronRight,
@@ -15,6 +17,7 @@ import {
   Pencil,
   Plug,
   Plus,
+  Settings,
   Sun,
   Table2,
   Trash2,
@@ -37,6 +40,7 @@ import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextM
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
 import { SavedQueriesPanel } from '@renderer/components/explorer/SavedQueriesPanel'
+import { SettingsModal } from '@renderer/components/settings/SettingsModal'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
 function TreeIcon({ name }: { name: string }): JSX.Element | null {
@@ -121,6 +125,7 @@ interface RowActions {
 type IoModal = { mode: 'export' | 'import'; connId: string; db: string; collection: string } | null
 
 export function Explorer(): JSX.Element {
+  const { t } = useTranslation()
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
   const catalogs = useAppStore((s) => s.catalogs)
@@ -147,9 +152,22 @@ export function Explorer(): JSX.Element {
     open: false
   })
   const [ioModal, setIoModal] = useState<IoModal>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(
     null
   )
+
+  // ⌘, / Ctrl+, opens Settings — the platform convention for preferences.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ',') {
+        e.preventDefault()
+        setSettingsOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Right-click a collection → Export / Import live here (not as hover buttons).
   const openCollMenu = (
@@ -163,13 +181,13 @@ export function Explorer(): JSX.Element {
       y: e.clientY,
       items: [
         {
-          label: 'Export collection…',
+          label: t('explorer.exportCollection'),
           icon: <Download size={14} />,
           onClick: () =>
             setIoModal({ mode: 'export', connId, db: coll.db, collection: coll.name })
         },
         {
-          label: 'Import into collection…',
+          label: t('explorer.importCollection'),
           icon: <Upload size={14} />,
           onClick: () =>
             setIoModal({ mode: 'import', connId, db: coll.db, collection: coll.name })
@@ -226,11 +244,11 @@ export function Explorer(): JSX.Element {
           prominent "New connection" action. */}
       <div className="side-section side-section--conns">
         <div className="side-section-head">
-          <span className="side-section-title">Connections</span>
+          <span className="side-section-title">{t('explorer.connections')}</span>
           <button
             className="ghost side-section-more"
-            data-tip="备份 / 恢复连接配置"
-            aria-label="备份 / 恢复连接配置"
+            data-tip={t('explorer.backupRestore')}
+            aria-label={t('explorer.backupRestore')}
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
               setCtxMenu({
@@ -238,12 +256,12 @@ export function Explorer(): JSX.Element {
                 y: r.bottom + 4,
                 items: [
                   {
-                    label: '导出连接配置…',
+                    label: t('explorer.exportConnections'),
                     icon: <Download size={14} />,
                     onClick: () => void exportConnections()
                   },
                   {
-                    label: '导入连接配置…',
+                    label: t('explorer.importConnections'),
                     icon: <Upload size={14} />,
                     onClick: () => void importConnections()
                   }
@@ -255,16 +273,16 @@ export function Explorer(): JSX.Element {
           </button>
           <button
             className="primary btn-new-conn"
-            data-tip="New connection"
+            data-tip={t('explorer.newConnectionTip')}
             onClick={() => setConnForm({ open: true })}
           >
             <Plus size={15} />
-            <span>New</span>
+            <span>{t('explorer.new')}</span>
           </button>
         </div>
         <div className="explorer-body">
           {connections.length === 0 && (
-            <div className="explorer-empty">No connections. Click “New” to add one.</div>
+            <div className="explorer-empty">{t('explorer.noConnections')}</div>
           )}
 
           {rows.map((row) =>
@@ -279,7 +297,7 @@ export function Explorer(): JSX.Element {
                 onDisconnect={() => void disconnect(row.id)}
                 onEdit={() => setConnForm({ open: true, editing: row.conn })}
                 onDelete={() => {
-                  if (confirm(`Delete connection "${row.conn.name}"?`)) void deleteConnection(row.id)
+                  if (confirm(t('explorer.deleteConfirm', { name: row.conn.name }))) void deleteConnection(row.id)
                 }}
               />
             ) : (
@@ -302,12 +320,12 @@ export function Explorer(): JSX.Element {
           className="theme-cycle"
           data-tip={
             theme === 'system'
-              ? 'Theme: System — click for Light'
+              ? t('explorer.theme.system')
               : theme === 'light'
-                ? 'Theme: Light — click for Dark'
-                : 'Theme: Dark — click for System'
+                ? t('explorer.theme.light')
+                : t('explorer.theme.dark')
           }
-          aria-label="Toggle color theme"
+          aria-label={t('explorer.toggleTheme')}
           onClick={() =>
             void updateSettings({
               theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
@@ -323,6 +341,14 @@ export function Explorer(): JSX.Element {
           )}
         </button>
         <span className="spacer" />
+        <button
+          className="theme-cycle"
+          data-tip={t('common.settings')}
+          aria-label={t('common.settings')}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings size={16} />
+        </button>
       </div>
 
       {connForm.open && (
@@ -353,6 +379,7 @@ export function Explorer(): JSX.Element {
           onClose={() => setCtxMenu(null)}
         />
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   )
 }
@@ -376,6 +403,7 @@ function ConnectionRow({
   onEdit: () => void
   onDelete: () => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const { conn, state, expandable, expanded } = row
   const isConnected = state === 'connected'
   const sub = conn.useSrv ? `srv · ${conn.host}` : `${conn.host}:${conn.port ?? 27017}`
@@ -420,8 +448,8 @@ function ConnectionRow({
         {isConnected ? (
           <button
             className="ghost"
-            data-tip="Disconnect"
-            aria-label="Disconnect"
+            data-tip={t('explorer.disconnect')}
+            aria-label={t('explorer.disconnect')}
             onClick={(e) => {
               e.stopPropagation()
               onDisconnect()
@@ -432,8 +460,8 @@ function ConnectionRow({
         ) : (
           <button
             className="ghost"
-            data-tip="Connect"
-            aria-label="Connect"
+            data-tip={t('explorer.connect')}
+            aria-label={t('explorer.connect')}
             onClick={(e) => {
               e.stopPropagation()
               onConnect()
@@ -444,8 +472,8 @@ function ConnectionRow({
         )}
         <button
           className="ghost"
-          data-tip="Edit"
-          aria-label="Edit"
+          data-tip={t('explorer.edit')}
+          aria-label={t('explorer.edit')}
           onClick={(e) => {
             e.stopPropagation()
             onEdit()
@@ -455,8 +483,8 @@ function ConnectionRow({
         </button>
         <button
           className="ghost danger"
-          data-tip="Delete"
-          aria-label="Delete"
+          data-tip={t('explorer.delete')}
+          aria-label={t('explorer.delete')}
           onClick={(e) => {
             e.stopPropagation()
             onDelete()
@@ -476,6 +504,7 @@ function CatalogRow({
   row: TreeRow
   onContextMenu: (e: MouseEvent, coll: { db: string; name: string }, connId: string) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const coll = row.collection
   const isNote = row.kind === 'leaf'
   const className =
@@ -488,7 +517,7 @@ function CatalogRow({
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
       onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
-      data-tip={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
+      data-tip={isNote ? undefined : row.empty ? t('explorer.emptyDb', { name: row.label }) : row.label}
     >
       <span
         className="tree-twisty"
@@ -577,7 +606,7 @@ function flattenCatalog(
       id: usersNodeId,
       connId,
       depth: 2,
-      label: 'Users',
+      label: i18n.t('explorer.users'),
       icon: 'users',
       kind: 'users',
       expandable: true,
@@ -594,7 +623,7 @@ function flattenCatalog(
           id: `${usersNodeId}:${u.db}.${u.user}`,
           connId,
           depth: 3,
-          label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || 'no roles'})`,
+          label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || i18n.t('explorer.noRoles')})`,
           icon: 'user',
           kind: 'leaf',
           expandable: false,
@@ -603,7 +632,7 @@ function flattenCatalog(
         })
       }
       if (usersList.length === 0) {
-        rows.push(leafNote(`${usersNodeId}:empty`, connId, 3, 'no users'))
+        rows.push(leafNote(`${usersNodeId}:empty`, connId, 3, i18n.t('explorer.noUsers')))
       }
     }
 
@@ -646,7 +675,7 @@ function flattenCatalog(
         id: idxNodeId,
         connId,
         depth: 3,
-        label: 'Indexes',
+        label: i18n.t('explorer.indexes'),
         icon: 'indexes',
         kind: 'indexes',
         expandable: true,
@@ -668,7 +697,7 @@ function flattenCatalog(
             id: `${idxNodeId}:${ix.name}`,
             connId,
             depth: 4,
-            label: `${ix.name} { ${keySpec} }${ix.unique ? ' · unique' : ''}`,
+            label: `${ix.name} { ${keySpec} }${ix.unique ? i18n.t('explorer.indexUnique') : ''}`,
             icon: 'index',
             kind: 'leaf',
             expandable: false,
@@ -677,13 +706,13 @@ function flattenCatalog(
           })
         }
         if (idxList.length === 0) {
-          rows.push(leafNote(`${idxNodeId}:empty`, connId, 4, 'no indexes'))
+          rows.push(leafNote(`${idxNodeId}:empty`, connId, 4, i18n.t('explorer.noIndexes')))
         }
       }
     }
 
     if (colls.length === 0) {
-      rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, 'no collections'))
+      rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, i18n.t('explorer.noCollections')))
     }
   }
 

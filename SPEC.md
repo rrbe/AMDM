@@ -95,3 +95,6 @@
 - **性能加固** ✅ 已完成
   序列化(BSON→EJSON 编码)与 schema 字段采样提取已挪到主进程的 **worker_thread 序列化池**(`src/main/workers/`),不再堵主进程事件循环(ADR-0004 第 3、4 条)。主线程只做很快的二进制 `BSON.serialize`,重活在 worker 里;worker 起不来或崩溃时自动**内联降级**,保证不影响功能。退出时随会话清理。
   遗留待办:官方工具(mongodump/mongorestore)的按需下载;BSON 导入的目标命名空间重映射;表格内联单元格编辑;连接配置导出/备份;保存查询的文件夹/两级组织 UI。
+
+- **多语言 + 集中式设置** ✅ 已完成
+  UI 文案经 `react-i18next` 全量国际化,内置 **简体中文 / English / 繁體中文** 三语,默认跟随系统 locale(`navigator.language`,回退 en)。语言偏好存进 `AppSettings.language`(settings.json,沿用现有 settings IPC,无新增通道)。资源在 `src/renderer/src/i18n/locales/*.json`,纯函数解析器 `lib/language.ts` + 键齐全性单测 `test/unit/renderer/i18n.test.ts`(三语键集合 + 插值占位符一致性)。新增**集中式设置弹窗**(`components/settings/SettingsModal.tsx`,齿轮按钮或 ⌘, 打开)统一承载语言/主题/集合排序/每页条数/编辑器字号·换行·缩进。同时清除了 UI 文案的强制大写(CSS `text-transform` + 硬编码全大写),遵循 CLAUDE.md 的大驼峰规则。

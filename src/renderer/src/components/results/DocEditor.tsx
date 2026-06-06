@@ -10,6 +10,7 @@
  * arrived in the result); the main process deserializes it for the filter.
  */
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { toJsonLines, indentFor } from '@renderer/lib/format'
@@ -34,6 +35,7 @@ function toEditableText(doc: unknown): string {
 }
 
 export function DocEditor({ connectionId, database, collection, doc, id, onClose }: DocEditorProps): JSX.Element {
+  const { t } = useTranslation()
   const updateDocument = useAppStore((s) => s.updateDocument)
 
   const initial = useMemo(() => toEditableText(doc), [doc])
@@ -47,7 +49,7 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
     // ISODate(..)) that aren't valid JSON, so we can't fully validate here — we
     // only catch empty input and let the main process do real EJSON parsing.
     if (!text.trim()) {
-      setError('Document is empty.')
+      setError(t('docEditor.errorEmpty'))
       return
     }
     setSaving(true)
@@ -62,21 +64,21 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
     if (res.ok) {
       onClose()
     } else {
-      setError(res.error ?? 'Update failed.')
+      setError(res.error ?? t('docEditor.errorUpdateFailed'))
     }
   }
 
   return (
     <Modal
-      title={`Edit document — ${collection}`}
+      title={t('docEditor.title', { collection })}
       onClose={onClose}
       footer={
         <>
           {error && <span className="doc-edit-error">{error}</span>}
           <span className="spacer" />
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('docEditor.cancel')}</Button>
           <Button variant="primary" busy={saving} onClick={() => void onSave()}>
-            Save
+            {t('docEditor.save')}
           </Button>
         </>
       }
@@ -88,8 +90,7 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
         onChange={(e) => setText(e.target.value)}
       />
       <div className="hint">
-        Edited as a full replacement. Shell types (ObjectId(…), ISODate(…)) are accepted; the document is
-        parsed as Extended JSON on save.
+        {t('docEditor.hint')}
       </div>
     </Modal>
   )

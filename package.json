@@ -39,9 +39,11 @@
     "@uiw/react-codemirror": "^4.23.6",
     "bson": "^6.9.0",
     "exceljs": "^4.4.0",
+    "i18next": "^26.3.1",
     "lucide-react": "^1.17.0",
     "mongodb": "^6.10.0",
     "prettier": "^3.8.3",
+    "react-i18next": "^17.0.8",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {

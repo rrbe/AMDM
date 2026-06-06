@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, type ResultView } from '@renderer/store/useAppStore'
 import { docActionContext } from '@renderer/lib/docActions'
@@ -15,6 +16,7 @@ import { ExplainView } from './ExplainView'
  * ShellResult.kind: 'documents' (array), 'value', 'ack', 'error'.
  */
 export function ResultPanel(): JSX.Element {
+  const { t } = useTranslation()
   const result = useAppStore((s) => getActiveTab(s).result)
   const view = useAppStore((s) => s.resultView)
   const setView = useAppStore((s) => s.setResultView)
@@ -44,7 +46,7 @@ export function ResultPanel(): JSX.Element {
     return (
       <div className="result-panel">
         <div className="result-body">
-          <div className="center-msg muted">Run a query to see results.</div>
+          <div className="center-msg muted">{t('result.noResults')}</div>
         </div>
       </div>
     )
@@ -64,7 +66,7 @@ export function ResultPanel(): JSX.Element {
     return (
       <div className="result-panel">
         <div className="result-bar">
-          <span className="explain-tag">EXPLAIN</span>
+          <span className="explain-tag">{t('result.explainTag')}</span>
           <ResultMeta result={result} docCount={0} />
         </div>
         <div className="result-body explain-body">
@@ -83,7 +85,7 @@ export function ResultPanel(): JSX.Element {
       <div className="result-bar">
         <div className="view-switch">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : 'Table'
+            const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
             return (
               <button
                 key={v}
@@ -102,8 +104,8 @@ export function ResultPanel(): JSX.Element {
         {result.kind === 'documents' && <ResultPager result={result} />}
         <button
           className="ghost result-copy"
-          data-tip="复制全部结果"
-          aria-label="复制全部结果"
+          data-tip={t('result.copyAllTip')}
+          aria-label={t('result.copyAllTip')}
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
             setCopyMenu({ x: r.left, y: r.bottom + 4 })
@@ -125,11 +127,11 @@ export function ResultPanel(): JSX.Element {
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            { label: '复制全部 (Pure JSON)', onClick: () => void copyText(toPlainJson(docs)) },
-            { label: '复制全部 (MongoShell JS)', onClick: () => void copyText(toShellText(docs)) },
-            { label: '复制全部 (Extended JSON)', onClick: () => void copyText(toStrictEjson(docs)) },
-            { label: '复制全部为 CSV', onClick: () => void copyText(toCsv(docs)) },
-            { label: '复制全部为 TSV', onClick: () => void copyText(toTsv(docs)) }
+            { label: t('result.copy.pureJson'), onClick: () => void copyText(toPlainJson(docs)) },
+            { label: t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(docs)) },
+            { label: t('result.copy.extendedJson'), onClick: () => void copyText(toStrictEjson(docs)) },
+            { label: t('result.copy.csv'), onClick: () => void copyText(toCsv(docs)) },
+            { label: t('result.copy.tsv'), onClick: () => void copyText(toTsv(docs)) }
           ]}
         />
       )}
@@ -147,26 +149,28 @@ function normalizeDocs(result: ShellResult): unknown[] {
 }
 
 function ResultMeta({ result, docCount }: { result: ShellResult; docCount: number }): JSX.Element {
+  const { t } = useTranslation()
   const parts = useMemo(() => {
     const out: { text: string; cls?: string }[] = []
     if (result.kind === 'documents') {
-      out.push({ text: `${result.count ?? docCount} doc${(result.count ?? docCount) === 1 ? '' : 's'}` })
+      const n = result.count ?? docCount
+      out.push({ text: t('result.docCount', { count: n }) })
       // For pageable results the pager shows the range + a next button, so the
       // "truncated" badge would be redundant. Keep it for non-pageable cursors
       // (aggregate / scripts), where raising the page size is the only way on.
       if (result.truncated && !result.pageable) {
-        out.push({ text: 'truncated — raise page size to see more', cls: 'truncated' })
+        out.push({ text: t('result.truncated'), cls: 'truncated' })
       }
     } else if (result.kind === 'value') {
-      out.push({ text: 'value' })
+      out.push({ text: t('result.kindValue') })
     } else if (result.kind === 'ack') {
-      out.push({ text: 'write result' })
+      out.push({ text: t('result.kindAck') })
     }
     if (typeof result.elapsedMs === 'number') {
-      out.push({ text: `${result.elapsedMs} ms` })
+      out.push({ text: t('result.elapsed', { ms: result.elapsedMs }) })
     }
     return out
-  }, [result, docCount])
+  }, [result, docCount, t])
 
   return (
     <div className="result-meta">
@@ -185,6 +189,7 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
  * way to see more). Next is enabled only while the page is truncated.
  */
 function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
+  const { t } = useTranslation()
   const skip = useAppStore((s) => getActiveTab(s).resultSkip)
   const limit = useAppStore((s) => s.settings.queryLimit)
   const running = useAppStore((s) => getActiveTab(s).running)
@@ -200,8 +205,8 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
       <button
         className="ghost"
         disabled={skip === 0 || running}
-        data-tip="上一页"
-        aria-label="上一页"
+        data-tip={t('result.prevPage')}
+        aria-label={t('result.prevPage')}
         onClick={() => void loadPage(Math.max(0, skip - limit))}
       >
         <ChevronLeft size={15} />
@@ -212,8 +217,8 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
       <button
         className="ghost"
         disabled={!result.truncated || running}
-        data-tip="下一页"
-        aria-label="下一页"
+        data-tip={t('result.nextPage')}
+        aria-label={t('result.nextPage')}
         onClick={() => void loadPage(skip + limit)}
       >
         <ChevronRight size={15} />
@@ -224,6 +229,7 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
 
 /** Page-size (per-page doc count) control; commits on blur / Enter, then re-runs. */
 function PageSizeControl(): JSX.Element {
+  const { t } = useTranslation()
   const limit = useAppStore((s) => s.settings.queryLimit)
   const setQueryLimit = useAppStore((s) => s.setQueryLimit)
   const running = useAppStore((s) => getActiveTab(s).running)
@@ -236,8 +242,8 @@ function PageSizeControl(): JSX.Element {
     if (n !== limit) void setQueryLimit(n)
   }
   return (
-    <label className="page-size" data-tip="每页条数（回车应用）">
-      <span>每页</span>
+    <label className="page-size" data-tip={t('result.pageSizeTip')}>
+      <span>{t('result.pageSizeLabel')}</span>
       <input
         type="number"
         min={1}
@@ -255,11 +261,12 @@ function PageSizeControl(): JSX.Element {
 }
 
 function ErrorView({ result }: { result: ShellResult }): JSX.Element {
+  const { t } = useTranslation()
   return (
     <div className="result-body">
       <div className="error-panel">
-        <div className="error-name">{result.errorName ?? 'Error'}</div>
-        <div className="error-msg">{result.error ?? 'An unknown error occurred.'}</div>
+        <div className="error-name">{result.errorName ?? t('result.errorName')}</div>
+        <div className="error-msg">{result.error ?? t('result.errorUnknown')}</div>
       </div>
     </div>
   )

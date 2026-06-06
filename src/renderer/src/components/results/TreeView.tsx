@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   entriesOf,
@@ -22,6 +23,7 @@ import {
   toStrictEjson
 } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 
@@ -70,6 +72,7 @@ const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
 export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
+  const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
   // Index of the document open in the full-document modal editor (null = none).
@@ -240,7 +243,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
       setEditing(null)
       setEditError(null)
     } else {
-      setEditError(res.error ?? '保存失败')
+      setEditError(res.error ?? t('tree.saveFailed'))
     }
   }
 
@@ -269,9 +272,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     const rootDoc = rootDocOf(node)
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
-      items.push({ label: '编辑文档…', onClick: () => setEditIndex(rootIndex) })
+      items.push({ label: t('tree.editDoc'), onClick: () => setEditIndex(rootIndex) })
       items.push({
-        label: '删除文档',
+        label: t('tree.deleteDoc'),
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, rootDoc._id)
       })
@@ -280,7 +283,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   }
 
   if (docs.length === 0) {
-    return <div className="center-msg muted">No documents.</div>
+    return <div className="center-msg muted">{t('tree.noDocuments')}</div>
   }
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
@@ -360,7 +363,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
                 )}
               </div>
               <div className={`kv-type v-${valueType(node.value)}`}>
-                {node.depth === 0 ? 'Document' : typeLabel(node.value)}
+                {node.depth === 0 ? t('tree.documentType') : typeLabel(node.value)}
               </div>
             </div>
           )
@@ -389,9 +392,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
 function bulkDocMenuItems(picked: unknown[]): ContextMenuItem[] {
   const n = picked.length
   return [
-    { label: `复制 ${n} 个文档 (Pure JSON)`, onClick: () => void copyText(toPlainJson(picked)) },
-    { label: `复制 ${n} 个文档 (MongoShell JS)`, onClick: () => void copyText(toShellText(picked)) },
-    { label: `复制 ${n} 个文档 (Extended JSON)`, onClick: () => void copyText(toStrictEjson(picked)) }
+    { label: i18n.t('tree.copyDocsPureJson', { count: n }), onClick: () => void copyText(toPlainJson(picked)) },
+    { label: i18n.t('tree.copyDocsMongoShell', { count: n }), onClick: () => void copyText(toShellText(picked)) },
+    { label: i18n.t('tree.copyDocsExtendedJson', { count: n }), onClick: () => void copyText(toStrictEjson(picked)) }
   ]
 }
 
@@ -400,20 +403,20 @@ function treeMenuItems(node: FlatNode, docs: unknown[]): ContextMenuItem[] {
   const rootDoc = docs[Number(node.id.split('.')[0])]
   if (node.depth === 0) {
     return [
-      { label: '复制文档 (Pure JSON)', onClick: () => void copyText(toPlainJson(node.value)) },
-      { label: '复制文档 (MongoShell JS)', onClick: () => void copyText(toShellText(node.value)) },
-      { label: '复制文档 (Extended JSON)', onClick: () => void copyText(toStrictEjson(node.value)) }
+      { label: i18n.t('tree.copyDocPureJson'), onClick: () => void copyText(toPlainJson(node.value)) },
+      { label: i18n.t('tree.copyDocMongoShell'), onClick: () => void copyText(toShellText(node.value)) },
+      { label: i18n.t('tree.copyDocExtendedJson'), onClick: () => void copyText(toStrictEjson(node.value)) }
     ]
   }
   const valueText = node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
   const fieldJson = node.expandable ? toPlainJson(node.value) : JSON.stringify(toPlainValue(node.value))
   return [
-    { label: '复制值', onClick: () => void copyText(valueText) },
-    { label: '复制键', onClick: () => void copyText(node.keyLabel) },
-    { label: '复制字段', onClick: () => void copyText(`${JSON.stringify(node.keyLabel)}: ${fieldJson}`) },
-    { label: '复制所在文档 (Pure JSON)', onClick: () => void copyText(toPlainJson(rootDoc)) },
-    { label: '复制所在文档 (MongoShell JS)', onClick: () => void copyText(toShellText(rootDoc)) },
-    { label: '复制所在文档 (Extended JSON)', onClick: () => void copyText(toStrictEjson(rootDoc)) }
+    { label: i18n.t('tree.copyValue'), onClick: () => void copyText(valueText) },
+    { label: i18n.t('tree.copyKey'), onClick: () => void copyText(node.keyLabel) },
+    { label: i18n.t('tree.copyField'), onClick: () => void copyText(`${JSON.stringify(node.keyLabel)}: ${fieldJson}`) },
+    { label: i18n.t('tree.copyOwnerDocPureJson'), onClick: () => void copyText(toPlainJson(rootDoc)) },
+    { label: i18n.t('tree.copyOwnerDocMongoShell'), onClick: () => void copyText(toShellText(rootDoc)) },
+    { label: i18n.t('tree.copyOwnerDocExtendedJson'), onClick: () => void copyText(toStrictEjson(rootDoc)) }
   ]
 }
 

@@ -10,6 +10,7 @@ import { ErrorBoundary } from '@renderer/components/common/ErrorBoundary'
 import '@fontsource/source-code-pro/400.css'
 import '@fontsource/source-code-pro/500.css'
 import '@fontsource/source-code-pro/600.css'
+import { setLanguage } from '@renderer/i18n'
 import './styles.css'
 
 // macOS uses a frameless window (titleBarStyle: hiddenInset); this flag drives
@@ -23,6 +24,10 @@ if (navigator.platform.toLowerCase().includes('mac')) {
 // the persisted preference (and keeps following the OS) once settings load.
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
 document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
+
+// Resolve the UI language from the OS locale for first paint (default pref is
+// 'system'); App.tsx re-syncs to the persisted preference once settings load.
+setLanguage('system')
 
 const container = document.getElementById('root')
 if (!container) {

@@ -17,6 +17,7 @@ import { isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
 import { cellValue, deriveColumns } from './tableShape'
 import { useAppStore } from '@renderer/store/useAppStore'
+import i18n from '@renderer/i18n'
 
 type Dict = Record<string, unknown>
 
@@ -174,6 +175,6 @@ export async function copyText(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text)
   } catch {
-    useAppStore.setState({ lastError: '复制失败：剪贴板不可用' })
+    useAppStore.setState({ lastError: i18n.t('notify.clipboardUnavailable') })
   }
 }

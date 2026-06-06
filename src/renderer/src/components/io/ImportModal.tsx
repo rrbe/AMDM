@@ -14,6 +14,7 @@
  *  - otherwise the error is shown in a red box.
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -34,6 +35,7 @@ const FORMATS: Array<{ value: DataFormat; label: string }> = [
 ]
 
 export function ImportModal({ connectionId, database, collection, onClose }: ImportModalProps): JSX.Element {
+  const { t } = useTranslation()
   const toolStatus = useAppStore((s) => s.toolStatus)
   const importCollection = useAppStore((s) => s.importCollection)
 
@@ -60,12 +62,12 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
 
   return (
     <Modal
-      title={`Import — ${database}.${collection}`}
+      title={t('io.importTitle', { ns: `${database}.${collection}` })}
       onClose={onClose}
       footer={
         <>
           <span className="spacer" />
-          <Button onClick={onClose}>{success ? 'Close' : 'Cancel'}</Button>
+          <Button onClick={onClose}>{success ? t('io.close') : t('io.cancel')}</Button>
           {!success && (
             <Button
               variant="primary"
@@ -73,14 +75,14 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
               disabled={isBson && !bsonReady}
               onClick={() => void onImport()}
             >
-              Import
+              {t('io.importBtn')}
             </Button>
           )}
         </>
       }
     >
       <div className="form-row">
-        <label>Format</label>
+        <label>{t('io.format')}</label>
         <div className="io-formats">
           {FORMATS.map((f) => {
             const disabled = f.value === 'bson' && !bsonReady
@@ -99,23 +101,23 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
         </div>
         {!bsonReady && (
           <div className="hint">
-            Install MongoDB Database Tools (brew install mongodb-database-tools) to enable BSON.
+            {t('io.bsonHint')}
           </div>
         )}
       </div>
 
       {isBson && (
         <div className="io-note warn">
-          BSON archives restore to their ORIGINAL namespace; the target collection is ignored.
+          {t('io.bsonImportNote')}
         </div>
       )}
 
       {result && !result.ok && (
-        <div className="io-result err">{result.error ?? 'Import failed.'}</div>
+        <div className="io-result err">{result.error ?? t('io.importFailed')}</div>
       )}
       {success && (
         <div className="io-result ok">
-          Imported {result?.count ?? 0} docs
+          {t('io.importSuccess', { count: result?.count ?? 0 })}
           {result?.warning ? <div className="io-warning">{result.warning}</div> : null}
         </div>
       )}

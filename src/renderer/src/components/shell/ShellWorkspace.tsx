@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor } from './ShellEditor'
@@ -14,6 +15,7 @@ import { Button } from '@renderer/components/common/Button'
  * its own code/result/db/run state (see the store's `tabs`).
  */
 export function ShellWorkspace(): JSX.Element {
+  const { t } = useTranslation()
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connections = useAppStore((s) => s.connections)
   const catalogs = useAppStore((s) => s.catalogs)
@@ -47,15 +49,15 @@ export function ShellWorkspace(): JSX.Element {
     <div className="work">
       <TabBar />
       <div className="work-header app-drag">
-        <span className="conn-title">{conn?.name ?? 'Shell'}</span>
+        <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
         <select
           className="db-select"
           value={activeDatabase}
           onChange={(e) => setActiveDatabase(e.target.value)}
-          data-tip="Active database"
+          data-tip={t('shell.activeDatabaseTip')}
         >
-          {dbOptions.length === 0 && <option value="">(no database)</option>}
-          {activeDatabase === '' && dbOptions.length > 0 && <option value="">Select database…</option>}
+          {dbOptions.length === 0 && <option value="">{t('shell.noDatabase')}</option>}
+          {activeDatabase === '' && dbOptions.length > 0 && <option value="">{t('shell.selectDatabase')}</option>}
           {dbOptions.map((name) => (
             <option key={name} value={name}>
               {name}
@@ -63,21 +65,21 @@ export function ShellWorkspace(): JSX.Element {
           ))}
         </select>
         <span className="spacer" />
-        <Button disabled={busy} onClick={() => setShowSave(true)} data-tip="Save current query">
-          Save
+        <Button disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
+          {t('shell.saveBtn')}
         </Button>
-        <Button disabled={busy} onClick={() => void runExplain()} data-tip="Run explain('executionStats')">
-          Explain
+        <Button disabled={busy} onClick={() => void runExplain()} data-tip={t('shell.explainTip')}>
+          {t('shell.explainBtn')}
         </Button>
         {running ? (
           // Swap Run → Stop while a query is in flight, so a runaway
           // find/aggregate can be cancelled server-side (driver AbortSignal).
-          <Button variant="danger" onClick={() => void stopShell()} data-tip="停止执行">
-            ■ 停止
+          <Button variant="danger" onClick={() => void stopShell()} data-tip={t('shell.stopTip')}>
+            {t('shell.stopBtn')}
           </Button>
         ) : (
           <Button variant="primary" disabled={busy} onClick={() => void runShell()}>
-            ▶ Run
+            {t('shell.runBtn')}
           </Button>
         )}
       </div>
@@ -107,7 +109,7 @@ export function ShellWorkspace(): JSX.Element {
         // Keep the result panel usable (≥~180px); mirrors the CSS calc cap.
         getMax={() => Math.max(80, window.innerHeight - 300)}
         onCommit={(px) => void updateSettings({ editorHeight: px })}
-        ariaLabel="Resize editor"
+        ariaLabel={t('shell.resizeEditor')}
       />
 
       <ResultPanel />
@@ -122,6 +124,7 @@ export function ShellWorkspace(): JSX.Element {
  * running dot while it executes, a close ✕, and a trailing "+" to open a tab.
  */
 function TabBar(): JSX.Element {
+  const { t } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
@@ -162,7 +165,7 @@ function TabBar(): JSX.Element {
             <span className="qtab-label">{tabLabel(tab, i)}</span>
             <button
               className="qtab-close"
-              aria-label="关闭标签页"
+              aria-label={t('shell.closeTab')}
               onClick={(e) => {
                 e.stopPropagation()
                 closeTab(tab.id)
@@ -173,7 +176,7 @@ function TabBar(): JSX.Element {
           </div>
         ))}
       </div>
-      <button className="qtab-new" data-tip="新建查询标签页 (⌘T)" aria-label="新建查询标签页" onClick={() => newTab()}>
+      <button className="qtab-new" data-tip={t('shell.newTabTip')} aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
         <Plus size={14} />
       </button>
     </div>

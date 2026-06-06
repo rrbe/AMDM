@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ModalProps {
   title: string
@@ -10,6 +11,7 @@ interface ModalProps {
 
 /** Minimal accessible modal: backdrop click + Escape close. */
 export function Modal({ title, onClose, children, footer, small }: ModalProps): JSX.Element {
+  const { t } = useTranslation()
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -28,7 +30,7 @@ export function Modal({ title, onClose, children, footer, small }: ModalProps): 
       >
         <div className="modal-header">
           <span>{title}</span>
-          <button className="ghost" onClick={onClose} aria-label="Close">
+          <button className="ghost" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>

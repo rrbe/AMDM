@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
@@ -17,6 +18,7 @@ import {
   toTsv
 } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 
@@ -51,6 +53,7 @@ const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 
 export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
+  const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
   // Document open in the full-document modal editor (null = none).
@@ -168,7 +171,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       setEditing(null)
       setEditError(null)
     } else {
-      setEditError(res.error ?? '保存失败')
+      setEditError(res.error ?? t('table.saveFailed'))
     }
   }
 
@@ -185,9 +188,9 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     const items = tableMenuItems(rows, row, col, docs)
     const doc = docs[row]
     if (docCtx && docHasId(doc)) {
-      items.push({ label: '编辑文档…', onClick: () => setEditIndex(row) })
+      items.push({ label: t('table.editDoc'), onClick: () => setEditIndex(row) })
       items.push({
-        label: '删除文档',
+        label: t('table.deleteDoc'),
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, doc._id)
       })
@@ -196,7 +199,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   }
 
   if (docs.length === 0) {
-    return <div className="center-msg muted">No documents.</div>
+    return <div className="center-msg muted">{t('table.noDocuments')}</div>
   }
 
   const totalWidth = INDEX_COL_WIDTH + columns.reduce((sum, c) => sum + widthOf(c), 0)
@@ -248,7 +251,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                 style={{ width: INDEX_COL_WIDTH }}
                 onClick={(e) => clickHandle(vi.index, e)}
                 onContextMenu={(e) => openMenu(e, vi.index, null)}
-                data-tip="点击选中整行（Shift / ⌘ 多选）"
+                data-tip={t('table.selectRowTip')}
               >
                 {vi.index + 1}
               </div>
@@ -304,16 +307,16 @@ function tableMenuItems(
   const items: ContextMenuItem[] = []
   if (col) {
     const { present, value } = cellValue(docs[row], col)
-    items.push({ label: '复制单元格', onClick: () => void copyText(present ? plainScalarText(value) : '') })
+    items.push({ label: i18n.t('table.copyCell'), onClick: () => void copyText(present ? plainScalarText(value) : '') })
   }
   const single = docs[row]
   const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
   const many = rows.length > 1
-  items.push({ label: many ? `复制 ${rows.length} 行 (Pure JSON)` : '复制行 (Pure JSON)', onClick: () => void copyText(many ? toPlainJson(sel) : toPlainJson(single)) })
-  items.push({ label: '复制行 (MongoShell JS)', onClick: () => void copyText(many ? toShellText(sel) : toShellText(single)) })
-  items.push({ label: '复制行 (Extended JSON)', onClick: () => void copyText(many ? toStrictEjson(sel) : toStrictEjson(single)) })
-  items.push({ label: '复制为 CSV', onClick: () => void copyText(toCsv(sel)) })
-  items.push({ label: '复制为 TSV', onClick: () => void copyText(toTsv(sel)) })
+  items.push({ label: i18n.t('table.copyRowsPureJson', { count: rows.length }), onClick: () => void copyText(many ? toPlainJson(sel) : toPlainJson(single)) })
+  items.push({ label: i18n.t('table.copyRowMongoShell'), onClick: () => void copyText(many ? toShellText(sel) : toShellText(single)) })
+  items.push({ label: i18n.t('table.copyRowExtendedJson'), onClick: () => void copyText(many ? toStrictEjson(sel) : toStrictEjson(single)) })
+  items.push({ label: i18n.t('table.copyCsv'), onClick: () => void copyText(toCsv(sel)) })
+  items.push({ label: i18n.t('table.copyTsv'), onClick: () => void copyText(toTsv(sel)) })
   return items
 }
 

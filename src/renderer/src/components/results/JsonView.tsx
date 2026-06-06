@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { useTranslation } from 'react-i18next'
+import i18n from '@renderer/i18n'
 import { indentFor, toJsonLines, type JsonLine } from '@renderer/lib/format'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import { copyText, toPlainJson, toShellText, toStrictEjson } from '@renderer/lib/resultCopy'
@@ -32,6 +34,7 @@ interface JsonViewProps {
 const LINE_HEIGHT = 19
 
 export function JsonView({ docs }: JsonViewProps): JSX.Element {
+  const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
@@ -71,16 +74,16 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
     const sel = window.getSelection()
     const selText = sel && !sel.isCollapsed ? sel.toString() : ''
     const items: ContextMenuItem[] = [
-      { label: '复制全部 (Pure JSON)', onClick: () => void copyText(toPlainJson(docs)) },
-      { label: '复制全部 (MongoShell JS)', onClick: () => void copyText(toShellText(docs)) },
-      { label: '复制全部 (Extended JSON)', onClick: () => void copyText(toStrictEjson(docs)) }
+      { label: i18n.t('result.copy.pureJson'), onClick: () => void copyText(toPlainJson(docs)) },
+      { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(docs)) },
+      { label: i18n.t('result.copy.extendedJson'), onClick: () => void copyText(toStrictEjson(docs)) }
     ]
-    if (selText) items.unshift({ label: '复制选区', onClick: () => void copyText(selText) })
+    if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
   if (lines.length === 0) {
-    return <div className="center-msg muted">No output.</div>
+    return <div className="center-msg muted">{t('json.noOutput')}</div>
   }
 
   return (

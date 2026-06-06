@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
 import { acceptCompletion, autocompletion } from '@codemirror/autocomplete'
 import { EditorView, keymap } from '@codemirror/view'
@@ -81,6 +82,7 @@ export function ShellEditor({
   running,
   busy
 }: ShellEditorProps): JSX.Element {
+  const { t } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).
   // 'system' must be resolved to the live OS appearance — otherwise "follow
@@ -184,7 +186,7 @@ export function ShellEditor({
         setMenu({ x: e.clientX, y: e.clientY })
       }}
     >
-      <Suspense fallback={<div className="editor-loading">Loading editor…</div>}>
+      <Suspense fallback={<div className="editor-loading">{t('shell.loadingEditor')}</div>}>
         <CodeMirror
           value={value}
           height="100%"
@@ -257,38 +259,38 @@ export function ShellEditor({
     const { busy: isBusy, running: isRunning } = handlers.current
     const hasSel = viewRef.current ? !viewRef.current.state.selection.main.empty : false
     return [
-      { label: '运行脚本', shortcut: '⌘↵', disabled: isBusy, onClick: () => runIfReady() },
+      { label: t('shell.menu.runScript'), shortcut: '⌘↵', disabled: isBusy, onClick: () => runIfReady() },
       {
-        label: hasSel ? '运行选中' : '运行当前语句',
+        label: hasSel ? t('shell.menu.runSelected') : t('shell.menu.runStatement'),
         shortcut: 'F6',
         disabled: isBusy,
         onClick: () => runStatementIfReady()
       },
-      { label: 'Explain', shortcut: '⌘E', disabled: isBusy, onClick: () => explainIfReady() },
+      { label: t('shell.menu.explain'), shortcut: '⌘E', disabled: isBusy, onClick: () => explainIfReady() },
       // Enabled only mid-run; cancels the in-flight find/aggregate server-side.
-      { label: '停止执行', disabled: !isRunning, onClick: () => handlers.current.onStop() },
+      { label: t('shell.menu.stop'), disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',
-      { label: '格式化代码', shortcut: '⌥⇧F', onClick: () => formatNow() },
-      { label: '切换注释', shortcut: '⌘/', onClick: () => withView((v) => toggleComment(v)) },
+      { label: t('shell.menu.format'), shortcut: '⌥⇧F', onClick: () => formatNow() },
+      { label: t('shell.menu.toggleComment'), shortcut: '⌘/', onClick: () => withView((v) => toggleComment(v)) },
       'separator',
       // Editor preferences (persisted): the `：值` labels show current state,
       // since the menu closes on click (no live checkmark column).
-      { label: `自动换行：${wordWrap ? '开' : '关'}`, onClick: () => toggleWordWrap() },
-      { label: `Tab 宽度：${tabSize}`, onClick: () => cycleTabSize() },
-      { label: '增大字号', shortcut: '⌘+', onClick: () => bumpFont(1) },
-      { label: '减小字号', shortcut: '⌘−', onClick: () => bumpFont(-1) },
+      { label: t('shell.menu.wordWrap', { state: wordWrap ? t('shell.on') : t('shell.off') }), onClick: () => toggleWordWrap() },
+      { label: t('shell.menu.tabSize', { size: tabSize }), onClick: () => cycleTabSize() },
+      { label: t('shell.menu.increaseFontSize'), shortcut: '⌘+', onClick: () => bumpFont(1) },
+      { label: t('shell.menu.decreaseFontSize'), shortcut: '⌘−', onClick: () => bumpFont(-1) },
       'separator',
-      { label: '查找 / 替换', shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
+      { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       'separator',
-      { label: '另存为…', shortcut: '⌘S', disabled: isBusy, onClick: () => saveIfReady() },
+      { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isBusy, onClick: () => saveIfReady() },
       'separator',
-      { label: '撤销', shortcut: '⌘Z', onClick: () => withView((v) => undo(v)) },
-      { label: '重做', shortcut: '⇧⌘Z', onClick: () => withView((v) => redo(v)) },
+      { label: t('shell.menu.undo'), shortcut: '⌘Z', onClick: () => withView((v) => undo(v)) },
+      { label: t('shell.menu.redo'), shortcut: '⇧⌘Z', onClick: () => withView((v) => redo(v)) },
       'separator',
-      { label: '剪切', shortcut: '⌘X', onClick: () => withView(() => document.execCommand('cut')) },
-      { label: '复制', shortcut: '⌘C', onClick: () => withView(() => document.execCommand('copy')) },
-      { label: '粘贴', shortcut: '⌘V', onClick: () => withView(() => document.execCommand('paste')) },
-      { label: '全选', shortcut: '⌘A', onClick: () => withView((v) => selectAll(v)) }
+      { label: t('shell.menu.cut'), shortcut: '⌘X', onClick: () => withView(() => document.execCommand('cut')) },
+      { label: t('shell.menu.copy'), shortcut: '⌘C', onClick: () => withView(() => document.execCommand('copy')) },
+      { label: t('shell.menu.paste'), shortcut: '⌘V', onClick: () => withView(() => document.execCommand('paste')) },
+      { label: t('shell.menu.selectAll'), shortcut: '⌘A', onClick: () => withView((v) => selectAll(v)) }
     ]
   }
 }
