@@ -1,4 +1,4 @@
-# Mongo Shell GUI — 规格书 (SPEC)
+# AMDM — 规格书 (SPEC)
 
 一个精简、性能优先的 MongoDB 桌面 GUI,作为 NoSQLBooster 的个人替代品:保留它最好的 UX(三种结果视图),砍掉让它卡顿的臃肿。**性能是第一优先级。** 所有代码由 AI agent 编写,用户不审阅代码,因此技术选型偏向"agent 最不容易写错、生态最成熟"的方案。
 

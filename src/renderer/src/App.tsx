@@ -68,7 +68,7 @@ function WorkspaceEmptyState(): JSX.Element {
     <div className="work">
       <div className="work-titlebar app-drag" />
       <div className="empty-state">
-        <h2>Mongo Shell GUI</h2>
+        <h2>AMDM</h2>
         {connections.length === 0 ? (
           <p>
             No connections yet. Use the <strong>+</strong> in the sidebar to create your first

@@ -219,7 +219,7 @@ export function Explorer(): JSX.Element {
   return (
     <div className="explorer">
       <div className="explorer-header app-drag">
-        <span className="explorer-title">Mongo Shell GUI</span>
+        <span className="explorer-title">AMDM</span>
       </div>
 
       {/* Connections fills the remaining height; its header carries the

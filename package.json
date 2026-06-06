@@ -1,9 +1,9 @@
 {
-  "name": "mongo-shell-gui",
+  "name": "amdm",
   "version": "0.1.0",
-  "description": "A lean, performance-first MongoDB shell GUI (NoSQLBooster alternative)",
+  "description": "AMDM (Another Mongo Desktop Manager) — a lean, performance-first desktop GUI for MongoDB (NoSQLBooster alternative)",
   "main": "./out/main/index.js",
-  "author": "",
+  "author": "shawn",
   "license": "MIT",
   "type": "commonjs",
   "packageManager": "pnpm@10.33.2",

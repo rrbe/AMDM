@@ -1,4 +1,4 @@
-# Mongo Shell GUI — Design System
+# AMDM — Design System
 
 **Codename: Compass.** Modeled directly on MongoDB Compass and its LeafyGreen design language. Light-first — pure white content on light LeafyGreen-gray chrome, dark-navy ink text, MongoDB-green primary — with a navy dark counterpart. The goal is crisp readability for data work: strong plane separation, calm chrome, and color reserved for the things that carry meaning (the green primary action, and the document syntax palette).
 

@@ -1,4 +1,4 @@
-# Mongo Shell GUI
+# AMDM (Another Mongo Desktop Manager)
 
 A lean, performance-first MongoDB desktop GUI — a personal alternative to NoSQLBooster.
 See [SPEC.md](./SPEC.md) for the full plan and [docs/adr/](./docs/adr/) for the key decisions.

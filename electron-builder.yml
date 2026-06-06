@@ -1,5 +1,5 @@
-appId: live.ezze.mongo-shell-gui
-productName: Mongo Shell GUI
+appId: com.shawn.amdm
+productName: AMDM
 copyright: Copyright © 2026 shawn
 
 directories:
@@ -52,6 +52,6 @@ nsis:
 linux:
   icon: build/icon.png
   category: Development
-  maintainer: shawn <shawn@ezze.live>
+  maintainer: shawn
   target:
     - AppImage
