@@ -452,8 +452,7 @@ label {
   flex: 1;
   font-size: var(--fs-sm);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   color: var(--fg-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -630,8 +629,7 @@ label {
   cursor: pointer;
   color: var(--fg-1);
   font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
 }
 .group-header:hover {
   background: var(--bg-2);
@@ -1833,8 +1831,7 @@ label {
 .explain-stat-label {
   color: var(--fg-2);
   font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
 }
 .explain-stat-value {
   color: var(--fg-0);
@@ -2287,13 +2284,8 @@ button:focus-visible {
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--fg-2);
-}
-.tbl-th.idx {
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 /* ---- Empty state: soft accent halo + editorial heading ---- */
