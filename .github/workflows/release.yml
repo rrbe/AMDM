@@ -1,0 +1,106 @@
+name: Release
+
+# 打 tag 触发：给某个 commit 打上 vX.Y.Z 形式的 tag 并 push 到远端后，
+# 在 macOS / Windows / Linux 三个 runner 上分别打包，再汇总创建一个
+# GitHub Release，把安装包作为附件挂上去。
+#
+# 平台产物由 electron-builder.yml 决定:
+#   macOS   -> .dmg + .zip (arm64)
+#   Windows -> .exe (NSIS, x64)
+#   Linux   -> .AppImage
+#
+# 质量闸门(typecheck + 单测)由 ci.yml 在同一次 push 上单独跑，这里只负责打包发布。
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 同一个 tag 不重复并发跑;但不取消已在跑的(打包很贵,跑完更划算)。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+            name: macos
+          - os: windows-latest
+            script: dist:win
+            name: windows
+          - os: ubuntu-latest
+            script: dist:linux
+            name: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 不写 version——pnpm/action-setup 从 package.json 的 packageManager 字段读取
+      # (单一真相源)。两处都写会报错。与 ci.yml 保持一致。
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # onlyBuiltDependencies 放行了 electron + esbuild,这里需要它们的二进制来打包。
+      # mongodb-memory-server 的 postinstall 仍被拦截(不会联网下载 mongod)。
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # 让产物版本号对齐 tag(去掉前导 v),于是安装包命名形如 AMDM-0.2.0-arm64.dmg。
+      - name: Derive version from tag
+        id: ver
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # 通过 electron-builder 的 -c.extraMetadata.version 覆盖版本(不改磁盘上的
+      # package.json)。--publish never:这里只产包,统一在 release job 里发布。
+      - name: Build & package
+        shell: bash
+        env:
+          # CI 上没有 Apple 签名证书——跳过签名而不是报错失败。
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: pnpm run ${{ matrix.script }} -- -c.extraMetadata.version=${{ steps.ver.outputs.version }} --publish never
+
+      # 只上传面向用户的安装包,不传体积巨大的 unpacked 目录。
+      # 每个平台只命中自己那几个 glob,未命中的 glob 自动忽略。
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 创建 Release / 上传附件需要写权限
+    steps:
+      - name: Download all installers
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true   # 三个 job 的产物拍平到 artifacts/ 下
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          # tag 里带 "-"(如 v0.2.0-beta.1)视为预发布。
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true   # 按提交自动生成 changelog
+          fail_on_unmatched_files: true
+          files: artifacts/**/*
