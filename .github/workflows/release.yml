@@ -9,7 +9,8 @@ name: Release
 #   Windows -> .exe (NSIS, x64)
 #   Linux   -> .AppImage
 #
-# 质量闸门(typecheck + 单测)由 ci.yml 在同一次 push 上单独跑，这里只负责打包发布。
+# 版本号以 package.json 为真相源(发版前用 `pnpm version` bump 并打 tag),
+# 这里只校验 tag 与之一致。质量闸门(typecheck + 单测)由 ci.yml 单独跑。
 on:
   push:
     tags:
@@ -27,13 +28,13 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            script: dist:mac
+            platform: mac
             name: macos
           - os: windows-latest
-            script: dist:win
+            platform: win
             name: windows
           - os: ubuntu-latest
-            script: dist:linux
+            platform: linux
             name: linux
     runs-on: ${{ matrix.os }}
     steps:
@@ -55,20 +56,31 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # 让产物版本号对齐 tag(去掉前导 v),于是安装包命名形如 AMDM-0.2.0-arm64.dmg。
-      - name: Derive version from tag
-        id: ver
+      # 强约束:tag(去掉前导 v)必须等于 package.json 的 version,否则产物版本会与
+      # Release tag 漂移。漂移时直接快速失败,提示用 `pnpm version` 先 bump。
+      - name: Verify tag matches package.json version
         shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package.json=$PKG  tag=$TAG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::Git tag v$TAG 与 package.json 版本 $PKG 不一致;请先 \`pnpm version\` 再打 tag。"
+            exit 1
+          fi
 
-      # 通过 electron-builder 的 -c.extraMetadata.version 覆盖版本(不改磁盘上的
-      # package.json)。--publish never:这里只产包,统一在 release job 里发布。
+      # 直接调用,不经 `pnpm run dist:* -- ...`——后者会把字面 `--` 透传给
+      # electron-builder,导致其后的 --publish never 被当成位置参数而失效。
+      # --publish never:这里只产包,统一在 release job 里发布(否则 electron-builder
+      # 在 CI+tag 环境下会默认尝试自动发布,进而索要 GH_TOKEN 而失败)。
       - name: Build & package
         shell: bash
         env:
           # CI 上没有 Apple 签名证书——跳过签名而不是报错失败。
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: pnpm run ${{ matrix.script }} -- -c.extraMetadata.version=${{ steps.ver.outputs.version }} --publish never
+        run: |
+          pnpm run build
+          pnpm exec electron-builder --${{ matrix.platform }} --publish never
 
       # 只上传面向用户的安装包,不传体积巨大的 unpacked 目录。
       # 每个平台只命中自己那几个 glob,未命中的 glob 自动忽略。
