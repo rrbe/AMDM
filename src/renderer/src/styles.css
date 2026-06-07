@@ -5,13 +5,16 @@
    ========================================================================= */
 
 /* ---------------------------------------------------------------------------
-   Design tokens — the "Compass" system, modeled on MongoDB Compass and its
-   LeafyGreen design language. Light-first (default in :root): pure white
-   content on light LeafyGreen-gray chrome, dark-navy ink text, and a
-   MongoDB-green accent; plus a navy dark mode under [data-theme='dark'].
+   Design tokens — the "Slate" system: a calm, neutral, professional
+   database-tool look (TablePlus / Navicat / TinyRDM lineage). Light-first
+   (default in :root): pure white content on tint-free neutral-gray chrome,
+   near-black neutral ink, and a restrained graphite accent (selection /
+   primary button / focus ring); plus a neutral dark mode under
+   [data-theme='dark']. Deliberately drops the old green-tinted "cement" grays.
    Semantic token names are preserved so every component rule inherits the
    palette unchanged; the dark block only re-points the palette, so toggling
-   back to light falls through to :root.
+   back to light falls through to :root. The CodeMirror editor carries its own
+   resolved palette in lib/pineEditorTheme.ts — keep the two in sync.
    --------------------------------------------------------------------------- */
 :root {
   /* Shape + type (theme-independent) */
@@ -28,113 +31,113 @@
   --fs-sm: 11px;
   --accent-fg: #ffffff;
 
-  /* ---- LIGHT · Compass (default) ---- */
-  /* Surfaces — pure white content on LeafyGreen gray chrome */
-  --bg-app: #f2f4f5; /* window chrome behind panels */
+  /* ---- LIGHT · Slate (default) ---- */
+  /* Surfaces — pure white content on tint-free neutral gray chrome */
+  --bg-app: #ececee; /* window chrome behind panels */
   --bg-0: #ffffff; /* primary content surface (work area, lists, results) */
-  --bg-1: #f9fbfa; /* sidebar / header chrome — gray.light3 */
-  --bg-2: #e8edeb; /* raised / inset — gray.light2 (inputs, table head, segmented) */
-  --bg-3: #e1e7e5; /* hover */
+  --bg-1: #f6f6f8; /* sidebar / header chrome */
+  --bg-2: #eeeef1; /* raised / inset (inputs, table head, segmented) */
+  --bg-3: #e6e6ea; /* hover */
   --bg-elevated: #ffffff; /* menus, modal, active segment */
-  --bg-sel: rgba(0, 104, 74, 0.08); /* selected row tint (green) */
+  --bg-sel: rgba(63, 71, 84, 0.1); /* selected row tint (graphite) */
   --bg-editor: #ffffff;
 
   /* Borders + the hairline rule */
-  --border: #e8edeb; /* gray.light2 */
-  --border-strong: #c1c7c6; /* gray.light1 */
-  --rule: #c1c7c6; /* light hairline under title bars / column heads */
+  --border: #e6e6ea;
+  --border-strong: #cfcfd6;
+  --rule: #d6d6dc; /* light hairline under title bars / column heads */
 
-  /* Text — LeafyGreen ink (dark navy, not black) */
-  --fg-0: #001e2b;
-  --fg-1: #3d4f58; /* gray.dark2 */
-  --fg-2: #5c6c75; /* gray.dark1 — muted */
-  --fg-3: #889397; /* gray.base — very muted */
+  /* Text — neutral ink (near-black, no hue) */
+  --fg-0: #1d1d20;
+  --fg-1: #3a3a40;
+  --fg-2: #6a6a73; /* muted */
+  --fg-3: #9a9aa3; /* very muted */
 
-  /* Accent — MongoDB green */
-  --accent: #00684a; /* green.dark2 — the Find button */
-  --accent-hover: #004d37;
-  --accent-soft: rgba(0, 104, 74, 0.08);
-  --accent-soft-strong: rgba(0, 104, 74, 0.16);
+  /* Accent — graphite (restrained, near-monochrome) */
+  --accent: #3f4754;
+  --accent-hover: #2c333d;
+  --accent-soft: rgba(63, 71, 84, 0.1);
+  --accent-soft-strong: rgba(63, 71, 84, 0.16);
 
   /* Status */
-  --ok: #00854a;
-  --warn: #b8651a;
-  --err: #db3030;
-  --err-bg: rgba(219, 48, 48, 0.08);
+  --ok: #1a8f4c;
+  --warn: #b5701a;
+  --err: #d23b3b;
+  --err-bg: rgba(210, 59, 59, 0.08);
 
-  /* Value type colors (Tree/Table/JSON) — Compass document palette */
-  --t-string: #12824d;
-  --t-number: #1254b7;
-  --t-boolean: #883ea8;
-  --t-null: #889397;
-  --t-objectId: #c2371a;
-  --t-date: #1254b7;
-  --t-key: #001e2b;
-  --t-binary: #c2371a;
-  --t-regex: #883ea8;
-  --t-special: #c2371a;
+  /* Value type colors (Tree/Table/JSON) — clean syntax palette */
+  --t-string: #1a8f4c;
+  --t-number: #2563eb;
+  --t-boolean: #8a3fd0;
+  --t-null: #9a9aa3;
+  --t-objectId: #c0481f;
+  --t-date: #2563eb;
+  --t-key: #1d1d20;
+  --t-binary: #c0481f;
+  --t-regex: #8a3fd0;
+  --t-special: #c0481f;
 
-  /* Shadows — navy-tinted, soft */
-  --shadow-sm: 0 1px 2px rgba(0, 30, 43, 0.08), 0 1px 1px rgba(0, 30, 43, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 30, 43, 0.1), 0 1px 3px rgba(0, 30, 43, 0.07);
-  --shadow-lg: 0 18px 48px rgba(0, 30, 43, 0.2), 0 4px 12px rgba(0, 30, 43, 0.12);
+  /* Shadows — neutral, soft */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.09), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
 
   /* Dot halos (status glow) */
-  --halo-ok: rgba(0, 237, 100, 0.2);
-  --halo-warn: rgba(245, 158, 11, 0.18);
-  --halo-err: rgba(219, 48, 48, 0.16);
+  --halo-ok: rgba(26, 143, 76, 0.18);
+  --halo-warn: rgba(181, 112, 26, 0.18);
+  --halo-err: rgba(210, 59, 59, 0.16);
 }
 
-/* ---- DARK · Compass Night ---- */
+/* ---- DARK · Slate Night ---- */
 [data-theme='dark'] {
-  --bg-app: #00141d;
-  --bg-0: #001e2b; /* LeafyGreen black */
-  --bg-1: #0c2330;
-  --bg-2: #112733; /* gray.dark4 */
-  --bg-3: #1c2d38; /* gray.dark3 */
-  --bg-elevated: #112733;
-  --bg-sel: rgba(0, 237, 100, 0.16);
-  --bg-editor: #001a26;
+  --bg-app: #161618;
+  --bg-0: #1c1c1f; /* neutral content surface */
+  --bg-1: #232327;
+  --bg-2: #2a2a2f;
+  --bg-3: #34343b;
+  --bg-elevated: #2a2a2f;
+  --bg-sel: rgba(174, 183, 198, 0.16);
+  --bg-editor: #19191c;
 
-  --border: #1c2d38; /* gray.dark3 */
-  --border-strong: #3d4f58; /* gray.dark2 */
-  --rule: #3d4f58;
+  --border: #303036;
+  --border-strong: #45454d;
+  --rule: #3a3a42;
 
-  --fg-0: #e8edeb; /* gray.light2 */
-  --fg-1: #c1c7c6; /* gray.light1 */
-  --fg-2: #889397; /* gray.base */
-  --fg-3: #5c6c75; /* gray.dark1 */
+  --fg-0: #ececee;
+  --fg-1: #c4c4cb;
+  --fg-2: #9a9aa3;
+  --fg-3: #6c6c75;
 
-  /* Bright MongoDB green on dark, with dark ink text */
-  --accent: #00ed64; /* green.base */
-  --accent-hover: #00c257;
-  --accent-soft: rgba(0, 237, 100, 0.15);
-  --accent-soft-strong: rgba(0, 237, 100, 0.26);
-  --accent-fg: #001e2b;
+  /* Light-slate graphite on dark, with dark ink text */
+  --accent: #aeb7c6;
+  --accent-hover: #9aa4b6;
+  --accent-soft: rgba(174, 183, 198, 0.14);
+  --accent-soft-strong: rgba(174, 183, 198, 0.24);
+  --accent-fg: #1b1d22;
 
-  --ok: #00d364;
-  --warn: #f0b429;
-  --err: #ff6960;
-  --err-bg: rgba(255, 105, 96, 0.13);
+  --ok: #3ec98a;
+  --warn: #e0a23a;
+  --err: #ff6f5c;
+  --err-bg: rgba(255, 111, 92, 0.13);
 
-  --t-string: #35de7e;
-  --t-number: #6ca8ff;
-  --t-boolean: #c39bf3;
-  --t-null: #889397;
-  --t-objectId: #ff6f4d;
-  --t-date: #6ca8ff;
-  --t-key: #e8edeb;
-  --t-binary: #ff6f4d;
-  --t-regex: #c39bf3;
-  --t-special: #ff6f4d;
+  --t-string: #5fd39a;
+  --t-number: #74a8ff;
+  --t-boolean: #c79bff;
+  --t-null: #6c6c75;
+  --t-objectId: #ff8a5c;
+  --t-date: #74a8ff;
+  --t-key: #ececee;
+  --t-binary: #ff8a5c;
+  --t-regex: #c79bff;
+  --t-special: #ff8a5c;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.66), 0 6px 16px rgba(0, 0, 0, 0.55);
 
-  --halo-ok: rgba(0, 237, 100, 0.24);
-  --halo-warn: rgba(240, 180, 41, 0.22);
-  --halo-err: rgba(255, 105, 96, 0.22);
+  --halo-ok: rgba(62, 201, 138, 0.22);
+  --halo-warn: rgba(224, 162, 58, 0.22);
+  --halo-err: rgba(255, 111, 92, 0.22);
 }
 
 * {
@@ -2286,7 +2289,7 @@ label {
 }
 
 /* ============================================================================
-   Pine theme — structural touches & component polish
+   Slate theme — structural touches & component polish
    Appended last so these win at equal specificity over the base rules above.
    ============================================================================ */
 
@@ -2325,7 +2328,7 @@ button {
 }
 button.primary {
   color: var(--accent-fg);
-  box-shadow: 0 1px 2px rgba(0, 80, 55, 0.22);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 button.ghost {
   background: transparent;
@@ -2440,7 +2443,7 @@ button:focus-visible {
 
 /* ---- Modal: light paper, soft border, large radius + shadow ---- */
 .modal-backdrop {
-  background: rgba(0, 30, 43, 0.45);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(3px);
 }
 [data-theme='dark'] .modal-backdrop {

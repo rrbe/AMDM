@@ -1,14 +1,15 @@
 /**
- * Compass CodeMirror themes — light + dark variants that match the app's
- * "Compass" design system (see styles.css), modeled on MongoDB Compass /
- * LeafyGreen. We build them with @uiw/codemirror-themes' `createTheme` so the
- * editor reads as part of the same surface rather than CodeMirror's generic
- * light/dark defaults.
+ * Slate CodeMirror themes — light + dark variants that match the app's
+ * "Slate" design system (see styles.css): a calm, neutral, professional
+ * database-tool look. We build them with @uiw/codemirror-themes' `createTheme`
+ * so the editor reads as part of the same surface rather than CodeMirror's
+ * generic light/dark defaults.
  *
  * Two explicit themes (resolved hex, not CSS vars) keep rendering predictable:
  * ShellEditor swaps between them on the persisted `theme` preference. Colors
- * mirror the Compass document palette — green method calls, green strings,
- * blue numbers, purple booleans/keywords, coral ObjectId/types.
+ * mirror the styles.css value-type palette — green strings, blue numbers,
+ * purple booleans/keywords, orange ObjectId/types, near-neutral method calls,
+ * and a graphite caret. Keep these in sync with the --t-* tokens.
  */
 import { createTheme } from '@uiw/codemirror-themes'
 import { tags as t } from '@lezer/highlight'
@@ -36,39 +37,39 @@ interface PinePalette {
 const LIGHT: PinePalette = {
   base: 'light',
   bg: '#ffffff',
-  text: '#001e2b',
-  caret: '#00684a',
-  selection: 'rgba(0, 104, 74, 0.16)',
-  lineHighlight: 'rgba(0, 30, 43, 0.04)',
-  gutterFg: '#889397',
-  keyword: '#883ea8',
-  string: '#12824d',
-  number: '#1254b7',
-  bool: '#883ea8',
-  property: '#00684a',
-  punct: '#5c6c75',
-  comment: '#889397',
-  type: '#c2371a',
-  regexp: '#883ea8'
+  text: '#1d1d20',
+  caret: '#3f4754',
+  selection: 'rgba(63, 71, 84, 0.16)',
+  lineHighlight: 'rgba(0, 0, 0, 0.035)',
+  gutterFg: '#9a9aa3',
+  keyword: '#8a3fd0',
+  string: '#1a8f4c',
+  number: '#2563eb',
+  bool: '#8a3fd0',
+  property: '#1d1d20',
+  punct: '#6a6a73',
+  comment: '#9a9aa3',
+  type: '#c0481f',
+  regexp: '#8a3fd0'
 }
 
 const DARK: PinePalette = {
   base: 'dark',
-  bg: '#001a26',
-  text: '#e8edeb',
-  caret: '#00ed64',
-  selection: 'rgba(0, 237, 100, 0.22)',
-  lineHighlight: 'rgba(255, 255, 255, 0.04)',
-  gutterFg: '#5c6c75',
-  keyword: '#c39bf3',
-  string: '#35de7e',
-  number: '#6ca8ff',
-  bool: '#c39bf3',
-  property: '#00ed64',
-  punct: '#889397',
-  comment: '#5c6c75',
-  type: '#ff6f4d',
-  regexp: '#c39bf3'
+  bg: '#19191c',
+  text: '#ececee',
+  caret: '#aeb7c6',
+  selection: 'rgba(174, 183, 198, 0.2)',
+  lineHighlight: 'rgba(255, 255, 255, 0.045)',
+  gutterFg: '#6c6c75',
+  keyword: '#c79bff',
+  string: '#5fd39a',
+  number: '#74a8ff',
+  bool: '#c79bff',
+  property: '#ececee',
+  punct: '#9a9aa3',
+  comment: '#6c6c75',
+  type: '#ff8a5c',
+  regexp: '#c79bff'
 }
 
 function build(p: PinePalette): ReturnType<typeof createTheme> {
