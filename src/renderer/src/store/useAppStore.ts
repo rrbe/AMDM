@@ -127,6 +127,8 @@ interface AppState {
   saveConnection(input: ConnectionInput): Promise<ConnectionConfig | null>
   deleteConnection(id: string): Promise<void>
   testConnection(input: ConnectionInput): Promise<TestResult>
+  /** Build a connection string from the current form fields ("To URL"). */
+  buildConnectionUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string | null>
   /** Back up all connections to a JSON file (secrets excluded). */
   exportConnections(): Promise<void>
   /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
@@ -326,6 +328,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       return await window.api.connections.test(input)
     } catch (e) {
       return { ok: false, error: errMessage(e) }
+    }
+  },
+
+  async buildConnectionUri(input, opts) {
+    try {
+      return await window.api.connections.buildUri(input, opts)
+    } catch (e) {
+      set({ lastError: tr('notify.buildUriFailed', { error: errMessage(e) }) })
+      return null
     }
   },
 

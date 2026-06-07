@@ -60,21 +60,27 @@
     "exportFailed": "导出失败：{{error}}",
     "importFailed": "导入失败：{{error}}",
     "unknown": "未知",
-    "clipboardUnavailable": "复制失败：剪贴板不可用"
+    "clipboardUnavailable": "复制失败：剪贴板不可用",
+    "buildUriFailed": "生成连接串失败：{{error}}"
   },
   "connection": {
     "title": { "edit": "编辑连接", "new": "新建连接" },
     "action": { "test": "测试连接", "cancel": "取消", "save": "保存" },
     "testResult": { "okPrefix": "连接成功", "failed": "失败：{{error}}" },
     "uri": {
-      "placeholder": "mongodb://user:pass@host:27017/db?replicaSet=rs0 — 粘贴后点击“从 URI 导入”",
-      "fromUri": "从 URI 导入",
-      "toUri": "导出 URI",
+      "placeholder": "mongodb://user:pass@host:27017/db?replicaSet=rs0",
+      "fromUrl": "From URL",
+      "toUrl": "To URL",
+      "fromUrlTitle": "From URL · 从连接串导入",
+      "fromUrlHint": "粘贴连接串，解析后填入下方字段。",
+      "parseAction": "解析",
       "parsedNote": "已解析到下方表单。",
       "parseFailed": "解析失败",
-      "builtCopied": "已生成 URI · 已复制到剪贴板。",
-      "built": "已生成 URI。",
-      "passwordOmitted": " （密码已省略——如需包含请重新输入）"
+      "toUrlTitle": "To URL · 导出连接串",
+      "toUrlHint": "把当前字段拼成连接串。",
+      "includePassword": "包含真实密码",
+      "copyAction": "复制",
+      "copied": "已复制到剪贴板。"
     },
     "secret": { "placeholder": "•••••••• （未更改——留空则保留原密码）" },
     "optional": "（可选）",

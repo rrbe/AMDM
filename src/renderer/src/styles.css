@@ -1683,19 +1683,135 @@ label {
   color: var(--fg-2);
 }
 
-/* ---- Connection string bar (ConnectionForm) ---- */
-.uri-bar {
+/* ---- From URL / To URL helpers (ConnectionForm) ---- */
+.url-actions {
   display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
 }
-.uri-bar input {
-  flex: 1;
+.url-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  font-weight: 500;
+  color: var(--fg-1);
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.url-action-btn:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.url-action-btn svg {
+  color: var(--fg-2);
+  transition: color 0.12s ease;
+}
+.url-action-btn:hover svg {
+  color: var(--accent);
+}
+.url-actions-note {
+  font-size: var(--fs-sm);
+  color: var(--ok);
+  margin-left: 4px;
+}
+
+/* Small popup stacked over the form for a single one-way action. */
+.url-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+.url-popup {
+  background: var(--bg-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  width: 470px;
+  max-width: 92vw;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+.url-popup-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.url-popup-head > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.url-popup-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.url-popup-title {
+  font-weight: 600;
+}
+.url-popup-sub {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.url-popup-input {
+  resize: vertical;
+  box-sizing: border-box;
+}
+.url-popup-input.mono {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
+  line-height: 1.6;
+  word-break: break-all;
 }
-.uri-bar button {
-  white-space: nowrap;
+.url-popup-err {
+  font-size: var(--fs-sm);
+  color: var(--err);
+  background: var(--err-bg);
+  padding: 6px 9px;
+  border-radius: var(--radius);
+}
+/* "Include real password" — an opt-in option card (overrides base label). */
+.url-popup-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: inherit;
+  color: var(--fg-1);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.url-popup-check:hover {
+  border-color: var(--border-strong);
+}
+.url-popup-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.url-popup-foot .spacer {
+  flex: 1;
+}
+.url-popup-ok {
+  font-size: var(--fs-sm);
+  color: var(--ok);
 }
 
 /* ---- Color swatches (ConnectionForm) ---- */

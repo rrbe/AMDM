@@ -33,6 +33,7 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsBuildUri: 'connections:buildUri',
   connectionsExport: 'connections:export',
   connectionsImport: 'connections:import',
 
@@ -75,6 +76,14 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    /**
+     * Build a connection string from the CURRENT form fields ("To URL" export) —
+     * works while creating or editing. With `includePassword`, the plaintext
+     * password is inlined (from the form if just typed, else — when editing a
+     * saved connection not re-typed — decrypted from the store, which renderers
+     * never hold); otherwise a readable `<password>` placeholder is used.
+     */
+    buildUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string>
     /** Back up all connections to a JSON file (secrets excluded). */
     export(): Promise<DataOpResult>
     /** Restore connections from a JSON backup (adds; secrets must be re-entered). */

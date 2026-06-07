@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ClipboardPaste, Link } from 'lucide-react'
 import type {
   ConnectionConfig,
   ConnectionInput,
@@ -10,7 +11,7 @@ import type {
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
-import { buildMongoUri, parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
+import { parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
 
@@ -29,23 +30,37 @@ interface ConnectionFormProps {
  * `has*` booleans). We track whether the user touched each secret; if they did
  * NOT, we send `undefined` so the main process keeps the stored secret.
  *
- * The top bar supports pasting a full connection string ("From URI" parses it
- * into the fields) and exporting the current fields ("To URI").
+ * "From URL" / "To URL" are two independent one-way helpers, each in its own
+ * little popup: "From URL" parses a pasted string INTO the fields; "To URL"
+ * exports the current fields OUT as a connection string. They never share a
+ * live field, so neither drives the other.
  */
 export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.Element {
   const { t: tFn } = useTranslation()
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
+  const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
+  const updateSettings = useAppStore((s) => s.updateSettings)
+  // Remembered "To URL" password choice (persisted in settings.json).
+  const rememberedIncludePassword = useAppStore((s) => s.settings.exportIncludeRealPassword)
 
   const [tab, setTab] = useState<Tab>('general')
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [test, setTest] = useState<TestResult | null>(null)
 
-  // ---- URI bar ----
-  const [uriText, setUriText] = useState('')
-  const [uriError, setUriError] = useState<string | null>(null)
-  const [uriNote, setUriNote] = useState<string | null>(null)
+  // ---- URL popups (From URL / To URL) ----
+  const [urlPanel, setUrlPanel] = useState<'from' | 'to' | null>(null)
+  const [parseNote, setParseNote] = useState<string | null>(null)
+  // From URL: paste a connection string, parse it into the fields below.
+  const [fromText, setFromText] = useState('')
+  const [fromError, setFromError] = useState<string | null>(null)
+  // To URL: export the current fields as a connection string. The password
+  // choice starts from the remembered preference (default off).
+  const [toUriText, setToUriText] = useState('')
+  const [toIncludePassword, setToIncludePassword] = useState(rememberedIncludePassword)
+  const [toCopied, setToCopied] = useState(false)
+  const [toBuilding, setToBuilding] = useState(false)
 
   // ---- General ----
   const [name, setName] = useState(editing?.name ?? '')
@@ -87,10 +102,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [caFile, setCaFile] = useState(editing?.tls.caFile ?? '')
   const [certificateKeyFile, setCertKeyFile] = useState(editing?.tls.certificateKeyFile ?? '')
 
-  // ---- URI parse / build ----
-  const applyUri = (): void => {
+  // ---- From URL: paste → parse into the fields (one-way, then close) ----
+  const applyFromUrl = (): void => {
     try {
-      const p = parseMongoUri(uriText)
+      const p = parseMongoUri(fromText)
       setUseSrv(p.useSrv)
       setHost(p.host)
       setPort(p.port != null ? String(p.port) : '27017')
@@ -110,45 +125,55 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       setTlsEnabled(p.tlsEnabled)
       setAllowInvalid(p.tlsAllowInvalid)
       setOptions(p.extraOptions)
-      setUriError(null)
-      setUriNote(tFn('connection.uri.parsedNote'))
+      setFromError(null)
+      setFromText('')
+      setUrlPanel(null)
+      setParseNote(tFn('connection.uri.parsedNote'))
       setTab('general')
     } catch (e) {
-      setUriNote(null)
-      setUriError(e instanceof Error ? e.message : tFn('connection.uri.parseFailed'))
+      setFromError(e instanceof Error ? e.message : tFn('connection.uri.parseFailed'))
     }
   }
 
-  const toUri = async (): Promise<void> => {
-    const uri = buildMongoUri({
-      useSrv,
-      host: host.trim(),
-      port: useSrv ? null : Number(port) || 27017,
-      replicaSet: replicaSet.trim() || undefined,
-      defaultDatabase: defaultDatabase.trim() || undefined,
-      authType,
-      username: username.trim() || undefined,
-      password: passwordTouched ? password : undefined,
-      authSource: authSource.trim() || undefined,
-      tlsEnabled,
-      tlsAllowInvalid: allowInvalidCertificates,
-      options
-    })
-    setUriText(uri)
-    setUriError(null)
-    let copied = false
+  // ---- To URL: serialize the CURRENT form fields to a string (one-way) ----
+  // Works while creating or editing. The "include real password" choice only
+  // matters when the connection uses username/password auth.
+  const hasPasswordAuth = authType === 'scram' && !!username.trim()
+
+  const refreshToUri = async (includePassword: boolean): Promise<void> => {
+    setToBuilding(true)
+    const uri = await buildConnectionUri(buildInput(), { includePassword })
+    setToUriText(uri ?? '')
+    setToBuilding(false)
+  }
+
+  const openToUrl = (): void => {
+    setToCopied(false)
+    setUrlPanel('to')
+    void refreshToUri(toIncludePassword)
+  }
+
+  // Toggle + remember the choice (persisted in settings.json).
+  const setIncludePassword = (v: boolean): void => {
+    setToIncludePassword(v)
+    setToCopied(false)
+    void updateSettings({ exportIncludeRealPassword: v })
+    void refreshToUri(v)
+  }
+
+  const copyToUri = async (): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(uri)
-      copied = true
+      await navigator.clipboard.writeText(toUriText)
+      setToCopied(true)
     } catch {
       /* clipboard may be unavailable */
     }
-    const pwOmitted = authType === 'scram' && !passwordTouched && editing?.hasPassword
-    setUriNote(
-      `${copied ? tFn('connection.uri.builtCopied') : tFn('connection.uri.built')}${
-        pwOmitted ? tFn('connection.uri.passwordOmitted') : ''
-      }`
-    )
+  }
+
+  // Esc / backdrop closes the open popup first, then the form itself.
+  const handleModalClose = (): void => {
+    if (urlPanel) setUrlPanel(null)
+    else onClose()
   }
 
   const buildInput = useMemo(
@@ -246,7 +271,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   return (
     <Modal
       title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
-      onClose={onClose}
+      onClose={handleModalClose}
       footer={
         <>
           <Button variant="ghost" busy={testing} onClick={() => void runTest()}>
@@ -276,26 +301,27 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         </>
       }
     >
-      {/* Connection string: paste to parse, or export the current fields. */}
-      <div className="uri-bar">
-        <input
-          value={uriText}
-          onChange={(e) => setUriText(e.target.value)}
-          placeholder={tFn('connection.uri.placeholder')}
-        />
-        <Button variant="ghost" type="button" disabled={!uriText.trim()} onClick={applyUri}>
-          {tFn('connection.uri.fromUri')}
-        </Button>
-        <Button variant="ghost" type="button" onClick={() => void toUri()}>
-          {tFn('connection.uri.toUri')}
-        </Button>
+      {/* From URL / To URL: two independent one-way helpers, each in its own
+          popup. From URL parses a pasted string INTO the fields; To URL exports
+          the current fields OUT as a connection string. */}
+      <div className="url-actions">
+        <button
+          type="button"
+          className="url-action-btn"
+          onClick={() => {
+            setFromError(null)
+            setUrlPanel('from')
+          }}
+        >
+          <ClipboardPaste size={15} />
+          <span>{tFn('connection.uri.fromUrl')}</span>
+        </button>
+        <button type="button" className="url-action-btn" onClick={openToUrl}>
+          <Link size={15} />
+          <span>{tFn('connection.uri.toUrl')}</span>
+        </button>
+        {parseNote && <span className="url-actions-note">{parseNote}</span>}
       </div>
-      {uriError && (
-        <div className="hint" style={{ color: 'var(--danger, #ef4444)' }}>
-          {uriError}
-        </div>
-      )}
-      {uriNote && !uriError && <div className="hint">{uriNote}</div>}
 
       <div className="tabs">
         {(['general', 'auth', 'ssh', 'tls'] as Tab[]).map((t) => (
@@ -576,6 +602,104 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             </>
           )}
         </>
+      )}
+
+      {/* From URL popup: paste a connection string → fill the fields. */}
+      {urlPanel === 'from' && (
+        <div className="url-popup-backdrop" onMouseDown={() => setUrlPanel(null)}>
+          <div className="url-popup" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="url-popup-head">
+              <ClipboardPaste size={16} />
+              <div className="url-popup-titles">
+                <span className="url-popup-title">{tFn('connection.uri.fromUrlTitle')}</span>
+                <span className="url-popup-sub">{tFn('connection.uri.fromUrlHint')}</span>
+              </div>
+            </div>
+            <textarea
+              className="url-popup-input mono"
+              autoFocus
+              rows={3}
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              value={fromText}
+              onChange={(e) => setFromText(e.target.value)}
+              placeholder={tFn('connection.uri.placeholder')}
+            />
+            {fromError && <div className="url-popup-err">{fromError}</div>}
+            <div className="url-popup-foot">
+              <span className="spacer" />
+              <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
+                {tFn('connection.action.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                disabled={!fromText.trim()}
+                onClick={applyFromUrl}
+              >
+                {tFn('connection.uri.parseAction')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* To URL popup: export the current fields as a connection string. */}
+      {urlPanel === 'to' && (
+        <div className="url-popup-backdrop" onMouseDown={() => setUrlPanel(null)}>
+          <div className="url-popup" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="url-popup-head">
+              <Link size={16} />
+              <div className="url-popup-titles">
+                <span className="url-popup-title">{tFn('connection.uri.toUrlTitle')}</span>
+                <span className="url-popup-sub">{tFn('connection.uri.toUrlHint')}</span>
+              </div>
+            </div>
+            {/* Editable: regenerated on open / password-toggle, but the user can
+                tweak it before copying. Copy uses whatever is in the box. */}
+            <textarea
+              className="url-popup-input mono"
+              rows={3}
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              value={toUriText}
+              placeholder={toBuilding ? '…' : undefined}
+              onChange={(e) => {
+                setToUriText(e.target.value)
+                setToCopied(false)
+              }}
+            />
+            {hasPasswordAuth && (
+              <label className="url-popup-check">
+                <input
+                  type="checkbox"
+                  checked={toIncludePassword}
+                  onChange={(e) => setIncludePassword(e.target.checked)}
+                />
+                <span>{tFn('connection.uri.includePassword')}</span>
+              </label>
+            )}
+            <div className="url-popup-foot">
+              {toCopied && <span className="url-popup-ok">{tFn('connection.uri.copied')}</span>}
+              <span className="spacer" />
+              <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
+                {tFn('connection.action.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                disabled={!toUriText || toBuilding}
+                onClick={() => void copyToUri()}
+              >
+                {tFn('connection.uri.copyAction')}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </Modal>
   )

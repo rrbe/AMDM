@@ -346,6 +346,9 @@ export interface AppSettings {
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
   editorTabSize: number
+  /** Remembered "To URL" choice: inline the real password (vs `<password>`
+      placeholder). Defaults off; persisted so the user's last pick sticks. */
+  exportIncludeRealPassword: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -357,5 +360,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   queryLimit: 50,
   editorFontSize: 13,
   editorWordWrap: false,
-  editorTabSize: 2
+  editorTabSize: 2,
+  exportIncludeRealPassword: false
 }

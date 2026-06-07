@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc'
+import { buildMongoUri } from '../../shared/connectionUri'
 import type {
   AppSettings,
   ConnectionConfig,
@@ -62,6 +63,43 @@ function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
   return { config, password: pw, sshPassword: sshPw, sshPassphrase: sshPp }
 }
 
+const PASSWORD_PLACEHOLDER = '<password>'
+
+/**
+ * Build a connection string from the CURRENT form fields for "To URL" — works
+ * while creating or editing. With `includePassword`, inline the plaintext: the
+ * just-typed one, else (editing a saved connection without re-typing) the one
+ * decrypted from the store. Otherwise emit a readable `<password>` placeholder.
+ */
+function buildConnectionUri(input: ConnectionInput, includePassword: boolean): string {
+  const scram = input.auth.type === 'scram' && !!input.auth.username?.trim()
+  let password: string | undefined
+  let encodePassword = true
+  if (scram) {
+    if (includePassword) {
+      password = input.password || (input.id ? connectionStore.getDecrypted(input.id)?.password : undefined)
+    } else {
+      password = PASSWORD_PLACEHOLDER
+      encodePassword = false
+    }
+  }
+  return buildMongoUri({
+    useSrv: input.useSrv,
+    host: input.host.trim(),
+    port: input.useSrv ? null : input.port ?? 27017,
+    replicaSet: input.replicaSet?.trim() || undefined,
+    defaultDatabase: input.defaultDatabase?.trim() || undefined,
+    authType: input.auth.type,
+    username: input.auth.username?.trim() || undefined,
+    password,
+    encodePassword,
+    authSource: input.auth.authSource?.trim() || undefined,
+    tlsEnabled: input.tls.enabled,
+    tlsAllowInvalid: !!input.tls.allowInvalidCertificates,
+    options: input.options
+  })
+}
+
 export function registerIpc(): void {
   // connections
   ipcMain.handle(IPC.connectionsList, () => connectionStore.listConnections())
@@ -74,6 +112,11 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
+  )
+  ipcMain.handle(
+    IPC.connectionsBuildUri,
+    (_e, input: ConnectionInput, opts: { includePassword: boolean }) =>
+      buildConnectionUri(input, !!opts?.includePassword)
   )
   ipcMain.handle(IPC.connectionsExport, () =>
     exportConnections(BrowserWindow.getFocusedWindow())

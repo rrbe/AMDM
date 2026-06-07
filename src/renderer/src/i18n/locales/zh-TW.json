@@ -60,21 +60,27 @@
     "exportFailed": "匯出失敗：{{error}}",
     "importFailed": "匯入失敗：{{error}}",
     "unknown": "未知",
-    "clipboardUnavailable": "複製失敗：剪貼簿不可用"
+    "clipboardUnavailable": "複製失敗：剪貼簿不可用",
+    "buildUriFailed": "產生連線字串失敗：{{error}}"
   },
   "connection": {
     "title": { "edit": "編輯連線", "new": "新增連線" },
     "action": { "test": "測試連線", "cancel": "取消", "save": "儲存" },
     "testResult": { "okPrefix": "連線成功", "failed": "失敗：{{error}}" },
     "uri": {
-      "placeholder": "mongodb://user:pass@host:27017/db?replicaSet=rs0 — 貼上後點選「從 URI 匯入」",
-      "fromUri": "從 URI 匯入",
-      "toUri": "匯出 URI",
+      "placeholder": "mongodb://user:pass@host:27017/db?replicaSet=rs0",
+      "fromUrl": "From URL",
+      "toUrl": "To URL",
+      "fromUrlTitle": "From URL · 從連線字串匯入",
+      "fromUrlHint": "貼上連線字串，解析後填入下方欄位。",
+      "parseAction": "解析",
       "parsedNote": "已解析至下方表單。",
       "parseFailed": "解析失敗",
-      "builtCopied": "已產生 URI · 已複製到剪貼簿。",
-      "built": "已產生 URI。",
-      "passwordOmitted": " （密碼已省略——如需包含請重新輸入）"
+      "toUrlTitle": "To URL · 匯出連線字串",
+      "toUrlHint": "把目前欄位拼成連線字串。",
+      "includePassword": "包含真實密碼",
+      "copyAction": "複製",
+      "copied": "已複製到剪貼簿。"
     },
     "secret": { "placeholder": "•••••••• （未變更——留空則保留原密碼）" },
     "optional": "（選填）",

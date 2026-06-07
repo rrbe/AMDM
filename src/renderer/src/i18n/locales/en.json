@@ -60,21 +60,27 @@
     "exportFailed": "Export failed: {{error}}",
     "importFailed": "Import failed: {{error}}",
     "unknown": "unknown",
-    "clipboardUnavailable": "Copy failed: clipboard unavailable"
+    "clipboardUnavailable": "Copy failed: clipboard unavailable",
+    "buildUriFailed": "Failed to build connection string: {{error}}"
   },
   "connection": {
     "title": { "edit": "Edit Connection", "new": "New Connection" },
     "action": { "test": "Test connection", "cancel": "Cancel", "save": "Save" },
     "testResult": { "okPrefix": "OK", "failed": "Failed: {{error}}" },
     "uri": {
-      "placeholder": "mongodb://user:pass@host:27017/db?replicaSet=rs0 — paste, then \"From URI\"",
-      "fromUri": "From URI",
-      "toUri": "To URI",
+      "placeholder": "mongodb://user:pass@host:27017/db?replicaSet=rs0",
+      "fromUrl": "From URL",
+      "toUrl": "To URL",
+      "fromUrlTitle": "From URL",
+      "fromUrlHint": "Paste a connection string to fill the fields below.",
+      "parseAction": "Parse",
       "parsedNote": "Parsed into the form below.",
       "parseFailed": "Parse failed",
-      "builtCopied": "Built URI · copied to clipboard.",
-      "built": "Built URI.",
-      "passwordOmitted": " (password omitted — re-type to include)"
+      "toUrlTitle": "To URL",
+      "toUrlHint": "The current fields as a connection string.",
+      "includePassword": "Include real password",
+      "copyAction": "Copy",
+      "copied": "Copied to clipboard."
     },
     "secret": { "placeholder": "•••••••• (unchanged — leave blank to keep)" },
     "optional": "(optional)",

@@ -12,6 +12,7 @@ const api: Api = {
     save: (input) => ipcRenderer.invoke(IPC.connectionsSave, input),
     delete: (id) => ipcRenderer.invoke(IPC.connectionsDelete, id),
     test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input),
+    buildUri: (input, opts) => ipcRenderer.invoke(IPC.connectionsBuildUri, input, opts),
     export: () => ipcRenderer.invoke(IPC.connectionsExport),
     import: () => ipcRenderer.invoke(IPC.connectionsImport)
   },
