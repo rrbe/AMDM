@@ -4,7 +4,15 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // exceljs is bundled (not externalized) on purpose: electron-builder 26's
+    // pnpm dependency collector reconstructs the nested tree from the lockfile
+    // and drops some leaf transitive deps (e.g. util-deprecate under
+    // readable-stream → archiver/unzipper), so an externalized exceljs crashed
+    // the packaged app at launch with "Cannot find module 'util-deprecate'".
+    // Letting rollup inline exceljs + all its transitive deps makes the asar
+    // self-contained and sidesteps that collector entirely. exceljs is pure JS
+    // (no native bindings), so bundling is safe.
+    plugins: [externalizeDepsPlugin({ exclude: ['exceljs'] })],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')
