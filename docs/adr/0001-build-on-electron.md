@@ -4,7 +4,7 @@
 
 The whole project exists because NoSQLBooster — an Electron app — became unbearably laggy. The instinct is therefore "anything but Electron." We chose Electron anyway.
 
-Research into NoSQLBooster's lag (June 2026, primary sources incl. vendor support-forum admissions) showed the slowness is **not the framework** — it is non-virtualized DOM rendering of result sets (vendor-admitted), eager schema-sampling on collection-open (caused V8 OOM), and main-thread blocking. All are app-level flaws we control, not Electron taxes.
+Our analysis of NoSQLBooster's lag — from observed behavior, not vendor-published measurements — points to the slowness being **not the framework** but app-level choices: non-virtualized DOM rendering of result sets, eager schema-sampling on collection-open (a plausible trigger for V8 OOM), and main-thread blocking. These are hypotheses, but each is an app-level flaw we control rather than an Electron tax.
 
 Meanwhile the two hardest parts of this app are nearly free in Electron's Node backend: (1) the official MongoDB **Node.js driver** (the reference implementation), and (2) executing the user's JavaScript shell in a `vm` context with `db` bound to that driver — both require a JS+Node runtime in the backend.
 

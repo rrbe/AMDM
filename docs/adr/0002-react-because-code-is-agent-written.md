@@ -4,7 +4,7 @@
 
 The user will not read or write any code on this project — every line is authored by AI agents. This inverts the usual frontend-selection criteria: the constraint is not the human's familiarity but the **agent's reliability and the availability of ready-made components**.
 
-On that basis React + TypeScript + Vite is the clear pick: the largest training corpus (lowest rate of agent-emitted wrong/outdated patterns), and the richest ecosystem of the exact heavy components this app needs — virtualized tables/trees (`@tanstack/virtual`, `react-window`, AG Grid, react-arborist).
+On that basis React + TypeScript + Vite is the clear pick: the largest training corpus (lowest rate of agent-emitted wrong/outdated patterns), and the richest ecosystem of the exact heavy components this app needs — virtualized tables/trees (`@tanstack/react-virtual` — what we ended up using — plus `react-window`, AG Grid, react-arborist as alternatives).
 
 ## Considered options
 

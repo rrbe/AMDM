@@ -30,10 +30,13 @@ mac:
   category: public.app-category.developer-tools
   icon: build/icon.icns
   target:
+    # Both architectures are NATIVE builds — arm64 for Apple Silicon, x64 for
+    # Intel. ADR-0004 rule #7 says "no Rosetta" (don't emulate), which these two
+    # native targets satisfy; it does NOT mean arm64-only.
     - target: dmg
-      arch: [arm64]      # native arm64 only (ADR-0004 perf rule #7)
+      arch: [arm64, x64]
     - target: zip
-      arch: [arm64]
+      arch: [arm64, x64]
 
 dmg:
   title: ${productName} ${version}

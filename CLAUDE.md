@@ -76,4 +76,4 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 4. schema/字段采样:懒、有界（~50 文档）、异步、缓存（`main/mongo/catalog.ts` 的 `sampleFields`）。
 5. **打开集合不自动查询**——浏览集合只会把 `db.coll.find({})` 填进编辑器,绝不执行。加载保存的查询/历史同理。
 6. 关闭 tab/连接时积极销毁；退出时清理所有 client、SSH 隧道和 worker（`main/index.ts` 的 `will-quit`）。
-7. 保持 Electron 版本新、原生 arm64,重功能懒加载（CodeMirror 6 即为懒加载）。
+7. 保持 Electron 版本新、各目标架构都出原生包（arm64+x64,都不走 Rosetta）,重功能懒加载（CodeMirror 6 即为懒加载）。

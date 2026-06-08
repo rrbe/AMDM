@@ -77,7 +77,7 @@
 4. schema 采样:懒、有界(20–100 文档)、异步、缓存。
 5. 打开集合不自动查询。
 6. 关闭 tab/连接立即销毁编辑器 model 和结果缓存;退出时清理所有子进程。
-7. 用当前版 Electron + 原生 arm64 构建;懒加载重功能,tree-shake。
+7. 用当前版 Electron,各目标架构都出**原生**包(arm64 给 Apple Silicon、x64 给 Intel,都不走 Rosetta);懒加载重功能,tree-shake。
 
 ---
 
