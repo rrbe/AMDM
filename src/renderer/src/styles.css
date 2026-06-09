@@ -1510,10 +1510,8 @@ label {
   color: var(--fg-2);
   padding: 6px 12px;
 }
-.tabs button.active {
-  color: var(--fg-0);
-  border-bottom-color: var(--accent);
-}
+/* Active tab is matched by Base UI's [data-selected] (ui/Tabs) — see the rule in
+   the Base UI wrappers section near the end of this file. */
 
 .form-row {
   margin-bottom: 12px;
@@ -1523,14 +1521,6 @@ label {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 12px;
-}
-.form-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.form-inline label {
-  margin: 0;
 }
 .hint {
   color: var(--fg-3);
@@ -1791,23 +1781,8 @@ label {
   padding: 6px 9px;
   border-radius: var(--radius);
 }
-/* "Include real password" — an opt-in option card (overrides base label). */
-.url-popup-check {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0;
-  padding: 10px 12px;
-  font-size: inherit;
-  color: var(--fg-1);
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.url-popup-check:hover {
-  border-color: var(--border-strong);
-}
+/* "Include real password" opt-in card: now a ui/Checkbox; its boxed look lives
+   under `.ui-check.url-popup-check` in the Base UI wrappers section below. */
 .url-popup-foot {
   display: flex;
   align-items: center;
@@ -2131,12 +2106,10 @@ label {
 
 /* ============================================================ Phase 3 styles */
 
-/* ---- Right-click context menu (catalog collection actions) ---- */
-.ctx-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-}
+/* ---- Right-click context menu (catalog collection actions) ----
+   Now rendered via ui/Menu (Base UI); the popup reuses these classes but its
+   placement is driven by the Base UI positioner (.ui-menu-popup resets the
+   `position: fixed` below). No backdrop element anymore. */
 .ctx-menu {
   position: fixed;
   background: var(--bg-1);
@@ -2456,10 +2429,6 @@ button:focus-visible {
   border-bottom: 1px solid var(--border);
   font-weight: 700;
   letter-spacing: -0.01em;
-}
-.tabs button.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
 }
 
 /* ---- Sidebar footer: app-level theme cycle (System / Light / Dark icon) ---- */
