@@ -61,6 +61,7 @@
     "importFailed": "导入失败：{{error}}",
     "unknown": "未知",
     "clipboardUnavailable": "复制失败：剪贴板不可用",
+    "copied": "已复制到剪贴板",
     "buildUriFailed": "生成连接串失败：{{error}}"
   },
   "connection": {

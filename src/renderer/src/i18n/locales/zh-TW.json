@@ -61,6 +61,7 @@
     "importFailed": "匯入失敗：{{error}}",
     "unknown": "未知",
     "clipboardUnavailable": "複製失敗：剪貼簿不可用",
+    "copied": "已複製到剪貼簿",
     "buildUriFailed": "產生連線字串失敗：{{error}}"
   },
   "connection": {

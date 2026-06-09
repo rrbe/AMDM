@@ -17,11 +17,12 @@ import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
  *  - `useVirtualizer` then renders only the visible lines (+ overscan), so even
  *    a result that pretty-prints to hundreds of thousands of lines stays smooth.
  *
- * COPY: drag-selecting visible text + Cmd+C is native. Because lines are
- * virtualized, a native "select all" can only see on-screen lines and its
- * highlight overflows into empty space — so Cmd+A is intercepted into an
- * `allSelected` state and Cmd+C then copies the FULL reconstructed result
- * (right-click offers the three formats).
+ * COPY: drag-selecting visible text + Cmd+C is native. With no drag-selection,
+ * Cmd+C copies the FULL reconstructed result as pure JSON (the view has no
+ * per-row selection). Because lines are virtualized, a native "select all" can
+ * only see on-screen lines and its highlight overflows into empty space — so
+ * Cmd+A is intercepted into an `allSelected` state for the highlight (right-
+ * click offers the three formats).
  *
  * Extended types render in shell style (ObjectId("..")/ISODate("..")) via the
  * formatter in lib/format.ts.
@@ -67,7 +68,10 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  useCopyHotkey(() => (allSelected ? toPlainJson(docs) : null))
+  // ⌘C with no drag-selection copies the whole result as pure JSON (the JSON
+  // view has no per-row/cell selection model); a real text selection still
+  // falls through to native copy inside useCopyHotkey.
+  useCopyHotkey(() => toPlainJson(docs))
 
   const openMenu = (e: MouseEvent): void => {
     e.preventDefault()
@@ -91,7 +95,15 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
       <div
         ref={parentRef}
         className={`virtual-scroller json-body${allSelected ? ' all-selected' : ''}`}
-        onMouseDown={() => allSelected && setAllSelected(false)}
+        // Focusable so a click moves focus off the query editor — otherwise ⌘C
+        // stays "in" the editor and useCopyHotkey defers to native copy instead
+        // of copying the result (mirrors the Tree/Table scrollers). Focusing
+        // doesn't interfere with drag-selecting the JSON text.
+        tabIndex={-1}
+        onMouseDown={() => {
+          if (allSelected) setAllSelected(false)
+          parentRef.current?.focus({ preventScroll: true })
+        }}
         onContextMenu={openMenu}
       >
         <div className="virtual-inner" style={{ height: virtualizer.getTotalSize() }}>

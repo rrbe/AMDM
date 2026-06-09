@@ -61,6 +61,7 @@
     "importFailed": "Import failed: {{error}}",
     "unknown": "unknown",
     "clipboardUnavailable": "Copy failed: clipboard unavailable",
+    "copied": "Copied to clipboard",
     "buildUriFailed": "Failed to build connection string: {{error}}"
   },
   "connection": {

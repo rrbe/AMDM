@@ -168,13 +168,16 @@ export function toTsv(docs: unknown[]): string {
 }
 
 /**
- * Write `text` to the clipboard, silently on success. Only failures (e.g.
- * clipboard permission denied) surface — via `lastError` — rather than throwing.
+ * Write `text` to the clipboard. Resolves `true` on success, `false` on failure
+ * (e.g. clipboard permission denied) — which also surfaces via `lastError`
+ * rather than throwing. Callers that don't care about the outcome can ignore it.
  */
-export async function copyText(text: string): Promise<void> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
+    return true
   } catch {
     useAppStore.setState({ lastError: i18n.t('notify.clipboardUnavailable') })
+    return false
   }
 }

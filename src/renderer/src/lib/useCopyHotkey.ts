@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { copyText } from './resultCopy'
+import { useAppStore } from '@renderer/store/useAppStore'
+import i18n from '@renderer/i18n'
 
 /**
  * Wire Cmd/Ctrl+C to copy a view-provided string — but only when it won't
@@ -26,7 +28,11 @@ export function useCopyHotkey(getText: () => string | null): void {
       const text = ref.current()
       if (text == null) return
       e.preventDefault()
-      void copyText(text)
+      // Confirm the copy with a transient toast — the keyboard path is otherwise
+      // invisible, so without it a successful ⌘C reads as "nothing happened".
+      void copyText(text).then((ok) => {
+        if (ok) useAppStore.getState().notify('success', i18n.t('notify.copied'))
+      })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

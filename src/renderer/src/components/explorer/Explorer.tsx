@@ -236,12 +236,8 @@ export function Explorer(): JSX.Element {
 
   return (
     <div className="explorer">
-      <div className="explorer-header app-drag">
-        <span className="explorer-title">AMDM</span>
-      </div>
-
-      {/* Connections fills the remaining height; its header carries the
-          prominent "New connection" action. */}
+      {/* The app brand + window drag strip now live in the global title bar
+          (App.tsx); the explorer opens straight into the Connections section. */}
       <div className="side-section side-section--conns">
         <div className="side-section-head">
           <span className="side-section-title">{t('explorer.connections')}</span>

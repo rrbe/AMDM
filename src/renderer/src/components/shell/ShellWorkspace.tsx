@@ -48,7 +48,7 @@ export function ShellWorkspace(): JSX.Element {
   return (
     <div className="work">
       <TabBar />
-      <div className="work-header app-drag">
+      <div className="work-header">
         <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
         <select
           className="db-select"

@@ -16,8 +16,9 @@ function createWindow(): void {
     minHeight: 620,
     show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    // Vertically center the traffic lights within the 38px header strip.
-    trafficLightPosition: process.platform === 'darwin' ? { x: 14, y: 12 } : undefined,
+    // Vertically center the traffic lights within the slim 30px title bar
+    // (.app-titlebar): (30 − ~14) / 2 ≈ 8.
+    trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 8 } : undefined,
     backgroundColor: '#1e1e1e',
     // Window/taskbar icon for Windows + Linux (macOS uses the .app bundle icon).
     icon: appIcon,

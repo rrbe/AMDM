@@ -269,8 +269,16 @@ label {
 /* ---------------------------------------------------------------- app shell */
 .app {
   display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
+}
+/* The explorer | work split lives below the full-width title bar. */
+.app-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
 }
 
 .pane-divider {
@@ -334,14 +342,40 @@ label {
 .is-mac .app-drag .tree-row-actions {
   -webkit-app-region: no-drag;
 }
-/* Reserve the top-left for the traffic lights so they never cover the title. */
-.is-mac .explorer-header {
+/* ---- Unified window title bar ----
+   A single slim strip across the full window top: it is the sole macOS window-
+   drag region and carries the app brand. Sitting above the explorer | work
+   split keeps the drag handle consistent no matter which pane is below. */
+.app-titlebar {
+  flex: 0 0 auto;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  position: relative; /* anchor for the absolutely-centered brand */
+  padding: 0 12px;
+  background: var(--bg-1);
+  color: var(--fg-1);
+  user-select: none;
+}
+/* Reserve the top-left for the macOS traffic lights so they never cover the
+   brand; other platforms keep the strip flush. */
+.is-mac .app-titlebar {
   padding-left: 78px;
 }
-/* A slim draggable strip above the empty work area (no header of its own). */
-.work-titlebar {
-  height: 38px;
-  flex: 0 0 auto;
+/* Centered on the full window width — absolutely positioned so the traffic-
+   light reserve (padding-left) doesn't pull it off the true centre line. */
+.app-titlebar-brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 160px); /* never run under the traffic lights */
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ----------------------------------------------------------------- explorer */
@@ -357,41 +391,6 @@ label {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-.explorer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  height: 38px;
-  flex: 0 0 auto;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--fg-1);
-}
-.explorer-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.explorer-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-}
-/* Compact, square-ish header buttons (the wide default padding looks bloated). */
-.explorer-actions .ghost {
-  padding: 2px 7px;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--fg-2);
-  border-radius: var(--radius-sm);
-}
-.explorer-actions .ghost:hover:not(:disabled) {
-  color: var(--fg-0);
 }
 .explorer-body {
   flex: 1;
@@ -922,8 +921,9 @@ label {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Fixed 38px to match .explorer-header / .work-titlebar so the two header
-     bottom-borders line up; controls vertical-center via align-items. */
+  /* The work area's own sub-header (connection · db · actions), under the tab
+     strip. Window dragging is handled by the global .app-titlebar, so this no
+     longer needs to be a drag region. */
   height: 38px;
   padding: 0 10px;
   border-bottom: 1px solid var(--border);
@@ -2354,16 +2354,9 @@ button:focus-visible {
 }
 
 /* ---- Editorial ink rule under the top title bars ---- */
-.explorer-header,
-.work-header,
-.work-titlebar {
+.app-titlebar,
+.work-header {
   border-bottom: 1.5px solid var(--rule);
-}
-.explorer-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--fg-1);
 }
 
 /* ---- Connection rows: active accent outline ---- */
