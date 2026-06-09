@@ -2525,3 +2525,256 @@ button:focus-visible {
     opacity: 1;
   }
 }
+
+/* =========================================================================
+   Base UI wrappers (components/ui/*) — Slate-token skins for the headless
+   primitives. Base UI portals popups to <body>; the app's stacking context is
+   isolated on #root (see top), so these z-indexes layer cleanly:
+     dialog backdrop 1000 < dialog popup 1001 < select/menu 2000 < tooltip 3000.
+   Several reuse existing chrome classes (.modal / .ctx-menu / .app-tooltip);
+   where those baked in `position: fixed`, we reset it so Base UI's positioner
+   (not the old inline left/top) drives placement.
+   ========================================================================= */
+
+/* ---- Dialog (ui/Dialog → backs common/Modal) ----
+   Backdrop + Popup are Portal siblings now, so the popup owns its own fixed
+   centering; the box look still comes from .modal / .modal.small. */
+.ui-dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+}
+
+/* ---- Field error text (ui/Field) ---- */
+.field-err {
+  color: var(--err);
+  font-size: var(--fs-sm);
+  margin-top: 3px;
+}
+.field-err:empty {
+  display: none;
+}
+
+/* ---- Checkbox (ui/Checkbox) ----
+   Base UI Checkbox.Root is a <button>; neutralise the global button skin and
+   draw a native-looking box that fills with the accent when [data-checked]. */
+.ui-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: auto;
+  cursor: pointer;
+  color: var(--fg-1);
+  font-size: var(--fs);
+  text-align: left;
+}
+.ui-check:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.ui-check-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.ui-check[data-checked] .ui-check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.ui-check:focus-visible .ui-check-box {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ui-check-ind {
+  display: inline-flex;
+  color: var(--accent-fg);
+}
+.ui-check-label {
+  user-select: none;
+}
+
+/* ---- Select (ui/Select) ----
+   Trigger mimics the inset input/select; popup mimics .ctx-menu. */
+.ui-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--fg-0);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+.ui-select-trigger > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-select-trigger:focus-visible,
+.ui-select-trigger[data-popup-open] {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ui-select-trigger[data-disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+.ui-select-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--fg-2);
+}
+.ui-select-positioner {
+  z-index: 2000;
+}
+.ui-select-popup {
+  min-width: var(--anchor-width);
+  max-height: var(--available-height);
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+}
+.ui-select-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-1);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.ui-select-item[data-highlighted] {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.ui-select-item[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.ui-select-ind {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--accent);
+}
+
+/* ---- Menu (ui/Menu → backs ContextMenu) ----
+   Reuses .ctx-menu / .ctx-item; reset the popup's inherited `position: fixed`
+   (Base UI positioner places it) and map disabled/highlight to data-* (Menu.Item
+   is a <div>, so :disabled / :hover from the old <button> markup don't apply). */
+.ui-menu-positioner {
+  z-index: 2000;
+}
+.ui-menu-popup {
+  position: static;
+  outline: none;
+}
+.ctx-item[data-highlighted] {
+  background: var(--bg-3);
+}
+.ctx-item[data-disabled] {
+  color: var(--fg-3);
+  cursor: default;
+  opacity: 0.55;
+}
+.ctx-item[data-disabled][data-highlighted] {
+  background: transparent;
+}
+
+/* ---- Tabs (ui/Tabs) — twin of the .active rule for Base UI's data-selected ---- */
+.tabs button[data-selected] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---- NumberField (ui/NumberField) — input flanked by −/+ steppers ---- */
+.ui-number {
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.ui-number:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ui-number-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  text-align: center;
+  padding: 5px 4px;
+}
+.ui-number-input:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+.ui-number-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.ui-number-btn:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.ui-number-btn[data-disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ---- Tooltip (ui/Tooltip) — popup look reused from .app-tooltip; reset its
+   `position: fixed` since the positioner places it. (Not wired in yet.) ---- */
+.ui-tooltip-positioner {
+  z-index: 3000;
+}
+.ui-tooltip-popup {
+  position: static;
+  pointer-events: none;
+}
