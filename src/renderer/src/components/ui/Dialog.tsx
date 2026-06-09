@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ComponentProps, type ReactNode } from 'react'
 import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 
 /**
@@ -23,6 +23,12 @@ interface DialogProps {
   className?: string
   /** Element id of the title, wired to the popup's `aria-labelledby`. */
   'aria-labelledby'?: string
+  /**
+   * Where to move focus when the dialog opens. Defaults to Base UI's "first
+   * tabbable element". Modal overrides this to target the first field in the
+   * body (so focus doesn't land on the header ✕).
+   */
+  initialFocus?: ComponentProps<typeof BaseDialog.Popup>['initialFocus']
   children: ReactNode
 }
 
@@ -31,6 +37,7 @@ export function Dialog({
   onOpenChange,
   className,
   'aria-labelledby': ariaLabelledBy,
+  initialFocus,
   children
 }: DialogProps): JSX.Element {
   return (
@@ -40,6 +47,7 @@ export function Dialog({
         <BaseDialog.Popup
           className={['ui-dialog', className].filter(Boolean).join(' ')}
           aria-labelledby={ariaLabelledBy}
+          initialFocus={initialFocus}
         >
           {children}
         </BaseDialog.Popup>

@@ -3,6 +3,10 @@ import type { CollectionSort, Language, ThemeMode } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
+import { Field } from '@renderer/components/ui/Field'
+import { Select } from '@renderer/components/ui/Select'
+import { NumberField } from '@renderer/components/ui/NumberField'
+import { Checkbox } from '@renderer/components/ui/Checkbox'
 
 /**
  * Centralized preferences. Every control writes straight through the store's
@@ -35,103 +39,92 @@ export function SettingsModal({ onClose }: { onClose: () => void }): JSX.Element
       <div className="settings-section">
         <div className="settings-section-title">{t('settings.sectionAppearance')}</div>
 
-        <div className="form-row">
-          <label>{t('settings.language')}</label>
-          <select
+        <Field label={t('settings.language')}>
+          <Select<Language>
             value={settings.language}
-            onChange={(e) => void updateSettings({ language: e.target.value as Language })}
-          >
-            <option value="system">{t('settings.languageSystem')}</option>
-            <option value="en">English</option>
-            <option value="zh-CN">简体中文</option>
-            <option value="zh-TW">繁體中文</option>
-          </select>
-        </div>
+            onChange={(language) => void updateSettings({ language })}
+            options={[
+              { label: t('settings.languageSystem'), value: 'system' },
+              { label: 'English', value: 'en' },
+              { label: '简体中文', value: 'zh-CN' },
+              { label: '繁體中文', value: 'zh-TW' }
+            ]}
+          />
+        </Field>
 
-        <div className="form-row">
-          <label>{t('settings.theme')}</label>
-          <select
+        <Field label={t('settings.theme')}>
+          <Select<ThemeMode>
             value={settings.theme}
-            onChange={(e) => void updateSettings({ theme: e.target.value as ThemeMode })}
-          >
-            <option value="system">{t('settings.themeSystem')}</option>
-            <option value="light">{t('settings.themeLight')}</option>
-            <option value="dark">{t('settings.themeDark')}</option>
-          </select>
-        </div>
+            onChange={(theme) => void updateSettings({ theme })}
+            options={[
+              { label: t('settings.themeSystem'), value: 'system' },
+              { label: t('settings.themeLight'), value: 'light' },
+              { label: t('settings.themeDark'), value: 'dark' }
+            ]}
+          />
+        </Field>
       </div>
 
       <div className="settings-section">
         <div className="settings-section-title">{t('settings.sectionCatalog')}</div>
-        <div className="form-row">
-          <label>{t('settings.collectionSort')}</label>
-          <select
+        <Field label={t('settings.collectionSort')}>
+          <Select<CollectionSort>
             value={settings.collectionSort}
-            onChange={(e) =>
-              void updateSettings({ collectionSort: e.target.value as CollectionSort })
-            }
-          >
-            <option value="natural">{t('settings.sortNatural')}</option>
-            <option value="alpha">{t('settings.sortAlpha')}</option>
-          </select>
-        </div>
+            onChange={(collectionSort) => void updateSettings({ collectionSort })}
+            options={[
+              { label: t('settings.sortNatural'), value: 'natural' },
+              { label: t('settings.sortAlpha'), value: 'alpha' }
+            ]}
+          />
+        </Field>
       </div>
 
       <div className="settings-section">
         <div className="settings-section-title">{t('settings.sectionQuery')}</div>
-        <div className="form-row">
-          <label>{t('settings.queryLimit')}</label>
-          <input
-            type="number"
+        <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
+          <NumberField
             min={1}
             max={1000}
             value={settings.queryLimit}
-            onChange={(e) => {
-              const n = Math.min(1000, Math.max(1, parseInt(e.target.value, 10) || settings.queryLimit))
-              void updateSettings({ queryLimit: n })
+            onChange={(n) => {
+              if (n != null) void updateSettings({ queryLimit: n })
             }}
+            aria-label={t('settings.queryLimit')}
           />
-          <div className="hint">{t('settings.queryLimitHint')}</div>
-        </div>
+        </Field>
       </div>
 
       <div className="settings-section">
         <div className="settings-section-title">{t('settings.sectionEditor')}</div>
         <div className="form-grid">
-          <div>
-            <label>{t('settings.editorFontSize')}</label>
-            <input
-              type="number"
+          <Field label={t('settings.editorFontSize')}>
+            <NumberField
               min={9}
               max={28}
               value={settings.editorFontSize}
-              onChange={(e) => {
-                const n = Math.min(28, Math.max(9, parseInt(e.target.value, 10) || settings.editorFontSize))
-                void updateSettings({ editorFontSize: n })
+              onChange={(n) => {
+                if (n != null) void updateSettings({ editorFontSize: n })
               }}
+              aria-label={t('settings.editorFontSize')}
             />
-          </div>
-          <div>
-            <label>{t('settings.editorTabSize')}</label>
-            <select
+          </Field>
+          <Field label={t('settings.editorTabSize')}>
+            <Select<number>
               value={settings.editorTabSize}
-              onChange={(e) => void updateSettings({ editorTabSize: Number(e.target.value) })}
-            >
-              <option value={2}>2</option>
-              <option value={4}>4</option>
-            </select>
-          </div>
+              onChange={(editorTabSize) => void updateSettings({ editorTabSize })}
+              options={[
+                { label: '2', value: 2 },
+                { label: '4', value: 4 }
+              ]}
+            />
+          </Field>
         </div>
         <div className="form-row">
-          <div className="form-inline">
-            <input
-              type="checkbox"
-              id="settings-word-wrap"
-              checked={settings.editorWordWrap}
-              onChange={(e) => void updateSettings({ editorWordWrap: e.target.checked })}
-            />
-            <label htmlFor="settings-word-wrap">{t('settings.editorWordWrap')}</label>
-          </div>
+          <Checkbox
+            checked={settings.editorWordWrap}
+            onCheckedChange={(editorWordWrap) => void updateSettings({ editorWordWrap })}
+            label={t('settings.editorWordWrap')}
+          />
         </div>
       </div>
     </Modal>

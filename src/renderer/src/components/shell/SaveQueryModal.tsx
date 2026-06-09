@@ -6,6 +6,8 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
+import { Field } from '@renderer/components/ui/Field'
+import { Input } from '@renderer/components/ui/Input'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 
 interface SaveQueryModalProps {
@@ -61,11 +63,8 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
         </>
       }
     >
-      <div className="form-row">
-        <label htmlFor="save-query-name">{t('saveQuery.name')}</label>
-        <input
-          id="save-query-name"
-          autoFocus
+      <Field label={t('saveQuery.name')}>
+        <Input
           value={name}
           placeholder={t('saveQuery.namePlaceholder')}
           onChange={(e) => setName(e.target.value)}
@@ -73,11 +72,9 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
             if (e.key === 'Enter') void onSave()
           }}
         />
-      </div>
-      <div className="form-row">
-        <label htmlFor="save-query-folder">{t('saveQuery.folder')}</label>
-        <input
-          id="save-query-folder"
+      </Field>
+      <Field label={t('saveQuery.folder')}>
+        <Input
           list="save-query-folders"
           value={folder}
           placeholder={t('saveQuery.folderPlaceholder')}
@@ -91,7 +88,7 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
             <option key={f} value={f} />
           ))}
         </datalist>
-      </div>
+      </Field>
       <code className="lib-code">{code.split('\n')[0]?.slice(0, 100) || t('saveQuery.empty')}</code>
     </Modal>
   )

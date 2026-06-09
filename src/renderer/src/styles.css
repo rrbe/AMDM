@@ -2556,6 +2556,11 @@ button:focus-visible {
 .field-err:empty {
   display: none;
 }
+/* ui/Field renders a .form-row; inside a 2-col .form-grid the row's own bottom
+   margin would add a stray gap, so neutralise it (the grid gap handles spacing). */
+.form-grid .form-row {
+  margin-bottom: 0;
+}
 
 /* ---- Checkbox (ui/Checkbox) ----
    Base UI Checkbox.Root is a <button>; neutralise the global button skin and
