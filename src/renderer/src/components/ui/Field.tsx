@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type CSSProperties, type ReactNode } from 'react'
 import { Field as BaseField } from '@base-ui/react/field'
 
 /**
@@ -34,6 +34,8 @@ interface FieldProps {
   disabled?: boolean
   /** Extra class(es) merged onto the `.form-row` wrapper. */
   className?: string
+  /** Inline style on the row wrapper (e.g. `gridColumn` inside a `.form-grid`). */
+  style?: CSSProperties
 }
 
 export function Field({
@@ -45,11 +47,13 @@ export function Field({
   validationMode,
   validate,
   disabled,
-  className
+  className,
+  style
 }: FieldProps): JSX.Element {
   return (
     <BaseField.Root
       className={['form-row', className].filter(Boolean).join(' ')}
+      style={style}
       name={name}
       validationMode={validationMode}
       validate={validate}

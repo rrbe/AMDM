@@ -21,6 +21,9 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void
   /** Extra class(es) for the popup box — typically `'modal'` or `'modal small'`. */
   className?: string
+  /** Class for the backdrop overlay. Defaults to `'modal-backdrop'`; a nested
+      dialog can pass its own (e.g. `'url-popup-backdrop'`) for a higher z-index. */
+  backdropClassName?: string
   /** Element id of the title, wired to the popup's `aria-labelledby`. */
   'aria-labelledby'?: string
   /**
@@ -36,6 +39,7 @@ export function Dialog({
   open,
   onOpenChange,
   className,
+  backdropClassName = 'modal-backdrop',
   'aria-labelledby': ariaLabelledBy,
   initialFocus,
   children
@@ -43,7 +47,7 @@ export function Dialog({
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
-        <BaseDialog.Backdrop className="modal-backdrop" />
+        <BaseDialog.Backdrop className={backdropClassName} />
         <BaseDialog.Popup
           className={['ui-dialog', className].filter(Boolean).join(' ')}
           aria-labelledby={ariaLabelledBy}

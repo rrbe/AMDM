@@ -2546,6 +2546,25 @@ button:focus-visible {
   transform: translate(-50%, -50%);
   z-index: 1001;
 }
+/* url-popup is a nested dialog over the connection form; its backdrop class
+   (.url-popup-backdrop) already carries z 1100, so lift the popup just above it
+   and above the form dialog (1001). */
+.ui-dialog.url-popup {
+  z-index: 1101;
+}
+/* The "include real password" option card keeps its boxed look layered on top of
+   the ui/Checkbox base (which is otherwise a borderless transparent row). */
+.ui-check.url-popup-check {
+  width: 100%;
+  gap: 9px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ui-check.url-popup-check:hover {
+  border-color: var(--border-strong);
+}
 
 /* ---- Field error text (ui/Field) ---- */
 .field-err {
