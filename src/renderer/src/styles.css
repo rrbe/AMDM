@@ -149,6 +149,10 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* New stacking context so the app's internal z-indexes can't out-stack
+     Base UI's body-portaled popups (Dialog/Select/Menu/Tooltip). Their
+     positioner/popup z-indexes (defined below) layer relative to this root. */
+  isolation: isolate;
 }
 
 body {
