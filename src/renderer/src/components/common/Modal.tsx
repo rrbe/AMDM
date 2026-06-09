@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Dialog, DialogClose, DialogTitle } from '@renderer/components/ui/Dialog'
 
 interface ModalProps {
   title: string
@@ -9,34 +10,30 @@ interface ModalProps {
   small?: boolean
 }
 
-/** Minimal accessible modal: backdrop click + Escape close. */
+/**
+ * Minimal accessible modal. Public API unchanged (consumers conditionally mount
+ * it, so mount = open); internally backed by Base UI Dialog, which provides Esc /
+ * outside-press dismissal, focus trap+restore, and auto aria-labelledby wiring
+ * from `Dialog.Title` — so the old keydown listener and backdrop handler are gone.
+ */
 export function Modal({ title, onClose, children, footer, small }: ModalProps): JSX.Element {
   const { t } = useTranslation()
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div
-        className={small ? 'modal small' : 'modal'}
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="modal-header">
-          <span>{title}</span>
-          <button className="ghost" onClick={onClose} aria-label={t('common.close')}>
-            ✕
-          </button>
-        </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-footer">{footer}</div>}
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+      className={small ? 'modal small' : 'modal'}
+    >
+      <div className="modal-header">
+        <DialogTitle render={<span />}>{title}</DialogTitle>
+        <DialogClose className="ghost" aria-label={t('common.close')}>
+          ✕
+        </DialogClose>
       </div>
-    </div>
+      <div className="modal-body">{children}</div>
+      {footer && <div className="modal-footer">{footer}</div>}
+    </Dialog>
   )
 }
