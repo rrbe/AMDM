@@ -32,6 +32,8 @@ interface SelectProps<T> {
   /** Extra class(es) merged onto the trigger. */
   className?: string
   'aria-label'?: string
+  /** Styled tooltip text, forwarded onto the trigger (see TooltipLayer). */
+  'data-tip'?: string
 }
 
 export function Select<T extends string | number = string>({
@@ -43,7 +45,8 @@ export function Select<T extends string | number = string>({
   id,
   name,
   className,
-  'aria-label': ariaLabel
+  'aria-label': ariaLabel,
+  'data-tip': dataTip
 }: SelectProps<T>): JSX.Element {
   return (
     <BaseSelect.Root
@@ -59,6 +62,7 @@ export function Select<T extends string | number = string>({
       <BaseSelect.Trigger
         className={['ui-select-trigger', className].filter(Boolean).join(' ')}
         aria-label={ariaLabel}
+        data-tip={dataTip}
       >
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon className="ui-select-icon">

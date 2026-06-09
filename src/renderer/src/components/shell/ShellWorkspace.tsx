@@ -8,6 +8,7 @@ import { SaveQueryModal } from './SaveQueryModal'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
+import { Select } from '@renderer/components/ui/Select'
 
 /**
  * The main work area: a tab strip, header (active connection + db selector +
@@ -50,20 +51,16 @@ export function ShellWorkspace(): JSX.Element {
       <TabBar />
       <div className="work-header">
         <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
-        <select
+        <Select
           className="db-select"
           value={activeDatabase}
-          onChange={(e) => setActiveDatabase(e.target.value)}
+          onChange={setActiveDatabase}
+          options={dbOptions.map((name) => ({ label: name, value: name }))}
+          placeholder={dbOptions.length === 0 ? t('shell.noDatabase') : t('shell.selectDatabase')}
+          disabled={dbOptions.length === 0}
+          aria-label={t('shell.activeDatabaseTip')}
           data-tip={t('shell.activeDatabaseTip')}
-        >
-          {dbOptions.length === 0 && <option value="">{t('shell.noDatabase')}</option>}
-          {activeDatabase === '' && dbOptions.length > 0 && <option value="">{t('shell.selectDatabase')}</option>}
-          {dbOptions.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+        />
         <span className="spacer" />
         <Button disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
           {t('shell.saveBtn')}
