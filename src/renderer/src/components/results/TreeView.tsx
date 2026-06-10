@@ -22,7 +22,7 @@ import {
   toShellText,
   toStrictEjson
 } from '@renderer/lib/resultCopy'
-import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
@@ -292,14 +292,15 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     <div
       ref={parentRef}
       className="virtual-scroller"
-      // Focusable so a grid click moves focus off the query editor — otherwise
-      // ⌘C stays "in" the editor and useCopyHotkey defers to native copy instead
-      // of copying the selected doc(s). Skip when the mousedown lands in the
-      // inline cell editor so editing keeps focus.
+      // Focusable so a grid click claims the ⌘C hotkey: claimCopyFocus moves
+      // focus off the query editor AND clears a selection lingering there
+      // (user-select:none rows don't collapse it natively — useCopyHotkey would
+      // defer to native copy, which copies nothing). Skip when the mousedown
+      // lands in the inline cell editor so editing keeps focus.
       tabIndex={-1}
       onMouseDown={(e) => {
         if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
-          parentRef.current?.focus({ preventScroll: true })
+          claimCopyFocus(parentRef.current)
       }}
     >
       <div className="virtual-inner" style={{ height: rowVirtualizer.getTotalSize() }}>

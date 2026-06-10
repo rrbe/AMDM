@@ -15,6 +15,25 @@ import i18n from '@renderer/i18n'
  * `getText` is held in a ref so the window listener registers once and always
  * sees fresh selection state without re-subscribing.
  */
+/**
+ * Click-to-focus for the result grids (Tree/Table/JSON scrollers): move focus
+ * off the query editor AND drop any text selection lingering OUTSIDE the grid.
+ * The grids are `user-select: none`, so a click on a row does NOT natively
+ * collapse a selection left in the editor (e.g. after select-all / run
+ * selection) — and that stale selection would trip deferral rule (b) below,
+ * handing ⌘C to native copy which then copies nothing (the selection's element
+ * isn't focused). A selection INSIDE the grid (JSON text) is the user's own
+ * copy intent — leave it alone.
+ */
+export function claimCopyFocus(el: HTMLElement | null): void {
+  if (!el) return
+  el.focus({ preventScroll: true })
+  const sel = window.getSelection()
+  if (sel && !sel.isCollapsed && sel.anchorNode && !el.contains(sel.anchorNode)) {
+    sel.removeAllRanges()
+  }
+}
+
 export function useCopyHotkey(getText: () => string | null): void {
   const ref = useRef(getText)
   ref.current = getText

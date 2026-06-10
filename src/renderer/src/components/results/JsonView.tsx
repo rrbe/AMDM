@@ -5,7 +5,7 @@ import i18n from '@renderer/i18n'
 import { indentFor, toJsonLines, type JsonLine } from '@renderer/lib/format'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import { copyText, toPlainJson, toShellText, toStrictEjson } from '@renderer/lib/resultCopy'
-import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 
 /**
  * Pretty-printed EJSON, virtualized BY LINE.
@@ -95,14 +95,14 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
       <div
         ref={parentRef}
         className={`virtual-scroller json-body${allSelected ? ' all-selected' : ''}`}
-        // Focusable so a click moves focus off the query editor — otherwise ⌘C
-        // stays "in" the editor and useCopyHotkey defers to native copy instead
-        // of copying the result (mirrors the Tree/Table scrollers). Focusing
-        // doesn't interfere with drag-selecting the JSON text.
+        // Focusable so a click claims the ⌘C hotkey (mirrors the Tree/Table
+        // scrollers): claimCopyFocus moves focus off the query editor and
+        // clears a selection lingering there, while leaving a selection inside
+        // the JSON text (the user's own copy intent) untouched.
         tabIndex={-1}
         onMouseDown={() => {
           if (allSelected) setAllSelected(false)
-          parentRef.current?.focus({ preventScroll: true })
+          claimCopyFocus(parentRef.current)
         }}
         onContextMenu={openMenu}
       >
