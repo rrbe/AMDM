@@ -1004,8 +1004,8 @@ label {
   max-width: 160px;
   padding: 0 3px 0 8px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: var(--bg-2);
-  color: var(--fg-2);
+  background: transparent;
+  color: var(--fg-3);
   font-size: var(--fs-sm);
   cursor: pointer;
   user-select: none;
@@ -1013,10 +1013,16 @@ label {
 }
 .rtab:hover {
   background: var(--bg-3);
+  color: var(--fg-1);
 }
+/* The active result needs to pop (the user compares runs by switching here):
+   accent top bar + bold + full-contrast text on the panel background, while
+   inactive chips stay quiet (transparent on the strip's bg-app). */
 .rtab.active {
   background: var(--bg-1);
   color: var(--fg-0);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 .rtab-label {
   overflow: hidden;
