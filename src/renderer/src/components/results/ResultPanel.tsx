@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ShellResult } from '@shared/types'
-import { useAppStore, getActiveTab, type ResultView } from '@renderer/store/useAppStore'
+import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
+import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { ContextMenu } from '@renderer/components/ContextMenu'
@@ -12,16 +13,18 @@ import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 
 /**
- * View switcher (Tree | JSON | Table) + metadata bar. Handles every
- * ShellResult.kind: 'documents' (array), 'value', 'ack', 'error'.
+ * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table) +
+ * metadata bar for the focused result. Handles every ShellResult.kind:
+ * 'documents' (array), 'value', 'ack', 'explain', 'error'.
  */
 export function ResultPanel(): JSX.Element {
   const { t } = useTranslation()
-  const result = useAppStore((s) => getActiveTab(s).result)
+  const results = useAppStore((s) => getActiveTab(s).results)
+  const active = useAppStore((s) => getActiveResult(s))
+  const result = active?.result ?? null
   const view = useAppStore((s) => s.resultView)
   const setView = useAppStore((s) => s.setResultView)
-  const lastQuery = useAppStore((s) => getActiveTab(s).lastQuery)
-  const docCtx = docActionContext(result, lastQuery)
+  const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -42,9 +45,15 @@ export function ResultPanel(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [switchable, setView])
 
+  // One tab per run; the strip only appears once there is something to switch
+  // between (a single result reads exactly as before).
+  const strip =
+    results.length > 1 ? <ResultTabStrip results={results} activeId={active?.id ?? null} /> : null
+
   if (!result) {
     return (
       <div className="result-panel">
+        {strip}
         <div className="result-body">
           <div className="center-msg muted">{t('result.noResults')}</div>
         </div>
@@ -55,6 +64,7 @@ export function ResultPanel(): JSX.Element {
   if (result.kind === 'error') {
     return (
       <div className="result-panel">
+        {strip}
         <ErrorView result={result} />
       </div>
     )
@@ -65,6 +75,7 @@ export function ResultPanel(): JSX.Element {
   if (result.kind === 'explain') {
     return (
       <div className="result-panel">
+        {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
           <ResultMeta result={result} docCount={0} />
@@ -82,6 +93,7 @@ export function ResultPanel(): JSX.Element {
 
   return (
     <div className="result-panel">
+      {strip}
       <div className="result-bar">
         <div className="view-switch">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
@@ -139,6 +151,60 @@ export function ResultPanel(): JSX.Element {
   )
 }
 
+/**
+ * The result-tab strip: one chip per kept run (newest last), click to focus,
+ * ✕ / middle-click to close. New runs always land in a fresh tab (the store
+ * caps how many are kept — see lib/tabs MAX_RESULT_TABS).
+ */
+function ResultTabStrip({
+  results,
+  activeId
+}: {
+  results: ResultTab[]
+  activeId: string | null
+}): JSX.Element {
+  const { t } = useTranslation()
+  const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
+  const closeResultTab = useAppStore((s) => s.closeResultTab)
+  return (
+    <div className="result-tabs">
+      {results.map((r) => (
+        <div
+          key={r.id}
+          className={r.id === activeId ? 'rtab active' : 'rtab'}
+          onClick={() => setActiveResultTab(r.id)}
+          onAuxClick={(e) => {
+            // Middle-click closes, matching the query-tab convention.
+            if (e.button === 1) {
+              e.preventDefault()
+              closeResultTab(r.id)
+            }
+          }}
+          data-tip={r.query ? firstLine(r.query.code) : undefined}
+        >
+          <span className="rtab-label">{resultTabLabel(r)}</span>
+          <button
+            className="rtab-close"
+            aria-label={t('result.closeTab')}
+            onClick={(e) => {
+              e.stopPropagation()
+              closeResultTab(r.id)
+            }}
+          >
+            <X size={11} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Tooltip-sized preview of the query that produced a result tab. */
+function firstLine(code: string): string {
+  const line = code.split('\n', 1)[0].trim()
+  return line.length > 80 ? `${line.slice(0, 80)}…` : line
+}
+
 /** Turn any non-error ShellResult into an array of values for the views. */
 function normalizeDocs(result: ShellResult): unknown[] {
   if (result.kind === 'documents') {
@@ -190,7 +256,7 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
  */
 function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
   const { t } = useTranslation()
-  const skip = useAppStore((s) => getActiveTab(s).resultSkip)
+  const skip = useAppStore((s) => getActiveResult(s)?.skip ?? 0)
   const limit = useAppStore((s) => s.settings.queryLimit)
   const running = useAppStore((s) => getActiveTab(s).running)
   const loadPage = useAppStore((s) => s.loadPage)

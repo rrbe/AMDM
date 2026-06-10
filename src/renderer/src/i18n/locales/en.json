@@ -201,6 +201,7 @@
   },
   "result": {
     "noResults": "Run a query to see results.",
+    "closeTab": "Close result",
     "explainTag": "Explain",
     "view": { "tree": "Tree", "table": "Table" },
     "copyAllTip": "Copy all results",

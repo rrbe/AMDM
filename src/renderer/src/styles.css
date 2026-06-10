@@ -980,6 +980,66 @@ label {
   flex-direction: column;
   overflow: hidden;
 }
+/* Result-tab strip — one chip per kept run, above the result bar. Visually a
+   smaller sibling of the query-tab strip (.qtab). */
+.result-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 26px;
+  padding: 3px 6px 0;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.result-tabs::-webkit-scrollbar {
+  display: none;
+}
+.rtab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 160px;
+  padding: 0 3px 0 8px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.rtab:hover {
+  background: var(--bg-3);
+}
+.rtab.active {
+  background: var(--bg-1);
+  color: var(--fg-0);
+}
+.rtab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rtab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-3);
+  opacity: 0.65;
+}
+.rtab:hover .rtab-close,
+.rtab.active .rtab-close {
+  opacity: 1;
+}
+.rtab-close:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+
 .result-bar {
   display: flex;
   align-items: center;

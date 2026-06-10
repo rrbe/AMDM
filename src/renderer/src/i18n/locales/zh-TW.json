@@ -201,6 +201,7 @@
   },
   "result": {
     "noResults": "執行查詢以查看結果。",
+    "closeTab": "關閉結果",
     "explainTag": "Explain",
     "view": { "tree": "樹狀", "table": "表格" },
     "copyAllTip": "複製全部結果",

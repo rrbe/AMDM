@@ -201,6 +201,7 @@
   },
   "result": {
     "noResults": "运行查询以查看结果。",
+    "closeTab": "关闭结果",
     "explainTag": "Explain",
     "view": { "tree": "树形", "table": "表格" },
     "copyAllTip": "复制全部结果",

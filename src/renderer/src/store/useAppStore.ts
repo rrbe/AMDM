@@ -3,7 +3,7 @@
  *
  * Holds: connections, the active connection, per-connection status,
  * the lazily-loaded catalog tree state, the active database, the shell editor
- * code, the last ShellResult, the chosen result view, and loading/error flags.
+ * code, per-tab result strips, the chosen result view, and loading/error flags.
  *
  * All backend access happens here via `window.api`; components dispatch actions
  * and read state. Every async action catches rejections and surfaces them as
@@ -34,13 +34,23 @@ import type {
   ToolStatus,
   UserInfo
 } from '@shared/types'
-import { createTab, patchTab, pickActiveAfterClose, type QueryTab } from '@renderer/lib/tabs'
+import {
+  activeResult,
+  appendResult,
+  closeResult,
+  createTab,
+  patchResult,
+  patchTab,
+  pickActiveAfterClose,
+  type QueryTab,
+  type ResultTab
+} from '@renderer/lib/tabs'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
 const tr = i18n.t.bind(i18n)
 
-export type { QueryTab }
+export type { QueryTab, ResultTab }
 
 export type ResultView = 'tree' | 'json' | 'table'
 
@@ -94,7 +104,8 @@ interface AppState {
   expandedConnections: Set<string>
 
   // ---- shell workspace (multi-tab) ----
-  /** Open query tabs; each carries its own code/result/db/paging/run state. */
+  /** Open query tabs; each carries its own code/db/run state plus a strip of
+      result tabs (one per run, capped — see lib/tabs MAX_RESULT_TABS). */
   tabs: QueryTab[]
   /** Id of the focused tab (always references an existing tab; ≥1 tab exists). */
   activeTabId: string
@@ -156,6 +167,12 @@ interface AppState {
   /** Close a tab (aborts its run if any); always leaves ≥1 tab open. */
   closeTab(id: string): void
 
+  // ---- actions: result tabs (operate on the active query tab) ----
+  /** Focus one of the active tab's result tabs. */
+  setActiveResultTab(id: string): void
+  /** Close one of the active tab's result tabs. */
+  closeResultTab(id: string): void
+
   // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
   formatCode(): Promise<void>
@@ -168,9 +185,10 @@ interface AppState {
   /** Cancel the in-flight run (the Stop button / menu item). No-op when idle. */
   stopShell(): Promise<void>
   runExplain(): Promise<void>
+  /** Re-run the active result tab's query in place (same page offset). */
   refreshResult(): Promise<void>
-  /** Re-run the last query at a new page offset (prev/next). Only meaningful
-      when the current result is `pageable` (a FindCursor). */
+  /** Re-run the active result tab's query at a new page offset (prev/next),
+      patching that result tab in place. Only meaningful when `pageable`. */
   loadPage(skip: number): Promise<void>
   /** Change the page size and re-run the current query from the first page. */
   setQueryLimit(n: number): Promise<void>
@@ -235,10 +253,32 @@ function newTabId(): string {
   return crypto.randomUUID()
 }
 
+/** Stable id for a new result tab. */
+function newResultId(): string {
+  return crypto.randomUUID()
+}
+
 /** The focused tab. Always defined — the store guarantees ≥1 tab exists; the
     `?? tabs[0]` is just a belt-and-suspenders for a stale activeTabId. */
 export function getActiveTab(s: { tabs: QueryTab[]; activeTabId: string }): QueryTab {
   return s.tabs.find((t) => t.id === s.activeTabId) ?? s.tabs[0]
+}
+
+/** The active tab's focused result tab (null = nothing has run yet). */
+export function getActiveResult(s: { tabs: QueryTab[]; activeTabId: string }): ResultTab | null {
+  return activeResult(getActiveTab(s))
+}
+
+/** Apply a result-strip patch (append/patch/close) to one tab by id, reading
+    the tab's CURRENT state inside `set` so concurrent runs don't clobber. */
+function patchTabResults(
+  s: { tabs: QueryTab[] },
+  tabId: string,
+  make: (tab: QueryTab) => Partial<QueryTab>
+): { tabs: QueryTab[] } | Record<string, never> {
+  const tab = s.tabs.find((t) => t.id === tabId)
+  if (!tab) return {}
+  return { tabs: patchTab(s.tabs, tabId, make(tab)) }
 }
 
 /** The tab present at first render (so init can point activeTabId at it). */
@@ -588,6 +628,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  // --------------------------------------------------------------- result tabs
+  setActiveResultTab(id) {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeResultId: id }) }))
+  },
+
+  closeResultTab(id) {
+    set((s) => patchTabResults(s, s.activeTabId, (t) => closeResult(t, id)))
+  },
+
   // --------------------------------------------------------------------- shell
   // All shell actions read/write the *active* tab. Async runs capture their
   // tab id up front and patch THAT tab on completion, so switching tabs (or
@@ -643,22 +692,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
       lastError: null
     }))
+    const query = { connectionId: activeConnectionId, database, code }
     try {
-      // A fresh run always starts at page 0.
-      const result = await window.api.shell.execute({ connectionId: activeConnectionId, database, code, limit, skip: 0, execId })
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
-          result,
-          lastQuery: { connectionId: activeConnectionId, database, code },
-          resultSkip: 0
-        })
-      }))
+      // A fresh run always starts at page 0 and lands in a NEW result tab, so
+      // earlier results stay around for side-by-side comparison.
+      const result = await window.api.shell.execute({ ...query, limit, skip: 0, execId })
+      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
     } catch (e) {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
-          result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' }
-        })
-      }))
+      set((s) =>
+        patchTabResults(s, tabId, (t) =>
+          appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
+        )
+      )
     } finally {
       set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
     }
@@ -680,8 +725,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   async loadPage(skip) {
     const tab = getActiveTab(get())
     const tabId = tab.id
-    const lq = tab.lastQuery
-    if (!lq || skip < 0) return
+    const rt = activeResult(tab)
+    if (!rt?.query || skip < 0) return
+    // Paging mutates the focused result tab IN PLACE (a page flip is the same
+    // result, not a new run). Capture its id so a tab switched mid-flight (or
+    // closed — patchResult no-ops then) still lands on the right result.
+    const resultId = rt.id
+    const query = rt.query
     const limit = get().settings.queryLimit
     const execId = newExecId()
     set((s) => ({
@@ -689,14 +739,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastError: null
     }))
     try {
-      const result = await window.api.shell.execute({ ...lq, limit, skip, execId })
-      set((s) => ({ tabs: patchTab(s.tabs, tabId, { result, resultSkip: skip }) }))
+      const result = await window.api.shell.execute({ ...query, limit, skip, execId })
+      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, skip })))
     } catch (e) {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
-          result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' }
-        })
-      }))
+      set((s) =>
+        patchTabResults(s, tabId, (t) =>
+          patchResult(t, resultId, { result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
+        )
+      )
     } finally {
       set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
     }
@@ -705,8 +755,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   async setQueryLimit(n) {
     const limit = Math.min(1000, Math.max(1, Math.floor(n) || 1))
     await get().updateSettings({ queryLimit: limit })
-    // Re-run the current query from the first page with the new page size.
-    if (getActiveTab(get()).lastQuery) await get().loadPage(0)
+    // Re-run the focused result's query from the first page with the new size.
+    if (getActiveResult(get())?.query) await get().loadPage(0)
   },
 
   async runExplain() {
@@ -725,26 +775,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
       lastError: null
     }))
+    const query = { connectionId: activeConnectionId, database, code }
     try {
-      const result = await window.api.shell.execute({
-        connectionId: activeConnectionId,
-        database,
-        code,
-        explain: true,
-        execId
-      })
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
-          result,
-          lastQuery: { connectionId: activeConnectionId, database, code }
-        })
-      }))
+      const result = await window.api.shell.execute({ ...query, explain: true, execId })
+      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
     } catch (e) {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
-          result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' }
-        })
-      }))
+      set((s) =>
+        patchTabResults(s, tabId, (t) =>
+          appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
+        )
+      )
     } finally {
       set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
     }
@@ -754,18 +794,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   async refreshResult() {
     const tab = getActiveTab(get())
     const tabId = tab.id
-    const lq = tab.lastQuery
-    if (!lq) return
+    const rt = activeResult(tab)
+    if (!rt?.query) return
+    const resultId = rt.id
     try {
-      // Refresh in place — keep the current page offset and size.
+      // Refresh the focused result tab in place — keep its page offset and size.
       const result = await window.api.shell.execute({
-        connectionId: lq.connectionId,
-        database: lq.database,
-        code: lq.code,
+        ...rt.query,
         limit: get().settings.queryLimit,
-        skip: getActiveTab(get()).resultSkip
+        skip: rt.skip
       })
-      set((s) => ({ tabs: patchTab(s.tabs, tabId, { result }) }))
+      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
     } catch (e) {
       set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
     }
