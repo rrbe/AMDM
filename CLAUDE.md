@@ -54,7 +54,13 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 - **cursor 层**（patch 到 `FindCursor`/`AggregationCursor` 原型,幂等）：`projection()`（→`project()`）、`pretty()`（链式 no-op）、`itcount()`/`size()`（物化后计数）。
 - **EJSON 构造器**：`ObjectId`/`ISODate`/`NumberLong`/`NumberInt`(→真正的 `Int32`)/`NumberDecimal`/`UUID`/`BinData`/`Timestamp`(支持 mongosh 的 `Timestamp(t, i)` 两参形式)/`MinKey`/`MaxKey`；构造器都包了 `callableCtor`,可带/不带 `new` 调用。
 
-我们**有意只实现 shell API 的一个子集**——缺失的应当报错,绝不静默错（典型坑:从前 `db.runCommand(...)` 会被当成名为 "runCommand" 的集合,已修）。注意 `vm` 沙箱里抛出的错误来自**不同 realm**,`instanceof Error` 为 false——`describeError` 用 duck-typing 提取真实 `name`/`message`,否则错误名会被压平成 "Error"。脚本的最后一个表达式的求值结果即为返回值（REPL 语义,**只 await 末尾表达式的 promise**,因此多条 async 语句之间不会相互 await——批量操作应走服务端 aggregation/`bulkWrite`）；游标按有界页拉取（`DEFAULT_LIMIT = 50`,多取一条用于判断是否被截断）。绝不把整个集合塞进内存。
+我们**有意只实现 shell API 的一个子集**——缺失的应当报错,绝不静默错（典型坑:从前 `db.runCommand(...)` 会被当成名为 "runCommand" 的集合,已修）。注意 `vm` 沙箱里抛出的错误来自**不同 realm**,`instanceof Error` 为 false——`describeError` 用 duck-typing 提取真实 `name`/`message`,否则错误名会被压平成 "Error"。
+
+**隐式 await（mongosh 同款）**：用户代码先经 `@mongosh/async-rewriter2` 转译再进 `vm`,被打了 `Symbol.for('@@mongosh.syntheticPromise')` 标记的 promise（proxy 透传方法 + cursor 原型 patch 统一打标）会在每个表达式处被隐式 await——所以 `const ids = db.x.distinct('k')` 拿到的是数组,多语句脚本自然顺序执行,和 mongosh 行为一致。脚本的最后一个表达式仍是返回值（REPL 完成值语义）。顶层 `await` 走降级路径（`wrapTopLevelAwait` 包成 async IIFE 并保留完成值）。转译有 50 条的 FIFO 缓存（翻页/刷新重复跑同一段代码）。**改 proxy/cursor patch 时务必保住打标逻辑**,否则多步脚本会拿到 Promise 而不是值。
+
+**print 输出捕获**：`print`/`printjson`/`console.*` 不是 no-op——沙箱内收集原始参数（上限 `MAX_OUTPUT_LINES = 1000`）,运行后经 serializerPool 转成 EJSON-canonical 的 `ShellResult.output` 下发,渲染层 Console 视图展示（纯 print 脚本自动落 Console;错误结果保留失败前的输出）。
+
+游标按有界页拉取（`DEFAULT_LIMIT = 50`,多取一条用于判断是否被截断）;显式 `toArray()`/`itcount()` 是用户主动要求,会全量物化。绝不把整个集合塞进内存。
 
 ### 序列化下沉到 worker + 内联降级（ADR-0004 第 3、4 条）
 `main/workers/serializerPool.ts` 是单个常驻 worker（`serializer.worker.ts`,作为**独立的 rollup input** 构建为 `out/main/serializer.worker.js`）的主线程客户端。主线程只做开销小的二进制 `BSON.serialize`；worker 做昂贵的 EJSON 编码 + 字段提取。**关键健壮性契约：** worker 起不来或崩溃时,池会透明地降级为内联执行**同一份** core 帮助函数（`serialize-core.ts`）——绝不能因 worker 抖动而白屏或卡死。改动池时,务必保住这套降级逻辑和那条 "no transferList" 注释（转移 BSON buffer 可能误伤 Node 的共享分配池）。退出时（`will-quit`）销毁。

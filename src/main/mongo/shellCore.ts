@@ -12,8 +12,17 @@
  * errors, never silent wrong behavior (ADR-0003).
  */
 import vm from 'node:vm'
+import AsyncWriterModule from '@mongosh/async-rewriter2'
+import { parse as parseJs } from '@babel/parser'
+
+// CJS/ESM interop differs between vitest (applies default-unwrapping) and the
+// electron-vite main bundle (bare `require`, no unwrapping) — resolve the
+// class from either shape explicitly so both runtimes construct the same thing.
+const AsyncWriter =
+  (AsyncWriterModule as unknown as { default?: typeof AsyncWriterModule }).default ??
+  AsyncWriterModule
 import { ObjectId, Long, Int32, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
-import { FindCursor, AggregationCursor } from 'mongodb'
+import { FindCursor, AggregationCursor, AbstractCursor } from 'mongodb'
 import type { Collection, Db, Document, FindOptions } from 'mongodb'
 import type { ShellOutputLine, ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
@@ -23,6 +32,84 @@ const EXEC_TIMEOUT_MS = 30_000
 /** Upper bound on captured print/printjson lines per run (ADR-0004 rule 2 in
     spirit: a `forEach(printjson)` over a huge cursor must not flood the IPC). */
 export const MAX_OUTPUT_LINES = 1000
+
+// ---------------------------------------------------------------------------
+// Implicit await (mongosh async-rewriter2)
+// ---------------------------------------------------------------------------
+// Multi-step scripts copied from mongosh / NoSQLBooster don't write `await`:
+// `const ids = db.cards.distinct(...)` expects an array, not a Promise. We run
+// user code through mongosh's own transpiler, which rewrites every expression
+// so that values tagged with the shared-registry symbol below are implicitly
+// awaited. Our proxies/prototype patches tag every driver promise; plain user
+// promises stay untouched unless explicitly `await`ed (top-level await works).
+
+const SYNTHETIC_PROMISE = Symbol.for('@@mongosh.syntheticPromise')
+
+/** Tag a thenable so the transpiled code implicitly awaits it. Non-thenables
+    pass through untouched; tagging is idempotent (defineProperty would throw
+    on a re-tag). The symbol comes from the cross-realm registry, so the check
+    inside the `vm` realm sees the same symbol. */
+export function markSyntheticPromise<T>(value: T): T {
+  if (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function' &&
+    !(value as Record<symbol, unknown>)[SYNTHETIC_PROMISE]
+  ) {
+    Object.defineProperty(value, SYNTHETIC_PROMISE, { value: true })
+  }
+  return value
+}
+
+const asyncWriter = new AsyncWriter()
+/** Per-code transpile cache — paging/refresh re-run the same code verbatim,
+    and Babel costs ~25–80ms per pass. Tiny FIFO, keyed by the exact source. */
+const transpileCache = new Map<string, string>()
+const TRANSPILE_CACHE_MAX = 50
+
+/**
+ * async-rewriter2 parses as sourceType 'script', so explicit TOP-LEVEL `await`
+ * is a SyntaxError there (mongosh sits inside the Node REPL, which pre-wraps).
+ * When that exact error appears, wrap the program in an async IIFE — keeping
+ * REPL completion-value semantics by `return`ing the last expression statement
+ * — and transpile the wrapper instead (implicit await still applies inside).
+ */
+function wrapTopLevelAwait(code: string): string {
+  const ast = parseJs(code, { sourceType: 'script', allowAwaitOutsideFunction: true })
+  const body = ast.program.body
+  const last = body[body.length - 1]
+  let inner = code
+  if (last?.type === 'ExpressionStatement') {
+    const expr = last.expression as { start: number; end: number }
+    inner =
+      code.slice(0, last.start as number) +
+      'return (' +
+      code.slice(expr.start, expr.end) +
+      ');' +
+      code.slice(last.end as number)
+  }
+  return `(async () => { ${inner}\n})()`
+}
+
+export function transpileShellCode(code: string): string {
+  const hit = transpileCache.get(code)
+  if (hit !== undefined) return hit
+  let out: string
+  try {
+    out = asyncWriter.process(code)
+  } catch (err) {
+    if (err instanceof SyntaxError && /'await' is only allowed/.test(err.message)) {
+      out = asyncWriter.process(wrapTopLevelAwait(code))
+    } else {
+      throw err
+    }
+  }
+  if (transpileCache.size >= TRANSPILE_CACHE_MAX) {
+    transpileCache.delete(transpileCache.keys().next().value as string)
+  }
+  transpileCache.set(code, out)
+  return out
+}
 
 // ---------------------------------------------------------------------------
 // Cursor prototype shims — mongosh / NoSQLBooster compatibility
@@ -66,6 +153,42 @@ if (typeof findCursorProto.projection !== 'function') {
 }
 patchSharedCursorMethods(findCursorProto)
 patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string, unknown>)
+
+/**
+ * Wrap the promise-returning methods of a prototype so their results carry the
+ * synthetic-promise tag (implicit await). Cursors escape our proxies — a chain
+ * like `db.x.find().sort(..).toArray()` calls `toArray` on the raw driver
+ * cursor — so the tag has to live on the prototypes. Idempotent via a flag on
+ * the wrapper; the extra symbol on promises is invisible to other callers
+ * (catalog etc.) that share these prototypes.
+ */
+function tagPromiseMethods(proto: Record<string, unknown>, names: string[]): void {
+  for (const name of names) {
+    const orig = proto[name]
+    if (typeof orig !== 'function') continue
+    if ((orig as { __amdmTagged?: boolean }).__amdmTagged) continue
+    const wrapped = function (this: unknown, ...args: unknown[]): unknown {
+      return markSyntheticPromise((orig as (...a: unknown[]) => unknown).apply(this, args))
+    }
+    ;(wrapped as { __amdmTagged?: boolean }).__amdmTagged = true
+    proto[name] = wrapped
+  }
+}
+
+// Order matters: AbstractCursor first, so the Find/Agg pass sees the inherited
+// methods already flagged and only wraps their own additions (explain, count,
+// and the itcount/size shims defined above).
+tagPromiseMethods(AbstractCursor.prototype as unknown as Record<string, unknown>, [
+  'toArray',
+  'forEach',
+  'next',
+  'tryNext',
+  'hasNext',
+  'close'
+])
+for (const proto of [findCursorProto, AggregationCursor.prototype as unknown as Record<string, unknown>]) {
+  tagPromiseMethods(proto, ['toArray', 'forEach', 'explain', 'count', 'itcount', 'size'])
+}
 
 // ---------------------------------------------------------------------------
 // Collection proxy — adapts shell-flavored calls to the driver
@@ -117,17 +240,24 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal): Collection {
             target.find(filter ?? {}, buildFindOptions(projection, options, signal))
         case 'findOne':
           return (filter?: Document, projection?: Document, options?: Document) =>
-            target.findOne(filter ?? {}, buildFindOptions(projection, options, signal))
+            markSyntheticPromise(
+              target.findOne(filter ?? {}, buildFindOptions(projection, options, signal))
+            )
         // Inject the signal so a runaway aggregation can be cancelled mid-flight.
         case 'aggregate':
           return (pipeline?: Document[], options?: Document) =>
             target.aggregate(pipeline ?? [], withSignal(options, signal))
         // mongosh `getIndexes()` → driver `indexes()`.
         case 'getIndexes':
-          return () => target.indexes()
+          return () => markSyntheticPromise(target.indexes())
       }
       const val = (target as unknown as Record<string, unknown>)[prop]
-      return typeof val === 'function' ? (val as (...a: unknown[]) => unknown).bind(target) : val
+      // Pass-through methods (distinct, countDocuments, insertOne, …): tag the
+      // returned promise so multi-step scripts get the value, not the Promise.
+      return typeof val === 'function'
+        ? (...args: unknown[]) =>
+            markSyntheticPromise((val as (...a: unknown[]) => unknown).apply(target, args))
+        : val
     }
   })
 }
@@ -162,30 +292,42 @@ export function makeDbProxy(db: Db, signal?: AbortSignal): Db {
             target.aggregate(pipeline ?? [], withSignal(options, signal))
         // mongosh `db.runCommand(cmd)` → driver `db.command(cmd)`.
         case 'runCommand':
-          return (cmd: Document) => target.command(cmd, withSignal(undefined, signal))
+          return (cmd: Document) =>
+            markSyntheticPromise(target.command(cmd, withSignal(undefined, signal)))
         // mongosh `db.adminCommand(cmd)` → `db.admin().command(cmd)`.
         case 'adminCommand':
-          return (cmd: Document) => target.admin().command(cmd, withSignal(undefined, signal))
+          return (cmd: Document) =>
+            markSyntheticPromise(target.admin().command(cmd, withSignal(undefined, signal)))
         case 'getCollectionNames':
           return () =>
-            target
-              .listCollections({}, { nameOnly: true })
-              .toArray()
-              .then((cs) => cs.map((c) => c.name))
+            markSyntheticPromise(
+              target
+                .listCollections({}, { nameOnly: true })
+                .toArray()
+                .then((cs) => cs.map((c) => c.name))
+            )
         case 'getCollectionInfos':
-          return (filter?: Document) => target.listCollections(filter ?? {}).toArray()
+          return (filter?: Document) =>
+            markSyntheticPromise(target.listCollections(filter ?? {}).toArray())
         case 'getName':
           return () => target.databaseName
         case 'version':
           return () =>
-            target
-              .admin()
-              .command({ buildInfo: 1 })
-              .then((r: Document) => r.version)
+            markSyntheticPromise(
+              target
+                .admin()
+                .command({ buildInfo: 1 })
+                .then((r: Document) => r.version)
+            )
       }
       if (prop in target) {
         const val = (target as unknown as Record<string, unknown>)[prop]
-        return typeof val === 'function' ? (val as (...a: unknown[]) => unknown).bind(target) : val
+        // Pass-through db methods (command, stats, dropDatabase, …): tag the
+        // returned promise for implicit await; sync values pass unchanged.
+        return typeof val === 'function'
+          ? (...args: unknown[]) =>
+              markSyntheticPromise((val as (...a: unknown[]) => unknown).apply(target, args))
+          : val
       }
       // Unknown property → treat as a collection name (mongosh: `db.<coll>`).
       return makeCollProxy(target.collection(prop))
@@ -446,7 +588,9 @@ export interface RunShellOptions {
  * Execute `code` against `db` in a `vm` sandbox and shape the completion value
  * into a {@link ShellResult}. The completion value of the script is the value
  * of its last expression (REPL semantics), so `db.coll.find({})` yields the
- * cursor, which we then drain to a bounded page.
+ * cursor, which we then drain to a bounded page. Driver calls are implicitly
+ * awaited (async-rewriter2, see above), so mongosh-style multi-step scripts
+ * run without explicit `await`; top-level `await` also works.
  */
 export async function runShellOnDb(
   db: Db,
@@ -468,12 +612,17 @@ export async function runShellOnDb(
   try {
     const sandbox = makeSandbox(db, signal, out)
     const context = vm.createContext(sandbox)
-    const script = new vm.Script(code, { filename: 'shell.js' })
-    // The synchronous body is bounded by the vm timeout; a runaway sync loop
+    // Implicit await: run the async-rewriter2 transpilation of the user code.
+    // Driver promises (tagged by our proxies/prototype patches) are awaited at
+    // every step, so multi-statement scripts sequence naturally; the program's
+    // completion value keeps REPL semantics (the last expression).
+    const script = new vm.Script(transpileShellCode(code), { filename: 'shell.js' })
+    // The synchronous prefix is bounded by the vm timeout; a runaway sync loop
     // can't be interrupted by the signal (it never yields to the event loop).
     let result: unknown = script.runInContext(context, { timeout: EXEC_TIMEOUT_MS })
 
-    // Unwrap a returned promise (findOne, updateOne, countDocuments, …).
+    // The transpiled program returns a promise once any async step is hit;
+    // race it against the abort signal so Stop unblocks mid-script.
     if (result && typeof (result as { then?: unknown }).then === 'function') {
       result = await withAbort(result as Promise<unknown>, signal)
     }

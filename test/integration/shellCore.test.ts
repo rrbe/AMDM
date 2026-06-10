@@ -3,12 +3,12 @@
  * real MongoDB (mongodb-memory-server) and asserts on the EJSON-canonical wire
  * shape the renderer actually receives.
  *
- * Execution-model note: the engine runs the snippet in a sync `vm` and awaits
- * only the *trailing* expression's promise (REPL completion value). So
- * multi-statement async sequencing (`db.x.insertOne(); db.x.find()`) does NOT
- * await between statements — by design (ADR-0003 steers bulk work server-side).
- * Tests that need pre-existing data therefore seed via the raw driver, then run
- * a single shell statement.
+ * Execution-model note: user code is transpiled with mongosh's async-rewriter2
+ * before running in the `vm`, so driver promises (tagged synthetic by the
+ * proxies / cursor prototype patches) are IMPLICITLY awaited at every step —
+ * `const ids = db.x.distinct('k')` yields the array, and
+ * `db.x.insertOne(); db.x.find()` sequences naturally, exactly like mongosh.
+ * The completion value keeps REPL semantics (the last expression).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { Db } from 'mongodb'
@@ -633,5 +633,86 @@ describe('console output capture (print / printjson / console.*)', () => {
     const r = await run(`db.nums.find({})`)
     expect(r.output).toBeUndefined()
     expect(r.outputTruncated).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('implicit await (async-rewriter2)', () => {
+  it('assigns the resolved value of a driver call, not the Promise', async () => {
+    const r = await run(`const ids = db.nums.distinct('g'); ids`)
+    expect(r.kind).toBe('documents') // distinct → array
+    expect(r.data).toEqual(['a', 'b', 'c'])
+  })
+
+  it('spreads a distinct result and feeds it back into a query', async () => {
+    const r = await run(`
+      const groups = db.nums.distinct('g', { n: { $lte: 2 } });
+      const more = db.nums.distinct('g', { n: { $gte: 4 } });
+      const all = [...groups, ...more];
+      db.nums.find({ g: { $in: all } }).sort({ n: 1 })
+    `)
+    expect(r.kind).toBe('documents')
+    // groups=[a], more=[b,c] → matches all five docs
+    expect(r.count).toBe(5)
+  })
+
+  it('interpolates countDocuments into a template literal (命令2 shape)', async () => {
+    const r = await run(`
+      const branches = { low: { n: { $lt: 3 } }, high: { n: { $gte: 3 } } };
+      for (const [name, cond] of Object.entries(branches)) {
+        print(\`\${name}: \${db.nums.countDocuments(cond)}\`);
+      }
+      const total = db.nums.countDocuments({ $or: Object.values(branches) });
+      print(\`total: \${total}\`);
+      null
+    `)
+    expect(r.kind).toBe('value')
+    expect(r.output?.map((l) => l.text)).toEqual(['low: 2', 'high: 3', 'total: 5'])
+  })
+
+  it('sequences write-then-read across statements', async () => {
+    const r = await run(`db.w.insertOne({ a: 1 }); db.w.insertOne({ a: 2 }); db.w.countDocuments({})`)
+    expect(r.kind).toBe('value')
+    expect(r.data).toEqual({ $numberInt: '2' })
+  })
+
+  it('explicit toArray() resolves to the full array (documents result)', async () => {
+    const r = await run(`const docs = db.nums.find({}).projection({ _id: 0, n: 1 }).toArray(); docs.length`)
+    expect(r.kind).toBe('value')
+    expect(r.data).toEqual({ $numberInt: '5' })
+  })
+
+  it('aggregate().toArray() inside a script materializes (命令1 shape)', async () => {
+    const r = await run(`
+      const pmIds = db.nums.distinct('n', { g: 'a' });
+      db.nums.aggregate([
+        { $match: { n: { $in: pmIds } } },
+        { $project: { _id: 0, n: 1 } },
+        { $sort: { n: 1 } }
+      ]).toArray()
+    `)
+    expect(r.kind).toBe('documents')
+    expect(r.data).toEqual([{ n: { $numberInt: '1' } }, { n: { $numberInt: '2' } }])
+  })
+
+  it('top-level await still works for explicit user promises', async () => {
+    const r = await run(`const v = await Promise.resolve(41); v + 1`)
+    expect(r.kind).toBe('value')
+    expect(r.data).toEqual({ $numberInt: '42' })
+  })
+
+  it('a bare trailing cursor still pages (not implicitly drained)', async () => {
+    const r = await run(`print('hi'); db.nums.find({})`, { limit: 2 })
+    expect(r.kind).toBe('documents')
+    expect(r.count).toBe(2)
+    expect(r.truncated).toBe(true)
+    expect(r.pageable).toBe(true)
+  })
+
+  it('an error mid-script still surfaces with prior output intact', async () => {
+    const r = await run(`const c = db.nums.countDocuments({}); print('count = ' + c); boom()`)
+    expect(r.kind).toBe('error')
+    expect(r.errorName).toBe('ReferenceError')
+    expect(r.output).toEqual([{ kind: 'text', text: 'count = 5', level: 'log' }])
   })
 })
