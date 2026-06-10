@@ -11,11 +11,15 @@ import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
+import { ConsoleView } from './ConsoleView'
 
 /**
- * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table) +
- * metadata bar for the focused result. Handles every ShellResult.kind:
- * 'documents' (array), 'value', 'ack', 'explain', 'error'.
+ * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
+ * Console when the run printed output) + metadata bar for the focused result.
+ * Handles every ShellResult.kind: 'documents', 'value', 'ack', 'explain',
+ * 'error'. A run whose only product is its output (final value null/undefined)
+ * lands on Console automatically; a run with a real result keeps the data view
+ * and offers Console alongside.
  */
 export function ResultPanel(): JSX.Element {
   const { t } = useTranslation()
@@ -28,22 +32,46 @@ export function ResultPanel(): JSX.Element {
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
 
-  // Cmd/Ctrl+1/2/3 switch Tree/JSON/Table — only while the switcher is showing
-  // (a documents/value result, not error/explain/empty).
+  const hasOutput = !!result?.output?.length
+  // Scripts that only print (REPL completion value null/undefined) open on
+  // Console; everything else opens on the data view with Console one click away.
+  const autoConsole = hasOutput && result!.kind === 'value' && result!.data == null
+  // The user's explicit Console-vs-data choice, per result tab (so switching
+  // result tabs restores each one's view). Pruned to live ids on update.
+  const [consoleChoice, setConsoleChoice] = useState<Record<string, boolean>>({})
+  const showConsole = hasOutput && !!active && (consoleChoice[active.id] ?? autoConsole)
+  const chooseConsole = (on: boolean): void => {
+    if (!active) return
+    setConsoleChoice((prev) => {
+      const next: Record<string, boolean> = { [active.id]: on }
+      for (const r of results) if (r.id in prev && r.id !== active.id) next[r.id] = prev[r.id]
+      return next
+    })
+  }
+
+  // Cmd/Ctrl+1/2/3 switch Tree/JSON/Table (and ⌘4 Console when present) — only
+  // while the switcher is showing (a documents/value result, not error/explain).
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
     if (!switchable) return
     const keyMap: Record<string, ResultView> = { '1': 'tree', '2': 'json', '3': 'table' }
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      if (e.key === '4') {
+        if (!hasOutput) return
+        e.preventDefault()
+        chooseConsole(true)
+        return
+      }
       const target = keyMap[e.key]
       if (!target) return
       e.preventDefault()
+      chooseConsole(false)
       setView(target)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [switchable, setView])
+  }, [switchable, hasOutput, active?.id, setView])
 
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
@@ -62,10 +90,17 @@ export function ResultPanel(): JSX.Element {
   }
 
   if (result.kind === 'error') {
+    // The output printed before the failure is often the best clue — keep it
+    // visible under the error.
     return (
       <div className="result-panel">
         {strip}
-        <ErrorView result={result} />
+        <ErrorView result={result} compact={hasOutput} />
+        {hasOutput && (
+          <div className="result-body">
+            <ConsoleView output={result.output!} truncated={result.outputTruncated} />
+          </div>
+        )}
       </div>
     )
   }
@@ -101,14 +136,26 @@ export function ResultPanel(): JSX.Element {
             return (
               <button
                 key={v}
-                className={view === v ? 'active' : ''}
+                className={!showConsole && view === v ? 'active' : ''}
                 data-tip={`${label} (⌘${i + 1})`}
-                onClick={() => setView(v)}
+                onClick={() => {
+                  chooseConsole(false)
+                  setView(v)
+                }}
               >
                 {label}
               </button>
             )
           })}
+          {hasOutput && (
+            <button
+              className={showConsole ? 'active' : ''}
+              data-tip={`Console (⌘4)`}
+              onClick={() => chooseConsole(true)}
+            >
+              {t('result.view.console')}
+            </button>
+          )}
         </div>
         <ResultMeta result={result} docCount={docs.length} />
         <span className="result-bar-spacer" />
@@ -128,9 +175,15 @@ export function ResultPanel(): JSX.Element {
       </div>
 
       <div className="result-body">
-        {view === 'tree' && <TreeView docs={docs} docCtx={docCtx} />}
-        {view === 'json' && <JsonView docs={docs} />}
-        {view === 'table' && <TableView docs={docs} docCtx={docCtx} />}
+        {showConsole ? (
+          <ConsoleView output={result.output!} truncated={result.outputTruncated} />
+        ) : (
+          <>
+            {view === 'tree' && <TreeView docs={docs} docCtx={docCtx} />}
+            {view === 'json' && <JsonView docs={docs} />}
+            {view === 'table' && <TableView docs={docs} docCtx={docCtx} />}
+          </>
+        )}
       </div>
 
       {copyMenu && (
@@ -232,6 +285,9 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
     } else if (result.kind === 'ack') {
       out.push({ text: t('result.kindAck') })
     }
+    if (result.output?.length) {
+      out.push({ text: t('result.outputLines', { count: result.output.length }) })
+    }
     if (typeof result.elapsedMs === 'number') {
       out.push({ text: t('result.elapsed', { ms: result.elapsedMs }) })
     }
@@ -326,10 +382,12 @@ function PageSizeControl(): JSX.Element {
   )
 }
 
-function ErrorView({ result }: { result: ShellResult }): JSX.Element {
+function ErrorView({ result, compact }: { result: ShellResult; compact?: boolean }): JSX.Element {
   const { t } = useTranslation()
   return (
-    <div className="result-body">
+    // Compact mode: a banner above the run's console output instead of the
+    // full-height body (the output printed before the failure stays visible).
+    <div className={compact ? 'result-error-banner' : 'result-body'}>
       <div className="error-panel">
         <div className="error-name">{result.errorName ?? t('result.errorName')}</div>
         <div className="error-msg">{result.error ?? t('result.errorUnknown')}</div>

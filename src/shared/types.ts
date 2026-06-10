@@ -164,6 +164,22 @@ export interface ShellRequest {
 
 export type ShellResultKind = 'documents' | 'value' | 'ack' | 'explain' | 'error'
 
+/**
+ * One captured shell-output line (print / printjson / console.*). Text lines
+ * carry a ready-to-display string; printjson payloads stay EJSON-canonical so
+ * the Console view renders them with the same shell-style formatting as the
+ * JSON view.
+ */
+export interface ShellOutputLine {
+  kind: 'text' | 'json'
+  /** Display string when kind === 'text'. */
+  text?: string
+  /** EJSON-canonical value when kind === 'json'. */
+  data?: unknown
+  /** Console channel; 'warn'/'error' tint the line. Defaults to 'log'. */
+  level?: 'log' | 'warn' | 'error'
+}
+
 export interface ShellResult {
   kind: ShellResultKind
   /**
@@ -189,6 +205,11 @@ export interface ShellResult {
   /** Populated when kind === 'error'. */
   error?: string
   errorName?: string
+  /** Captured print/printjson/console output, in call order (bounded). Present
+      for every kind — an error still carries the output produced before it. */
+  output?: ShellOutputLine[]
+  /** True when output hit the capture cap and further lines were dropped. */
+  outputTruncated?: boolean
 }
 
 // ---------------------------------------------------------------------------

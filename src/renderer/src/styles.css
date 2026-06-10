@@ -1491,6 +1491,46 @@ label {
   background: var(--accent-soft);
 }
 
+/* ---------------------------------------------------------- console result */
+.console-view-wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.console-view-wrap .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.console-line pre {
+  color: var(--fg-1);
+}
+.console-line.warn pre {
+  color: var(--warn);
+}
+.console-line.error pre {
+  color: var(--err);
+}
+.console-truncated {
+  padding: 3px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--err-bg);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  flex: 0 0 auto;
+}
+/* Error banner above the console output (a failed run that printed first). */
+.result-error-banner {
+  flex: 0 0 auto;
+  max-height: 160px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+}
+.result-error-banner .error-panel {
+  margin: 8px 12px;
+}
+
 /* ------------------------------------------------------------- empty state */
 .empty-state {
   flex: 1;

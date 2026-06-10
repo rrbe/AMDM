@@ -560,3 +560,78 @@ describe('collection detection (drives doc edit/delete)', () => {
     expect((await run('db.getCollection("foo-bar").find({})')).collection).toBe('foo-bar')
   })
 })
+
+// ---------------------------------------------------------------------------
+describe('console output capture (print / printjson / console.*)', () => {
+  it('captures print lines in call order and still returns the completion value', async () => {
+    const r = await run(`print('start'); print('n =', 42); db.nums.countDocuments({})`)
+    expect(r.kind).toBe('value')
+    expect(r.data).toEqual({ $numberInt: '5' })
+    expect(r.output).toEqual([
+      { kind: 'text', text: 'start', level: 'log' },
+      { kind: 'text', text: 'n = 42', level: 'log' }
+    ])
+    expect(r.outputTruncated).toBeUndefined()
+  })
+
+  it('printjson serializes BSON to EJSON-canonical; console.error/warn carry levels', async () => {
+    const r = await run(
+      `printjson({ id: ObjectId('65f1a2b3c4d5e6f7a8b9c0d1'), big: NumberLong('9007199254740993') });
+       console.error('bad'); console.warn('meh'); console.log('ok');
+       null`
+    )
+    expect(r.kind).toBe('value')
+    expect(r.output?.[0]).toEqual({
+      kind: 'json',
+      data: { id: { $oid: '65f1a2b3c4d5e6f7a8b9c0d1' }, big: { $numberLong: '9007199254740993' } },
+      level: 'log'
+    })
+    expect(r.output?.slice(1)).toEqual([
+      { kind: 'text', text: 'bad', level: 'error' },
+      { kind: 'text', text: 'meh', level: 'warn' },
+      { kind: 'text', text: 'ok', level: 'log' }
+    ])
+  })
+
+  it('print with a BSON object argument inlines it as compact EJSON', async () => {
+    const r = await run(`print('doc:', { n: NumberInt(7) }); null`)
+    expect(r.output?.[0]).toEqual({ kind: 'text', text: 'doc: {"n":{"$numberInt":"7"}}', level: 'log' })
+  })
+
+  it('cursor.forEach(printjson) streams docs into the output (script-only run)', async () => {
+    const r = await run(`db.nums.find({}).sort({ n: 1 }).forEach(printjson)`)
+    // forEach resolves to undefined → a value-null result whose payload is the output.
+    expect(r.kind).toBe('value')
+    expect(r.data).toBeNull()
+    expect(r.output).toHaveLength(5)
+    expect(r.output?.every((l) => l.kind === 'json')).toBe(true)
+    expect((r.output?.[0].data as { n: unknown }).n).toEqual({ $numberInt: '1' })
+  })
+
+  it('documents results carry output alongside the docs', async () => {
+    const r = await run(`print('querying'); db.nums.find({})`)
+    expect(r.kind).toBe('documents')
+    expect(r.count).toBe(5)
+    expect(r.output).toEqual([{ kind: 'text', text: 'querying', level: 'log' }])
+  })
+
+  it('an error keeps the output printed before the failure', async () => {
+    const r = await run(`print('step 1 ok'); nope()`)
+    expect(r.kind).toBe('error')
+    expect(r.errorName).toBe('ReferenceError')
+    expect(r.output).toEqual([{ kind: 'text', text: 'step 1 ok', level: 'log' }])
+  })
+
+  it('caps captured lines at MAX_OUTPUT_LINES and flags truncation', async () => {
+    const r = await run(`for (let i = 0; i < 1500; i++) print('line', i); null`)
+    expect(r.output).toHaveLength(1000)
+    expect(r.outputTruncated).toBe(true)
+    expect(r.output?.[999]).toEqual({ kind: 'text', text: 'line 999', level: 'log' })
+  })
+
+  it('results with no printed output omit the output field entirely', async () => {
+    const r = await run(`db.nums.find({})`)
+    expect(r.output).toBeUndefined()
+    expect(r.outputTruncated).toBeUndefined()
+  })
+})

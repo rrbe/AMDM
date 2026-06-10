@@ -203,7 +203,7 @@
     "noResults": "运行查询以查看结果。",
     "closeTab": "关闭结果",
     "explainTag": "Explain",
-    "view": { "tree": "树形", "table": "表格" },
+    "view": { "tree": "树形", "table": "表格", "console": "Console" },
     "copyAllTip": "复制全部结果",
     "copy": {
       "pureJson": "复制全部 (Pure JSON)",
@@ -214,6 +214,9 @@
     },
     "docCount_one": "{{count}} 个文档",
     "docCount_other": "{{count}} 个文档",
+    "outputLines_one": "{{count}} 行输出",
+    "outputLines_other": "{{count}} 行输出",
+    "consoleTruncated": "输出行数已达上限，后续输出被丢弃",
     "truncated": "已截断 — 增大每页条数以查看更多",
     "kindValue": "值",
     "kindAck": "写入结果",

@@ -15,11 +15,14 @@ import vm from 'node:vm'
 import { ObjectId, Long, Int32, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
 import { FindCursor, AggregationCursor } from 'mongodb'
 import type { Collection, Db, Document, FindOptions } from 'mongodb'
-import type { ShellResult } from '../../shared/types'
+import type { ShellOutputLine, ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
+/** Upper bound on captured print/printjson lines per run (ADR-0004 rule 2 in
+    spirit: a `forEach(printjson)` over a huge cursor must not flood the IPC). */
+export const MAX_OUTPUT_LINES = 1000
 
 // ---------------------------------------------------------------------------
 // Cursor prototype shims — mongosh / NoSQLBooster compatibility
@@ -202,7 +205,61 @@ function callableCtor<T extends new (...args: never[]) => unknown>(Ctor: T): T {
   })
 }
 
-export function makeSandbox(db: Db, signal?: AbortSignal): Record<string, unknown> {
+/**
+ * Collects raw print/printjson arguments during a run. Values are kept as-is
+ * (they may be live BSON) and converted to wire-ready {@link ShellOutputLine}s
+ * only once, after the run — the sandbox callbacks stay cheap and synchronous.
+ */
+export class OutputCollector {
+  private entries: { kind: 'print' | 'printjson'; values: unknown[]; level: 'log' | 'warn' | 'error' }[] = []
+  truncated = false
+
+  push(kind: 'print' | 'printjson', values: unknown[], level: 'log' | 'warn' | 'error' = 'log'): void {
+    if (this.entries.length >= MAX_OUTPUT_LINES) {
+      this.truncated = true
+      return
+    }
+    this.entries.push({ kind, values, level })
+  }
+
+  get size(): number {
+    return this.entries.length
+  }
+
+  /** Convert the collected raw values into EJSON-safe wire lines. */
+  async toLines(): Promise<ShellOutputLine[]> {
+    const lines: ShellOutputLine[] = []
+    for (const e of this.entries) {
+      if (e.kind === 'printjson') {
+        lines.push({ kind: 'json', data: await serializerPool.serializeOne(e.values[0] ?? null), level: e.level })
+        continue
+      }
+      // print/console: primitives via String(); objects (likely BSON) as a
+      // compact EJSON string so `print('found:', doc)` stays one line.
+      const parts: string[] = []
+      for (const v of e.values) {
+        if (v !== null && typeof v === 'object') {
+          try {
+            parts.push(JSON.stringify(await serializerPool.serializeOne(v)))
+          } catch {
+            parts.push(String(v))
+          }
+        } else {
+          parts.push(String(v))
+        }
+      }
+      lines.push({ kind: 'text', text: parts.join(' '), level: e.level })
+    }
+    return lines
+  }
+}
+
+export function makeSandbox(
+  db: Db,
+  signal?: AbortSignal,
+  out?: OutputCollector
+): Record<string, unknown> {
+  const print = (...args: unknown[]): void => out?.push('print', args)
   return {
     db: makeDbProxy(db, signal),
     ObjectId: callableCtor(ObjectId),
@@ -226,10 +283,15 @@ export function makeSandbox(db: Db, signal?: AbortSignal): Record<string, unknow
     },
     MinKey: callableCtor(MinKey),
     MaxKey: callableCtor(MaxKey),
-    // Shell print helpers are no-ops here; the result is the completion value.
-    print: () => undefined,
-    printjson: () => undefined,
-    console: { log: () => undefined, error: () => undefined, warn: () => undefined }
+    // Shell print helpers feed the Console output (bounded; see MAX_OUTPUT_LINES).
+    print,
+    printjson: (v?: unknown) => out?.push('printjson', [v]),
+    console: {
+      log: print,
+      info: print,
+      error: (...args: unknown[]) => out?.push('print', args, 'error'),
+      warn: (...args: unknown[]) => out?.push('print', args, 'warn')
+    }
   }
 }
 
@@ -395,9 +457,16 @@ export async function runShellOnDb(
   const signal = options.signal
   const started = Date.now()
   const collection = detectCollection(code)
+  const out = new OutputCollector()
+  // Attach whatever the script printed to the outgoing result — every kind,
+  // including errors (the output produced before a failure is the best clue).
+  const withOutput = async (r: ShellResult): Promise<ShellResult> => {
+    if (out.size === 0) return r
+    return { ...r, output: await out.toLines(), ...(out.truncated ? { outputTruncated: true } : {}) }
+  }
 
   try {
-    const sandbox = makeSandbox(db, signal)
+    const sandbox = makeSandbox(db, signal, out)
     const context = vm.createContext(sandbox)
     const script = new vm.Script(code, { filename: 'shell.js' })
     // The synchronous body is bounded by the vm timeout; a runaway sync loop
@@ -413,20 +482,20 @@ export async function runShellOnDb(
     if (options.explain) {
       if (isExplainable(result)) {
         const plan = await withAbort(result.explain('executionStats'), signal)
-        return {
+        return await withOutput({
           kind: 'explain',
           data: await serializerPool.serializeOne(plan),
           collection,
           elapsedMs: Date.now() - started
-        }
+        })
       }
-      return {
+      return await withOutput({
         kind: 'error',
         error: 'Explain is only supported for find()/aggregate() queries.',
         errorName: 'ExplainError',
         collection,
         elapsedMs: Date.now() - started
-      }
+      })
     }
 
     const elapsedMs = Date.now() - started
@@ -439,7 +508,7 @@ export async function runShellOnDb(
       const skip = options.skip ?? 0
       if (pageable && skip > 0) (result as FindCursor).skip(skip)
       const { docs, truncated } = await drainCursor(result, limit, signal)
-      return {
+      return await withOutput({
         kind: 'documents',
         data: await serializerPool.serialize(docs),
         count: docs.length,
@@ -448,43 +517,54 @@ export async function runShellOnDb(
         skip,
         collection,
         elapsedMs: Date.now() - started
-      }
+      })
     }
 
     if (Array.isArray(result)) {
-      return {
+      return await withOutput({
         kind: 'documents',
         data: await serializerPool.serialize(result),
         count: result.length,
         truncated: false,
         collection,
         elapsedMs
-      }
+      })
     }
 
     if (isWriteAck(result)) {
-      return { kind: 'ack', data: await serializerPool.serializeOne(result), collection, elapsedMs }
+      return await withOutput({
+        kind: 'ack',
+        data: await serializerPool.serializeOne(result),
+        collection,
+        elapsedMs
+      })
     }
 
-    return {
+    return await withOutput({
       kind: 'value',
       data: await serializerPool.serializeOne(result ?? null),
       collection,
       elapsedMs
-    }
+    })
   } catch (err) {
     // A user-initiated stop surfaces as whatever the driver/race threw; collapse
     // all of them to one clean "Aborted" result rather than a scary stack.
     if (signal?.aborted) {
-      return {
+      return await withOutput({
         kind: 'error',
         error: '执行已停止',
         errorName: 'Aborted',
         collection,
         elapsedMs: Date.now() - started
-      }
+      })
     }
     const { error, errorName } = describeError(err)
-    return { kind: 'error', error, errorName, collection, elapsedMs: Date.now() - started }
+    return await withOutput({
+      kind: 'error',
+      error,
+      errorName,
+      collection,
+      elapsedMs: Date.now() - started
+    })
   }
 }

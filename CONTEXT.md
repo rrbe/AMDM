@@ -21,7 +21,7 @@ The editor + execution context where the user types JavaScript (e.g. `db.lives.f
 _Avoid_: Console, terminal, REPL
 
 **Result View**:
-One of three interchangeable renderings of a query result: **Tree**, **JSON**, or **Table**.
+One of four interchangeable renderings of a query result: **Tree**, **JSON**, **Table**, or **Console**. Console appears only when the run printed output (`print`/`printjson`/`console.*`) and shows those captured lines; "Console" never refers to the Shell itself (see Shell, above).
 _Avoid_: Output, grid (Table only)
 
 **Saved Query**:

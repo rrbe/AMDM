@@ -203,7 +203,7 @@
     "noResults": "執行查詢以查看結果。",
     "closeTab": "關閉結果",
     "explainTag": "Explain",
-    "view": { "tree": "樹狀", "table": "表格" },
+    "view": { "tree": "樹狀", "table": "表格", "console": "Console" },
     "copyAllTip": "複製全部結果",
     "copy": {
       "pureJson": "複製全部 (Pure JSON)",
@@ -214,6 +214,9 @@
     },
     "docCount_one": "{{count}} 筆文件",
     "docCount_other": "{{count}} 筆文件",
+    "outputLines_one": "{{count}} 行輸出",
+    "outputLines_other": "{{count}} 行輸出",
+    "consoleTruncated": "輸出行數已達上限，後續輸出被丟棄",
     "truncated": "已截斷 — 增大每頁筆數以查看更多",
     "kindValue": "值",
     "kindAck": "寫入結果",

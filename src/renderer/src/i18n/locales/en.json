@@ -203,7 +203,7 @@
     "noResults": "Run a query to see results.",
     "closeTab": "Close result",
     "explainTag": "Explain",
-    "view": { "tree": "Tree", "table": "Table" },
+    "view": { "tree": "Tree", "table": "Table", "console": "Console" },
     "copyAllTip": "Copy all results",
     "copy": {
       "pureJson": "Copy all (Pure JSON)",
@@ -214,6 +214,9 @@
     },
     "docCount_one": "{{count}} doc",
     "docCount_other": "{{count}} docs",
+    "outputLines_one": "{{count}} output line",
+    "outputLines_other": "{{count}} output lines",
+    "consoleTruncated": "Output capped — lines beyond the limit were dropped",
     "truncated": "truncated — raise page size to see more",
     "kindValue": "value",
     "kindAck": "write result",
