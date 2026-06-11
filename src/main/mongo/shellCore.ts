@@ -114,8 +114,11 @@ export function markSyntheticPromise<T>(value: T): T {
 //
 // Boundaries:
 // - Covered: forEach / map / flatMap / filter / find / findIndex / some /
-//   every / reduce / reduceRight. Anything else (e.g. `sort` with an async
-//   comparator) falls through to the native, async-unaware method.
+//   every / reduce / reduceRight. `sort`/`toSorted` cannot be made async-aware
+//   (a comparator has no sequential-await order), so a comparator returning a
+//   thenable THROWS instead of silently misordering (ADR-0003: loud, never
+//   silent). Anything else with a callback (e.g. `findLast`) falls through to
+//   the native, async-unaware method.
 // - Plain array literals are NOT patched — same limitation as mongosh itself.
 // - Enhancement only happens during a shell run (`activeShellRuns` above);
 //   catalog/exporter and other main-process driver callers get raw arrays.
@@ -212,7 +215,9 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
   define('filter', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const pick = (flags: unknown[]): unknown[] => {
       const out: unknown[] = []
-      for (let i = 0; i < a.length; i++) if (flags[i]) out.push(a[i])
+      // flags.length is the length captured before iteration — elements the
+      // callbacks appended are excluded, matching the native methods.
+      for (let i = 0; i < flags.length; i++) if (flags[i]) out.push(a[i])
       return patchAsyncAwareArray(out)
     }
     const flags = collectSeq(a, cb, thisArg)
@@ -306,6 +311,38 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
       return acc
     }
   )
+  // A db-touching comparator (rewritten to return a promise) would make the
+  // NATIVE sort coerce promises to NaN and "succeed" with garbage order —
+  // exactly the silent-wrong ADR-0003 forbids. Throw with a way out instead.
+  const guardComparator =
+    (cmp: (x: unknown, y: unknown) => unknown) =>
+    (x: unknown, y: unknown): number => {
+      const r = cmp(x, y)
+      if (isThenable(r)) {
+        // The in-flight promise is abandoned on purpose; keep its eventual
+        // rejection handled (e.g. client closed before it settles) so it
+        // can't surface as an unhandledRejection.
+        void r.then(undefined, () => {})
+        throw new TypeError(
+          'sort() comparator returned a Promise — db calls inside a comparator are not supported; compute the sort keys first (e.g. map to { key, doc }), then sort'
+        )
+      }
+      return r as number
+    }
+  define('sort', (cmp?: (x: unknown, y: unknown) => unknown): unknown =>
+    Array.prototype.sort.call(a, typeof cmp === 'function' ? guardComparator(cmp) : undefined)
+  )
+  const nativeToSorted = (Array.prototype as unknown as Record<string, unknown>).toSorted
+  if (typeof nativeToSorted === 'function') {
+    define('toSorted', (cmp?: (x: unknown, y: unknown) => unknown): unknown =>
+      patchAsyncAwareArray(
+        (nativeToSorted as (this: unknown, c?: unknown) => unknown[]).call(
+          a,
+          typeof cmp === 'function' ? guardComparator(cmp) : undefined
+        )
+      )
+    )
+  }
   return arr
 }
 
@@ -412,8 +449,17 @@ patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string
 // the driver's own implementation (see `activeShellRuns`). Must run BEFORE
 // tagPromiseMethods below so the replacement gets the synthetic-promise
 // wrapper too.
-const abstractCursorProto = AbstractCursor.prototype as unknown as Record<string, unknown>
-if (!(abstractCursorProto.forEach as { __amdmAwaits?: boolean } | undefined)?.__amdmAwaits) {
+// The idempotency marker lives on the PROTOTYPE (shared-registry symbol), not
+// on the function: tagPromiseMethods wraps forEach right below, so a flag on
+// the function itself would be hidden behind the wrapper and a re-evaluation
+// of this module would needlessly re-replace the method.
+const CURSOR_FOREACH_PATCHED = Symbol.for('amdm.cursorForEachAwaits')
+const abstractCursorProto = AbstractCursor.prototype as unknown as Record<
+  string | symbol,
+  unknown
+>
+if (!abstractCursorProto[CURSOR_FOREACH_PATCHED]) {
+  Object.defineProperty(abstractCursorProto, CURSOR_FOREACH_PATCHED, { value: true })
   const origForEach = abstractCursorProto.forEach as (
     this: unknown,
     iterator: (doc: unknown) => unknown
@@ -432,7 +478,6 @@ if (!(abstractCursorProto.forEach as { __amdmAwaits?: boolean } | undefined)?.__
       if (r === false) break
     }
   }
-  ;(forEach as unknown as { __amdmAwaits?: boolean }).__amdmAwaits = true
   abstractCursorProto.forEach = forEach
 }
 
