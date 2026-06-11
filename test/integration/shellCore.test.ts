@@ -716,3 +716,100 @@ describe('implicit await (async-rewriter2)', () => {
     expect(r.output).toEqual([{ kind: 'text', text: 'count = 5', level: 'log' }])
   })
 })
+
+// ---------------------------------------------------------------------------
+// Async-aware arrays: native-looking forEach/map/… over driver-resolved arrays
+// whose callbacks hit the db again (the NoSQLBooster "collection report" idiom).
+// Without the patch the run "finishes" before the callbacks do (prints lost)
+// or map yields pending promises (JSON.stringify → `[{}, {}]`).
+describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
+  it('getCollectionNames().forEach with db.runCommand inside completes before the run ends', async () => {
+    const r = await run(`
+      db.getCollectionNames().forEach(function (name) {
+        var st = {};
+        try { st = db.runCommand({ collStats: name, scale: 1048576 }); } catch (e) {}
+        print([name, st.count || 0, st.nindexes || 0].join(':'));
+      });
+    `)
+    expect(r.kind).toBe('value')
+    expect(r.output?.map((l) => l.text)).toEqual(['nums:5:1'])
+  })
+
+  it('getCollectionInfos().map with db calls yields resolved rows, not pending promises', async () => {
+    const r = await run(`
+      const rows = db.getCollectionInfos({ type: 'collection' }).map(ci => {
+        const c = db.getCollection(ci.name);
+        const doc = c.findOne() || {};
+        return {
+          name: ci.name,
+          count: c.estimatedDocumentCount(),
+          topFields: Object.keys(doc).join(',')
+        };
+      });
+      print(JSON.stringify(rows));
+      rows
+    `)
+    expect(r.kind).toBe('documents')
+    expect(r.data).toEqual([
+      { name: 'nums', count: { $numberInt: '5' }, topFields: '_id,n,g' }
+    ])
+    // The printed JSON proves rows held real values at stringify time.
+    expect(r.output?.[0]).toEqual({
+      kind: 'text',
+      text: '[{"name":"nums","count":5,"topFields":"_id,n,g"}]',
+      level: 'log'
+    })
+  })
+
+  it('filter/find/reduce over a distinct result with async predicates', async () => {
+    const r = await run(`
+      const gs = db.nums.distinct('g');
+      const big = gs.filter(g => db.nums.countDocuments({ g: g }) >= 2);
+      const single = gs.find(g => db.nums.countDocuments({ g: g }) === 1);
+      const total = gs.reduce((acc, g) => acc + db.nums.countDocuments({ g: g }), 0);
+      ({ big, single, total })
+    `)
+    expect(r.kind).toBe('value')
+    expect(r.data).toEqual({
+      big: ['a', 'b'],
+      single: 'c',
+      total: { $numberInt: '5' }
+    })
+  })
+
+  it('sync callbacks over driver arrays keep native synchronous behavior', async () => {
+    const r = await run(`
+      const names = db.getCollectionNames();
+      const upper = names.map(n => n.toUpperCase());
+      upper
+    `)
+    expect(r.kind).toBe('documents')
+    expect(r.data).toEqual(['NUMS'])
+  })
+
+  // The driver's own cursor.forEach fires callbacks without awaiting them —
+  // our AbstractCursor patch awaits each one, like mongosh's shell cursor.
+  it('cursor forEach awaits db-touching callbacks before the run ends', async () => {
+    const r = await run(`
+      db.nums.find({ g: 'a' }).sort({ n: 1 }).forEach(function (doc) {
+        var total = db.nums.countDocuments({ g: doc.g });
+        print(doc.n + '/' + total);
+      });
+    `)
+    expect(r.kind).toBe('value')
+    expect(r.output?.map((l) => l.text)).toEqual(['1/2', '2/2'])
+  })
+
+  it('cursor forEach stops when an async callback returns false', async () => {
+    const r = await run(`
+      const seen = [];
+      db.nums.find().sort({ n: 1 }).forEach(function (doc) {
+        seen.push(doc.n);
+        if (db.nums.countDocuments({ n: doc.n }) === 1 && doc.n >= 2) return false;
+      });
+      seen
+    `)
+    expect(r.kind).toBe('documents')
+    expect(r.data).toEqual([{ $numberInt: '1' }, { $numberInt: '2' }])
+  })
+})

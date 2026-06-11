@@ -45,20 +45,268 @@ export const MAX_OUTPUT_LINES = 1000
 
 const SYNTHETIC_PROMISE = Symbol.for('@@mongosh.syntheticPromise')
 
-/** Tag a thenable so the transpiled code implicitly awaits it. Non-thenables
-    pass through untouched; tagging is idempotent (defineProperty would throw
-    on a re-tag). The symbol comes from the cross-realm registry, so the check
-    inside the `vm` realm sees the same symbol. */
-export function markSyntheticPromise<T>(value: T): T {
-  if (
-    value !== null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function' &&
-    !(value as Record<symbol, unknown>)[SYNTHETIC_PROMISE]
-  ) {
-    Object.defineProperty(value, SYNTHETIC_PROMISE, { value: true })
+function isThenable(v: unknown): v is PromiseLike<unknown> {
+  return (
+    v !== null &&
+    (typeof v === 'object' || typeof v === 'function') &&
+    typeof (v as { then?: unknown }).then === 'function'
+  )
+}
+
+// The prototype patches below are global (cursors escape the shell proxies, so
+// the tag has to live on shared driver prototypes), but their BEHAVIOR is
+// scoped: outside a shell run they degrade to tag-in-place / native-driver
+// paths, so other main-process callers on the same prototypes (catalog,
+// exporter, …) keep pristine driver semantics — e.g. `docs.map(async …)` +
+// `Promise.all` there must NOT hit the sequential-await arrays. A concurrent
+// catalog call DURING a shell run still sees the enhanced behavior (module
+// counter, not per-async-context), which is harmless: the array helpers are
+// inert for sync callbacks.
+let activeShellRuns = 0
+
+/** Run `fn` with shell semantics active (async-aware arrays, awaiting cursor
+    forEach). `runShellOnDb` wraps itself in this; exported for unit tests. */
+export async function shellRunScope<T>(fn: () => Promise<T>): Promise<T> {
+  activeShellRuns++
+  try {
+    return await fn()
+  } finally {
+    activeShellRuns--
   }
-  return value
+}
+
+/** Tag a thenable so the transpiled code implicitly awaits it. Non-thenables
+    pass through untouched; tagging is idempotent. The symbol comes from the
+    cross-realm registry, so the check inside the `vm` realm sees the same
+    symbol. During a shell run, thenables are re-wrapped (not mutated) so that
+    resolved ARRAYS gain the async-aware iteration helpers below before user
+    code ever sees them; outside one they are tagged in place — same promise
+    identity, no array enhancement. */
+export function markSyntheticPromise<T>(value: T): T {
+  if (!isThenable(value)) return value
+  if ((value as Record<symbol, unknown>)[SYNTHETIC_PROMISE]) return value
+  if (activeShellRuns === 0) {
+    Object.defineProperty(value, SYNTHETIC_PROMISE, { value: true })
+    return value
+  }
+  const chained = Promise.resolve(value).then((v) =>
+    Array.isArray(v) ? patchAsyncAwareArray(v) : v
+  )
+  Object.defineProperty(chained, SYNTHETIC_PROMISE, { value: true })
+  return chained as unknown as T
+}
+
+// ---------------------------------------------------------------------------
+// Async-aware array iteration (NoSQLBooster / mongosh script compatibility)
+// ---------------------------------------------------------------------------
+// async-rewriter2 rewrites user CALLBACKS too: a callback that touches the db
+// (`names.forEach(n => print(db[n].countDocuments()))`) suspends at its first
+// driver call and returns a promise — which the NATIVE Array.prototype methods
+// neither await nor surface. The script then "finishes" before the callbacks
+// run (prints lost, result null), or `map` yields an array of pending promises
+// (`JSON.stringify(rows)` → `[{}, {}]`). NoSQLBooster's fiber-based shell is
+// fully synchronous, so snippets copied from it lean on this pattern heavily.
+// Fix: arrays resolved from tagged driver promises (getCollectionNames,
+// getCollectionInfos, toArray, distinct, …) get OWN forEach/map/… that run the
+// callbacks sequentially, await any thenable result, and return a tagged
+// promise the implicit await then unwraps. Sync callbacks keep exact native
+// behavior (and native return types).
+//
+// Boundaries:
+// - Covered: forEach / map / flatMap / filter / find / findIndex / some /
+//   every / reduce / reduceRight. Anything else (e.g. `sort` with an async
+//   comparator) falls through to the native, async-unaware method.
+// - Plain array literals are NOT patched — same limitation as mongosh itself.
+// - Enhancement only happens during a shell run (`activeShellRuns` above);
+//   catalog/exporter and other main-process driver callers get raw arrays.
+// - The driver CURSOR's own `forEach` has the same fire-without-await flaw;
+//   it is replaced separately below (see the AbstractCursor.forEach patch).
+
+const ASYNC_AWARE_ARRAY = Symbol('amdm.asyncAwareArray')
+
+type ArrayCb = (value: unknown, index: number, array: unknown[]) => unknown
+
+/** Sequentially collect cb(item) for every item. Fully synchronous until the
+    first thenable result, then switches to awaiting (order preserved). Length
+    is captured up front, like the native methods (a callback that pushes new
+    elements doesn't extend the iteration). */
+function collectSeq(
+  arr: unknown[],
+  cb: ArrayCb,
+  thisArg?: unknown
+): unknown[] | Promise<unknown[]> {
+  const len = arr.length
+  const results = new Array(len)
+  for (let i = 0; i < len; i++) {
+    const r = cb.call(thisArg, arr[i], i, arr)
+    if (isThenable(r)) {
+      return (async () => {
+        results[i] = await r
+        for (let j = i + 1; j < len; j++) {
+          results[j] = await cb.call(thisArg, arr[j], j, arr)
+        }
+        return results
+      })()
+    }
+    results[i] = r
+  }
+  return results
+}
+
+/** Index of the first element whose predicate result coerces to `stopOn`
+    (early exit), or -1. Same sync-until-first-thenable strategy. */
+function findIndexSeq(
+  arr: unknown[],
+  pred: ArrayCb,
+  thisArg: unknown,
+  stopOn: boolean
+): number | Promise<number> {
+  const len = arr.length
+  for (let i = 0; i < len; i++) {
+    const r = pred.call(thisArg, arr[i], i, arr)
+    if (isThenable(r)) {
+      return (async () => {
+        if (Boolean(await r) === stopOn) return i
+        for (let j = i + 1; j < len; j++) {
+          if (Boolean(await pred.call(thisArg, arr[j], j, arr)) === stopOn) return j
+        }
+        return -1
+      })()
+    }
+    if (Boolean(r) === stopOn) return i
+  }
+  return -1
+}
+
+/** Install own, non-enumerable async-aware iteration methods on `arr`.
+    Idempotent; invisible to JSON.stringify / BSON / structuredClone (all skip
+    non-enumerable props), so the array still serializes as a plain array. */
+export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
+  if ((arr as Record<symbol, unknown>)[ASYNC_AWARE_ARRAY] || !Object.isExtensible(arr)) return arr
+  Object.defineProperty(arr, ASYNC_AWARE_ARRAY, { value: true })
+  const a = arr as unknown[]
+  const define = (name: string, fn: unknown): void => {
+    Object.defineProperty(arr, name, { value: fn, writable: true, configurable: true })
+  }
+
+  define('forEach', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const r = collectSeq(a, cb, thisArg)
+    return isThenable(r) ? markSyntheticPromise(r.then(() => undefined)) : undefined
+  })
+  define('map', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const r = collectSeq(a, cb, thisArg)
+    // Derived arrays stay enhanced by LINEAGE (the source array is enhanced),
+    // not by scope — patch explicitly on both paths instead of relying on
+    // markSyntheticPromise's scoped patching.
+    return isThenable(r)
+      ? markSyntheticPromise((r as Promise<unknown[]>).then((vals) => patchAsyncAwareArray(vals)))
+      : patchAsyncAwareArray(r as unknown[])
+  })
+  define('flatMap', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const flat = (vals: unknown[]): unknown[] => patchAsyncAwareArray(vals.flat())
+    const r = collectSeq(a, cb, thisArg)
+    return isThenable(r)
+      ? markSyntheticPromise((r as Promise<unknown[]>).then(flat))
+      : flat(r as unknown[])
+  })
+  define('filter', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const pick = (flags: unknown[]): unknown[] => {
+      const out: unknown[] = []
+      for (let i = 0; i < a.length; i++) if (flags[i]) out.push(a[i])
+      return patchAsyncAwareArray(out)
+    }
+    const flags = collectSeq(a, cb, thisArg)
+    return isThenable(flags)
+      ? markSyntheticPromise((flags as Promise<unknown[]>).then(pick))
+      : pick(flags as unknown[])
+  })
+  define('find', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, true)
+    return isThenable(i)
+      ? markSyntheticPromise((i as Promise<number>).then((ix) => (ix === -1 ? undefined : a[ix])))
+      : i === -1
+        ? undefined
+        : a[i as number]
+  })
+  define('findIndex', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, true)
+    return isThenable(i) ? markSyntheticPromise(i) : i
+  })
+  define('some', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, true)
+    return isThenable(i)
+      ? markSyntheticPromise((i as Promise<number>).then((ix) => ix !== -1))
+      : i !== -1
+  })
+  define('every', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, false)
+    return isThenable(i)
+      ? markSyntheticPromise((i as Promise<number>).then((ix) => ix === -1))
+      : i === -1
+  })
+  define(
+    'reduce',
+    (cb: (acc: unknown, v: unknown, i: number, arr: unknown[]) => unknown, ...init: unknown[]): unknown => {
+      const len = a.length
+      let acc: unknown
+      let start: number
+      if (init.length > 0) {
+        acc = init[0]
+        start = 0
+      } else if (len === 0) {
+        throw new TypeError('Reduce of empty array with no initial value')
+      } else {
+        acc = a[0]
+        start = 1
+      }
+      for (let i = start; i < len; i++) {
+        const r = cb(acc, a[i], i, a)
+        if (isThenable(r)) {
+          return markSyntheticPromise(
+            (async () => {
+              acc = await r
+              for (let j = i + 1; j < len; j++) acc = await cb(acc, a[j], j, a)
+              return acc
+            })()
+          )
+        }
+        acc = r
+      }
+      return acc
+    }
+  )
+  define(
+    'reduceRight',
+    (cb: (acc: unknown, v: unknown, i: number, arr: unknown[]) => unknown, ...init: unknown[]): unknown => {
+      const len = a.length
+      let acc: unknown
+      let start: number
+      if (init.length > 0) {
+        acc = init[0]
+        start = len - 1
+      } else if (len === 0) {
+        throw new TypeError('Reduce of empty array with no initial value')
+      } else {
+        acc = a[len - 1]
+        start = len - 2
+      }
+      for (let i = start; i >= 0; i--) {
+        const r = cb(acc, a[i], i, a)
+        if (isThenable(r)) {
+          return markSyntheticPromise(
+            (async () => {
+              acc = await r
+              for (let j = i - 1; j >= 0; j--) acc = await cb(acc, a[j], j, a)
+              return acc
+            })()
+          )
+        }
+        acc = r
+      }
+      return acc
+    }
+  )
+  return arr
 }
 
 const asyncWriter = new AsyncWriter()
@@ -154,13 +402,48 @@ if (typeof findCursorProto.projection !== 'function') {
 patchSharedCursorMethods(findCursorProto)
 patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string, unknown>)
 
+// The driver's `cursor.forEach` fires the iterator WITHOUT awaiting its result
+// (`iterator(document)` in abstract_cursor.js) — so a rewritten, db-touching
+// callback in `db.x.find().forEach(...)` races past the end of the run, the
+// same failure mode the async-aware ARRAY methods above fix. mongosh's shell
+// cursor awaits each callback; replace the method to match. Sync callbacks
+// keep exact driver semantics (stop on `=== false`), thenable results are
+// awaited in document order. Outside a shell run the replacement delegates to
+// the driver's own implementation (see `activeShellRuns`). Must run BEFORE
+// tagPromiseMethods below so the replacement gets the synthetic-promise
+// wrapper too.
+const abstractCursorProto = AbstractCursor.prototype as unknown as Record<string, unknown>
+if (!(abstractCursorProto.forEach as { __amdmAwaits?: boolean } | undefined)?.__amdmAwaits) {
+  const origForEach = abstractCursorProto.forEach as (
+    this: unknown,
+    iterator: (doc: unknown) => unknown
+  ) => Promise<void>
+  const forEach = async function forEach(
+    this: AsyncIterable<unknown>,
+    iterator: (doc: unknown) => unknown
+  ): Promise<void> {
+    if (activeShellRuns === 0) return origForEach.call(this, iterator)
+    if (typeof iterator !== 'function') {
+      throw new TypeError('Argument "iterator" must be a function')
+    }
+    for await (const doc of this) {
+      let r = iterator(doc)
+      if (isThenable(r)) r = await r
+      if (r === false) break
+    }
+  }
+  ;(forEach as unknown as { __amdmAwaits?: boolean }).__amdmAwaits = true
+  abstractCursorProto.forEach = forEach
+}
+
 /**
  * Wrap the promise-returning methods of a prototype so their results carry the
  * synthetic-promise tag (implicit await). Cursors escape our proxies — a chain
  * like `db.x.find().sort(..).toArray()` calls `toArray` on the raw driver
  * cursor — so the tag has to live on the prototypes. Idempotent via a flag on
- * the wrapper; the extra symbol on promises is invisible to other callers
- * (catalog etc.) that share these prototypes.
+ * the wrapper. Other callers (catalog etc.) that share these prototypes run
+ * outside a shell scope, so markSyntheticPromise tags their promises in place —
+ * same promise identity, no array enhancement (see activeShellRuns above).
  */
 function tagPromiseMethods(proto: Record<string, unknown>, names: string[]): void {
   for (const name of names) {
@@ -596,6 +879,17 @@ export async function runShellOnDb(
   db: Db,
   code: string,
   options: RunShellOptions = {}
+): Promise<ShellResult> {
+  // Everything below runs with shell semantics active: driver promises get
+  // re-wrapped, resolved arrays get the async-aware helpers, and the cursor
+  // forEach awaits callbacks (all scoped via activeShellRuns).
+  return shellRunScope(() => runShellOnDbImpl(db, code, options))
+}
+
+async function runShellOnDbImpl(
+  db: Db,
+  code: string,
+  options: RunShellOptions
 ): Promise<ShellResult> {
   const limit = options.limit ?? DEFAULT_LIMIT
   const signal = options.signal
