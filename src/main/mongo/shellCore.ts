@@ -53,14 +53,42 @@ function isThenable(v: unknown): v is PromiseLike<unknown> {
   )
 }
 
+// The prototype patches below are global (cursors escape the shell proxies, so
+// the tag has to live on shared driver prototypes), but their BEHAVIOR is
+// scoped: outside a shell run they degrade to tag-in-place / native-driver
+// paths, so other main-process callers on the same prototypes (catalog,
+// exporter, …) keep pristine driver semantics — e.g. `docs.map(async …)` +
+// `Promise.all` there must NOT hit the sequential-await arrays. A concurrent
+// catalog call DURING a shell run still sees the enhanced behavior (module
+// counter, not per-async-context), which is harmless: the array helpers are
+// inert for sync callbacks.
+let activeShellRuns = 0
+
+/** Run `fn` with shell semantics active (async-aware arrays, awaiting cursor
+    forEach). `runShellOnDb` wraps itself in this; exported for unit tests. */
+export async function shellRunScope<T>(fn: () => Promise<T>): Promise<T> {
+  activeShellRuns++
+  try {
+    return await fn()
+  } finally {
+    activeShellRuns--
+  }
+}
+
 /** Tag a thenable so the transpiled code implicitly awaits it. Non-thenables
     pass through untouched; tagging is idempotent. The symbol comes from the
     cross-realm registry, so the check inside the `vm` realm sees the same
-    symbol. Thenables are re-wrapped (not mutated) so that resolved ARRAYS gain
-    the async-aware iteration helpers below before user code ever sees them. */
+    symbol. During a shell run, thenables are re-wrapped (not mutated) so that
+    resolved ARRAYS gain the async-aware iteration helpers below before user
+    code ever sees them; outside one they are tagged in place — same promise
+    identity, no array enhancement. */
 export function markSyntheticPromise<T>(value: T): T {
   if (!isThenable(value)) return value
   if ((value as Record<symbol, unknown>)[SYNTHETIC_PROMISE]) return value
+  if (activeShellRuns === 0) {
+    Object.defineProperty(value, SYNTHETIC_PROMISE, { value: true })
+    return value
+  }
   const chained = Promise.resolve(value).then((v) =>
     Array.isArray(v) ? patchAsyncAwareArray(v) : v
   )
@@ -89,6 +117,8 @@ export function markSyntheticPromise<T>(value: T): T {
 //   every / reduce / reduceRight. Anything else (e.g. `sort` with an async
 //   comparator) falls through to the native, async-unaware method.
 // - Plain array literals are NOT patched — same limitation as mongosh itself.
+// - Enhancement only happens during a shell run (`activeShellRuns` above);
+//   catalog/exporter and other main-process driver callers get raw arrays.
 // - The driver CURSOR's own `forEach` has the same fire-without-await flaw;
 //   it is replaced separately below (see the AbstractCursor.forEach patch).
 
@@ -165,9 +195,12 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
   })
   define('map', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const r = collectSeq(a, cb, thisArg)
-    // markSyntheticPromise patches the resolved array, so async chains stay
-    // async-aware; the sync path patches explicitly to match.
-    return isThenable(r) ? markSyntheticPromise(r) : patchAsyncAwareArray(r as unknown[])
+    // Derived arrays stay enhanced by LINEAGE (the source array is enhanced),
+    // not by scope — patch explicitly on both paths instead of relying on
+    // markSyntheticPromise's scoped patching.
+    return isThenable(r)
+      ? markSyntheticPromise((r as Promise<unknown[]>).then((vals) => patchAsyncAwareArray(vals)))
+      : patchAsyncAwareArray(r as unknown[])
   })
   define('flatMap', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const flat = (vals: unknown[]): unknown[] => patchAsyncAwareArray(vals.flat())
@@ -375,14 +408,21 @@ patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string
 // same failure mode the async-aware ARRAY methods above fix. mongosh's shell
 // cursor awaits each callback; replace the method to match. Sync callbacks
 // keep exact driver semantics (stop on `=== false`), thenable results are
-// awaited in document order. Must run BEFORE tagPromiseMethods below so the
-// replacement gets the synthetic-promise wrapper too.
+// awaited in document order. Outside a shell run the replacement delegates to
+// the driver's own implementation (see `activeShellRuns`). Must run BEFORE
+// tagPromiseMethods below so the replacement gets the synthetic-promise
+// wrapper too.
 const abstractCursorProto = AbstractCursor.prototype as unknown as Record<string, unknown>
 if (!(abstractCursorProto.forEach as { __amdmAwaits?: boolean } | undefined)?.__amdmAwaits) {
+  const origForEach = abstractCursorProto.forEach as (
+    this: unknown,
+    iterator: (doc: unknown) => unknown
+  ) => Promise<void>
   const forEach = async function forEach(
     this: AsyncIterable<unknown>,
     iterator: (doc: unknown) => unknown
   ): Promise<void> {
+    if (activeShellRuns === 0) return origForEach.call(this, iterator)
     if (typeof iterator !== 'function') {
       throw new TypeError('Argument "iterator" must be a function')
     }
@@ -401,9 +441,9 @@ if (!(abstractCursorProto.forEach as { __amdmAwaits?: boolean } | undefined)?.__
  * synthetic-promise tag (implicit await). Cursors escape our proxies — a chain
  * like `db.x.find().sort(..).toArray()` calls `toArray` on the raw driver
  * cursor — so the tag has to live on the prototypes. Idempotent via a flag on
- * the wrapper. Other callers (catalog etc.) that share these prototypes get an
- * equivalent derived promise; resolved arrays carry inert non-enumerable
- * helpers that don't affect serialization or iteration.
+ * the wrapper. Other callers (catalog etc.) that share these prototypes run
+ * outside a shell scope, so markSyntheticPromise tags their promises in place —
+ * same promise identity, no array enhancement (see activeShellRuns above).
  */
 function tagPromiseMethods(proto: Record<string, unknown>, names: string[]): void {
   for (const name of names) {
@@ -839,6 +879,17 @@ export async function runShellOnDb(
   db: Db,
   code: string,
   options: RunShellOptions = {}
+): Promise<ShellResult> {
+  // Everything below runs with shell semantics active: driver promises get
+  // re-wrapped, resolved arrays get the async-aware helpers, and the cursor
+  // forEach awaits callbacks (all scoped via activeShellRuns).
+  return shellRunScope(() => runShellOnDbImpl(db, code, options))
+}
+
+async function runShellOnDbImpl(
+  db: Db,
+  code: string,
+  options: RunShellOptions
 ): Promise<ShellResult> {
   const limit = options.limit ?? DEFAULT_LIMIT
   const signal = options.signal

@@ -8,7 +8,8 @@ import {
   describeError,
   detectCollection,
   markSyntheticPromise,
-  patchAsyncAwareArray
+  patchAsyncAwareArray,
+  shellRunScope
 } from '../../../src/main/mongo/shellCore'
 
 describe('describeError', () => {
@@ -155,12 +156,24 @@ describe('patchAsyncAwareArray', () => {
 })
 
 describe('markSyntheticPromise', () => {
-  it('tags a promise and patches a resolved array with async-aware helpers', async () => {
-    const p = markSyntheticPromise(Promise.resolve(['a', 'b']))
+  it('inside a shell run: tags a derived promise and patches the resolved array', async () => {
+    await shellRunScope(async () => {
+      const p = markSyntheticPromise(Promise.resolve(['a', 'b']))
+      expect(isTagged(p)).toBe(true)
+      const arr = await p
+      const r = arr.forEach(async () => {}) as unknown
+      expect(isTagged(r)).toBe(true) // own async-aware forEach, not the native one
+    })
+  })
+
+  it('outside a shell run: tags in place, keeps promise identity, no array enhancement', async () => {
+    const orig = Promise.resolve(['a', 'b'])
+    const p = markSyntheticPromise(orig)
+    expect(p).toBe(orig) // catalog/exporter callers keep the original promise
     expect(isTagged(p)).toBe(true)
     const arr = await p
-    const r = arr.forEach(async () => {}) as unknown
-    expect(isTagged(r)).toBe(true) // own async-aware forEach, not the native one
+    // No own forEach/map/… — pristine driver array for non-shell callers.
+    expect(Object.getOwnPropertyNames(arr)).not.toContain('forEach')
   })
 
   it('passes non-thenables through untouched and re-tags idempotently', () => {
