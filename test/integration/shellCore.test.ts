@@ -812,4 +812,33 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
     expect(r.kind).toBe('documents')
     expect(r.data).toEqual([{ $numberInt: '1' }, { $numberInt: '2' }])
   })
+
+  // Regression: the replacement forEach must keep the DRIVER's early-exit
+  // semantics for plain sync callbacks too (stop on `=== false`).
+  it('cursor forEach keeps driver early-exit semantics for sync callbacks returning false', async () => {
+    const r = await run(`
+      const seen = [];
+      db.nums.find().sort({ n: 1 }).forEach(function (doc) {
+        seen.push(doc.n);
+        if (doc.n >= 2) return false;
+      });
+      seen
+    `)
+    expect(r.kind).toBe('documents')
+    expect(r.data).toEqual([{ $numberInt: '1' }, { $numberInt: '2' }])
+  })
+
+  // A comparator has no sequential-await order — a db-touching one must fail
+  // loudly (ADR-0003), not "succeed" with garbage order via Promise→NaN.
+  it('sort with a db-touching comparator fails loudly instead of silently misordering', async () => {
+    const r = await run(`
+      const gs = db.nums.distinct('g');
+      gs.sort((x, y) => db.nums.countDocuments({ g: x }) - db.nums.countDocuments({ g: y }));
+    `)
+    expect(r.kind).toBe('error')
+    if (r.kind === 'error') {
+      expect(r.errorName).toBe('TypeError')
+      expect(r.error).toMatch(/comparator returned a Promise/)
+    }
+  })
 })

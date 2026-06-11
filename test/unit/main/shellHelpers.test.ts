@@ -153,6 +153,34 @@ describe('patchAsyncAwareArray', () => {
     expect(JSON.stringify(a)).toBe('[1,2]')
     expect(Object.keys(a)).toEqual(['0', '1'])
   })
+
+  it('sort/toSorted with sync comparators keep native behavior, toSorted stays enhanced', () => {
+    const a = patchAsyncAwareArray([3, 1, 2])
+    const sorted = (a as unknown as { toSorted(c: unknown): number[] }).toSorted(
+      (x: number, y: number) => x - y
+    )
+    expect(sorted).toEqual([1, 2, 3])
+    expect(Object.getOwnPropertyNames(sorted)).toContain('forEach') // lineage
+    expect(a.sort((x, y) => (x as number) - (y as number))).toBe(a)
+    expect([...a]).toEqual([1, 2, 3])
+  })
+
+  it('sort/toSorted with an async comparator throw instead of silently misordering', () => {
+    const a = patchAsyncAwareArray([3, 1, 2])
+    expect(() => a.sort((async () => 0) as never)).toThrow(/comparator returned a Promise/)
+    expect(() =>
+      (a as unknown as { toSorted(c: unknown): unknown }).toSorted(async () => 0)
+    ).toThrow(/comparator returned a Promise/)
+  })
+
+  it('async filter captures length up front — elements appended by callbacks are ignored', async () => {
+    const a = patchAsyncAwareArray([1, 2])
+    const r = await (a.filter(async () => {
+      ;(a as number[]).push(99)
+      return true
+    }) as unknown as Promise<number[]>)
+    expect(r).toEqual([1, 2])
+  })
 })
 
 describe('markSyntheticPromise', () => {
