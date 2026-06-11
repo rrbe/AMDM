@@ -82,27 +82,37 @@ export function markSyntheticPromise<T>(value: T): T {
 // getCollectionInfos, toArray, distinct, …) get OWN forEach/map/… that run the
 // callbacks sequentially, await any thenable result, and return a tagged
 // promise the implicit await then unwraps. Sync callbacks keep exact native
-// behavior (and native return types). Plain array literals are NOT patched —
-// same limitation as mongosh itself.
+// behavior (and native return types).
+//
+// Boundaries:
+// - Covered: forEach / map / flatMap / filter / find / findIndex / some /
+//   every / reduce / reduceRight. Anything else (e.g. `sort` with an async
+//   comparator) falls through to the native, async-unaware method.
+// - Plain array literals are NOT patched — same limitation as mongosh itself.
+// - The driver CURSOR's own `forEach` has the same fire-without-await flaw;
+//   it is replaced separately below (see the AbstractCursor.forEach patch).
 
 const ASYNC_AWARE_ARRAY = Symbol('amdm.asyncAwareArray')
 
 type ArrayCb = (value: unknown, index: number, array: unknown[]) => unknown
 
 /** Sequentially collect cb(item) for every item. Fully synchronous until the
-    first thenable result, then switches to awaiting (order preserved). */
+    first thenable result, then switches to awaiting (order preserved). Length
+    is captured up front, like the native methods (a callback that pushes new
+    elements doesn't extend the iteration). */
 function collectSeq(
   arr: unknown[],
   cb: ArrayCb,
   thisArg?: unknown
 ): unknown[] | Promise<unknown[]> {
-  const results = new Array(arr.length)
-  for (let i = 0; i < arr.length; i++) {
+  const len = arr.length
+  const results = new Array(len)
+  for (let i = 0; i < len; i++) {
     const r = cb.call(thisArg, arr[i], i, arr)
     if (isThenable(r)) {
       return (async () => {
         results[i] = await r
-        for (let j = i + 1; j < arr.length; j++) {
+        for (let j = i + 1; j < len; j++) {
           results[j] = await cb.call(thisArg, arr[j], j, arr)
         }
         return results
@@ -121,12 +131,13 @@ function findIndexSeq(
   thisArg: unknown,
   stopOn: boolean
 ): number | Promise<number> {
-  for (let i = 0; i < arr.length; i++) {
+  const len = arr.length
+  for (let i = 0; i < len; i++) {
     const r = pred.call(thisArg, arr[i], i, arr)
     if (isThenable(r)) {
       return (async () => {
         if (Boolean(await r) === stopOn) return i
-        for (let j = i + 1; j < arr.length; j++) {
+        for (let j = i + 1; j < len; j++) {
           if (Boolean(await pred.call(thisArg, arr[j], j, arr)) === stopOn) return j
         }
         return -1
@@ -203,24 +214,56 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
   define(
     'reduce',
     (cb: (acc: unknown, v: unknown, i: number, arr: unknown[]) => unknown, ...init: unknown[]): unknown => {
+      const len = a.length
       let acc: unknown
       let start: number
       if (init.length > 0) {
         acc = init[0]
         start = 0
-      } else if (a.length === 0) {
+      } else if (len === 0) {
         throw new TypeError('Reduce of empty array with no initial value')
       } else {
         acc = a[0]
         start = 1
       }
-      for (let i = start; i < a.length; i++) {
+      for (let i = start; i < len; i++) {
         const r = cb(acc, a[i], i, a)
         if (isThenable(r)) {
           return markSyntheticPromise(
             (async () => {
               acc = await r
-              for (let j = i + 1; j < a.length; j++) acc = await cb(acc, a[j], j, a)
+              for (let j = i + 1; j < len; j++) acc = await cb(acc, a[j], j, a)
+              return acc
+            })()
+          )
+        }
+        acc = r
+      }
+      return acc
+    }
+  )
+  define(
+    'reduceRight',
+    (cb: (acc: unknown, v: unknown, i: number, arr: unknown[]) => unknown, ...init: unknown[]): unknown => {
+      const len = a.length
+      let acc: unknown
+      let start: number
+      if (init.length > 0) {
+        acc = init[0]
+        start = len - 1
+      } else if (len === 0) {
+        throw new TypeError('Reduce of empty array with no initial value')
+      } else {
+        acc = a[len - 1]
+        start = len - 2
+      }
+      for (let i = start; i >= 0; i--) {
+        const r = cb(acc, a[i], i, a)
+        if (isThenable(r)) {
+          return markSyntheticPromise(
+            (async () => {
+              acc = await r
+              for (let j = i - 1; j >= 0; j--) acc = await cb(acc, a[j], j, a)
               return acc
             })()
           )
@@ -325,6 +368,33 @@ if (typeof findCursorProto.projection !== 'function') {
 }
 patchSharedCursorMethods(findCursorProto)
 patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string, unknown>)
+
+// The driver's `cursor.forEach` fires the iterator WITHOUT awaiting its result
+// (`iterator(document)` in abstract_cursor.js) — so a rewritten, db-touching
+// callback in `db.x.find().forEach(...)` races past the end of the run, the
+// same failure mode the async-aware ARRAY methods above fix. mongosh's shell
+// cursor awaits each callback; replace the method to match. Sync callbacks
+// keep exact driver semantics (stop on `=== false`), thenable results are
+// awaited in document order. Must run BEFORE tagPromiseMethods below so the
+// replacement gets the synthetic-promise wrapper too.
+const abstractCursorProto = AbstractCursor.prototype as unknown as Record<string, unknown>
+if (!(abstractCursorProto.forEach as { __amdmAwaits?: boolean } | undefined)?.__amdmAwaits) {
+  const forEach = async function forEach(
+    this: AsyncIterable<unknown>,
+    iterator: (doc: unknown) => unknown
+  ): Promise<void> {
+    if (typeof iterator !== 'function') {
+      throw new TypeError('Argument "iterator" must be a function')
+    }
+    for await (const doc of this) {
+      let r = iterator(doc)
+      if (isThenable(r)) r = await r
+      if (r === false) break
+    }
+  }
+  ;(forEach as unknown as { __amdmAwaits?: boolean }).__amdmAwaits = true
+  abstractCursorProto.forEach = forEach
+}
 
 /**
  * Wrap the promise-returning methods of a prototype so their results carry the

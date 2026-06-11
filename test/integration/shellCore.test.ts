@@ -786,4 +786,30 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
     expect(r.kind).toBe('documents')
     expect(r.data).toEqual(['NUMS'])
   })
+
+  // The driver's own cursor.forEach fires callbacks without awaiting them —
+  // our AbstractCursor patch awaits each one, like mongosh's shell cursor.
+  it('cursor forEach awaits db-touching callbacks before the run ends', async () => {
+    const r = await run(`
+      db.nums.find({ g: 'a' }).sort({ n: 1 }).forEach(function (doc) {
+        var total = db.nums.countDocuments({ g: doc.g });
+        print(doc.n + '/' + total);
+      });
+    `)
+    expect(r.kind).toBe('value')
+    expect(r.output?.map((l) => l.text)).toEqual(['1/2', '2/2'])
+  })
+
+  it('cursor forEach stops when an async callback returns false', async () => {
+    const r = await run(`
+      const seen = [];
+      db.nums.find().sort({ n: 1 }).forEach(function (doc) {
+        seen.push(doc.n);
+        if (db.nums.countDocuments({ n: doc.n }) === 1 && doc.n >= 2) return false;
+      });
+      seen
+    `)
+    expect(r.kind).toBe('documents')
+    expect(r.data).toEqual([{ $numberInt: '1' }, { $numberInt: '2' }])
+  })
 })

@@ -112,6 +112,32 @@ describe('patchAsyncAwareArray', () => {
     expect(await (a.reduce(async (acc, v) => (acc as number) + (v as number), 0) as unknown)).toBe(10)
   })
 
+  it('flatMap/findIndex handle async callbacks', async () => {
+    const a = patchAsyncAwareArray([1, 2, 3])
+    expect(await (a.flatMap(async (v) => [v, (v as number) * 10]) as unknown)).toEqual([
+      1, 10, 2, 20, 3, 30
+    ])
+    expect(await (a.findIndex(async (v) => (v as number) === 2) as unknown)).toBe(1)
+  })
+
+  it('reduceRight folds right-to-left, sync and async', async () => {
+    const a = patchAsyncAwareArray(['a', 'b', 'c'])
+    expect(a.reduceRight((acc, v) => (acc as string) + v)).toBe('cba')
+    expect(await (a.reduceRight(async (acc, v) => (acc as string) + v, '') as unknown)).toBe('cba')
+  })
+
+  it('reduce/reduceRight without an initial value seed from the array end', async () => {
+    const a = patchAsyncAwareArray([1, 2, 3])
+    // No initial value + async callback: acc seeds sync from the array, the
+    // first callback result is a thenable, so the rest of the fold awaits.
+    expect(await (a.reduce(async (acc, v) => (acc as number) + (v as number)) as unknown)).toBe(6)
+    expect(
+      await (a.reduceRight(async (acc, v) => (acc as number) - (v as number)) as unknown)
+    ).toBe(0) // 3 - 2 - 1
+    expect(() => patchAsyncAwareArray([]).reduce((acc) => acc)).toThrow(TypeError)
+    expect(() => patchAsyncAwareArray([]).reduceRight((acc) => acc)).toThrow(TypeError)
+  })
+
   it('async map results are patched too, so chains stay async-aware', async () => {
     const a = patchAsyncAwareArray([1, 2])
     const mapped = (await (a.map(async (v) => v) as unknown)) as number[]
