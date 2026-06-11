@@ -45,20 +45,192 @@ export const MAX_OUTPUT_LINES = 1000
 
 const SYNTHETIC_PROMISE = Symbol.for('@@mongosh.syntheticPromise')
 
+function isThenable(v: unknown): v is PromiseLike<unknown> {
+  return (
+    v !== null &&
+    (typeof v === 'object' || typeof v === 'function') &&
+    typeof (v as { then?: unknown }).then === 'function'
+  )
+}
+
 /** Tag a thenable so the transpiled code implicitly awaits it. Non-thenables
-    pass through untouched; tagging is idempotent (defineProperty would throw
-    on a re-tag). The symbol comes from the cross-realm registry, so the check
-    inside the `vm` realm sees the same symbol. */
+    pass through untouched; tagging is idempotent. The symbol comes from the
+    cross-realm registry, so the check inside the `vm` realm sees the same
+    symbol. Thenables are re-wrapped (not mutated) so that resolved ARRAYS gain
+    the async-aware iteration helpers below before user code ever sees them. */
 export function markSyntheticPromise<T>(value: T): T {
-  if (
-    value !== null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function' &&
-    !(value as Record<symbol, unknown>)[SYNTHETIC_PROMISE]
-  ) {
-    Object.defineProperty(value, SYNTHETIC_PROMISE, { value: true })
+  if (!isThenable(value)) return value
+  if ((value as Record<symbol, unknown>)[SYNTHETIC_PROMISE]) return value
+  const chained = Promise.resolve(value).then((v) =>
+    Array.isArray(v) ? patchAsyncAwareArray(v) : v
+  )
+  Object.defineProperty(chained, SYNTHETIC_PROMISE, { value: true })
+  return chained as unknown as T
+}
+
+// ---------------------------------------------------------------------------
+// Async-aware array iteration (NoSQLBooster / mongosh script compatibility)
+// ---------------------------------------------------------------------------
+// async-rewriter2 rewrites user CALLBACKS too: a callback that touches the db
+// (`names.forEach(n => print(db[n].countDocuments()))`) suspends at its first
+// driver call and returns a promise — which the NATIVE Array.prototype methods
+// neither await nor surface. The script then "finishes" before the callbacks
+// run (prints lost, result null), or `map` yields an array of pending promises
+// (`JSON.stringify(rows)` → `[{}, {}]`). NoSQLBooster's fiber-based shell is
+// fully synchronous, so snippets copied from it lean on this pattern heavily.
+// Fix: arrays resolved from tagged driver promises (getCollectionNames,
+// getCollectionInfos, toArray, distinct, …) get OWN forEach/map/… that run the
+// callbacks sequentially, await any thenable result, and return a tagged
+// promise the implicit await then unwraps. Sync callbacks keep exact native
+// behavior (and native return types). Plain array literals are NOT patched —
+// same limitation as mongosh itself.
+
+const ASYNC_AWARE_ARRAY = Symbol('amdm.asyncAwareArray')
+
+type ArrayCb = (value: unknown, index: number, array: unknown[]) => unknown
+
+/** Sequentially collect cb(item) for every item. Fully synchronous until the
+    first thenable result, then switches to awaiting (order preserved). */
+function collectSeq(
+  arr: unknown[],
+  cb: ArrayCb,
+  thisArg?: unknown
+): unknown[] | Promise<unknown[]> {
+  const results = new Array(arr.length)
+  for (let i = 0; i < arr.length; i++) {
+    const r = cb.call(thisArg, arr[i], i, arr)
+    if (isThenable(r)) {
+      return (async () => {
+        results[i] = await r
+        for (let j = i + 1; j < arr.length; j++) {
+          results[j] = await cb.call(thisArg, arr[j], j, arr)
+        }
+        return results
+      })()
+    }
+    results[i] = r
   }
-  return value
+  return results
+}
+
+/** Index of the first element whose predicate result coerces to `stopOn`
+    (early exit), or -1. Same sync-until-first-thenable strategy. */
+function findIndexSeq(
+  arr: unknown[],
+  pred: ArrayCb,
+  thisArg: unknown,
+  stopOn: boolean
+): number | Promise<number> {
+  for (let i = 0; i < arr.length; i++) {
+    const r = pred.call(thisArg, arr[i], i, arr)
+    if (isThenable(r)) {
+      return (async () => {
+        if (Boolean(await r) === stopOn) return i
+        for (let j = i + 1; j < arr.length; j++) {
+          if (Boolean(await pred.call(thisArg, arr[j], j, arr)) === stopOn) return j
+        }
+        return -1
+      })()
+    }
+    if (Boolean(r) === stopOn) return i
+  }
+  return -1
+}
+
+/** Install own, non-enumerable async-aware iteration methods on `arr`.
+    Idempotent; invisible to JSON.stringify / BSON / structuredClone (all skip
+    non-enumerable props), so the array still serializes as a plain array. */
+export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
+  if ((arr as Record<symbol, unknown>)[ASYNC_AWARE_ARRAY] || !Object.isExtensible(arr)) return arr
+  Object.defineProperty(arr, ASYNC_AWARE_ARRAY, { value: true })
+  const a = arr as unknown[]
+  const define = (name: string, fn: unknown): void => {
+    Object.defineProperty(arr, name, { value: fn, writable: true, configurable: true })
+  }
+
+  define('forEach', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const r = collectSeq(a, cb, thisArg)
+    return isThenable(r) ? markSyntheticPromise(r.then(() => undefined)) : undefined
+  })
+  define('map', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const r = collectSeq(a, cb, thisArg)
+    // markSyntheticPromise patches the resolved array, so async chains stay
+    // async-aware; the sync path patches explicitly to match.
+    return isThenable(r) ? markSyntheticPromise(r) : patchAsyncAwareArray(r as unknown[])
+  })
+  define('flatMap', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const flat = (vals: unknown[]): unknown[] => patchAsyncAwareArray(vals.flat())
+    const r = collectSeq(a, cb, thisArg)
+    return isThenable(r)
+      ? markSyntheticPromise((r as Promise<unknown[]>).then(flat))
+      : flat(r as unknown[])
+  })
+  define('filter', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const pick = (flags: unknown[]): unknown[] => {
+      const out: unknown[] = []
+      for (let i = 0; i < a.length; i++) if (flags[i]) out.push(a[i])
+      return patchAsyncAwareArray(out)
+    }
+    const flags = collectSeq(a, cb, thisArg)
+    return isThenable(flags)
+      ? markSyntheticPromise((flags as Promise<unknown[]>).then(pick))
+      : pick(flags as unknown[])
+  })
+  define('find', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, true)
+    return isThenable(i)
+      ? markSyntheticPromise((i as Promise<number>).then((ix) => (ix === -1 ? undefined : a[ix])))
+      : i === -1
+        ? undefined
+        : a[i as number]
+  })
+  define('findIndex', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, true)
+    return isThenable(i) ? markSyntheticPromise(i) : i
+  })
+  define('some', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, true)
+    return isThenable(i)
+      ? markSyntheticPromise((i as Promise<number>).then((ix) => ix !== -1))
+      : i !== -1
+  })
+  define('every', (cb: ArrayCb, thisArg?: unknown): unknown => {
+    const i = findIndexSeq(a, cb, thisArg, false)
+    return isThenable(i)
+      ? markSyntheticPromise((i as Promise<number>).then((ix) => ix === -1))
+      : i === -1
+  })
+  define(
+    'reduce',
+    (cb: (acc: unknown, v: unknown, i: number, arr: unknown[]) => unknown, ...init: unknown[]): unknown => {
+      let acc: unknown
+      let start: number
+      if (init.length > 0) {
+        acc = init[0]
+        start = 0
+      } else if (a.length === 0) {
+        throw new TypeError('Reduce of empty array with no initial value')
+      } else {
+        acc = a[0]
+        start = 1
+      }
+      for (let i = start; i < a.length; i++) {
+        const r = cb(acc, a[i], i, a)
+        if (isThenable(r)) {
+          return markSyntheticPromise(
+            (async () => {
+              acc = await r
+              for (let j = i + 1; j < a.length; j++) acc = await cb(acc, a[j], j, a)
+              return acc
+            })()
+          )
+        }
+        acc = r
+      }
+      return acc
+    }
+  )
+  return arr
 }
 
 const asyncWriter = new AsyncWriter()
@@ -159,8 +331,9 @@ patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string
  * synthetic-promise tag (implicit await). Cursors escape our proxies — a chain
  * like `db.x.find().sort(..).toArray()` calls `toArray` on the raw driver
  * cursor — so the tag has to live on the prototypes. Idempotent via a flag on
- * the wrapper; the extra symbol on promises is invisible to other callers
- * (catalog etc.) that share these prototypes.
+ * the wrapper. Other callers (catalog etc.) that share these prototypes get an
+ * equivalent derived promise; resolved arrays carry inert non-enumerable
+ * helpers that don't affect serialization or iteration.
  */
 function tagPromiseMethods(proto: Record<string, unknown>, names: string[]): void {
   for (const name of names) {
