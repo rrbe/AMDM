@@ -23,8 +23,16 @@ export interface ClientArgs {
 export function buildClientArgs(dec: DecryptedConnection, localTunnelPort?: number): ClientArgs {
   const { config } = dec
   const options: MongoClientOptions = {
-    serverSelectionTimeoutMS: 8000,
-    connectTimeoutMS: 8000
+    // Driver defaults (30s) — deliberately not shorter. connectTimeoutMS
+    // doubles as the heartbeat (monitor) socket timeout, and
+    // serverSelectionTimeoutMS bounds every operation's server selection:
+    // at the old 8s, a server pegged by a heavy query (or a saturated SSH
+    // tunnel) missed heartbeats, got marked Unknown, and the cleared pool
+    // killed the in-flight slow query. Queries themselves have no
+    // client-side timeout (socketTimeoutMS stays 0, like NoSQLBooster);
+    // long runs are cancelled via the Stop button, not a deadline.
+    serverSelectionTimeoutMS: 30_000,
+    connectTimeoutMS: 30_000
   }
 
   let uri: string
