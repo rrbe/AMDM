@@ -118,7 +118,7 @@ interface RowActions {
   toggleNode: (connId: string, nodeId: string, kind: NodeKind, payload: NodePayload) => Promise<void>
   setActiveConnection: (id: string | null) => void
   setActiveDatabase: (db: string) => void
-  insertSnippet: (db: string, coll: string) => void
+  browseCollection: (db: string, coll: string) => void
 }
 
 /** Which import/export modal (if any) is open, and for which collection. */
@@ -143,7 +143,7 @@ export function Explorer(): JSX.Element {
   const exportConnections = useAppStore((s) => s.exportConnections)
   const importConnections = useAppStore((s) => s.importConnections)
   const toggleNode = useAppStore((s) => s.toggleNode)
-  const insertSnippet = useAppStore((s) => s.insertSnippet)
+  const browseCollection = useAppStore((s) => s.browseCollection)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   // Saved Queries lives in a bottom drawer, collapsed by default.
@@ -200,7 +200,7 @@ export function Explorer(): JSX.Element {
   // + expanded connection contributes its database subtree starting at depth 1.
   // zustand action refs are stable, so listing them as deps is free.
   const rows = useMemo<Row[]>(() => {
-    const actions: RowActions = { toggleNode, setActiveConnection, setActiveDatabase, insertSnippet }
+    const actions: RowActions = { toggleNode, setActiveConnection, setActiveDatabase, browseCollection }
     const out: Row[] = []
     for (const conn of connections) {
       const state = statuses[conn.id]?.state ?? 'disconnected'
@@ -231,7 +231,7 @@ export function Explorer(): JSX.Element {
     toggleNode,
     setActiveConnection,
     setActiveDatabase,
-    insertSnippet
+    browseCollection
   ])
 
   return (
@@ -544,10 +544,10 @@ function CatalogRow({
   )
 }
 
-/** Seed the editor for a collection, making its connection active first. */
+/** Browse a collection (seed its tab), making its connection active first. */
 function browseCollection(a: RowActions, connId: string, db: string, coll: string): void {
   a.setActiveConnection(connId)
-  a.insertSnippet(db, coll)
+  a.browseCollection(db, coll)
 }
 
 /** Toggle a database node and sync the work area's active connection + db. */
