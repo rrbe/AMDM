@@ -42,6 +42,7 @@ import {
   patchResult,
   patchTab,
   pickActiveAfterClose,
+  pickFillTarget,
   type QueryTab,
   type ResultTab
 } from '@renderer/lib/tabs'
@@ -178,7 +179,11 @@ interface AppState {
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
-  insertSnippet(db: string, coll: string): void
+  /** Browse a collection from the explorer: seed `db.<coll>.find({})` into a
+      tab of its own — focus an identical browse tab if one is open, refill the
+      active tab only while it's pristine, else open a new tab. Never clobbers
+      code the user wrote, never auto-runs (ADR-0004 rule 5). */
+  browseCollection(db: string, coll: string): void
   /** Run the editor's script, or `codeOverride` when given (e.g. the current
       statement / selection from the right-click menu). */
   runShell(codeOverride?: string): Promise<void>
@@ -642,7 +647,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   // tab id up front and patch THAT tab on completion, so switching tabs (or
   // running another) mid-flight stays correct and tabs run independently.
   setCode(code) {
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code }) }))
+    // Only real user edits reach here (the editor skips external value syncs),
+    // so typing permanently marks the tab as holding user work.
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false }) }))
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
@@ -668,11 +675,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ resultView: view })
   },
 
-  insertSnippet(db, coll) {
-    // ADR-0004 rule 5: never auto-run. We only seed the editor.
-    set((s) => ({
-      tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db, code: `db.${coll}.find({})` })
-    }))
+  browseCollection(db, coll) {
+    // ADR-0004 rule 5: never auto-run. We only seed the editor — and only into
+    // a pristine tab, so browsing the catalog can't overwrite user code.
+    const seed = `db.${coll}.find({})`
+    set((s) => {
+      const { focusId, reuseId } = pickFillTarget(s.tabs, s.activeTabId, {
+        database: db,
+        code: seed
+      })
+      if (focusId) return { activeTabId: focusId }
+      if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
+      const tab = createTab(newTabId(), { activeDatabase: db, code: seed })
+      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
   },
 
   async runShell(codeOverride) {
@@ -870,13 +886,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   applyQuery(code, database) {
-    // Never auto-run (ADR-0004 rule 5) — just load into the active tab's editor.
-    set((s) => ({
-      tabs: patchTab(s.tabs, s.activeTabId, {
-        code,
-        activeDatabase: database || getActiveTab(s).activeDatabase
-      })
-    }))
+    // Never auto-run (ADR-0004 rule 5). Loads land like browse seeds: refill
+    // the active tab while it's pristine, else open a tab of their own —
+    // loading a query must not clobber code the user wrote.
+    set((s) => {
+      const activeDatabase = database || getActiveTab(s).activeDatabase
+      const { reuseId } = pickFillTarget(s.tabs, s.activeTabId)
+      if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { code, activeDatabase }) }
+      const tab = createTab(newTabId(), { code, activeDatabase })
+      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
   },
 
   // ---------------------------------------------------------------- autocomplete

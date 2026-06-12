@@ -36,6 +36,12 @@ export interface QueryTab {
   /** Per-tab active database (the db selector is scoped to the tab). */
   activeDatabase: string
   code: string
+  /** True while `code` is blank or a programmatic fill (browse seed, loaded
+      query) the user hasn't edited. Only pristine tabs may be refilled in
+      place; anything the user typed gets a tab of its own. Cleared by the
+      editor's onChange (user keystrokes only — external value syncs don't
+      fire it), never set back. */
+  pristine: boolean
   /** Result strip: one entry per run, newest last, capped at MAX_RESULT_TABS. */
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
@@ -53,6 +59,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     id,
     activeDatabase: '',
     code: '',
+    pristine: true,
     results: [],
     activeResultId: null,
     resultSeq: 0,
@@ -60,6 +67,28 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     runningExecId: null,
     ...init
   }
+}
+
+/**
+ * Where a programmatic editor fill (browse-collection seed, saved query or
+ * history load) should land without clobbering user work:
+ * - `focusId`: a tab already holds exactly this fill — just focus it.
+ * - `reuseId`: the active tab is still pristine and has no results — refill it
+ *   in place (so clicking through the catalog doesn't spray tabs).
+ * - neither: the caller opens a fresh tab.
+ */
+export function pickFillTarget(
+  tabs: QueryTab[],
+  activeTabId: string,
+  match?: { database: string; code: string }
+): { focusId?: string; reuseId?: string } {
+  if (match) {
+    const existing = tabs.find((t) => t.activeDatabase === match.database && t.code === match.code)
+    if (existing) return { focusId: existing.id }
+  }
+  const active = tabs.find((t) => t.id === activeTabId)
+  if (active?.pristine && active.results.length === 0) return { reuseId: active.id }
+  return {}
 }
 
 /** Immutably patch one tab by id (others keep identity → stable selectors). */
