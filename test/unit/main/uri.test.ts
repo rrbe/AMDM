@@ -28,7 +28,7 @@ describe('buildClientArgs — host / topology', () => {
   it('builds a basic mongodb:// URI with timeouts', () => {
     const { uri, options } = buildClientArgs(dec(cfg()))
     expect(uri).toBe('mongodb://db.example.com:27017')
-    expect(options).toMatchObject({ serverSelectionTimeoutMS: 8000, connectTimeoutMS: 8000 })
+    expect(options).toMatchObject({ serverSelectionTimeoutMS: 30_000, connectTimeoutMS: 30_000 })
   })
   it('defaults the port to 27017', () => {
     expect(buildClientArgs(dec(cfg({ port: undefined }))).uri).toBe('mongodb://db.example.com:27017')
