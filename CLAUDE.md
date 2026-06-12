@@ -28,7 +28,7 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 - **可测性是硬约定（写新代码时照做）：** 纯逻辑与副作用分离——渲染层纯逻辑放 `src/renderer/src/lib/`,主进程纯逻辑放 `*Core.ts`,需要活连接/特权 API 的部分只做薄封装（`shellEngine` 式,见下「Shell-on-driver」）。**新增 `lib/` 纯函数或 `*Core` 内核 → 必须配 unit 测试;新增写路径（doc 改/删）或 IPC handler → 配 integration 测试;新增 BSON 类型 → 同步改 `serialize-core.ts`+`ejson.ts` 并扩 `test/fixtures/bson-corpus.ts`。**
 - **`pnpm test` 怎么跑：** 测试放在 `test/`（**不在两个 tsconfig 的 include 里**,所以 `pnpm typecheck` 不会检查它们）。`test/helpers/mongo.ts` 优先复用 `~/.cache/mongodb-binaries` 里已缓存的 `mongod` 二进制（`systemBinary`,**零下载**）；本机没有缓存二进制时 mms 会尝试联网下载。`mongodb-memory-server` 的 postinstall 已被 pnpm v10 拦截（不在 `onlyBuiltDependencies`）,所以 `pnpm install` 不会触发下载。集成测试里 `serializerPool.dispose()` 强制走内联序列化（worker 产物在测试期未构建,内联用的是同一份 core,行为一致）。
 - **必须用 pnpm。** `.npmrc` 设了 `node-linker=hoisted`（Electron 不喜欢 pnpm 的软链接隔离布局）,且 `package.json#pnpm.onlyBuiltDependencies` 放行了 `electron`+`esbuild`,否则它们的二进制装不全——pnpm v10 默认拦截依赖的构建脚本。新增需要原生/下载二进制的依赖时,也要加进这里。
-- **给主进程新增纯 JS 重依赖时,把它加进 `electron.vite.config.ts` 的 `externalizeDepsPlugin({ exclude })` 让 rollup 内联**——electron-builder 26 的 pnpm 依赖收集器会丢叶子级传递依赖,外置的包打包后会启动即崩 "Cannot find module"（`exceljs` 丢 `util-deprecate`、`@mongosh/async-rewriter2` 丢 `ms` 都踩过）。
+- **给主进程新增纯 JS 重依赖时,把它加进 `electron.vite.config.ts` 的 `main.build.externalizeDeps.exclude` 让 rollup 内联**（electron-vite 5 起 `externalizeDeps` 默认开启、旧的 `externalizeDepsPlugin` 已废弃）——electron-builder 26 的 pnpm 依赖收集器会丢叶子级传递依赖,外置的包打包后会启动即崩 "Cannot find module"（`exceljs` 丢 `util-deprecate`、`@mongosh/async-rewriter2` 丢 `ms` 都踩过）。
 
 ## 进程架构
 
