@@ -26,16 +26,30 @@ export function PipelineBuilderPanel(): JSX.Element | null {
   const moveStage = useAppStore((s) => s.movePipelineStage)
   const applyPipeline = useAppStore((s) => s.applyPipeline)
   const sampleFields = useAppStore((s) => s.sampleFields)
+  const loadCollections = useAppStore((s) => s.loadCollections)
 
   const [dragIndex, setDragIndex] = useState<number | null>(null)
 
   const collection = pipeline?.collection ?? ''
+  // Ensure the collection dropdown has options even when the db was never
+  // expanded in the explorer (catalog collections lazy-load on demand).
+  useEffect(() => {
+    if (activeConnectionId && activeDatabase) void loadCollections(activeConnectionId, activeDatabase)
+  }, [activeConnectionId, activeDatabase, loadCollections])
+
   // Warm the field cache so stage-body completion has names to offer.
   useEffect(() => {
     if (activeConnectionId && activeDatabase && collection) {
       void sampleFields(activeConnectionId, activeDatabase, collection)
     }
   }, [activeConnectionId, activeDatabase, collection, sampleFields])
+
+  // Once collections arrive, default to the first if none was guessed at open.
+  const firstColl =
+    (activeConnectionId && catalogs[activeConnectionId]?.collections[activeDatabase]?.[0]?.name) || ''
+  useEffect(() => {
+    if (pipeline?.open && !pipeline.collection && firstColl) setCollection(firstColl)
+  }, [pipeline?.open, pipeline?.collection, firstColl, setCollection])
 
   if (!pipeline) return null
 

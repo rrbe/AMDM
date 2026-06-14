@@ -107,6 +107,16 @@ describe('code generation', () => {
     )
   })
 
+  it('uses getCollection() for names that collide with db members', () => {
+    for (const name of ['admin', 'collection', 'aggregate', 'getCollection', 'stats']) {
+      expect(buildAggregateCode(name, [stage('a', '$limit', '1')])).toContain(
+        `db.getCollection("${name}").aggregate(`
+      )
+    }
+    // plain names are still unquoted
+    expect(buildAggregateCode('orders', [stage('a', '$limit', '1')])).toContain('db.orders.aggregate(')
+  })
+
   it('previews the pipeline truncated through a stage index (inclusive)', () => {
     const list = [
       stage('a', '$match', '{ x: 1 }'),

@@ -116,9 +116,30 @@ export function moveStage(stages: AggregationStage[], from: number, to: number):
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 
-/** `db.orders` for a plain name, else `db.getCollection("…")` for odd names. */
+/**
+ * Collection names that collide with a Db member/method (driver) or a shellCore
+ * `db` shim. For these `db.<name>` resolves to the METHOD, not a collection
+ * (e.g. `db.collection`, `db.admin`, `db.aggregate`), so `.aggregate(...)` on it
+ * would blow up — they must go through `db.getCollection("…")`. Best-effort
+ * denylist; uncommon as collection names but real.
+ */
+const DB_MEMBERS = new Set([
+  // shellCore db shims
+  'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'getName', 'version',
+  'runCommand', 'adminCommand',
+  // driver Db members / methods
+  'aggregate', 'admin', 'collection', 'collections', 'command', 'createCollection', 'createIndex',
+  'dropCollection', 'dropDatabase', 'indexInformation', 'listCollections', 'profilingLevel',
+  'removeUser', 'renameCollection', 'setProfilingLevel', 'stats', 'watch', 'namespace',
+  'databaseName', 'options', 'readConcern', 'writeConcern', 'readPreference', 's', 'client'
+])
+
+/** `db.orders` for a plain name, else `db.getCollection("…")` for odd names or
+    names that collide with a Db member/method. */
 function dbCollRef(coll: string): string {
-  return IDENTIFIER.test(coll) ? `db.${coll}` : `db.getCollection(${JSON.stringify(coll)})`
+  return IDENTIFIER.test(coll) && !DB_MEMBERS.has(coll)
+    ? `db.${coll}`
+    : `db.getCollection(${JSON.stringify(coll)})`
 }
 
 /** Re-indent continuation lines of a body so they align under the operator. */

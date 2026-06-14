@@ -358,6 +358,17 @@ function dropPreviews(
   return changed ? next : previews
 }
 
+/** Clear previews for `fromId` and every stage downstream of it — their sampled
+    output depends on the changed stage, so a stale preview must not linger. */
+function clearPreviewsFrom(
+  previews: Record<string, StagePreview>,
+  stages: AggregationStage[],
+  fromId: string
+): Record<string, StagePreview> {
+  const idx = stages.findIndex((s) => s.id === fromId)
+  return idx < 0 ? previews : dropPreviews(previews, stages.slice(idx))
+}
+
 /** Apply a result-strip patch (append/patch/close) to one tab by id, reading
     the tab's CURRENT state inside `set` so concurrent runs don't clobber. */
 function patchTabResults(
@@ -999,44 +1010,88 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setPipelineCollection(collection) {
-    set((s) => patchPipeline(s, (p) => ({ ...p, collection })))
+    // Different source collection invalidates every preview.
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.pipeline) return {}
+      return {
+        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, collection } }),
+        pipelinePreviews: dropPreviews(s.pipelinePreviews, tab.pipeline.stages)
+      }
+    })
   },
 
   addPipelineStage(op) {
+    // Appended at the end → earlier previews stay valid; nothing to clear.
     set((s) => patchPipeline(s, (p) => ({ ...p, stages: addStage(p.stages, createStage(newStageId(), op)) })))
   },
 
   removePipelineStage(stageId) {
     set((s) => {
-      const patch = patchPipeline(s, (p) => ({ ...p, stages: removeStage(p.stages, stageId) }))
-      if (!('tabs' in patch)) return {}
-      // Also forget the removed stage's preview so it can't linger.
-      const { [stageId]: _gone, ...pipelinePreviews } = s.pipelinePreviews
-      return { ...patch, pipelinePreviews }
+      const tab = getActiveTab(s)
+      if (!tab.pipeline) return {}
+      return {
+        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: removeStage(tab.pipeline.stages, stageId) } }),
+        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
+      }
     })
   },
 
   movePipelineStage(from, to) {
-    set((s) => patchPipeline(s, (p) => ({ ...p, stages: moveStage(p.stages, from, to) })))
+    // Reordering changes outputs from the first moved position on → clear all.
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.pipeline) return {}
+      return {
+        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: moveStage(tab.pipeline.stages, from, to) } }),
+        pipelinePreviews: dropPreviews(s.pipelinePreviews, tab.pipeline.stages)
+      }
+    })
   },
 
   togglePipelineStage(stageId) {
-    set((s) => patchPipeline(s, (p) => ({ ...p, stages: toggleStage(p.stages, stageId) })))
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.pipeline) return {}
+      return {
+        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: toggleStage(tab.pipeline.stages, stageId) } }),
+        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
+      }
+    })
   },
 
   setPipelineStageOp(stageId, op) {
-    set((s) => patchPipeline(s, (p) => ({ ...p, stages: setStageOp(p.stages, stageId, op) })))
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.pipeline) return {}
+      return {
+        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: setStageOp(tab.pipeline.stages, stageId, op) } }),
+        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
+      }
+    })
   },
 
   setPipelineStageBody(stageId, body) {
-    set((s) => patchPipeline(s, (p) => ({ ...p, stages: setStageBody(p.stages, stageId, body) })))
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.pipeline) return {}
+      return {
+        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: setStageBody(tab.pipeline.stages, stageId, body) } }),
+        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
+      }
+    })
   },
 
   applyPipeline() {
     const s = get()
-    const p = getActiveTab(s).pipeline
+    const tab = getActiveTab(s)
+    const p = tab.pipeline
     if (!p || !p.collection) return
-    get().applyQuery(buildAggregateCode(p.collection, p.stages), getActiveTab(s).activeDatabase)
+    // Explicit user action → write into the builder's OWN tab. (applyQuery's
+    // no-clobber path would open a NEW tab when this one isn't pristine, hiding
+    // the builder and spawning tabs on repeated Apply.)
+    const code = buildAggregateCode(p.collection, p.stages)
+    set((st) => ({ tabs: patchTab(st.tabs, tab.id, { code, pristine: false }) }))
   },
 
   async previewPipelineStage(index) {
