@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Workflow } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
+import { PipelineBuilderPanel } from './pipeline/PipelineBuilderPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
@@ -30,6 +31,8 @@ export function ShellWorkspace(): JSX.Element {
   const runShell = useAppStore((s) => s.runShell)
   const stopShell = useAppStore((s) => s.stopShell)
   const runExplain = useAppStore((s) => s.runExplain)
+  const togglePipeline = useAppStore((s) => s.togglePipeline)
+  const pipelineOpen = useAppStore((s) => getActiveTab(s).pipeline?.open ?? false)
   const editorHeight = useAppStore((s) => s.settings.editorHeight)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
@@ -62,6 +65,14 @@ export function ShellWorkspace(): JSX.Element {
           data-tip={t('shell.activeDatabaseTip')}
         />
         <span className="spacer" />
+        <Button
+          className={pipelineOpen ? 'pipeline-toggle is-active' : 'pipeline-toggle'}
+          onClick={() => togglePipeline()}
+          data-tip={t('builder.toggleTip')}
+          aria-label={t('builder.title')}
+        >
+          <Workflow size={14} /> {t('builder.toggleBtn')}
+        </Button>
         <Button disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
           {t('shell.saveBtn')}
         </Button>
@@ -81,21 +92,25 @@ export function ShellWorkspace(): JSX.Element {
         )}
       </div>
 
-      {/* Key by tab id so each tab gets its own CodeMirror instance (isolated
-          undo history / selection); switching tabs swaps in that tab's editor. */}
-      <ShellEditor
-        key={activeTabId}
-        value={code}
-        onChange={setCode}
-        onRun={() => void runShell()}
-        onRunStatement={(c) => void runShell(c)}
-        onSave={() => setShowSave(true)}
-        onExplain={() => void runExplain()}
-        onFormat={() => void formatCode()}
-        onStop={() => void stopShell()}
-        running={running}
-        busy={busy}
-      />
+      {/* Editor + optional pipeline-builder panel share one resizable row. Key
+          the editor by tab id so each tab gets its own CodeMirror instance
+          (isolated undo history / selection). */}
+      <div className="editor-row">
+        <ShellEditor
+          key={activeTabId}
+          value={code}
+          onChange={setCode}
+          onRun={() => void runShell()}
+          onRunStatement={(c) => void runShell(c)}
+          onSave={() => setShowSave(true)}
+          onExplain={() => void runExplain()}
+          onFormat={() => void formatCode()}
+          onStop={() => void stopShell()}
+          running={running}
+          busy={busy}
+        />
+        {pipelineOpen && <PipelineBuilderPanel />}
+      </div>
 
       <ResizeHandle
         axis="y"

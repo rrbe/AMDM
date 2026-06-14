@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
 import { acceptCompletion, autocompletion } from '@codemirror/autocomplete'
@@ -10,6 +10,7 @@ import { syntaxTree, indentUnit } from '@codemirror/language'
 import { mongoCompletionSource } from '@renderer/lib/mongoCompletion'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
+import { useIsDark } from '@renderer/lib/useIsDark'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 
 /**
@@ -85,21 +86,7 @@ export function ShellEditor({
   const { t } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).
-  // 'system' must be resolved to the live OS appearance — otherwise "follow
-  // system" leaves the editor stuck on light while the rest of the app is dark.
-  const theme = useAppStore((s) => s.settings.theme)
-  const [systemDark, setSystemDark] = useState(
-    () => window.matchMedia('(prefers-color-scheme: dark)').matches
-  )
-  useEffect(() => {
-    if (theme !== 'system') return
-    const mql = window.matchMedia('(prefers-color-scheme: dark)')
-    const sync = (): void => setSystemDark(mql.matches)
-    sync() // re-read in case the OS toggled while we weren't following it
-    mql.addEventListener('change', sync)
-    return () => mql.removeEventListener('change', sync)
-  }, [theme])
-  const isDark = theme === 'dark' || (theme === 'system' && systemDark)
+  const isDark = useIsDark()
 
   // Editor preferences (persisted to AppSettings; see the right-click menu and
   // ⌘+/⌘−/⌘0). These feed the extensions memo below, so a change reconfigures

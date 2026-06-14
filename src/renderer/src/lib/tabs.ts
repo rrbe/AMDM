@@ -6,6 +6,7 @@
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
 import type { ShellResult } from '@shared/types'
+import type { PipelineBuilderState } from '@renderer/lib/pipelineBuilder'
 
 /** The query that produced a result (refresh / paging / doc-edit target). */
 export interface ResultQuery {
@@ -51,6 +52,10 @@ export interface QueryTab {
   running: boolean
   /** execId of this tab's in-flight run, for Stop / cleanup on close. */
   runningExecId: string | null
+  /** Aggregation pipeline builder state for this tab (absent until opened). The
+      stage definitions are lightweight text and persist with the tab; preview
+      results are kept transiently in the store, not here. */
+  pipeline?: PipelineBuilderState
 }
 
 /** A fresh, empty tab. `id` is injected so callers control id generation. */

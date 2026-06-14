@@ -241,6 +241,29 @@
     "metricKeys": "keys",
     "metricTime": "time"
   },
+  "builder": {
+    "title": "管道建構器",
+    "toggleBtn": "管道",
+    "toggleTip": "切換聚合管道建構器",
+    "close": "關閉建構器",
+    "collection": "目標集合",
+    "selectCollection": "選擇集合",
+    "noDb": "（未選資料庫）",
+    "empty": "尚無階段。",
+    "stageType": "階段類型",
+    "addStage": "新增階段",
+    "addStageTip": "附加一個管道階段",
+    "removeStage": "刪除階段",
+    "drag": "拖曳排序",
+    "enableTip": "啟用 / 停用此階段",
+    "preview": "預覽至此階段",
+    "previewWriteDisabled": "寫入階段（$out/$merge）不可預覽",
+    "previewing": "預覽中…",
+    "previewCount": "樣本：{{count}} 筆",
+    "previewFailed": "預覽失敗。",
+    "apply": "套用到編輯器",
+    "applyTip": "產生 db.coll.aggregate([...]) 到編輯器"
+  },
   "json": {
     "noOutput": "無輸出。",
     "copySelection": "複製選取範圍"
