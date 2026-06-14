@@ -1,14 +1,11 @@
 import { readFileSync } from 'node:fs'
-import { execFile } from 'node:child_process'
 import { dialog, type BrowserWindow } from 'electron'
 import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ImportRequest } from '../../shared/types'
 import { sessionManager } from '../mongo/sessionManager'
-import { connectionStore } from '../store/connectionStore'
-import { buildToolBaseArgs } from './connArgs'
-import { requireTool } from './tools'
+import { decodeBsonFile } from './bsonFileCore'
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -18,7 +15,7 @@ const OPEN_FILTERS: Record<ImportRequest['format'], { name: string; extensions: 
   json: { name: 'JSON', extensions: ['json', 'ndjson'] },
   csv: { name: 'CSV', extensions: ['csv'] },
   xlsx: { name: 'Excel', extensions: ['xlsx'] },
-  bson: { name: 'BSON archive', extensions: ['archive', 'bson', 'gz'] }
+  bson: { name: 'BSON', extensions: ['bson', 'gz'] }
 }
 
 // --- parsing ---
@@ -99,29 +96,21 @@ async function insertDocs(
   return { inserted, failures }
 }
 
-function runTool(toolPath: string, args: string[]): Promise<{ stderr: string }> {
-  return new Promise((resolve, reject) => {
-    execFile(toolPath, args, { maxBuffer: 64 * 1024 * 1024 }, (err, _stdout, stderr) => {
-      if (err) reject(new Error(stderr?.trim() || err.message))
-      else resolve({ stderr: stderr ?? '' })
-    })
-  })
-}
-
+/**
+ * Native BSON import — reads a plain `.bson` file (length-prefixed documents,
+ * gzip auto-detected) and inserts it into the chosen target db/collection. No
+ * external tool, and unlike a `mongorestore --archive`, the target namespace
+ * the user picked is honoured directly.
+ */
 async function importBson(req: ImportRequest, filePath: string): Promise<DataOpResult> {
-  const tool = requireTool('mongorestore')
-  const dec = connectionStore.getDecrypted(req.connectionId)
-  if (!dec) return { ok: false, error: 'Connection not found', filePath }
-  const tunnelPort = sessionManager.getTunnelPort(req.connectionId)
-  const args = [...buildToolBaseArgs(dec, tunnelPort, req.database, false), `--archive=${filePath}`]
-  const { stderr } = await runTool(tool, args)
-  const m = /(\d+)\s+document\(s\) restored/i.exec(stderr)
+  const docs = decodeBsonFile(readFileSync(filePath))
+  if (!docs.length) return { ok: true, filePath, count: 0, warning: 'No documents found in the file.' }
+  const { inserted, failures } = await insertDocs(req.connectionId, req.database, req.collection, docs)
   return {
     ok: true,
     filePath,
-    count: m ? Number(m[1]) : undefined,
-    warning:
-      'BSON archive restored to its original namespace — the selected target db/collection was not applied.'
+    count: inserted,
+    warning: failures ? `${failures} document(s) were skipped (e.g. duplicate _id).` : undefined
   }
 }
 

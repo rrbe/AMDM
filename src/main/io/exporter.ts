@@ -1,20 +1,18 @@
 import { createWriteStream } from 'node:fs'
-import { execFile } from 'node:child_process'
+import { createGzip } from 'node:zlib'
 import { dialog, type BrowserWindow } from 'electron'
 import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ExportRequest } from '../../shared/types'
 import { sessionManager } from '../mongo/sessionManager'
-import { connectionStore } from '../store/connectionStore'
-import { buildToolBaseArgs } from './connArgs'
-import { requireTool } from './tools'
+import { encodeBsonDoc } from './bsonFileCore'
 
 const EXT: Record<ExportRequest['format'], string> = {
   json: 'json',
   csv: 'csv',
   xlsx: 'xlsx',
-  bson: 'archive'
+  bson: 'bson'
 }
 
 function errMsg(e: unknown): string {
@@ -93,7 +91,7 @@ function cellFor(doc: Document, column: string): Cell {
 
 // --- format writers ---
 
-function writeChunk(stream: NodeJS.WritableStream, chunk: string): Promise<void> {
+function writeChunk(stream: NodeJS.WritableStream, chunk: string | Uint8Array): Promise<void> {
   return new Promise((resolve) => {
     if (stream.write(chunk)) resolve()
     else stream.once('drain', resolve)
@@ -136,30 +134,40 @@ async function exportTabular(docs: Document[], filePath: string, xlsx: boolean):
   return docs.length
 }
 
-function runTool(toolPath: string, args: string[]): Promise<{ stderr: string }> {
-  return new Promise((resolve, reject) => {
-    execFile(toolPath, args, { maxBuffer: 64 * 1024 * 1024 }, (err, _stdout, stderr) => {
-      if (err) reject(new Error(stderr?.trim() || err.message))
-      else resolve({ stderr: stderr ?? '' })
-    })
-  })
-}
-
+/**
+ * Native BSON export — streams the (bounded) cursor straight to a plain `.bson`
+ * file (length-prefixed documents back to back), optionally through gzip. No
+ * external tool: the docs are serialized one at a time so memory stays bounded
+ * regardless of collection size (ADR-0004 #2).
+ */
 async function exportBson(req: ExportRequest, filePath: string): Promise<DataOpResult> {
-  const tool = requireTool('mongodump')
-  const dec = connectionStore.getDecrypted(req.connectionId)
-  if (!dec) return { ok: false, error: 'Connection not found', filePath }
-  const tunnelPort = sessionManager.getTunnelPort(req.connectionId)
-  const args = [
-    ...buildToolBaseArgs(dec, tunnelPort, req.database),
-    '--collection',
-    req.collection,
-    `--archive=${filePath}`
-  ]
-  if (req.query && req.query.trim() && req.query.trim() !== '{}') args.push('--query', req.query)
-  const { stderr } = await runTool(tool, args)
-  const m = /done dumping [^(]*\((\d+) document/i.exec(stderr)
-  return { ok: true, filePath, count: m ? Number(m[1]) : undefined }
+  const client = sessionManager.getClient(req.connectionId)
+  const filter = req.query && req.query.trim() ? (EJSON.parse(req.query) as Document) : {}
+  let cursor = client.db(req.database).collection(req.collection).find(filter)
+  if (req.limit && req.limit > 0) cursor = cursor.limit(req.limit)
+
+  const file = createWriteStream(filePath)
+  const gzip = req.gzip ? createGzip() : null
+  const sink: NodeJS.WritableStream = gzip ?? file
+  if (gzip) gzip.pipe(file)
+  // Resolves once the bytes are fully flushed to disk (through gzip if present).
+  const flushed = new Promise<void>((resolve, reject) => {
+    file.on('finish', resolve)
+    file.on('error', reject)
+    gzip?.on('error', reject)
+  })
+
+  let count = 0
+  try {
+    for await (const doc of cursor) {
+      await writeChunk(sink, encodeBsonDoc(doc))
+      count++
+    }
+  } finally {
+    sink.end()
+  }
+  await flushed
+  return { ok: true, filePath, count }
 }
 
 async function exportNative(req: ExportRequest, filePath: string): Promise<DataOpResult> {
@@ -182,10 +190,11 @@ export async function exportData(
   req: ExportRequest,
   win: BrowserWindow | null
 ): Promise<DataOpResult> {
-  const ext = EXT[req.format]
+  const isBson = req.format === 'bson'
+  const ext = isBson && req.gzip ? 'bson.gz' : EXT[req.format]
   const opts = {
     defaultPath: `${req.collection}.${ext}`,
-    filters: [{ name: req.format.toUpperCase(), extensions: [ext] }]
+    filters: [{ name: req.format.toUpperCase(), extensions: isBson ? ['bson', 'gz'] : [ext] }]
   }
   const picked = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
   if (picked.canceled || !picked.filePath) return { ok: false, cancelled: true }

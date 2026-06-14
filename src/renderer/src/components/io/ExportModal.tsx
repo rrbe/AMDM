@@ -7,9 +7,8 @@
  * process via `exportCollection`; this component only collects the request and
  * renders the returned `DataOpResult`.
  *
- *  - BSON is driven by `mongodump` (an archive). It's disabled when the tool is
- *    not installed; the query filter still applies but the CSV/array options
- *    don't.
+ *  - BSON is written natively (plain `.bson`, optionally gzipped) — no external
+ *    tool; the query filter and limit apply, the JSON array option doesn't.
  *  - `res.cancelled` (user dismissed the save dialog) just closes the modal.
  *  - `res.ok` keeps the modal open showing a success summary + Close button.
  *  - otherwise the error is shown in a red box.
@@ -37,17 +36,16 @@ const FORMATS: Array<{ value: DataFormat; label: string }> = [
 
 export function ExportModal({ connectionId, database, collection, onClose }: ExportModalProps): JSX.Element {
   const { t } = useTranslation()
-  const toolStatus = useAppStore((s) => s.toolStatus)
   const exportCollection = useAppStore((s) => s.exportCollection)
 
   const [format, setFormat] = useState<DataFormat>('json')
   const [jsonArray, setJsonArray] = useState(true)
+  const [gzip, setGzip] = useState(false)
   const [query, setQuery] = useState('')
   const [limit, setLimit] = useState('')
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<DataOpResult | null>(null)
 
-  const bsonReady = Boolean(toolStatus?.mongodump)
   const isBson = format === 'bson'
   const isJson = format === 'json'
 
@@ -63,7 +61,8 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
       format,
       query: trimmedQuery ? trimmedQuery : undefined,
       limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined,
-      jsonArray: isJson ? jsonArray : undefined
+      jsonArray: isJson ? jsonArray : undefined,
+      gzip: isBson ? gzip : undefined
     })
     setRunning(false)
     if (res.cancelled) {
@@ -84,12 +83,7 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
           <span className="spacer" />
           <Button onClick={onClose}>{success ? t('io.close') : t('io.cancel')}</Button>
           {!success && (
-            <Button
-              variant="primary"
-              busy={running}
-              disabled={isBson && !bsonReady}
-              onClick={() => void onExport()}
-            >
+            <Button variant="primary" busy={running} onClick={() => void onExport()}>
               {t('io.exportBtn')}
             </Button>
           )}
@@ -99,26 +93,17 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
       <div className="form-row">
         <label>{t('io.format')}</label>
         <div className="io-formats">
-          {FORMATS.map((f) => {
-            const disabled = f.value === 'bson' && !bsonReady
-            return (
-              <button
-                key={f.value}
-                type="button"
-                className={`io-format${format === f.value ? ' active' : ''}`}
-                disabled={disabled}
-                onClick={() => setFormat(f.value)}
-              >
-                {f.label}
-              </button>
-            )
-          })}
+          {FORMATS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              className={`io-format${format === f.value ? ' active' : ''}`}
+              onClick={() => setFormat(f.value)}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
-        {!bsonReady && (
-          <div className="hint">
-            {t('io.bsonHint')}
-          </div>
-        )}
       </div>
 
       {isJson && (
@@ -146,23 +131,24 @@ export function ExportModal({ connectionId, database, collection, onClose }: Exp
         />
       </div>
 
-      {!isBson && (
-        <div className="form-row">
-          <label htmlFor="export-limit">{t('io.limit')}</label>
-          <input
-            id="export-limit"
-            type="number"
-            min={1}
-            placeholder={t('io.limitPlaceholder')}
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-          />
-        </div>
-      )}
+      <div className="form-row">
+        <label htmlFor="export-limit">{t('io.limit')}</label>
+        <input
+          id="export-limit"
+          type="number"
+          min={1}
+          placeholder={t('io.limitPlaceholder')}
+          value={limit}
+          onChange={(e) => setLimit(e.target.value)}
+        />
+      </div>
 
       {isBson && (
-        <div className="hint">
-          {t('io.bsonExportNote')}
+        <div className="form-row">
+          <label className="io-check">
+            <input type="checkbox" checked={gzip} onChange={(e) => setGzip(e.target.checked)} />
+            <span>{t('io.gzip')}</span>
+          </label>
         </div>
       )}
 

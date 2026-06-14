@@ -6,9 +6,8 @@
  * This component only collects the request and renders the returned
  * `DataOpResult`.
  *
- *  - BSON is driven by `mongorestore` (an archive). It's disabled when the tool
- *    is not installed. A BSON archive always restores to its ORIGINAL namespace,
- *    so the target collection here is ignored — we warn about that.
+ *  - BSON is read natively (plain `.bson`, gzip auto-detected) into the chosen
+ *    target collection — no external tool, no namespace surprises.
  *  - `res.cancelled` (user dismissed the file dialog) just closes the modal.
  *  - `res.ok` keeps the modal open showing a success summary (+ any warning).
  *  - otherwise the error is shown in a red box.
@@ -36,15 +35,11 @@ const FORMATS: Array<{ value: DataFormat; label: string }> = [
 
 export function ImportModal({ connectionId, database, collection, onClose }: ImportModalProps): JSX.Element {
   const { t } = useTranslation()
-  const toolStatus = useAppStore((s) => s.toolStatus)
   const importCollection = useAppStore((s) => s.importCollection)
 
   const [format, setFormat] = useState<DataFormat>('json')
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<DataOpResult | null>(null)
-
-  const bsonReady = Boolean(toolStatus?.mongorestore)
-  const isBson = format === 'bson'
 
   const onImport = async (): Promise<void> => {
     setResult(null)
@@ -69,12 +64,7 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
           <span className="spacer" />
           <Button onClick={onClose}>{success ? t('io.close') : t('io.cancel')}</Button>
           {!success && (
-            <Button
-              variant="primary"
-              busy={running}
-              disabled={isBson && !bsonReady}
-              onClick={() => void onImport()}
-            >
+            <Button variant="primary" busy={running} onClick={() => void onImport()}>
               {t('io.importBtn')}
             </Button>
           )}
@@ -84,33 +74,18 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
       <div className="form-row">
         <label>{t('io.format')}</label>
         <div className="io-formats">
-          {FORMATS.map((f) => {
-            const disabled = f.value === 'bson' && !bsonReady
-            return (
-              <button
-                key={f.value}
-                type="button"
-                className={`io-format${format === f.value ? ' active' : ''}`}
-                disabled={disabled}
-                onClick={() => setFormat(f.value)}
-              >
-                {f.label}
-              </button>
-            )
-          })}
+          {FORMATS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              className={`io-format${format === f.value ? ' active' : ''}`}
+              onClick={() => setFormat(f.value)}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
-        {!bsonReady && (
-          <div className="hint">
-            {t('io.bsonHint')}
-          </div>
-        )}
       </div>
-
-      {isBson && (
-        <div className="io-note warn">
-          {t('io.bsonImportNote')}
-        </div>
-      )}
 
       {result && !result.ok && (
         <div className="io-result err">{result.error ?? t('io.importFailed')}</div>

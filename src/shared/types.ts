@@ -300,6 +300,8 @@ export interface ExportRequest {
   limit?: number
   /** json: true = single array, false = newline-delimited (NDJSON). */
   jsonArray?: boolean
+  /** bson: gzip the output (writes a `.bson.gz`). */
+  gzip?: boolean
 }
 
 export interface ImportRequest {
@@ -316,16 +318,10 @@ export interface DataOpResult {
   count?: number
   /** Resolved file path (export target / import source). */
   filePath?: string
-  /** Non-fatal note (e.g. BSON restored to original namespace). */
+  /** Non-fatal note (e.g. some documents skipped on duplicate _id). */
   warning?: string
   /** True when the user cancelled the file dialog. */
   cancelled?: boolean
-}
-
-/** Resolved paths to the official MongoDB Database Tools (undefined = missing). */
-export interface ToolStatus {
-  mongodump?: string
-  mongorestore?: string
 }
 
 // ---------------------------------------------------------------------------
