@@ -31,7 +31,6 @@ import type {
   SavedQueryInput,
   ShellResult,
   TestResult,
-  ToolStatus,
   UserInfo
 } from '@shared/types'
 import {
@@ -118,10 +117,6 @@ interface AppState {
   history: HistoryEntry[]
   /** Sampled field names for autocomplete, keyed `${connId}:${db}.${coll}`. */
   fieldCache: Record<string, string[]>
-
-  // ---- import/export (Phase 3) ----
-  /** Resolved mongodump/mongorestore paths (null = not yet checked). */
-  toolStatus: ToolStatus | null
 
   // ---- preferences ----
   settings: AppSettings
@@ -223,7 +218,6 @@ interface AppState {
   deleteDocument(req: DocMutateRequest): Promise<DocMutateResult>
 
   // ---- actions: import/export (Phase 3) ----
-  loadToolStatus(): Promise<void>
   exportCollection(req: ExportRequest): Promise<DataOpResult>
   importCollection(req: ImportRequest): Promise<DataOpResult>
 
@@ -305,8 +299,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   history: [],
   fieldCache: {},
 
-  toolStatus: null,
-
   settings: DEFAULT_SETTINGS,
 
   initializing: true,
@@ -320,7 +312,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().loadConnections(),
       get().loadQueries(),
       get().loadHistory(),
-      get().loadToolStatus(),
       get().loadSettings()
     ])
     set({ initializing: false })
@@ -957,14 +948,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ------------------------------------------------------------- import/export
-  async loadToolStatus() {
-    try {
-      set({ toolStatus: await window.api.io.toolStatus() })
-    } catch {
-      set({ toolStatus: {} })
-    }
-  },
-
   async exportCollection(req) {
     try {
       const res = await window.api.io.export(req)

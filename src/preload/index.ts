@@ -51,8 +51,7 @@ const api: Api = {
   },
   io: {
     export: (request) => ipcRenderer.invoke(IPC.ioExport, request),
-    import: (request) => ipcRenderer.invoke(IPC.ioImport, request),
-    toolStatus: () => ipcRenderer.invoke(IPC.ioToolStatus)
+    import: (request) => ipcRenderer.invoke(IPC.ioImport, request)
   },
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet),

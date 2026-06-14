@@ -24,7 +24,6 @@ import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOp
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
 import { exportConnections, importConnections } from '../io/connectionBackup'
-import { getToolStatus } from '../io/tools'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
   if (kind === 'documents') return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`
@@ -178,7 +177,6 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.ioImport, (_e, req: ImportRequest) =>
     importData(req, BrowserWindow.getFocusedWindow())
   )
-  ipcMain.handle(IPC.ioToolStatus, () => getToolStatus())
 
   // settings
   ipcMain.handle(IPC.settingsGet, () => settingsStore.get())

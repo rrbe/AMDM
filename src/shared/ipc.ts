@@ -24,7 +24,6 @@ import type {
   ShellRequest,
   ShellResult,
   TestResult,
-  ToolStatus,
   UserInfo
 } from './types'
 
@@ -63,7 +62,6 @@ export const IPC = {
 
   ioExport: 'io:export',
   ioImport: 'io:import',
-  ioToolStatus: 'io:toolStatus',
 
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update'
@@ -127,8 +125,6 @@ export interface Api {
     export(request: ExportRequest): Promise<DataOpResult>
     /** Import into a collection; opens an open dialog for the source file. */
     import(request: ImportRequest): Promise<DataOpResult>
-    /** Resolved paths to mongodump/mongorestore (for BSON; undefined if absent). */
-    toolStatus(): Promise<ToolStatus>
   }
   settings: {
     get(): Promise<AppSettings>
