@@ -45,6 +45,18 @@ import {
   type QueryTab,
   type ResultTab
 } from '@renderer/lib/tabs'
+import {
+  addStage,
+  buildAggregateCode,
+  buildPreviewCode,
+  createStage,
+  moveStage,
+  removeStage,
+  setStageBody,
+  setStageOp,
+  toggleStage,
+  type PipelineBuilderState
+} from '@renderer/lib/pipelineBuilder'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -53,6 +65,16 @@ const tr = i18n.t.bind(i18n)
 export type { QueryTab, ResultTab }
 
 export type ResultView = 'tree' | 'json' | 'table'
+
+/** Transient per-stage preview outcome (keyed by stage id, not persisted with
+    the tab — pipeline previews hold a bounded sample, ADR-0004 rule 6). */
+export interface StagePreview {
+  loading: boolean
+  result?: ShellResult
+}
+
+/** Documents pulled for a per-stage preview (small — it's a sample, not a run). */
+const PREVIEW_LIMIT = 10
 
 export type NoticeKind = 'success' | 'info' | 'warn'
 
@@ -111,6 +133,8 @@ interface AppState {
   activeTabId: string
   /** Result view (Tree/JSON/Table) — a global UI preference, not per-tab. */
   resultView: ResultView
+  /** Transient pipeline-builder previews, keyed by stage id (not persisted). */
+  pipelinePreviews: Record<string, StagePreview>
 
   // ---- saved queries + history + autocomplete (Phase 2) ----
   savedQueries: SavedQuery[]
@@ -197,6 +221,22 @@ interface AppState {
   notify(kind: NoticeKind, message: string): void
   dismissNotice(): void
 
+  // ---- actions: aggregation pipeline builder (active tab) ----
+  /** Open/close the builder panel for the active tab (initializing it on first
+      open with one empty stage + a guessed target collection). */
+  togglePipeline(): void
+  setPipelineCollection(collection: string): void
+  addPipelineStage(op?: string): void
+  removePipelineStage(stageId: string): void
+  movePipelineStage(from: number, to: number): void
+  togglePipelineStage(stageId: string): void
+  setPipelineStageOp(stageId: string, op: string): void
+  setPipelineStageBody(stageId: string, body: string): void
+  /** Generate `db.<coll>.aggregate([...])` and load it into the editor. */
+  applyPipeline(): void
+  /** Run the pipeline truncated through `index` and store a bounded sample. */
+  previewPipelineStage(index: number): Promise<void>
+
   // ---- actions: saved queries + history (Phase 2) ----
   loadQueries(): Promise<void>
   saveQuery(input: SavedQueryInput): Promise<SavedQuery | null>
@@ -268,6 +308,38 @@ export function getActiveResult(s: { tabs: QueryTab[]; activeTabId: string }): R
   return activeResult(getActiveTab(s))
 }
 
+/** Stable id for a new pipeline stage. */
+function newStageId(): string {
+  return crypto.randomUUID()
+}
+
+const RESERVED_DB_MEMBERS = new Set(['getCollection', 'getSiblingDB', 'runCommand', 'adminCommand'])
+
+/** Best-guess target collection when the builder first opens: the collection
+    referenced in the tab's code, else the active db's first collection. */
+function guessCollection(s: {
+  tabs: QueryTab[]
+  activeTabId: string
+  activeConnectionId: string | null
+  catalogs: Record<string, CatalogState>
+}): string {
+  const tab = getActiveTab(s)
+  const m = /\bdb\s*\.\s*([A-Za-z_$][\w$]*)\s*\./.exec(tab.code)
+  if (m && !RESERVED_DB_MEMBERS.has(m[1])) return m[1]
+  const colls = s.catalogs[s.activeConnectionId ?? '']?.collections[tab.activeDatabase] ?? []
+  return colls[0]?.name ?? ''
+}
+
+/** Apply a transform to the active tab's pipeline (no-op if none open). */
+function patchPipeline(
+  s: { tabs: QueryTab[]; activeTabId: string },
+  fn: (p: PipelineBuilderState) => PipelineBuilderState
+): { tabs: QueryTab[] } | Record<string, never> {
+  const tab = getActiveTab(s)
+  if (!tab.pipeline) return {}
+  return { tabs: patchTab(s.tabs, tab.id, { pipeline: fn(tab.pipeline) }) }
+}
+
 /** Apply a result-strip patch (append/patch/close) to one tab by id, reading
     the tab's CURRENT state inside `set` so concurrent runs don't clobber. */
 function patchTabResults(
@@ -294,6 +366,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [INITIAL_TAB],
   activeTabId: INITIAL_TAB.id,
   resultView: 'tree',
+  pipelinePreviews: {},
 
   savedQueries: [],
   history: [],
@@ -887,6 +960,87 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tab = createTab(newTabId(), { code, activeDatabase })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
+  },
+
+  // ------------------------------------------------------ pipeline builder
+  togglePipeline() {
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (tab.pipeline) {
+        return { tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, open: !tab.pipeline.open } }) }
+      }
+      const pipeline: PipelineBuilderState = {
+        open: true,
+        collection: guessCollection(s),
+        stages: [createStage(newStageId())]
+      }
+      return { tabs: patchTab(s.tabs, tab.id, { pipeline }) }
+    })
+  },
+
+  setPipelineCollection(collection) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, collection })))
+  },
+
+  addPipelineStage(op) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, stages: addStage(p.stages, createStage(newStageId(), op)) })))
+  },
+
+  removePipelineStage(stageId) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, stages: removeStage(p.stages, stageId) })))
+  },
+
+  movePipelineStage(from, to) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, stages: moveStage(p.stages, from, to) })))
+  },
+
+  togglePipelineStage(stageId) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, stages: toggleStage(p.stages, stageId) })))
+  },
+
+  setPipelineStageOp(stageId, op) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, stages: setStageOp(p.stages, stageId, op) })))
+  },
+
+  setPipelineStageBody(stageId, body) {
+    set((s) => patchPipeline(s, (p) => ({ ...p, stages: setStageBody(p.stages, stageId, body) })))
+  },
+
+  applyPipeline() {
+    const s = get()
+    const p = getActiveTab(s).pipeline
+    if (!p || !p.collection) return
+    get().applyQuery(buildAggregateCode(p.collection, p.stages), getActiveTab(s).activeDatabase)
+  },
+
+  async previewPipelineStage(index) {
+    const s = get()
+    const tab = getActiveTab(s)
+    const p = tab.pipeline
+    const stage = p?.stages[index]
+    if (!p || !stage || !s.activeConnectionId || !p.collection) return
+    const stageId = stage.id
+    const code = buildPreviewCode(p.collection, p.stages, index)
+    const database = tab.activeDatabase || 'test'
+    set((st) => ({ pipelinePreviews: { ...st.pipelinePreviews, [stageId]: { loading: true } } }))
+    try {
+      const result = await window.api.shell.execute({
+        connectionId: s.activeConnectionId,
+        database,
+        code,
+        limit: PREVIEW_LIMIT,
+        skip: 0,
+        execId: newExecId()
+      })
+      set((st) => ({ pipelinePreviews: { ...st.pipelinePreviews, [stageId]: { loading: false, result } } }))
+    } catch (e) {
+      set((st) => ({
+        pipelinePreviews: {
+          ...st.pipelinePreviews,
+          [stageId]: { loading: false, result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } }
+        }
+      }))
+    }
   },
 
   // ---------------------------------------------------------------- autocomplete

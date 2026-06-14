@@ -35,12 +35,12 @@ const CURSOR_METHODS = [
   'allowDiskUse', 'maxTimeMS', 'min', 'max', 'returnKey', 'showRecordId', 'tailable', 'addCursorFlag'
 ]
 
-const SHELL_GLOBALS = [
+export const SHELL_GLOBALS = [
   'ObjectId', 'ISODate', 'NumberLong', 'NumberInt', 'NumberDecimal', 'UUID', 'BinData',
   'Timestamp', 'MinKey', 'MaxKey', 'Date', 'RegExp'
 ]
 
-const JS_KEYWORDS = ['true', 'false', 'null']
+export const JS_KEYWORDS = ['true', 'false', 'null']
 
 // Query operators (find filters / $match).
 const QUERY_OPERATORS = [
@@ -64,7 +64,7 @@ const UPDATE_OPERATORS = [
 ]
 
 // Aggregation pipeline stages.
-const AGG_STAGES = [
+export const AGG_STAGES = [
   '$addFields', '$bucket', '$bucketAuto', '$changeStream', '$collStats', '$count', '$densify',
   '$documents', '$facet', '$fill', '$geoNear', '$graphLookup', '$group', '$indexStats', '$limit',
   '$lookup', '$match', '$merge', '$out', '$project', '$redact', '$replaceRoot', '$replaceWith',
@@ -73,7 +73,7 @@ const AGG_STAGES = [
 ]
 
 // Aggregation expression / accumulator operators.
-const AGG_EXPR_OPERATORS = [
+export const AGG_EXPR_OPERATORS = [
   // arithmetic
   '$abs', '$add', '$ceil', '$divide', '$exp', '$floor', '$ln', '$log', '$log10', '$mod',
   '$multiply', '$pow', '$round', '$sqrt', '$subtract', '$trunc',

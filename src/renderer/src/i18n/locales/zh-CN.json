@@ -241,6 +241,28 @@
     "metricKeys": "keys",
     "metricTime": "time"
   },
+  "builder": {
+    "title": "管道构建器",
+    "toggleBtn": "管道",
+    "toggleTip": "切换聚合管道构建器",
+    "close": "关闭构建器",
+    "collection": "目标集合",
+    "selectCollection": "选择集合",
+    "noDb": "（未选数据库）",
+    "empty": "暂无阶段。",
+    "stageType": "阶段类型",
+    "addStage": "添加阶段",
+    "addStageTip": "追加一个管道阶段",
+    "removeStage": "删除阶段",
+    "drag": "拖拽排序",
+    "enableTip": "启用 / 禁用此阶段",
+    "preview": "预览到此阶段",
+    "previewing": "预览中…",
+    "previewCount": "预览：{{count}} 条",
+    "previewFailed": "预览失败。",
+    "apply": "应用到编辑器",
+    "applyTip": "生成 db.coll.aggregate([...]) 到编辑器"
+  },
   "json": {
     "noOutput": "无输出。",
     "copySelection": "复制选区"

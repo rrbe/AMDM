@@ -241,6 +241,28 @@
     "metricKeys": "keys",
     "metricTime": "time"
   },
+  "builder": {
+    "title": "Pipeline Builder",
+    "toggleBtn": "Pipeline",
+    "toggleTip": "Toggle the aggregation pipeline builder",
+    "close": "Close builder",
+    "collection": "Target collection",
+    "selectCollection": "Select collection",
+    "noDb": "(no database)",
+    "empty": "No stages yet.",
+    "stageType": "Stage type",
+    "addStage": "Add stage",
+    "addStageTip": "Append a pipeline stage",
+    "removeStage": "Remove stage",
+    "drag": "Drag to reorder",
+    "enableTip": "Enable / disable this stage",
+    "preview": "Preview up to this stage",
+    "previewing": "Previewing…",
+    "previewCount": "Preview: {{count}} docs",
+    "previewFailed": "Preview failed.",
+    "apply": "Apply to editor",
+    "applyTip": "Generate db.coll.aggregate([...]) into the editor"
+  },
   "json": {
     "noOutput": "No output.",
     "copySelection": "Copy selection"

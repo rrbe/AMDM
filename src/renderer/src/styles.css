@@ -946,14 +946,22 @@ label {
   flex: 1;
 }
 
-.editor-wrap {
+/* Editor + optional pipeline panel share one resizable row (the height var the
+   ResizeHandle drives now lives here; the editor flexes, the panel is fixed). */
+.editor-row {
+  display: flex;
   flex: 0 0 auto;
   height: var(--editor-height, 160px);
-  border-bottom: 1px solid var(--border);
-  position: relative;
   min-height: 80px;
   /* Keep the result panel usable; mirrors the JS drag clamp in ShellWorkspace. */
   max-height: calc(100vh - 300px);
+  border-bottom: 1px solid var(--border);
+}
+.editor-wrap {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
   overflow: hidden;
   background: var(--bg-0);
 }
@@ -965,6 +973,199 @@ label {
 }
 .editor-wrap .cm-editor {
   height: 100%;
+}
+
+/* ---- Aggregation pipeline builder (PipelineBuilderPanel / StageCard) ---- */
+.pipeline-toggle .busy-btn-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.busy-btn.pipeline-toggle.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--fg-0);
+}
+.pipeline-panel {
+  flex: 0 0 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-1);
+  overflow: hidden;
+}
+.pipeline-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pipeline-title {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+}
+.pipeline-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--fg-2);
+}
+.pipeline-close:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.pipeline-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pipeline-target-db {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.pipeline-coll {
+  flex: 1;
+  min-width: 0;
+}
+.pipeline-stages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pipeline-empty {
+  padding: 16px;
+  text-align: center;
+}
+.stage-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+.stage-card.disabled {
+  opacity: 0.55;
+}
+.stage-card.error {
+  border-left-color: var(--err);
+}
+.stage-card.dragging {
+  opacity: 0.4;
+}
+.stage-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+}
+.stage-drag {
+  display: inline-flex;
+  cursor: grab;
+  color: var(--fg-3);
+}
+.stage-drag:active {
+  cursor: grabbing;
+}
+.stage-num {
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  min-width: 12px;
+  text-align: center;
+}
+.stage-op {
+  min-width: 124px;
+}
+.stage-head .spacer {
+  flex: 1;
+}
+.stage-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--fg-2);
+}
+.stage-icon-btn:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.stage-icon-btn:disabled {
+  opacity: 0.4;
+}
+.stage-enable {
+  display: inline-flex;
+  align-items: center;
+}
+.stage-editor {
+  max-height: 220px;
+  overflow: auto;
+}
+.stage-editor-loading {
+  padding: 8px 12px;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+}
+.stage-preview {
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.stage-preview.muted,
+.stage-preview.err {
+  padding: 5px 10px;
+}
+.stage-preview > summary {
+  padding: 5px 10px;
+  cursor: pointer;
+  color: var(--t-number);
+  user-select: none;
+}
+.stage-preview.muted {
+  color: var(--fg-3);
+}
+.stage-preview.err {
+  color: var(--err);
+  background: var(--err-bg);
+  white-space: pre-wrap;
+}
+.stage-preview-box {
+  max-height: 160px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-top: 1px solid var(--bg-2);
+  font-family: var(--font-mono);
+}
+.stage-preview-line {
+  margin: 0;
+  white-space: pre;
+  line-height: 1.4;
+  color: var(--fg-1);
+}
+.pipeline-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.pipeline-foot .spacer {
+  flex: 1;
 }
 .editor-loading {
   padding: 14px;
