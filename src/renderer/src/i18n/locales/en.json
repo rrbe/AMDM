@@ -238,7 +238,8 @@
     "rawJson": "Raw explain JSON",
     "metricN": "n",
     "metricDocs": "docs",
-    "metricKeys": "keys"
+    "metricKeys": "keys",
+    "metricTime": "time"
   },
   "json": {
     "noOutput": "No output.",
