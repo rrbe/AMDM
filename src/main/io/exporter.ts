@@ -1,12 +1,11 @@
 import { createWriteStream } from 'node:fs'
-import { createGzip } from 'node:zlib'
 import { dialog, type BrowserWindow } from 'electron'
 import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ExportRequest } from '../../shared/types'
 import { sessionManager } from '../mongo/sessionManager'
-import { encodeBsonDoc } from './bsonFileCore'
+import { streamBsonToFile, writeChunk } from './bsonWriteCore'
 
 const EXT: Record<ExportRequest['format'], string> = {
   json: 'json',
@@ -91,13 +90,6 @@ function cellFor(doc: Document, column: string): Cell {
 
 // --- format writers ---
 
-function writeChunk(stream: NodeJS.WritableStream, chunk: string | Uint8Array): Promise<void> {
-  return new Promise((resolve) => {
-    if (stream.write(chunk)) resolve()
-    else stream.once('drain', resolve)
-  })
-}
-
 async function exportJson(
   cursor: AsyncIterable<Document>,
   filePath: string,
@@ -135,38 +127,16 @@ async function exportTabular(docs: Document[], filePath: string, xlsx: boolean):
 }
 
 /**
- * Native BSON export — streams the (bounded) cursor straight to a plain `.bson`
- * file (length-prefixed documents back to back), optionally through gzip. No
- * external tool: the docs are serialized one at a time so memory stays bounded
- * regardless of collection size (ADR-0004 #2).
+ * Native BSON export — a thin session wrapper that resolves the active cursor
+ * (with the optional EJSON filter + limit) and hands it to the streaming writer
+ * (`streamBsonToFile`, where the bounded-memory + gzip + cleanup logic lives).
  */
 async function exportBson(req: ExportRequest, filePath: string): Promise<DataOpResult> {
   const client = sessionManager.getClient(req.connectionId)
   const filter = req.query && req.query.trim() ? (EJSON.parse(req.query) as Document) : {}
   let cursor = client.db(req.database).collection(req.collection).find(filter)
   if (req.limit && req.limit > 0) cursor = cursor.limit(req.limit)
-
-  const file = createWriteStream(filePath)
-  const gzip = req.gzip ? createGzip() : null
-  const sink: NodeJS.WritableStream = gzip ?? file
-  if (gzip) gzip.pipe(file)
-  // Resolves once the bytes are fully flushed to disk (through gzip if present).
-  const flushed = new Promise<void>((resolve, reject) => {
-    file.on('finish', resolve)
-    file.on('error', reject)
-    gzip?.on('error', reject)
-  })
-
-  let count = 0
-  try {
-    for await (const doc of cursor) {
-      await writeChunk(sink, encodeBsonDoc(doc))
-      count++
-    }
-  } finally {
-    sink.end()
-  }
-  await flushed
+  const count = await streamBsonToFile(cursor, filePath, Boolean(req.gzip))
   return { ok: true, filePath, count }
 }
 

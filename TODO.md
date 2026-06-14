@@ -49,6 +49,9 @@ store 从「单 code/result」改为 `tabs: QueryTab[]` + `activeTabId`；每个
 - 导入：读文件→gzip 自动探测/解压→逐文档解析（`promoteValues:false` 保数值子类型保真）→批量 insert，写进用户选的目标集合。
 - 纯编解码逻辑落 `bsonFileCore.ts` + 7 个单测；导入写路径 2 个集成测试（真 mongod，断言 ObjectId/Int32/Long/Decimal128/Binary/Date 保真 + gzip）。`tools.ts`/`connArgs.ts`/`tools:status` IPC/`ToolStatus`/各 Modal 的工具置灰逻辑全部删除——净减代码。
 
+### 13. 导入侧增量解析(有界内存)　`[难度: 中] [风险: 低]`
+导出已是流式有界,但导入(`importBson`/`importNative`)仍是「整个文件 `readFileSync` + 全部文档一次性进内存再分批 insert」。.bson/JSON 动辄上 GB 时会顶内存。理想形态:边解析 buffer 边按 1000 批量插(已有批量插入逻辑,缺的是流式读)。与既有 JSON/CSV/XLSX 导入同形状,不是回归,优先级低。
+
 ### 12. 聚合管道可视化构建器　`[难度: 高] [风险: 中]`
 NoSQLBooster 招牌功能（分阶段搭 pipeline、逐级预览）。大件，需单独立项评估，不轻易开。
 - 已做架构调研（2026-06-14）：执行/结果/字段采样链路均可复用（`runShellOnDb` 任意 pipeline、三视图对数据来源无感、`catalog.sampleFields` 现成缓存、`shell:execute` 通道够用），无需改 shell 引擎。最自然落点是**编辑器旁挂可折叠侧面板 + 生成 JS code 回填编辑器**（不新增 tab 类型，复用现有 `QueryTab` 与执行链路）。主要风险：聚合游标不可分页（需隐藏翻页器）、逐阶段预览的执行频率（仅手动「预览」时跑）、生成代码的 BSON-safe 正确性。
