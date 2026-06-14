@@ -55,6 +55,7 @@ import {
   setStageBody,
   setStageOp,
   toggleStage,
+  type AggregationStage,
   type PipelineBuilderState
 } from '@renderer/lib/pipelineBuilder'
 import i18n from '@renderer/i18n'
@@ -338,6 +339,23 @@ function patchPipeline(
   const tab = getActiveTab(s)
   if (!tab.pipeline) return {}
   return { tabs: patchTab(s.tabs, tab.id, { pipeline: fn(tab.pipeline) }) }
+}
+
+/** Drop the preview entries for `stages` (e.g. when a tab/stage is closed),
+    returning the same object when nothing matched (stable reference). */
+function dropPreviews(
+  previews: Record<string, StagePreview>,
+  stages: AggregationStage[] | undefined
+): Record<string, StagePreview> {
+  if (!stages || stages.length === 0) return previews
+  const ids = new Set(stages.map((st) => st.id))
+  let changed = false
+  const next: Record<string, StagePreview> = {}
+  for (const [k, v] of Object.entries(previews)) {
+    if (ids.has(k)) changed = true
+    else next[k] = v
+  }
+  return changed ? next : previews
 }
 
 /** Apply a result-strip patch (append/patch/close) to one tab by id, reading
@@ -688,12 +706,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (closing?.runningExecId) void window.api.shell.abort(closing.runningExecId).catch(() => {})
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id)
+      // Free any per-stage previews the closed tab's builder was holding.
+      const pipelinePreviews = dropPreviews(s.pipelinePreviews, closing?.pipeline?.stages)
       if (remaining.length === 0) {
         const fresh = createTab(newTabId())
-        return { tabs: [fresh], activeTabId: fresh.id }
+        return { tabs: [fresh], activeTabId: fresh.id, pipelinePreviews }
       }
       const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
-      return { tabs: remaining, activeTabId: nextActive }
+      return { tabs: remaining, activeTabId: nextActive, pipelinePreviews }
     })
   },
 
@@ -987,7 +1007,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removePipelineStage(stageId) {
-    set((s) => patchPipeline(s, (p) => ({ ...p, stages: removeStage(p.stages, stageId) })))
+    set((s) => {
+      const patch = patchPipeline(s, (p) => ({ ...p, stages: removeStage(p.stages, stageId) }))
+      if (!('tabs' in patch)) return {}
+      // Also forget the removed stage's preview so it can't linger.
+      const { [stageId]: _gone, ...pipelinePreviews } = s.pipelinePreviews
+      return { ...patch, pipelinePreviews }
+    })
   },
 
   movePipelineStage(from, to) {

@@ -118,4 +118,14 @@ describe('code generation', () => {
     expect(code).toContain('$group')
     expect(code).not.toContain('$sort') // stage c excluded
   })
+
+  it('never includes write stages ($out/$merge) in a preview', () => {
+    const list = [stage('a', '$match', '{ x: 1 }'), stage('b', '$out', '"archive"')]
+    // Previewing the $out stage itself must not generate a write.
+    const code = buildPreviewCode('c', list, 1)
+    expect(code).toContain('$match')
+    expect(code).not.toContain('$out')
+    // But the real (apply) code keeps it.
+    expect(buildAggregateCode('c', list)).toContain('$out')
+  })
 })

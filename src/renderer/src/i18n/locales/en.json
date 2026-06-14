@@ -257,8 +257,9 @@
     "drag": "Drag to reorder",
     "enableTip": "Enable / disable this stage",
     "preview": "Preview up to this stage",
+    "previewWriteDisabled": "Write stages ($out/$merge) can't be previewed",
     "previewing": "Previewing…",
-    "previewCount": "Preview: {{count}} docs",
+    "previewCount": "Sample: {{count}} docs",
     "previewFailed": "Preview failed.",
     "apply": "Apply to editor",
     "applyTip": "Generate db.coll.aggregate([...]) into the editor"

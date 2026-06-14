@@ -257,8 +257,9 @@
     "drag": "拖拽排序",
     "enableTip": "启用 / 禁用此阶段",
     "preview": "预览到此阶段",
+    "previewWriteDisabled": "写阶段（$out/$merge）不可预览",
     "previewing": "预览中…",
-    "previewCount": "预览：{{count}} 条",
+    "previewCount": "样本：{{count}} 条",
     "previewFailed": "预览失败。",
     "apply": "应用到编辑器",
     "applyTip": "生成 db.coll.aggregate([...]) 到编辑器"

@@ -55,6 +55,15 @@ export const STAGE_OPS: StageOpDef[] = [
 
 const DEFAULT_OP = '$match'
 
+/** Stages that WRITE to the database (terminal). A preview must never run these
+    — `limit` bounds only the client cursor, not the server-side write. */
+const WRITE_STAGES = new Set(['$out', '$merge'])
+
+/** True for stages that persist to a collection ($out / $merge). */
+export function isWriteStage(op: string): boolean {
+  return WRITE_STAGES.has(op)
+}
+
 /** Starter body for an operator (empty object when unknown). */
 export function defaultBody(op: string): string {
   return STAGE_OPS.find((s) => s.op === op)?.template ?? '{\n  \n}'
@@ -138,13 +147,17 @@ export function buildAggregateCode(collection: string, stages: AggregationStage[
 
 /**
  * Aggregate code for a per-stage preview: the pipeline truncated through
- * `uptoIndex` (inclusive). No `.toArray()` — the shell engine bounds the
- * aggregation cursor to a page on its own, keeping the preview cheap.
+ * `uptoIndex` (inclusive), with **write stages ($out/$merge) stripped** — a
+ * "preview" must be read-only (`limit` bounds only the client cursor, not a
+ * server-side write), so a write stage at or before the cursor previews the
+ * data that *would* be written, never performing the write. No `.toArray()`:
+ * the shell engine bounds the aggregation cursor to a page on its own.
  */
 export function buildPreviewCode(
   collection: string,
   stages: AggregationStage[],
   uptoIndex: number
 ): string {
-  return buildAggregateCode(collection, stages.slice(0, uptoIndex + 1))
+  const readOnly = stages.slice(0, uptoIndex + 1).filter((s) => !isWriteStage(s.op))
+  return buildAggregateCode(collection, readOnly)
 }

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { GripVertical, Play, X } from 'lucide-react'
 import { useAppStore, type StagePreview } from '@renderer/store/useAppStore'
-import { STAGE_OPS, type AggregationStage } from '@renderer/lib/pipelineBuilder'
+import { STAGE_OPS, isWriteStage, type AggregationStage } from '@renderer/lib/pipelineBuilder'
 import { indentFor, toJsonLines } from '@renderer/lib/format'
 import { Select } from '@renderer/components/ui/Select'
 import { StageEditor } from './StageEditor'
@@ -41,6 +41,11 @@ export function StageCard({
   const remove = useAppStore((s) => s.removePipelineStage)
   const runPreview = useAppStore((s) => s.previewPipelineStage)
 
+  // A write stage ($out/$merge) must never be "previewed" — that would run the
+  // server-side write. Disabled here (and stripped in buildPreviewCode as a
+  // backstop). Also block re-clicks while a preview is already in flight.
+  const writeStage = isWriteStage(stage.op)
+  const previewDisabled = !stage.enabled || writeStage || (preview?.loading ?? false)
   const isError = preview?.result?.kind === 'error'
   const cls = ['stage-card', !stage.enabled && 'disabled', isError && 'error', dragging && 'dragging']
     .filter(Boolean)
@@ -70,9 +75,9 @@ export function StageCard({
         <span className="spacer" />
         <button
           className="stage-icon-btn"
-          disabled={!stage.enabled}
+          disabled={previewDisabled}
           onClick={() => void runPreview(index)}
-          data-tip={t('builder.preview')}
+          data-tip={writeStage ? t('builder.previewWriteDisabled') : t('builder.preview')}
           aria-label={t('builder.preview')}
         >
           <Play size={13} />
