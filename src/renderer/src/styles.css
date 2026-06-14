@@ -2069,50 +2069,129 @@ label {
   text-overflow: ellipsis;
 }
 .explain-stages {
-  display: flex;
-  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-1);
-  overflow: hidden;
+  overflow: auto;
 }
 .explain-empty {
   padding: 12px;
 }
-.explain-stage-row {
+
+/* Graphical stage tree: connected boxes, output stage at the top → scans at the
+   leaves. Connector lines use the classic pure-CSS org-chart pseudo-elements. */
+.explain-tree {
+  padding: 18px 16px 10px;
+  width: max-content;
+  min-width: 100%;
+}
+.explain-tree ul {
   display: flex;
+  justify-content: center;
+  position: relative;
+  margin: 0;
+  padding: 22px 0 0;
+  list-style: none;
+}
+.explain-tree li {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  height: 28px;
-  padding-right: 12px;
-  border-bottom: 1px solid var(--bg-2);
+  position: relative;
+  padding: 22px 12px 0;
+  list-style: none;
 }
-.explain-stage-row:last-child {
-  border-bottom: none;
+/* connector segments above each node (horizontal + the elbow verticals) */
+.explain-tree li::before,
+.explain-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 22px;
+  border-top: 1.5px solid var(--border);
 }
-.explain-stage-row:hover {
-  background: var(--bg-2);
+.explain-tree li::after {
+  right: auto;
+  left: 50%;
+}
+.explain-tree li:first-child::before,
+.explain-tree li:last-child::after {
+  border: 0 none;
+}
+.explain-tree li:last-child::before {
+  border-right: 1.5px solid var(--border);
+  border-radius: 0 6px 0 0;
+}
+.explain-tree li:first-child::after {
+  border-left: 1.5px solid var(--border);
+  border-radius: 6px 0 0 0;
+}
+.explain-tree li:only-child::before,
+.explain-tree li:only-child::after {
+  display: none;
+}
+/* vertical drop from a parent down into its children's connector bus */
+.explain-tree ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 22px;
+  border-left: 1.5px solid var(--border);
+}
+/* the root row carries no incoming connector */
+.explain-tree > ul {
+  padding-top: 0;
+}
+.explain-tree > ul > li {
+  padding-top: 0;
+}
+.explain-tree > ul > li::before,
+.explain-tree > ul > li::after {
+  display: none;
+}
+
+.explain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 12px;
+  min-width: 116px;
+  max-width: 280px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.explain-card.tone-bad {
+  border-color: var(--err);
+  background: var(--err-bg);
+}
+.explain-card.tone-good {
+  border-color: var(--ok);
 }
 .explain-stage-name {
   font-weight: 700;
-  flex: 0 0 auto;
 }
-.explain-stage-name.tone-bad {
+.explain-card.tone-bad .explain-stage-name {
   color: var(--err);
 }
-.explain-stage-name.tone-good {
+.explain-card.tone-good .explain-stage-name {
   color: var(--ok);
 }
-.explain-stage-name.tone-neutral {
+.explain-card.tone-neutral .explain-stage-name {
   color: var(--fg-1);
 }
 .explain-stage-metrics {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 4px 10px;
   color: var(--fg-2);
   font-size: var(--fs-sm);
-  overflow: hidden;
 }
 .explain-metric {
   display: inline-flex;
@@ -2126,6 +2205,7 @@ label {
 }
 .explain-stage-index {
   color: var(--t-objectId);
+  font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

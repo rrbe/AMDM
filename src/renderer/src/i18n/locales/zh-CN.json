@@ -238,7 +238,8 @@
     "rawJson": "原始 explain JSON",
     "metricN": "n",
     "metricDocs": "docs",
-    "metricKeys": "keys"
+    "metricKeys": "keys",
+    "metricTime": "time"
   },
   "json": {
     "noOutput": "无输出。",
