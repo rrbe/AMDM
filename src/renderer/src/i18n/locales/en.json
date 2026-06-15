@@ -143,6 +143,12 @@
     "edit": "Edit",
     "delete": "Delete",
     "deleteConfirm": "Delete connection \"{{name}}\"?",
+    "state": {
+      "connected": "Connected",
+      "connecting": "Connecting…",
+      "error": "Connection error",
+      "disconnected": "Disconnected"
+    },
     "users": "Users",
     "indexes": "Indexes",
     "noUsers": "no users",

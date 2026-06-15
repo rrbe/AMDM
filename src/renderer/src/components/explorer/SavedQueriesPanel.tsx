@@ -1,14 +1,15 @@
 /**
- * Saved Queries — the sidebar view formerly known as the "Library" modal.
- * Two sub-tabs:
+ * Two independent sidebar drawers, each its own collapsible section:
  *
- *  - Saved: persisted SavedQuery items. Clicking a row loads it into the editor
- *    (applyQuery, never auto-runs); a hover trash button deletes it.
- *  - History: execution history newest-first. Clicking loads; the list can be
- *    cleared.
+ *  - SavedQueriesPanel — persisted SavedQuery items, grouped by folder. Clicking
+ *    a row loads it into the editor (applyQuery, never auto-runs); a hover trash
+ *    button deletes it.
+ *  - HistoryPanel — execution history newest-first. Clicking loads; the list can
+ *    be cleared. The head shows the live entry count.
  *
- * The panel only seeds the editor; running stays an explicit user action
- * (ADR-0004 rule 5). It reads the same store slices the old modal used.
+ * Both only seed the editor; running stays an explicit user action (ADR-0004
+ * rule 5). They read the same store slices the old combined panel used; the
+ * code-preview / time helpers below are shared.
  */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -17,8 +18,6 @@ import type { HistoryEntry, SavedQuery } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
-
-type Tab = 'saved' | 'history'
 
 /** Group saved queries by folder; folders alpha, ungrouped (`''`) last. */
 function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQuery[] }[] {
@@ -37,7 +36,7 @@ function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQue
   return keys.map((folder) => ({ folder, items: map.get(folder) ?? [] }))
 }
 
-interface SavedQueriesPanelProps {
+interface DrawerProps {
   /** Whether the drawer is expanded. */
   open: boolean
   /** Toggle the drawer open/closed. */
@@ -63,13 +62,12 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-export function SavedQueriesPanel({ open, onToggle }: SavedQueriesPanelProps): JSX.Element {
+/** Saved Queries drawer: a collapsible head over the folder-grouped list. */
+export function SavedQueriesPanel({ open, onToggle }: DrawerProps): JSX.Element {
   const { t } = useTranslation()
   const savedQueries = useAppStore((s) => s.savedQueries)
-  const history = useAppStore((s) => s.history)
   const deleteQuery = useAppStore((s) => s.deleteQuery)
   const saveQuery = useAppStore((s) => s.saveQuery)
-  const clearHistory = useAppStore((s) => s.clearHistory)
   const applyQuery = useAppStore((s) => s.applyQuery)
 
   // Re-folder an existing query in place (saveQuery with its id updates it).
@@ -84,7 +82,35 @@ export function SavedQueriesPanel({ open, onToggle }: SavedQueriesPanelProps): J
     })
   }
 
-  const [tab, setTab] = useState<Tab>('saved')
+  return (
+    <div className="sq-panel">
+      <div className="side-section-head sq-head" onClick={onToggle}>
+        <span className="sq-twisty">
+          <ChevronRight size={14} className={open ? 'twisty-icon open' : 'twisty-icon'} />
+        </span>
+        <span className="side-section-title">{t('savedQueries.title')}</span>
+      </div>
+
+      {open && (
+        <div className="sq-body">
+          <SavedTab
+            queries={savedQueries}
+            onLoad={applyQuery}
+            onDelete={(id) => void deleteQuery(id)}
+            onMove={moveToFolder}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** History drawer: a collapsible head (with live count) over the run list. */
+export function HistoryPanel({ open, onToggle }: DrawerProps): JSX.Element {
+  const { t } = useTranslation()
+  const history = useAppStore((s) => s.history)
+  const clearHistory = useAppStore((s) => s.clearHistory)
+  const applyQuery = useAppStore((s) => s.applyQuery)
 
   // History is newest-first by ranAt.
   const sortedHistory = useMemo(() => [...history].sort((a, b) => b.ranAt - a.ranAt), [history])
@@ -95,35 +121,17 @@ export function SavedQueriesPanel({ open, onToggle }: SavedQueriesPanelProps): J
         <span className="sq-twisty">
           <ChevronRight size={14} className={open ? 'twisty-icon open' : 'twisty-icon'} />
         </span>
-        <span className="side-section-title">{t('savedQueries.title')}</span>
-        {open && (
-          <div className="sq-switch" onClick={(e) => e.stopPropagation()}>
-            <button className={tab === 'saved' ? 'active' : ''} onClick={() => setTab('saved')}>
-              {t('savedQueries.tabSaved')}
-            </button>
-            <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
-              {t('savedQueries.tabHistory')} ({history.length})
-            </button>
-          </div>
-        )}
+        <span className="side-section-title">{t('savedQueries.tabHistory')}</span>
+        {history.length > 0 && <span className="sq-head-count muted">{history.length}</span>}
       </div>
 
       {open && (
         <div className="sq-body">
-          {tab === 'saved' ? (
-            <SavedTab
-              queries={savedQueries}
-              onLoad={applyQuery}
-              onDelete={(id) => void deleteQuery(id)}
-              onMove={moveToFolder}
-            />
-          ) : (
-            <HistoryTab
-              entries={sortedHistory}
-              onLoad={applyQuery}
-              onClear={() => void clearHistory()}
-            />
-          )}
+          <HistoryTab
+            entries={sortedHistory}
+            onLoad={applyQuery}
+            onClear={() => void clearHistory()}
+          />
         </div>
       )}
     </div>

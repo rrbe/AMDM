@@ -143,6 +143,12 @@
     "edit": "編輯",
     "delete": "刪除",
     "deleteConfirm": "刪除連線「{{name}}」？",
+    "state": {
+      "connected": "已連線",
+      "connecting": "連線中…",
+      "error": "連線錯誤",
+      "disconnected": "未連線"
+    },
     "users": "使用者",
     "indexes": "索引",
     "noUsers": "尚無使用者",
