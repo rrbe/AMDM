@@ -340,7 +340,6 @@
   },
   "savedQueries": {
     "title": "已儲存的查詢",
-    "tabSaved": "已儲存",
     "tabHistory": "歷史紀錄",
     "ungrouped": "未分組",
     "emptySaved": "尚無已儲存的查詢。請在工具列使用「儲存」。",
