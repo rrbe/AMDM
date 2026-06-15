@@ -1,0 +1,18 @@
+/* =========================================================================
+   全局样式汇总入口
+   —— @import 顺序就是层叠契约,不能打乱:tokens 最先(是 module 与全局共享的
+   底座);theme-polish 必须排在所有功能分区之后(它靠源码顺序在同等权重下覆盖
+   前面的基础规则);base-ui 收尾。改某一区样式只需改对应分区文件。
+   约定见项目根 CLAUDE.md「样式约定」。
+   ========================================================================= */
+@import './tokens.css';
+@import './base.css';
+@import './app-shell.css';
+@import './explorer.css';
+@import './work-area.css';
+@import './results.css';
+@import './modals-forms.css';
+@import './phase2.css';
+@import './phase3.css';
+@import './theme-polish.css';
+@import './base-ui.css';

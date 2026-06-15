@@ -12,7 +12,7 @@ import '@fontsource/source-code-pro/500.css'
 import '@fontsource/source-code-pro/600.css'
 import { setLanguage } from '@renderer/i18n'
 import { useAppStore } from '@renderer/store/useAppStore'
-import './styles.css'
+import './styles/index.css'
 
 // Dev-only escape hatch: expose the store so the app can be driven from the
 // devtools console / CDP (manual testing, bug repros). Stripped in production.
@@ -21,7 +21,7 @@ if (import.meta.env.DEV) {
 }
 
 // macOS uses a frameless window (titleBarStyle: hiddenInset); this flag drives
-// the traffic-light clearance + window-drag CSS in styles.css.
+// the traffic-light clearance + window-drag CSS in styles/app-shell.css.
 if (navigator.platform.toLowerCase().includes('mac')) {
   document.body.classList.add('is-mac')
 }

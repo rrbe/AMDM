@@ -1,0 +1,161 @@
+/* ============================================================ Phase 3 styles */
+
+/* ---- Right-click context menu (catalog collection actions) ----
+   Now rendered via ui/Menu (Base UI); the popup reuses these classes but its
+   placement is driven by the Base UI positioner (.ui-menu-popup resets the
+   `position: fixed` below). No backdrop element anymore. */
+.ctx-menu {
+  position: fixed;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--fg-1);
+  font-size: var(--fs);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.ctx-item:hover {
+  background: var(--bg-3);
+}
+.ctx-item.danger {
+  color: var(--err);
+}
+.ctx-icon {
+  display: flex;
+  align-items: center;
+  color: var(--fg-3);
+}
+.ctx-item:hover .ctx-icon {
+  color: inherit;
+}
+.ctx-item svg {
+  display: block;
+}
+.ctx-label {
+  flex: 1;
+}
+.ctx-shortcut {
+  margin-left: 16px;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.ctx-item:disabled {
+  color: var(--fg-3);
+  cursor: default;
+  opacity: 0.55;
+}
+.ctx-item:disabled:hover {
+  background: transparent;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* ---- Import/Export modals (ExportModal / ImportModal) ---- */
+.io-formats {
+  display: flex;
+  gap: 6px;
+}
+.io-format {
+  flex: 1;
+  text-align: center;
+}
+.io-format.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.io-format.active:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.io-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--fg-1);
+  font-size: var(--fs);
+  cursor: pointer;
+}
+.io-query {
+  min-height: 64px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+}
+.io-note {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+  margin-bottom: 12px;
+}
+.io-note.warn {
+  background: rgba(210, 153, 34, 0.12);
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  color: var(--warn);
+}
+.io-result {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  word-break: break-word;
+}
+.io-result.ok {
+  background: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.4);
+  color: var(--ok);
+}
+.io-result.err {
+  background: var(--err-bg);
+  border: 1px solid var(--err);
+  color: var(--err);
+  white-space: pre-wrap;
+}
+.io-warning {
+  margin-top: 6px;
+  color: var(--warn);
+}
+
+/* ---- Catalog sort toggle (A–Z button in the explorer header) ---- */
+.catalog-sort {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.catalog-sort:hover {
+  color: var(--fg-0);
+  border-color: var(--border-strong);
+}
+.catalog-sort.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+

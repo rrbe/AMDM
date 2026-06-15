@@ -7,10 +7,10 @@ import { ChevronDown, Check } from 'lucide-react'
  * by a simple `value / onChange / options` API; the trigger auto-renders the
  * selected option's label via the `items` prop.
  *
- * Styling (styles.css `.ui-select-*`): the trigger mimics the inset `input`/`select`
+ * Styling (styles/base-ui.css `.ui-select-*`): the trigger mimics the inset `input`/`select`
  * look (bg-2 + border + focus ring); the popup mimics `.ctx-menu`; highlighted
  * items (`[data-highlighted]`, keyboard/hover) use `--bg-3`. The popup is body-
- * portaled, so its positioner carries a z-index above dialogs (see styles.css).
+ * portaled, so its positioner carries a z-index above dialogs (see styles/base-ui.css).
  *
  * Values are strings/numbers in this app (auth type, theme, db name, …), so the
  * generic defaults to `string`.

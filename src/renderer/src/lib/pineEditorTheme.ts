@@ -1,13 +1,13 @@
 /**
  * Slate CodeMirror themes — light + dark variants that match the app's
- * "Slate" design system (see styles.css): a calm, neutral, professional
+ * "Slate" design system (see styles/tokens.css): a calm, neutral, professional
  * database-tool look. We build them with @uiw/codemirror-themes' `createTheme`
  * so the editor reads as part of the same surface rather than CodeMirror's
  * generic light/dark defaults.
  *
  * Two explicit themes (resolved hex, not CSS vars) keep rendering predictable:
  * ShellEditor swaps between them on the persisted `theme` preference. Colors
- * mirror the styles.css value-type palette — green strings, blue numbers,
+ * mirror the styles/tokens.css value-type palette — green strings, blue numbers,
  * purple booleans/keywords, orange ObjectId/types, near-neutral method calls,
  * and a graphite caret. Keep these in sync with the --t-* tokens.
  */

@@ -73,6 +73,16 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 ### 密钥与持久化（ADR-0006）
 应用状态以纯 JSON 存于 Electron `userData`：`connections.json`、`queries.json`（保存的查询 + 有上限的历史）、`settings.json`——不用 SQLite（避免原生模块重编译的折腾）。存储模块在 `main/store/`。密钥（密码、SSH passphrase）**绝不**以明文落入这些文件,**绝不**跨 IPC：`connectionStore` 用 Electron `safeStorage`（macOS Keychain）加密；渲染进程只看到 `hasPassword` 之类的布尔标志。解密只在连接时、在 `main/` 内部发生。
 
+## 样式（CSS）约定
+
+全局样式拆分在 `src/renderer/src/styles/`,由 `index.css` 按固定顺序 `@import` 11 个分区文件汇总(`main.tsx` 只引 `./styles/index.css`)。分区:`tokens`(设计令牌)、`base`(reset/按钮/输入/滚动条)、`app-shell`、`explorer`、`work-area`、`results`、`modals-forms`、`phase2`、`phase3`、`theme-polish`、`base-ui`。改某一区样式只需改对应分区文件。
+
+- **`@import` 顺序是层叠契约,别打乱。** `tokens.css` 必须最先;`theme-polish.css`(Slate 后置修饰)必须排在所有功能分区**之后**——它靠源码顺序在**同等权重**下覆盖前面的基础规则(`button`/`input`/`.conn-item`/`.tree-node`/`.view-switch`/`.modal*`/`.tbl-head` 等约 29 个选择器在文件里出现两次:基础在前、polish 在后);`base-ui.css` 收尾。
+- **何时全局 vs CSS Module:**
+  - **永远全局**:`tokens.css` 的主题令牌(module 与全局共享的底座)、第三方选择器(CodeMirror `.cm-*`、Base UI `[data-*]`)、跨组件复用的共享基类(`.v-*` value 颜色、`.kv-row`、`.vrow`)。
+  - **用 `Foo.module.css`**(放组件旁,作用域隔离):全新、**自包含**的组件(独立面板/弹窗/小部件)。Vite 开箱支持 `*.module.css`,无需新依赖。
+  - 复用既有 result/tree/table/explorer 词汇的组件 → **留全局**。判断标准是「组件是否自包含」,**不是「新不新」**;不强制回迁老组件。
+
 ## 性能铁律（ADR-0004 —— 不可妥协,每个功能都必须遵守）
 
 1. 所有大列表/树/表格一律虚拟化（`@tanstack/react-virtual`）；DOM 只持有可见行。

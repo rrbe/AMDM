@@ -1,0 +1,110 @@
+/* ---------------------------------------------------------------- app shell */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+/* The explorer | work split lives below the full-width title bar. */
+.app-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+
+.pane-divider {
+  width: 1px;
+  background: var(--border);
+  flex: 0 0 auto;
+}
+
+/* ---- Drag-to-resize dividers ----
+   A wide invisible grab strip that overlaps the panel's hairline border via
+   negative margins (so it adds no layout width/height). On hover/drag a 1px
+   accent line lights up. Not part of the macOS window-drag region. */
+.resize-handle {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 5;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+.resize-handle--col {
+  width: 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+}
+.resize-handle--row {
+  height: 7px;
+  margin: -3px 0;
+  cursor: row-resize;
+}
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.resize-handle--col::before {
+  inset: 0 3px; /* 1px-wide centered vertical line */
+}
+.resize-handle--row::before {
+  inset: 3px 0; /* 1px-tall centered horizontal line */
+}
+.resize-handle:hover::before,
+.resize-handle.dragging::before {
+  opacity: 0.6;
+}
+
+/* ---- Window drag (macOS frameless titleBarStyle: hiddenInset) ----
+   Header strips act as the window's drag handle; interactive children opt
+   back out so clicks still register. Scoped to macOS — other platforms keep
+   their native title bar. */
+.is-mac .app-drag {
+  -webkit-app-region: drag;
+}
+.is-mac .app-drag button,
+.is-mac .app-drag select,
+.is-mac .app-drag input,
+.is-mac .app-drag textarea,
+.is-mac .app-drag a {
+  -webkit-app-region: no-drag;
+}
+/* ---- Unified window title bar ----
+   A single slim strip across the full window top: it is the sole macOS window-
+   drag region and carries the app brand. Sitting above the explorer | work
+   split keeps the drag handle consistent no matter which pane is below. */
+.app-titlebar {
+  flex: 0 0 auto;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  position: relative; /* anchor for the absolutely-centered brand */
+  padding: 0 12px;
+  background: var(--bg-1);
+  color: var(--fg-1);
+  user-select: none;
+}
+/* Reserve the top-left for the macOS traffic lights so they never cover the
+   brand; other platforms keep the strip flush. */
+.is-mac .app-titlebar {
+  padding-left: 78px;
+}
+/* Centered on the full window width — absolutely positioned so the traffic-
+   light reserve (padding-left) doesn't pull it off the true centre line. */
+.app-titlebar-brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 160px); /* never run under the traffic lights */
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+

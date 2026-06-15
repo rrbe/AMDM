@@ -4,7 +4,7 @@ import { Input as BaseInput } from '@base-ui/react/input'
 /**
  * Thin wrapper over Base UI Input — a native `<input>` that auto-wires id / aria
  * / validation state when rendered inside a `ui/Field`. Visual styling comes from
- * the global `input` rule in styles.css (unchanged), so it looks identical to the
+ * the global `input` rule in styles/base.css (unchanged), so it looks identical to the
  * raw inputs it replaces.
  *
  * Accepts the usual native props (`value`, `onChange`, `placeholder`, …); Base UI

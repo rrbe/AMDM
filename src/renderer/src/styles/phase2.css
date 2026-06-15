@@ -1,0 +1,348 @@
+/* ============================================================ Phase 2 styles */
+
+/* ---- Query Library / Saved + History (QueryLibrary) ---- */
+.lib-empty {
+  padding: 24px 8px;
+  text-align: center;
+}
+.lib-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.lib-toolbar .spacer {
+  flex: 1;
+}
+.lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.lib-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-0);
+}
+.lib-row:hover {
+  border-color: var(--border-strong);
+}
+.lib-main {
+  flex: 1;
+  min-width: 0;
+}
+.lib-name {
+  font-weight: 600;
+  color: var(--fg-0);
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--t-string);
+  background: var(--bg-2);
+  padding: 4px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-sub {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+}
+.lib-sub .lib-ok {
+  color: var(--ok);
+}
+.lib-sub .lib-err {
+  color: var(--err);
+}
+.lib-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* ---- Result bar EXPLAIN tag ---- */
+.explain-tag {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+/* ---- Visual explain (ExplainView) ---- */
+.explain-body {
+  overflow: auto;
+}
+.explain-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+}
+.explain-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.explain-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-1);
+  min-width: 92px;
+}
+.explain-stat-label {
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.01em;
+}
+.explain-stat-value {
+  color: var(--fg-0);
+  font-weight: 600;
+}
+.explain-stat-value.mono {
+  font-family: var(--font-mono);
+  color: var(--t-key);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.explain-stages {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-1);
+  overflow: auto;
+}
+.explain-empty {
+  padding: 12px;
+}
+
+/* Graphical stage tree: connected boxes, output stage at the top → scans at the
+   leaves. Connector lines use the classic pure-CSS org-chart pseudo-elements. */
+.explain-tree {
+  padding: 18px 16px 10px;
+  width: max-content;
+  min-width: 100%;
+}
+.explain-tree ul {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin: 0;
+  padding: 22px 0 0;
+  list-style: none;
+}
+.explain-tree li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 22px 12px 0;
+  list-style: none;
+}
+/* connector segments above each node (horizontal + the elbow verticals) */
+.explain-tree li::before,
+.explain-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 22px;
+  border-top: 1.5px solid var(--border);
+}
+.explain-tree li::after {
+  right: auto;
+  left: 50%;
+}
+.explain-tree li:first-child::before,
+.explain-tree li:last-child::after {
+  border: 0 none;
+}
+.explain-tree li:last-child::before {
+  border-right: 1.5px solid var(--border);
+  border-radius: 0 6px 0 0;
+}
+.explain-tree li:first-child::after {
+  border-left: 1.5px solid var(--border);
+  border-radius: 6px 0 0 0;
+}
+.explain-tree li:only-child::before,
+.explain-tree li:only-child::after {
+  display: none;
+}
+/* vertical drop from a parent down into its children's connector bus */
+.explain-tree ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 22px;
+  border-left: 1.5px solid var(--border);
+}
+/* the root row carries no incoming connector */
+.explain-tree > ul {
+  padding-top: 0;
+}
+.explain-tree > ul > li {
+  padding-top: 0;
+}
+.explain-tree > ul > li::before,
+.explain-tree > ul > li::after {
+  display: none;
+}
+
+.explain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 12px;
+  min-width: 116px;
+  max-width: 280px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.explain-card.tone-bad {
+  border-color: var(--err);
+  background: var(--err-bg);
+}
+.explain-card.tone-good {
+  border-color: var(--ok);
+}
+.explain-stage-name {
+  font-weight: 700;
+}
+.explain-card.tone-bad .explain-stage-name {
+  color: var(--err);
+}
+.explain-card.tone-good .explain-stage-name {
+  color: var(--ok);
+}
+.explain-card.tone-neutral .explain-stage-name {
+  color: var(--fg-1);
+}
+.explain-stage-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.explain-metric {
+  display: inline-flex;
+  gap: 4px;
+}
+.explain-metric-label {
+  color: var(--fg-3);
+}
+.explain-metric-value {
+  color: var(--t-number);
+}
+.explain-stage-index {
+  color: var(--t-objectId);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explain-raw {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-1);
+}
+.explain-raw > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  color: var(--fg-1);
+  user-select: none;
+}
+.explain-raw-box {
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+.explain-raw-line {
+  margin: 0;
+  white-space: pre;
+  line-height: 1.45;
+  color: var(--fg-1);
+}
+
+/* ---- Document editor (DocEditor) ---- */
+.doc-edit-area {
+  width: 100%;
+  min-height: 320px;
+  max-height: 56vh;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+  line-height: 1.5;
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+}
+.doc-edit-error {
+  color: var(--err);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Fatal error boundary ---- */
+.fatal-error {
+  padding: 24px;
+  max-width: 900px;
+  margin: 24px auto;
+  color: var(--fg-0);
+  font-family: var(--font-ui);
+}
+.fatal-error h2 {
+  color: var(--err);
+  margin: 0 0 12px;
+}
+.fatal-msg {
+  background: var(--err-bg);
+  color: var(--err);
+  padding: 10px 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+}
+.fatal-stack {
+  background: var(--bg-1);
+  color: var(--fg-2);
+  padding: 10px 12px;
+  border-radius: 6px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  margin-top: 10px;
+}
+

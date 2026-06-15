@@ -1,0 +1,478 @@
+/* ----------------------------------------------------------------- explorer */
+.explorer {
+  width: var(--sidebar-width, 300px);
+  min-width: 200px;
+  /* Always leave the work area ≥480px even on small windows / huge persisted
+     widths — the CSS net mirrors the JS drag clamp in App.tsx. */
+  max-width: calc(100vw - 480px);
+  flex: 0 0 auto;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.explorer-body {
+  flex: 1;
+  overflow-y: auto;
+  /* No top padding: the sticky-scroll connection header must hug the very top of
+     the scroll area with no gap (a top inset would let catalog rows peek above
+     the pinned header). Side padding stays — it insets the catalog tree; the
+     connection rows cancel it with negative margins to span full width. */
+  padding: 0 6px 8px;
+  user-select: none;
+}
+.explorer-empty {
+  padding: 14px;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+}
+
+/* Prominent "New connection" action in the explorer header. */
+.btn-new-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1;
+}
+.btn-new-conn svg {
+  display: block;
+}
+/* Compact "backup/restore" overflow button in the Connections header. */
+.side-section-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+}
+.side-section-more svg {
+  display: block;
+}
+
+/* Two stacked side-panel sections: Connections (top, fills space) and a
+   collapsible Saved Queries drawer (bottom), split by a light horizontal rule. */
+.side-section--conns {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.side-section--saved,
+.side-section--history {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+}
+.side-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 8px 8px 5px 10px;
+}
+.side-section-title {
+  flex: 1;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Saved Queries drawer (sidebar): clickable head + bounded body ---- */
+.sq-panel {
+  display: block;
+}
+/* The head is the collapse toggle: click anywhere (but the switch) to fold. */
+.sq-head {
+  padding-left: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.sq-head:hover {
+  background: var(--bg-2);
+}
+.sq-twisty {
+  width: 16px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sq-twisty svg {
+  display: block;
+}
+/* Expanded list is capped so the drawer never crowds out Connections. */
+.sq-body {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+/* Live entry count beside the History drawer title. */
+.sq-head-count {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.sq-toolbar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 8px 4px;
+}
+.sq-toolbar .spacer {
+  flex: 1;
+}
+.sq-empty {
+  padding: 18px 14px;
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.sq-list {
+  padding: 2px 6px 8px;
+}
+/* Folder grouping (two-level saved-query organization). */
+.sq-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin-top: 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  color: var(--fg-1);
+}
+.sq-folder-head:hover {
+  background: var(--bg-2);
+}
+.sq-folder-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-folder-count {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+/* Rows nested under a folder header get a little indent. */
+.sq-folder .sq-row {
+  margin-left: 10px;
+}
+.sq-row {
+  position: relative;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sq-row:hover {
+  background: var(--bg-2);
+}
+.sq-name {
+  font-weight: 600;
+  color: var(--fg-0);
+  font-size: var(--fs-sm);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 20px;
+}
+.sq-code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--t-string);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-sub {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: var(--fs-xs, 11px);
+}
+.sq-sub .lib-ok {
+  color: var(--ok);
+}
+.sq-sub .lib-err {
+  color: var(--err);
+}
+.sq-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 3px;
+  line-height: 1;
+  color: var(--fg-3);
+  opacity: 0;
+}
+.sq-row:hover .sq-del {
+  opacity: 1;
+}
+.sq-del:hover {
+  color: var(--err);
+}
+
+.group {
+  margin-bottom: 2px;
+}
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--fg-1);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.01em;
+}
+.group-header:hover {
+  background: var(--bg-2);
+}
+.group-header .group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conn-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 7px;
+  /* Negative side margins cancel .explorer-body's 6px side padding so the row —
+     and its pinned sticky band — spans the sidebar edge to edge. */
+  margin: 0 -6px;
+  cursor: pointer;
+  /* The per-connection environment color paints this edge (set inline); a 3px
+     transparent default keeps colored and uncolored rows on the same baseline. */
+  border-left: 3px solid transparent;
+  /* Sticky scroll (VS Code style): each connection row is its subtree's section
+     header, so pinning it to the top of the scroll area keeps the owning
+     connection identifiable however deep you scroll. The rows are flat siblings
+     in a single scroll container (.explorer-body), which gives the iOS-style
+     hand-off for free — when the next connection reaches the top it paints over
+     the previously pinned one (later in the DOM = higher paint order). The
+     opaque background (matching the sidebar at rest; hover/active still
+     override) hides the catalog rows scrolling beneath the pinned header. */
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-1);
+}
+/* Top-level connections need a tighter twisty than deep catalog rows. */
+.conn-item .tree-twisty {
+  width: 14px;
+}
+.conn-item:hover {
+  background: var(--bg-2);
+}
+.conn-item.active {
+  /* --bg-sel is a translucent tint; layered alone it would let catalog rows
+     bleed through when this row is pinned by sticky scroll. Compositing it over
+     an opaque --bg-1 base keeps the same look at rest but stays fully opaque
+     while pinned. */
+  background: linear-gradient(var(--bg-sel), var(--bg-sel)), var(--bg-1);
+}
+.conn-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.3;
+  /* Side panel: connection name + host:port render in the code font
+     (Source Code Pro); the catalog tree (db / collection names) stays on the
+     UI font, and the editor / data views are untouched. */
+  font-family: var(--font-mono);
+}
+.conn-item .conn-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-0);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.conn-item .conn-sub {
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ---- The status signal — the row's only piece of chrome ----
+   A single dot carries every connection state. There are no check / x / spinner
+   glyphs and no hover buttons: state reads from color + glow alone, and all
+   actions live in the right-click menu. The dot sits centered in a fixed column
+   so names stay aligned whatever the state. */
+.conn-status {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.conn-signal {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+  flex: 0 0 auto;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.25s ease;
+}
+/* Online: a lit dot wrapped in a soft halo — confident, "live". */
+.conn-signal--on {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--halo-ok);
+}
+/* Error: same lit treatment in danger red. */
+.conn-signal--error {
+  background: var(--err);
+  box-shadow: 0 0 0 3px var(--halo-err);
+}
+/* Connecting: an amber core with a radar ping rippling outward. */
+.conn-signal--connecting {
+  background: var(--warn);
+}
+.conn-signal--connecting::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--warn);
+  animation: signal-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes signal-ping {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+/* Offline: a quiet hollow ring so the column never reads as blank. */
+.conn-signal--off {
+  width: 7px;
+  height: 7px;
+  background: transparent;
+  border: 1.5px solid var(--fg-3);
+  opacity: 0.5;
+}
+/* The row carries no glow until it matters — but a connected row keeps a subtle
+   one even at rest, fading up a touch on hover so the active link feels alive. */
+.conn-item:hover .conn-signal--on {
+  box-shadow: 0 0 0 4px var(--halo-ok);
+}
+.conn-item:hover .conn-signal--error {
+  box-shadow: 0 0 0 4px var(--halo-err);
+}
+
+/* Expand chevron — rotates 90° when the node is open */
+.twisty-icon {
+  color: var(--fg-3);
+  transition: transform 0.12s ease;
+}
+.twisty-icon.open {
+  transform: rotate(90deg);
+}
+
+/* Spinning loader (connecting / lazy-loading rows) */
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* lucide glyphs sit as blocks inside icon slots */
+.tree-twisty svg,
+.tree-icon svg {
+  display: block;
+}
+
+/* --------------------------------------------------------------- catalog tree */
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--row-h);
+  padding: 0 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--fg-1);
+  font-size: var(--fs);
+}
+.tree-node:hover {
+  background: var(--bg-2);
+}
+/* Empty database (sharded-empty, or authorized but not yet created): muted
+   label + dashed icon outline, mirroring Compass's dashed database marker.
+   lucide glyphs are stroke-based, so stroke-dasharray draws the dashes. */
+.tree-node--empty {
+  color: var(--fg-3);
+}
+.tree-node--empty .tree-icon {
+  opacity: 1;
+}
+.tree-node--empty .tree-icon svg {
+  stroke-dasharray: 2 1.6;
+  color: var(--fg-3);
+}
+/* Placeholder note ("no collections" / "no users" / "no indexes") — a hint, not
+   a selectable item: muted italic, smaller, and inert (no hover, no pointer). */
+.tree-node--note {
+  color: var(--fg-3);
+  font-style: italic;
+  font-size: var(--fs-sm);
+  cursor: default;
+}
+.tree-node--note:hover {
+  background: transparent;
+}
+.tree-twisty {
+  width: 16px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-2);
+}
+.tree-icon {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+.tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-count {
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  margin-left: 4px;
+}
+.tree-spinner {
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  margin-left: auto;
+}
+

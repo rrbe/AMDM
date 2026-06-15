@@ -9,7 +9,7 @@ import { Menu as BaseMenu } from '@base-ui/react/menu'
  *
  * Reuses the existing `.ctx-menu` / `.ctx-item` / `.ctx-sep` styles; disabled and
  * highlighted states key off the `data-disabled` / `data-highlighted` attributes
- * Base UI sets (see styles.css).
+ * Base UI sets (see styles/base-ui.css).
  */
 export interface MenuItemDef {
   label: string

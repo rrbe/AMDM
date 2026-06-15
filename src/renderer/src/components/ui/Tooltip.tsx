@@ -3,7 +3,7 @@ import { Tooltip as BaseTooltip } from '@base-ui/react/tooltip'
 
 /**
  * Thin wrapper over Base UI Tooltip — wraps a single trigger element and shows a
- * styled popup on hover/focus. Reuses the `.app-tooltip` look (styles.css).
+ * styled popup on hover/focus. Reuses the `.app-tooltip` look (styles/theme-polish.css).
  *
  * NOTE: the app currently shows tooltips via the global `data-tip` + `TooltipLayer`
  * singleton; per the migration plan this per-trigger primitive is the eventual

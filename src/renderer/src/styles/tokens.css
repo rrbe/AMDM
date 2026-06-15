@@ -1,0 +1,142 @@
+/* =========================================================================
+   Mongo Shell GUI — global styles
+   Light-first, dense, developer-tool aesthetic. No Tailwind, no UI lib.
+   Layout: [ Explorer (connections + catalog, one tree) | Work area ]
+   ========================================================================= */
+
+/* ---------------------------------------------------------------------------
+   Design tokens — the "Slate" system: a calm, neutral, professional
+   database-tool look (TablePlus / Navicat / TinyRDM lineage). Light-first
+   (default in :root): pure white content on tint-free neutral-gray chrome,
+   near-black neutral ink, and a restrained graphite accent (selection /
+   primary button / focus ring); plus a neutral dark mode under
+   [data-theme='dark']. Deliberately drops the old green-tinted "cement" grays.
+   Semantic token names are preserved so every component rule inherits the
+   palette unchanged; the dark block only re-points the palette, so toggling
+   back to light falls through to :root. The CodeMirror editor carries its own
+   resolved palette in lib/pineEditorTheme.ts — keep the two in sync.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Shape + type (theme-independent) */
+  --radius: 5px;
+  --radius-sm: 4px;
+  --radius-lg: 9px;
+  --row-h: 24px;
+  /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
+  --sidebar-width: 300px;
+  --editor-height: 160px;
+  --font-ui: 'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'Source Code Pro', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
+  --fs: 12px;
+  --fs-sm: 11px;
+  --accent-fg: #ffffff;
+
+  /* ---- LIGHT · Slate (default) ---- */
+  /* Surfaces — pure white content on tint-free neutral gray chrome */
+  --bg-app: #ececee; /* window chrome behind panels */
+  --bg-0: #ffffff; /* primary content surface (work area, lists, results) */
+  --bg-1: #f6f6f8; /* sidebar / header chrome */
+  --bg-2: #eeeef1; /* raised / inset (inputs, table head, segmented) */
+  --bg-3: #e6e6ea; /* hover */
+  --bg-elevated: #ffffff; /* menus, modal, active segment */
+  --bg-sel: rgba(63, 71, 84, 0.1); /* selected row tint (graphite) */
+  --bg-editor: #ffffff;
+
+  /* Borders + the hairline rule */
+  --border: #e6e6ea;
+  --border-strong: #cfcfd6;
+  --rule: #d6d6dc; /* light hairline under title bars / column heads */
+
+  /* Text — neutral ink (near-black, no hue) */
+  --fg-0: #1d1d20;
+  --fg-1: #3a3a40;
+  --fg-2: #6a6a73; /* muted */
+  --fg-3: #9a9aa3; /* very muted */
+
+  /* Accent — graphite (restrained, near-monochrome) */
+  --accent: #3f4754;
+  --accent-hover: #2c333d;
+  --accent-soft: rgba(63, 71, 84, 0.1);
+  --accent-soft-strong: rgba(63, 71, 84, 0.16);
+
+  /* Status */
+  --ok: #1a8f4c;
+  --warn: #b5701a;
+  --err: #d23b3b;
+  --err-bg: rgba(210, 59, 59, 0.08);
+
+  /* Value type colors (Tree/Table/JSON) — clean syntax palette */
+  --t-string: #1a8f4c;
+  --t-number: #2563eb;
+  --t-boolean: #8a3fd0;
+  --t-null: #9a9aa3;
+  --t-objectId: #c0481f;
+  --t-date: #2563eb;
+  --t-key: #1d1d20;
+  --t-binary: #c0481f;
+  --t-regex: #8a3fd0;
+  --t-special: #c0481f;
+
+  /* Shadows — neutral, soft */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.09), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  /* Dot halos (status glow) */
+  --halo-ok: rgba(26, 143, 76, 0.18);
+  --halo-warn: rgba(181, 112, 26, 0.18);
+  --halo-err: rgba(210, 59, 59, 0.16);
+}
+
+/* ---- DARK · Slate Night ---- */
+[data-theme='dark'] {
+  --bg-app: #161618;
+  --bg-0: #1c1c1f; /* neutral content surface */
+  --bg-1: #232327;
+  --bg-2: #2a2a2f;
+  --bg-3: #34343b;
+  --bg-elevated: #2a2a2f;
+  --bg-sel: rgba(174, 183, 198, 0.16);
+  --bg-editor: #19191c;
+
+  --border: #303036;
+  --border-strong: #45454d;
+  --rule: #3a3a42;
+
+  --fg-0: #ececee;
+  --fg-1: #c4c4cb;
+  --fg-2: #9a9aa3;
+  --fg-3: #6c6c75;
+
+  /* Light-slate graphite on dark, with dark ink text */
+  --accent: #aeb7c6;
+  --accent-hover: #9aa4b6;
+  --accent-soft: rgba(174, 183, 198, 0.14);
+  --accent-soft-strong: rgba(174, 183, 198, 0.24);
+  --accent-fg: #1b1d22;
+
+  --ok: #3ec98a;
+  --warn: #e0a23a;
+  --err: #ff6f5c;
+  --err-bg: rgba(255, 111, 92, 0.13);
+
+  --t-string: #5fd39a;
+  --t-number: #74a8ff;
+  --t-boolean: #c79bff;
+  --t-null: #6c6c75;
+  --t-objectId: #ff8a5c;
+  --t-date: #74a8ff;
+  --t-key: #ececee;
+  --t-binary: #ff8a5c;
+  --t-regex: #c79bff;
+  --t-special: #ff8a5c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.66), 0 6px 16px rgba(0, 0, 0, 0.55);
+
+  --halo-ok: rgba(62, 201, 138, 0.22);
+  --halo-warn: rgba(224, 162, 58, 0.22);
+  --halo-err: rgba(255, 111, 92, 0.22);
+}
+

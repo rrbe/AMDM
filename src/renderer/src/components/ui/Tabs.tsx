@@ -8,7 +8,7 @@ import { Tabs as BaseTabs } from '@base-ui/react/tabs'
  * ConnectionForm already works), so this only replaces the `.tabs` button row.
  *
  * Reuses the existing `.tabs` / `.tabs button` styles; the active tab is matched
- * by `[data-selected]` (twin of the old `button.active` rule) in styles.css.
+ * by `[data-selected]` (twin of the old `button.active` rule) in styles/base-ui.css.
  */
 export interface TabItem<T> {
   value: T

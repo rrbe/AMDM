@@ -1,0 +1,232 @@
+/* ============================================================================
+   Slate theme — structural touches & component polish
+   Appended last so these win at equal specificity over the base rules above.
+   ============================================================================ */
+
+/* App chrome shows behind the panels at the window edges. */
+body {
+  background: var(--bg-app);
+  text-rendering: optimizeLegibility;
+}
+
+/* Inset form fields with a pine focus ring. */
+input,
+select,
+textarea {
+  background: var(--bg-2);
+  border-radius: var(--radius);
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Buttons: elevated surface; pine primary with a subtle lift. */
+button {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+button.primary {
+  color: var(--accent-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+button.ghost {
+  background: transparent;
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Scrollbars — track blends into the surface; thumb is a soft hairline. */
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-3);
+  background-clip: padding-box;
+}
+::selection {
+  background: var(--accent-soft-strong);
+}
+
+/* ---- Editorial ink rule under the top title bars ---- */
+.app-titlebar,
+.work-header {
+  border-bottom: 1.5px solid var(--rule);
+}
+
+/* ---- Connection rows: full-bleed sticky band, active accent outline ----
+   Squared corners (no radius): the rows span the sidebar edge to edge so they
+   read as section-header bands when pinned by sticky scroll. */
+.conn-item {
+  border-radius: 0;
+}
+.conn-item.active {
+  box-shadow: inset 0 0 0 1px var(--accent-soft-strong);
+}
+
+/* ---- Catalog tree rows ---- */
+.tree-node {
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Result view switcher → segmented control ---- */
+.view-switch {
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  border-radius: var(--radius);
+  overflow: visible;
+  padding: 2px;
+  gap: 2px;
+}
+.view-switch button {
+  font-weight: 600;
+  color: var(--fg-2);
+  border-radius: var(--radius-sm);
+  padding: 3px 13px;
+  background: transparent;
+}
+.view-switch button:hover {
+  color: var(--fg-0);
+  background: transparent;
+}
+.view-switch button.active {
+  background: var(--bg-elevated);
+  color: var(--fg-0);
+  box-shadow: var(--shadow-sm);
+}
+[data-theme='dark'] .view-switch button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  box-shadow: none;
+}
+
+/* ---- Result meta: warm "truncated" amber ---- */
+.result-meta .truncated {
+  color: var(--warn);
+}
+
+/* ---- Table: editorial uppercase column heads with an ink underline ---- */
+.tbl-head {
+  background: var(--bg-2);
+  border-bottom: 1.5px solid var(--rule);
+}
+.tbl-th {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--fg-2);
+}
+
+/* ---- Empty state: soft accent halo + editorial heading ---- */
+.empty-state {
+  background:
+    radial-gradient(58% 48% at 50% 40%, var(--accent-soft) 0%, transparent 70%),
+    var(--bg-0);
+}
+.empty-state h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg-0);
+}
+
+/* ---- Modal: light paper, soft border, large radius + shadow ---- */
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+}
+[data-theme='dark'] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.modal-header {
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Sidebar footer: app-level theme cycle (System / Light / Dark icon) ---- */
+.side-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.side-foot .spacer {
+  flex: 1;
+}
+/* App-level theme control: a single icon button cycling System → Light → Dark. */
+.theme-cycle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--fg-1);
+  cursor: pointer;
+}
+.theme-cycle:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.theme-cycle svg {
+  display: block;
+}
+
+/* --------------------------------------------------------------- tooltip
+   App-wide styled tooltip (TooltipLayer) — replaces native title=. Portaled to
+   <body>, positioned via inline top/left, sits above modals/menus (z 3000). */
+.app-tooltip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 360px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--fg-0);
+  color: var(--bg-0);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+  animation: tip-in 90ms ease-out;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+

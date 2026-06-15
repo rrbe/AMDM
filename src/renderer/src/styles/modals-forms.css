@@ -1,0 +1,388 @@
+/* ----------------------------------------------------------------- modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: var(--bg-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  width: 520px;
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+.modal.small {
+  width: 360px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+.modal-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.modal-footer .spacer {
+  flex: 1;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.tabs button {
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-2);
+  padding: 6px 12px;
+}
+/* Active tab is matched by Base UI's [data-selected] (ui/Tabs) — see the rule in
+   the Base UI wrappers section near the end of this file. */
+
+.form-row {
+  margin-bottom: 12px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.hint {
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  margin-top: 3px;
+}
+
+/* ---- Settings modal: grouped preference sections ---- */
+.settings-section {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.settings-section:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+.settings-section-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--fg-2);
+  margin-bottom: 10px;
+}
+.settings-section .form-row:last-child,
+.settings-section .form-grid:last-child {
+  margin-bottom: 0;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.swatch.selected {
+  border-color: var(--fg-0);
+}
+
+.test-result {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.test-result.ok {
+  background: rgba(63, 185, 80, 0.12);
+  color: var(--ok);
+  border: 1px solid rgba(63, 185, 80, 0.4);
+}
+.test-result.err {
+  background: var(--err-bg);
+  color: var(--err);
+  border: 1px solid var(--err);
+}
+
+.toast-stack {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.toast {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  /* Opaque elevated surface — a floating toast must NOT use the translucent
+     --err-bg tint, or the content behind it bleeds through. Severity is carried
+     by the colored left bar + icon, not a wash over the whole panel. */
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  color: var(--fg-0);
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in 0.18s ease-out;
+}
+.toast-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.toast .toast-msg {
+  flex: 1;
+  font-size: var(--fs);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.toast-close {
+  flex: 0 0 auto;
+  margin: -3px -4px 0 0;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  color: var(--fg-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.toast-close:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.toast-error {
+  border-left-color: var(--err);
+}
+.toast-error .toast-icon {
+  color: var(--err);
+}
+.toast-success {
+  border-left-color: var(--ok);
+}
+.toast-success .toast-icon {
+  color: var(--ok);
+}
+.toast-warn {
+  border-left-color: var(--warn);
+}
+.toast-warn .toast-icon {
+  color: var(--warn);
+}
+.toast-info {
+  border-left-color: var(--accent);
+}
+.toast-info .toast-icon {
+  color: var(--accent);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.muted {
+  color: var(--fg-2);
+}
+.center-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--fg-2);
+}
+
+/* ---- From URL / To URL helpers (ConnectionForm) ---- */
+.url-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.url-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  font-weight: 500;
+  color: var(--fg-1);
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.url-action-btn:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.url-action-btn svg {
+  color: var(--fg-2);
+  transition: color 0.12s ease;
+}
+.url-action-btn:hover svg {
+  color: var(--accent);
+}
+.url-actions-note {
+  font-size: var(--fs-sm);
+  color: var(--ok);
+  margin-left: 4px;
+}
+
+/* Small popup stacked over the form for a single one-way action. */
+.url-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+.url-popup {
+  background: var(--bg-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  width: 470px;
+  max-width: 92vw;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+.url-popup-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.url-popup-head > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.url-popup-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.url-popup-title {
+  font-weight: 600;
+}
+.url-popup-sub {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.url-popup-input {
+  resize: vertical;
+  box-sizing: border-box;
+}
+.url-popup-input.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  word-break: break-all;
+}
+.url-popup-err {
+  font-size: var(--fs-sm);
+  color: var(--err);
+  background: var(--err-bg);
+  padding: 6px 9px;
+  border-radius: var(--radius);
+}
+/* "Include real password" opt-in card: now a ui/Checkbox; its boxed look lives
+   under `.ui-check.url-popup-check` in the Base UI wrappers section below. */
+.url-popup-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.url-popup-foot .spacer {
+  flex: 1;
+}
+.url-popup-ok {
+  font-size: var(--fs-sm);
+  color: var(--ok);
+}
+
+/* ---- Color swatches (ConnectionForm) ---- */
+.color-swatches {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+.color-swatch:hover {
+  border-color: var(--border-strong);
+}
+.color-swatch.selected {
+  border-color: var(--fg-0);
+  box-shadow: 0 0 0 2px var(--bg-1);
+}
+.color-swatch.none {
+  background: var(--bg-2);
+  position: relative;
+  border-color: var(--border);
+}
+.color-swatch.none::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 2px;
+  background: var(--err);
+  transform: rotate(-45deg);
+}
+
