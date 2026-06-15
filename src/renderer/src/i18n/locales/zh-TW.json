@@ -143,6 +143,12 @@
     "edit": "編輯",
     "delete": "刪除",
     "deleteConfirm": "刪除連線「{{name}}」？",
+    "state": {
+      "connected": "已連線",
+      "connecting": "連線中…",
+      "error": "連線錯誤",
+      "disconnected": "未連線"
+    },
     "users": "使用者",
     "indexes": "索引",
     "noUsers": "尚無使用者",
@@ -334,7 +340,6 @@
   },
   "savedQueries": {
     "title": "已儲存的查詢",
-    "tabSaved": "已儲存",
     "tabHistory": "歷史紀錄",
     "ungrouped": "未分組",
     "emptySaved": "尚無已儲存的查詢。請在工具列使用「儲存」。",

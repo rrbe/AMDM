@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import {
-  CheckCircle2,
   ChevronRight,
   Clock,
   Database,
@@ -24,8 +23,7 @@ import {
   Unplug,
   Upload,
   User as UserIcon,
-  Users as UsersIcon,
-  XCircle
+  Users as UsersIcon
 } from 'lucide-react'
 import type { CollectionSort, ConnectionConfig, ConnectionState } from '@shared/types'
 import {
@@ -36,10 +34,10 @@ import {
 } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
-import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
+import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
-import { SavedQueriesPanel } from '@renderer/components/explorer/SavedQueriesPanel'
+import { HistoryPanel, SavedQueriesPanel } from '@renderer/components/explorer/SavedQueriesPanel'
 import { SettingsModal } from '@renderer/components/settings/SettingsModal'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
@@ -71,9 +69,11 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
  *
  *   Connection → Databases → (Users) + Collections → (Indexes) → leaves
  *
- * Top-level rows are connections (state dot, color, host/port + connect / edit /
- * delete actions). A connected connection expands to reveal its database
- * subtree, lazily loaded via catalog.* and cached per-connection in the store.
+ * Top-level rows are connections — each shows only a live status signal, name,
+ * and host/port; connect / edit / delete all live in the right-click menu
+ * (`openConnMenu`), so the row carries no hover buttons. A connected connection
+ * expands to reveal its database subtree, lazily loaded via catalog.* and cached
+ * per-connection in the store.
  *
  * ADR-0004 rule 5: clicking a collection never auto-runs a query; it sets the
  * active connection + database and seeds the editor with `db.<coll>.find({})`.
@@ -146,14 +146,16 @@ export function Explorer(): JSX.Element {
   const browseCollection = useAppStore((s) => s.browseCollection)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
-  // Saved Queries lives in a bottom drawer, collapsed by default.
+  // Saved Queries + History each live in their own bottom drawer, collapsed by
+  // default and independently toggled.
   const [savedOpen, setSavedOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [connForm, setConnForm] = useState<{ open: boolean; editing?: ConnectionConfig }>({
     open: false
   })
   const [ioModal, setIoModal] = useState<IoModal>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(
     null
   )
 
@@ -168,6 +170,45 @@ export function Explorer(): JSX.Element {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // Right-click a connection → every action (connect, edit, delete) lives here.
+  // The row itself carries nothing but the live status signal — no hover buttons.
+  const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
+    e.preventDefault()
+    const connected = row.state === 'connected'
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        connected
+          ? {
+              label: t('explorer.disconnect'),
+              icon: <Unplug size={14} />,
+              onClick: () => void disconnect(row.id)
+            }
+          : {
+              label: t('explorer.connect'),
+              icon: <Plug size={14} />,
+              onClick: () => void connect(row.id)
+            },
+        'separator',
+        {
+          label: t('explorer.edit'),
+          icon: <Pencil size={14} />,
+          onClick: () => setConnForm({ open: true, editing: row.conn })
+        },
+        {
+          label: t('explorer.delete'),
+          icon: <Trash2 size={14} />,
+          danger: true,
+          onClick: () => {
+            if (confirm(t('explorer.deleteConfirm', { name: row.conn.name })))
+              void deleteConnection(row.id)
+          }
+        }
+      ]
+    })
+  }
 
   // Right-click a collection → Export / Import live here (not as hover buttons).
   const openCollMenu = (
@@ -290,11 +331,7 @@ export function Explorer(): JSX.Element {
                 onSelect={() => setActiveConnection(row.id)}
                 onToggle={() => toggleConnectionExpanded(row.id)}
                 onConnect={() => void connect(row.id)}
-                onDisconnect={() => void disconnect(row.id)}
-                onEdit={() => setConnForm({ open: true, editing: row.conn })}
-                onDelete={() => {
-                  if (confirm(t('explorer.deleteConfirm', { name: row.conn.name }))) void deleteConnection(row.id)
-                }}
+                onContextMenu={(e) => openConnMenu(e, row)}
               />
             ) : (
               <CatalogRow key={row.id} row={row} onContextMenu={openCollMenu} />
@@ -303,10 +340,14 @@ export function Explorer(): JSX.Element {
         </div>
       </div>
 
-      {/* Saved Queries: a collapsible drawer pinned to the bottom (collapsed by
-          default). The light rule above it separates it from Connections. */}
+      {/* Saved Queries + History: two sibling collapsible drawers pinned to the
+          bottom (each collapsed by default). The light rules above them separate
+          them from Connections and from each other. */}
       <div className="side-section side-section--saved">
         <SavedQueriesPanel open={savedOpen} onToggle={() => setSavedOpen((v) => !v)} />
+      </div>
+      <div className="side-section side-section--history">
+        <HistoryPanel open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
       </div>
 
       {/* App-level controls live in the sidebar footer (VS Code pattern), out of
@@ -386,23 +427,32 @@ function ConnectionRow({
   onSelect,
   onToggle,
   onConnect,
-  onDisconnect,
-  onEdit,
-  onDelete
+  onContextMenu
 }: {
   row: ConnRow
   isActive: boolean
   onSelect: () => void
   onToggle: () => void
   onConnect: () => void
-  onDisconnect: () => void
-  onEdit: () => void
-  onDelete: () => void
+  onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
   const { t } = useTranslation()
   const { conn, state, expandable, expanded } = row
   const isConnected = state === 'connected'
   const sub = conn.useSrv ? `srv · ${conn.host}` : `${conn.host}:${conn.port ?? 27017}`
+
+  // The lone surviving piece of chrome: a single status signal whose color +
+  // glow carry the live state (online / connecting / error / offline). No
+  // check/x/spinner glyphs — every action moved into the right-click menu.
+  const signalClass = `conn-signal conn-signal--${
+    state === 'connected'
+      ? 'on'
+      : state === 'error'
+        ? 'error'
+        : state === 'connecting'
+          ? 'connecting'
+          : 'off'
+  }`
 
   return (
     <div
@@ -410,7 +460,8 @@ function ConnectionRow({
       data-tip={sub}
       onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : onConnect())}
-      style={conn.color ? { borderLeft: `3px solid ${conn.color}` } : undefined}
+      onContextMenu={onContextMenu}
+      style={conn.color ? { borderLeftColor: conn.color } : undefined}
     >
       <span
         className="tree-twisty"
@@ -425,69 +476,12 @@ function ConnectionRow({
           <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} />
         ) : null}
       </span>
-      <span className="conn-status">
-        {state === 'connected' ? (
-          <CheckCircle2 size={15} className="ok" />
-        ) : state === 'error' ? (
-          <XCircle size={15} className="err" />
-        ) : state === 'connecting' ? (
-          <Loader2 size={15} className="spin" />
-        ) : (
-          <span className="conn-dot-off" />
-        )}
+      <span className="conn-status" data-tip={t(`explorer.state.${state}`)}>
+        <span className={signalClass} />
       </span>
       <div className="conn-text">
         <div className="conn-name">{conn.name}</div>
         <div className="conn-sub">{sub}</div>
-      </div>
-      <div className="conn-row-actions">
-        {isConnected ? (
-          <button
-            className="ghost"
-            data-tip={t('explorer.disconnect')}
-            aria-label={t('explorer.disconnect')}
-            onClick={(e) => {
-              e.stopPropagation()
-              onDisconnect()
-            }}
-          >
-            <Unplug size={14} />
-          </button>
-        ) : (
-          <button
-            className="ghost"
-            data-tip={t('explorer.connect')}
-            aria-label={t('explorer.connect')}
-            onClick={(e) => {
-              e.stopPropagation()
-              onConnect()
-            }}
-          >
-            <Plug size={14} />
-          </button>
-        )}
-        <button
-          className="ghost"
-          data-tip={t('explorer.edit')}
-          aria-label={t('explorer.edit')}
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit()
-          }}
-        >
-          <Pencil size={14} />
-        </button>
-        <button
-          className="ghost danger"
-          data-tip={t('explorer.delete')}
-          aria-label={t('explorer.delete')}
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-        >
-          <Trash2 size={14} />
-        </button>
       </div>
     </div>
   )
