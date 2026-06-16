@@ -6,6 +6,7 @@ import { indentFor, toJsonLines } from '@renderer/lib/format'
 import { Select } from '@renderer/components/ui/Select'
 import { StageEditor } from './StageEditor'
 import type { StageTarget } from '@renderer/lib/stageCompletion'
+import styles from './pipeline.module.css'
 
 interface StageCardProps {
   stage: AggregationStage
@@ -47,15 +48,15 @@ export function StageCard({
   const writeStage = isWriteStage(stage.op)
   const previewDisabled = !stage.enabled || writeStage || (preview?.loading ?? false)
   const isError = preview?.result?.kind === 'error'
-  const cls = ['stage-card', !stage.enabled && 'disabled', isError && 'error', dragging && 'dragging']
+  const cls = [styles.stageCard, !stage.enabled && styles.disabled, isError && styles.error, dragging && styles.dragging]
     .filter(Boolean)
     .join(' ')
 
   return (
     <div className={cls} onDragOver={(e) => onDragOver(e, index)} onDrop={() => onDrop(index)}>
-      <div className="stage-head">
+      <div className={styles.stageHead}>
         <span
-          className="stage-drag"
+          className={styles.stageDrag}
           draggable
           onDragStart={() => onDragStart(index)}
           onDragEnd={onDragEnd}
@@ -64,17 +65,17 @@ export function StageCard({
         >
           <GripVertical size={14} />
         </span>
-        <span className="stage-num">{index + 1}</span>
+        <span className={styles.stageNum}>{index + 1}</span>
         <Select
-          className="stage-op"
+          className={styles.stageOp}
           value={stage.op}
           onChange={(op) => setOp(stage.id, op)}
           options={OP_OPTIONS}
           aria-label={t('builder.stageType')}
         />
-        <span className="spacer" />
+        <span className={styles.spacer} />
         <button
-          className="stage-icon-btn"
+          className={styles.stageIconBtn}
           disabled={previewDisabled}
           onClick={() => void runPreview(index)}
           data-tip={writeStage ? t('builder.previewWriteDisabled') : t('builder.preview')}
@@ -82,11 +83,11 @@ export function StageCard({
         >
           <Play size={13} />
         </button>
-        <label className="stage-enable" data-tip={t('builder.enableTip')}>
+        <label className={styles.stageEnable} data-tip={t('builder.enableTip')}>
           <input type="checkbox" checked={stage.enabled} onChange={() => toggle(stage.id)} />
         </label>
         <button
-          className="stage-icon-btn"
+          className={styles.stageIconBtn}
           onClick={() => remove(stage.id)}
           data-tip={t('builder.removeStage')}
           aria-label={t('builder.removeStage')}
@@ -104,23 +105,24 @@ export function StageCard({
 
 function PreviewFooter({ preview }: { preview: StagePreview }): JSX.Element | null {
   const { t } = useTranslation()
-  if (preview.loading) return <div className="stage-preview muted">{t('builder.previewing')}</div>
+  if (preview.loading) return <div className={`${styles.stagePreview} muted`}>{t('builder.previewing')}</div>
 
   const r = preview.result
   if (!r) return null
-  if (r.kind === 'error') return <div className="stage-preview err">{r.error ?? t('builder.previewFailed')}</div>
+  if (r.kind === 'error')
+    return <div className={`${styles.stagePreview} ${styles.err}`}>{r.error ?? t('builder.previewFailed')}</div>
 
   const docs = Array.isArray(r.data) ? (r.data as unknown[]) : []
   const count = r.count ?? docs.length
   return (
-    <details className="stage-preview">
+    <details className={styles.stagePreview}>
       <summary>
         {t('builder.previewCount', { count })}
         {r.truncated ? '+' : ''}
       </summary>
-      <div className="stage-preview-box">
+      <div className={styles.stagePreviewBox}>
         {toJsonLines(docs).map((line, i) => (
-          <pre key={i} className="stage-preview-line">
+          <pre key={i} className={styles.stagePreviewLine}>
             {indentFor(line.depth)}
             {line.text}
           </pre>
