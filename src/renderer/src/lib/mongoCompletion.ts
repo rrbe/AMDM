@@ -1,5 +1,8 @@
 /**
- * CodeMirror 6 completion source for the mongo shell editor.
+ * CodeMirror 6 completion source for the mongo shell editor — the regex engine.
+ * It owns the "MQL-string space" the TS language service can't see (operators &
+ * values inside Document literals, field names) and is the transparent fallback
+ * for member access when the TS worker is unavailable (see `shellCompletion.ts`).
  *
  * Decides suggestions from the text immediately before the cursor:
  *  - `db.<word>`           → collection names (active db) + Db methods
@@ -8,17 +11,32 @@
  *  - `<field>: <value>`    → value candidates for the slot we're in
  *                           (sort→1/-1, projection→1/0, boolean keys→true/false)
  *  - `$<word>`             → MongoDB operators, scoped to the call we're inside
- *                           (find→query ops, update→update ops, aggregate→
- *                           pipeline stages + expression ops); union if unsure
- *  - otherwise             → shell globals + JS literals + cached field names
+ *  - otherwise             → shell globals + JS keywords/literals + field names
+ *
+ * The completion *data* (operators, globals, keywords, value tables) lives in
+ * `completionRegistry.ts`; this file is the matching/decision logic.
  *
  * Robustness: reads the live store outside React; never throws (returns null).
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
+import {
+  operatorGroups,
+  SHELL_GLOBALS,
+  JS_LITERALS,
+  JS_KEYWORDS,
+  SORT_VALUES,
+  PROJECTION_VALUES,
+  BOOLEAN_VALUES,
+  BOOLEAN_KEYS,
+  type OpContext,
+  type ValueChoice
+} from '@renderer/lib/completionRegistry'
 
 // --------------------------------------------------------------------------
-// Static vocabularies
+// Method vocabularies — the regex-fallback path. The TS engine is the primary
+// source for member access; these mirror the base d.ts subset so completion
+// still works (less precisely) when the worker is unavailable.
 // --------------------------------------------------------------------------
 
 const DB_METHODS = ['getCollection', 'getSiblingDB', 'aggregate', 'runCommand', 'stats', 'listCollections']
@@ -35,76 +53,6 @@ const CURSOR_METHODS = [
   'sort', 'limit', 'skip', 'project', 'projection', 'count', 'toArray', 'forEach', 'map',
   'hasNext', 'next', 'explain', 'pretty', 'hint', 'collation', 'comment', 'batchSize', 'size',
   'allowDiskUse', 'maxTimeMS', 'min', 'max', 'returnKey', 'showRecordId', 'tailable', 'addCursorFlag'
-]
-
-export const SHELL_GLOBALS = [
-  'ObjectId', 'ISODate', 'NumberLong', 'NumberInt', 'NumberDecimal', 'UUID', 'BinData',
-  'Timestamp', 'MinKey', 'MaxKey', 'Date', 'RegExp'
-]
-
-export const JS_KEYWORDS = ['true', 'false', 'null']
-
-// Query operators (find filters / $match).
-const QUERY_OPERATORS = [
-  '$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin',
-  '$and', '$or', '$nor', '$not',
-  '$exists', '$type',
-  '$expr', '$jsonSchema', '$mod', '$regex', '$options', '$text', '$search', '$language',
-  '$caseSensitive', '$diacriticSensitive', '$where', '$comment', '$rand',
-  '$geoWithin', '$geoIntersects', '$near', '$nearSphere', '$geometry', '$center', '$centerSphere',
-  '$box', '$polygon', '$maxDistance', '$minDistance',
-  '$all', '$elemMatch', '$size',
-  '$bitsAllClear', '$bitsAllSet', '$bitsAnyClear', '$bitsAnySet',
-  '$slice', '$meta'
-]
-
-// Update operators.
-const UPDATE_OPERATORS = [
-  '$set', '$unset', '$setOnInsert', '$inc', '$mul', '$min', '$max', '$rename', '$currentDate',
-  '$push', '$pull', '$pullAll', '$pop', '$addToSet',
-  '$each', '$position', '$slice', '$sort', '$bit'
-]
-
-// Aggregation pipeline stages.
-export const AGG_STAGES = [
-  '$addFields', '$bucket', '$bucketAuto', '$changeStream', '$collStats', '$count', '$densify',
-  '$documents', '$facet', '$fill', '$geoNear', '$graphLookup', '$group', '$indexStats', '$limit',
-  '$lookup', '$match', '$merge', '$out', '$project', '$redact', '$replaceRoot', '$replaceWith',
-  '$sample', '$search', '$searchMeta', '$set', '$setWindowFields', '$skip', '$sort', '$sortByCount',
-  '$unionWith', '$unset', '$unwind', '$vectorSearch'
-]
-
-// Aggregation expression / accumulator operators.
-export const AGG_EXPR_OPERATORS = [
-  // arithmetic
-  '$abs', '$add', '$ceil', '$divide', '$exp', '$floor', '$ln', '$log', '$log10', '$mod',
-  '$multiply', '$pow', '$round', '$sqrt', '$subtract', '$trunc',
-  // array
-  '$arrayElemAt', '$arrayToObject', '$concatArrays', '$filter', '$first', '$firstN', '$in',
-  '$indexOfArray', '$isArray', '$last', '$lastN', '$map', '$maxN', '$minN', '$objectToArray',
-  '$range', '$reduce', '$reverseArray', '$size', '$slice', '$sortArray', '$zip',
-  // boolean / comparison / conditional
-  '$and', '$or', '$not', '$cmp', '$eq', '$gt', '$gte', '$lt', '$lte', '$ne',
-  '$cond', '$ifNull', '$switch',
-  // date
-  '$dateAdd', '$dateDiff', '$dateFromParts', '$dateFromString', '$dateSubtract', '$dateToParts',
-  '$dateToString', '$dateTrunc', '$dayOfMonth', '$dayOfWeek', '$dayOfYear', '$hour', '$isoDayOfWeek',
-  '$isoWeek', '$isoWeekYear', '$millisecond', '$minute', '$month', '$second', '$week', '$year',
-  // string
-  '$concat', '$indexOfBytes', '$indexOfCP', '$ltrim', '$regexFind', '$regexFindAll', '$regexMatch',
-  '$replaceOne', '$replaceAll', '$rtrim', '$split', '$strLenBytes', '$strLenCP', '$strcasecmp',
-  '$substr', '$substrBytes', '$substrCP', '$toLower', '$toUpper', '$trim',
-  // object / set / type
-  '$mergeObjects', '$setDifference', '$setEquals', '$setIntersection', '$setIsSubset', '$setUnion',
-  '$allElementsTrue', '$anyElementTrue', '$getField', '$setField', '$literal', '$type', '$isNumber',
-  '$convert', '$toBool', '$toDate', '$toDecimal', '$toDouble', '$toInt', '$toLong', '$toObjectId',
-  '$toString',
-  // accumulators
-  '$sum', '$avg', '$push', '$addToSet', '$stdDevPop', '$stdDevSamp', '$count', '$accumulator',
-  '$bottom', '$bottomN', '$top', '$topN', '$mergeObjects',
-  // window / misc
-  '$rank', '$denseRank', '$documentNumber', '$shift', '$derivative', '$integral', '$expMovingAvg',
-  '$linearFill', '$locf', '$function', '$let', '$meta', '$rand', '$sampleRate'
 ]
 
 // --------------------------------------------------------------------------
@@ -128,10 +76,8 @@ export function lengthBoost(label: string): number {
   return Math.max(-99, 99 - label.length)
 }
 
-type CallContext = 'aggregate' | 'update' | 'query' | null
-
 /** Which collection method's call are we currently (innermost) inside? */
-function detectCallContext(before: string): CallContext {
+function detectCallContext(before: string): OpContext | null {
   const re =
     /\.(aggregate|find|findOne|updateOne|updateMany|update|replaceOne|findOneAndUpdate|findOneAndReplace|findOneAndDelete|deleteOne|deleteMany|countDocuments|count|distinct|bulkWrite)\s*\(/g
   let m: RegExpExecArray | null
@@ -147,24 +93,9 @@ function detectCallContext(before: string): CallContext {
 
 /** Operator completions scoped to the enclosing call (union if unknown). */
 function operatorCompletions(before: string): Completion[] {
-  const ctx = detectCallContext(before)
   const map = new Map<string, Completion>()
-  const add = (labels: string[], detail: string): void => {
-    for (const l of labels) if (!map.has(l)) map.set(l, opt(l, 'property', detail))
-  }
-  if (ctx === 'aggregate') {
-    add(AGG_STAGES, 'agg stage')
-    add(AGG_EXPR_OPERATORS, 'expr op')
-  } else if (ctx === 'update') {
-    add(UPDATE_OPERATORS, 'update op')
-    add(AGG_EXPR_OPERATORS, 'expr op (pipeline update)')
-  } else if (ctx === 'query') {
-    add(QUERY_OPERATORS, 'query op')
-  } else {
-    add(QUERY_OPERATORS, 'query op')
-    add(UPDATE_OPERATORS, 'update op')
-    add(AGG_STAGES, 'agg stage')
-    add(AGG_EXPR_OPERATORS, 'expr op')
+  for (const group of operatorGroups(detectCallContext(before))) {
+    for (const l of group.labels) if (!map.has(l)) map.set(l, opt(l, 'property', group.detail))
   }
   return [...map.values()]
 }
@@ -192,13 +123,6 @@ function lastReferencedCollection(code: string): string | undefined {
 // --------------------------------------------------------------------------
 // Value-slot detection (shared with the inline ghost-text hint)
 // --------------------------------------------------------------------------
-
-// Keys whose value is a boolean (option flags). Used to offer true/false.
-const BOOLEAN_KEYS = new Set([
-  '$exists', 'upsert', 'multi', 'unique', 'sparse', 'background', 'new',
-  'returnNewDocument', 'allowDiskUse', 'bypassDocumentValidation', 'ordered',
-  'justOne', 'caseSensitive', 'diacriticSensitive', 'showRecordId', 'returnKey'
-])
 
 /** Is the cursor sitting inside an unterminated string literal? (heuristic) */
 export function inString(before: string): boolean {
@@ -244,9 +168,10 @@ export function isInsideProjection(before: string): boolean {
 function computeValueOptions(before: string): Completion[] {
   const key = atValueSlot(before)
   if (key == null) return []
-  if (isInsideSort(before)) return [opt('1', 'text', 'ascending'), opt('-1', 'text', 'descending')]
-  if (isInsideProjection(before)) return [opt('1', 'text', 'include'), opt('0', 'text', 'exclude')]
-  if (BOOLEAN_KEYS.has(key)) return [opt('true', 'text', 'boolean'), opt('false', 'text', 'boolean')]
+  const toOpts = (vs: ValueChoice[]): Completion[] => vs.map((v) => opt(v.label, 'text', v.detail))
+  if (isInsideSort(before)) return toOpts(SORT_VALUES)
+  if (isInsideProjection(before)) return toOpts(PROJECTION_VALUES)
+  if (BOOLEAN_KEYS.has(key)) return toOpts(BOOLEAN_VALUES)
   return []
 }
 
@@ -323,12 +248,13 @@ export function computeShellCompletion(
     return { from: pos - word.length, options: operatorCompletions(before), validFor: /^\$[\w$]*$/ }
   }
 
-  // otherwise → globals + literals + cached field names
+  // otherwise → globals + literals + keywords + cached field names
   const wordMatch = /([\w$]*)$/.exec(before)
   const word = wordMatch ? wordMatch[1] : ''
   const options: Completion[] = []
   for (const g of SHELL_GLOBALS) options.push(opt(g, 'keyword', 'constructor'))
-  for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'literal'))
+  for (const kw of JS_LITERALS) options.push(opt(kw, 'keyword', 'literal'))
+  for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'keyword'))
   for (const f of data.fields) options.push(opt(f, 'variable', 'field', lengthBoost(f)))
   if (options.length === 0) return null
   return { from: pos - word.length, options, validFor: /^[\w$]*$/ }

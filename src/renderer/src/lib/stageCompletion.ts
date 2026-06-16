@@ -11,13 +11,8 @@
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { useAppStore } from '@renderer/store/useAppStore'
-import {
-  AGG_STAGES,
-  AGG_EXPR_OPERATORS,
-  SHELL_GLOBALS,
-  JS_KEYWORDS,
-  lengthBoost
-} from '@renderer/lib/mongoCompletion'
+import { lengthBoost } from '@renderer/lib/mongoCompletion'
+import { AGG_STAGES, AGG_EXPR_OPERATORS, SHELL_GLOBALS, JS_LITERALS } from '@renderer/lib/completionRegistry'
 
 export interface StageTarget {
   connId: string
@@ -59,7 +54,7 @@ export function makeStageCompletionSource(
         }
       }
       for (const g of SHELL_GLOBALS) options.push({ label: g, type: 'keyword', detail: 'constructor' })
-      for (const kw of JS_KEYWORDS) options.push({ label: kw, type: 'keyword', detail: 'literal' })
+      for (const kw of JS_LITERALS) options.push({ label: kw, type: 'keyword', detail: 'literal' })
       if (options.length === 0) return null
       return { from: context.pos - word.length, options, validFor: /^[\w$]*$/ }
     } catch {

@@ -13,6 +13,7 @@
  * `CompletionSource` Promise contract; honors abort to drop stale requests.
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
+import { snippetCompletion } from '@codemirror/autocomplete'
 import {
   mongoCompletionSource,
   activeContext,
@@ -58,15 +59,62 @@ function kindToType(kind: string): Completion['type'] {
   }
 }
 
+// Method call snippets (CodeMirror snippet syntax — `${}` is a tab stop, `${x}`
+// a labelled placeholder). Curated for the common ones; others fall to a default.
+const METHOD_SNIPPETS: Record<string, string> = {
+  find: 'find({ ${} })',
+  findOne: 'findOne({ ${} })',
+  aggregate: 'aggregate([ ${} ])',
+  limit: 'limit(${10})',
+  skip: 'skip(${0})',
+  sort: 'sort({ ${field}: ${-1} })',
+  project: 'project({ ${field}: ${1} })',
+  projection: 'projection({ ${field}: ${1} })',
+  countDocuments: 'countDocuments({ ${} })',
+  distinct: 'distinct(${field})',
+  insertOne: 'insertOne({ ${} })',
+  insertMany: 'insertMany([ ${} ])',
+  updateOne: 'updateOne({ ${filter} }, { $set: { ${} } })',
+  updateMany: 'updateMany({ ${filter} }, { $set: { ${} } })',
+  replaceOne: 'replaceOne({ ${filter} }, { ${} })',
+  deleteOne: 'deleteOne({ ${} })',
+  deleteMany: 'deleteMany({ ${} })',
+  createIndex: 'createIndex({ ${field}: ${1} })',
+  getSiblingDB: 'getSiblingDB(${db})',
+  getCollection: 'getCollection(${name})',
+  runCommand: 'runCommand({ ${} })'
+}
+const ZERO_ARG_METHODS = new Set([
+  'toArray', 'itcount', 'count', 'size', 'pretty', 'hasNext', 'next', 'explain',
+  'getName', 'getCollectionNames', 'getCollectionInfos', 'drop', 'dropIndexes',
+  'getIndexes', 'indexes', 'listIndexes', 'stats', 'admin', 'estimatedDocumentCount'
+])
+
+function methodSnippet(name: string): string {
+  if (METHOD_SNIPPETS[name]) return METHOD_SNIPPETS[name]
+  if (ZERO_ARG_METHODS.has(name)) return `${name}()`
+  return `${name}(\${})` // place the cursor inside the parens
+}
+
+function isMethodKind(kind: string): boolean {
+  return kind === 'method' || kind === 'function' || kind === 'local function'
+}
+
 function mapEntry(e: TsCompletionEntry, onDb: boolean): Completion {
   // Reuse the length-boost ranking so shorter, closer matches win prefix ties.
   const boost = lengthBoost(e.name)
   // `db.` members: our generated collections come back as `property` (typed as
   // Collection) — show them with the collection icon (○) + label, not the bare
-  // property square (□); the real Database methods stay ƒ with a "db" hint.
+  // property square (□).
   if (onDb && e.kind === 'property') return { label: e.name, type: 'class', detail: 'collection', boost }
-  if (onDb && (e.kind === 'method' || e.kind === 'function')) {
-    return { label: e.name, type: 'method', detail: 'db', boost }
+  // Methods insert as call snippets (limit → limit(10), find → find({ })…).
+  if (isMethodKind(e.kind)) {
+    return snippetCompletion(methodSnippet(e.name), {
+      label: e.name,
+      type: 'method',
+      detail: onDb ? 'db' : undefined,
+      boost
+    })
   }
   return { label: e.name, type: kindToType(e.kind), boost }
 }
