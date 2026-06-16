@@ -212,4 +212,19 @@
   color: var(--accent-fg);
   opacity: 0.72;
 }
+/* Icon set: keep only the high-recognition glyphs — ƒ (method) and 𝑥 (field).
+   CodeMirror's defaults for the other types (○ class, □ property, 🔑 keyword,
+   abc text…) read as noise beside the type label, so blank them. The .8em icon
+   column keeps its width, so labels stay aligned. */
+.cm-tooltip-autocomplete .cm-completionIcon-class::after,
+.cm-tooltip-autocomplete .cm-completionIcon-property::after,
+.cm-tooltip-autocomplete .cm-completionIcon-keyword::after,
+.cm-tooltip-autocomplete .cm-completionIcon-text::after,
+.cm-tooltip-autocomplete .cm-completionIcon-constant::after,
+.cm-tooltip-autocomplete .cm-completionIcon-enum::after,
+.cm-tooltip-autocomplete .cm-completionIcon-interface::after,
+.cm-tooltip-autocomplete .cm-completionIcon-namespace::after,
+.cm-tooltip-autocomplete .cm-completionIcon-type::after {
+  content: '';
+}
 
