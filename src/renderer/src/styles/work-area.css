@@ -177,3 +177,39 @@
   pointer-events: none;
 }
 
+/* ---- Completion dropdown ----
+   Distinguish the suggestion label from its type detail, and align the
+   selected row with the app accent (CodeMirror's default is a clashing blue).
+   The doubled `.cm-tooltip.cm-tooltip-autocomplete` raises specificity above
+   CodeMirror's runtime-injected base theme so these win regardless of order. */
+.cm-tooltip.cm-tooltip-autocomplete > ul > li {
+  padding: 2px 6px;
+}
+.cm-tooltip-autocomplete .cm-completionLabel {
+  font-weight: 600;
+  color: var(--fg-0);
+}
+.cm-tooltip-autocomplete .cm-completionMatchedText {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--accent);
+}
+.cm-tooltip-autocomplete .cm-completionDetail {
+  margin-left: 0.8em;
+  font-style: italic;
+  font-size: 0.82em;
+  color: var(--fg-3); /* very muted — recedes behind the label */
+}
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionLabel,
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText {
+  color: var(--accent-fg);
+}
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail {
+  color: var(--accent-fg);
+  opacity: 0.72;
+}
+
