@@ -58,9 +58,17 @@ function kindToType(kind: string): Completion['type'] {
   }
 }
 
-function mapEntry(e: TsCompletionEntry): Completion {
+function mapEntry(e: TsCompletionEntry, onDb: boolean): Completion {
   // Reuse the length-boost ranking so shorter, closer matches win prefix ties.
-  return { label: e.name, type: kindToType(e.kind), boost: lengthBoost(e.name) }
+  const boost = lengthBoost(e.name)
+  // `db.` members: our generated collections come back as `property` (typed as
+  // Collection) — show them with the collection icon (○) + label, not the bare
+  // property square (□); the real Database methods stay ƒ with a "db" hint.
+  if (onDb && e.kind === 'property') return { label: e.name, type: 'class', detail: 'collection', boost }
+  if (onDb && (e.kind === 'method' || e.kind === 'function')) {
+    return { label: e.name, type: 'method', detail: 'db', boost }
+  }
+  return { label: e.name, type: kindToType(e.kind), boost }
 }
 
 export async function shellCompletionSource(
@@ -82,7 +90,8 @@ export async function shellCompletionSource(
     if (res && res.entries.length) {
       const word = /[\w$]*$/.exec(before)?.[0] ?? ''
       const from = res.replacementSpan ? res.replacementSpan.from : context.pos - word.length
-      return { from, options: res.entries.map(mapEntry), validFor: /^[\w$]*$/ }
+      const onDb = /\bdb\s*\.\s*[\w$]*$/.test(before)
+      return { from, options: res.entries.map((e) => mapEntry(e, onDb)), validFor: /^[\w$]*$/ }
     }
     // Worker returned nothing usable — fall through to the regex source.
   }
