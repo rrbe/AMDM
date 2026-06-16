@@ -1,0 +1,130 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  /* New stacking context so the app's internal z-indexes can't out-stack
+     Base UI's body-portaled popups (Dialog/Select/Menu/Tooltip). Their
+     positioner/popup z-indexes (defined below) layer relative to this root. */
+  isolation: isolate;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--fg-0);
+  font-family: var(--font-ui);
+  font-size: var(--fs);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--fg-0);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+button:hover:not(:disabled) {
+  background: var(--bg-3);
+  border-color: var(--border-strong);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--bg-3);
+}
+button.danger {
+  color: var(--err);
+}
+
+/* Busy state (BusyButton): the label stays in flow but hidden so the width
+   never changes between idle and in-flight; a spinner overlays it instead of
+   swapping the text. See DESIGN.md §4 (Buttons). currentColor adapts the
+   spinner to each variant (white on primary, ink on neutral/ghost). */
+.busy-btn {
+  position: relative;
+}
+.busy-btn.is-busy .busy-btn-label {
+  visibility: hidden;
+}
+.busy-btn-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: busy-spin 0.7s linear infinite;
+}
+@keyframes busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--fg-0);
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  width: 100%;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+input[type='checkbox'] {
+  width: auto;
+}
+label {
+  display: block;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  margin-bottom: 3px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+  border: 2px solid var(--bg-0);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+

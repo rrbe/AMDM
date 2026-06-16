@@ -34,7 +34,7 @@ export default function App(): JSX.Element {
   }, [language])
 
   // Reflect the persisted theme onto the document root, which drives the
-  // `[data-theme]` token cascade in styles.css. 'system' resolves to the OS
+  // `[data-theme]` token cascade in styles/tokens.css. 'system' resolves to the OS
   // appearance and re-resolves live when the OS toggles light/dark.
   useEffect(() => {
     const mql = window.matchMedia('(prefers-color-scheme: dark)')

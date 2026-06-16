@@ -9,7 +9,7 @@ import { Check } from 'lucide-react'
  * `<input type="checkbox">` + sibling `<label>` pattern, fixing the flaky native
  * label/click behaviour the migration plan calls out.
  *
- * Styling lives in styles.css under `.ui-check*`; checked state is driven by the
+ * Styling lives in styles/base-ui.css under `.ui-check*`; checked state is driven by the
  * `data-checked` attribute Base UI sets on the root.
  */
 interface CheckboxProps {

@@ -7,6 +7,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
 import { makeStageCompletionSource, type StageTarget } from '@renderer/lib/stageCompletion'
+import styles from './pipeline.module.css'
 
 const CodeMirror = lazy(() => import('@uiw/react-codemirror'))
 
@@ -45,9 +46,9 @@ export function StageEditor({ value, onChange, target }: StageEditorProps): JSX.
   )
 
   return (
-    <Suspense fallback={<div className="stage-editor-loading">{t('shell.loadingEditor')}</div>}>
+    <Suspense fallback={<div className={styles.stageEditorLoading}>{t('shell.loadingEditor')}</div>}>
       <CodeMirror
-        className="stage-editor"
+        className={styles.stageEditor}
         value={value}
         theme={isDark ? pineDark : pineLight}
         extensions={extensions}

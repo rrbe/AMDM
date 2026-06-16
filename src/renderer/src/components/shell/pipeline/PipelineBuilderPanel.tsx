@@ -6,6 +6,7 @@ import { Button } from '@renderer/components/common/Button'
 import { Select } from '@renderer/components/ui/Select'
 import type { StageTarget } from '@renderer/lib/stageCompletion'
 import { StageCard } from './StageCard'
+import styles from './pipeline.module.css'
 
 /**
  * The aggregation pipeline builder — a collapsible panel beside the editor.
@@ -70,12 +71,12 @@ export function PipelineBuilderPanel(): JSX.Element | null {
   }
 
   return (
-    <div className="pipeline-panel">
-      <div className="pipeline-head">
-        <span className="pipeline-title">{t('builder.title')}</span>
-        <span className="spacer" />
+    <div className={styles.pipelinePanel}>
+      <div className={styles.pipelineHead}>
+        <span className={styles.pipelineTitle}>{t('builder.title')}</span>
+        <span className={styles.spacer} />
         <button
-          className="pipeline-close"
+          className={styles.pipelineClose}
           onClick={togglePipeline}
           data-tip={t('builder.close')}
           aria-label={t('builder.close')}
@@ -84,12 +85,12 @@ export function PipelineBuilderPanel(): JSX.Element | null {
         </button>
       </div>
 
-      <div className="pipeline-target">
-        <span className="pipeline-target-db" data-tip={t('builder.collection')}>
+      <div className={styles.pipelineTarget}>
+        <span className={styles.pipelineTargetDb} data-tip={t('builder.collection')}>
           {activeDatabase || t('builder.noDb')}
         </span>
         <Select
-          className="pipeline-coll"
+          className={styles.pipelineColl}
           value={collection}
           onChange={setCollection}
           options={collOptions}
@@ -98,9 +99,9 @@ export function PipelineBuilderPanel(): JSX.Element | null {
         />
       </div>
 
-      <div className="pipeline-stages">
+      <div className={styles.pipelineStages}>
         {pipeline.stages.length === 0 ? (
-          <div className="pipeline-empty muted">{t('builder.empty')}</div>
+          <div className={`${styles.pipelineEmpty} muted`}>{t('builder.empty')}</div>
         ) : (
           pipeline.stages.map((stage, i) => (
             <StageCard
@@ -119,11 +120,11 @@ export function PipelineBuilderPanel(): JSX.Element | null {
         )}
       </div>
 
-      <div className="pipeline-foot">
+      <div className={styles.pipelineFoot}>
         <Button onClick={() => addStage()} data-tip={t('builder.addStageTip')}>
           <Plus size={14} /> {t('builder.addStage')}
         </Button>
-        <span className="spacer" />
+        <span className={styles.spacer} />
         <Button variant="primary" disabled={!collection} onClick={applyPipeline} data-tip={t('builder.applyTip')}>
           {t('builder.apply')}
         </Button>

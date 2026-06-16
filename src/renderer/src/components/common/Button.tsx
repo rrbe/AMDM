@@ -16,7 +16,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * The standard text action button — toolbar actions and dialog footers.
  *
  * A thin, typed wrapper over `<button>` + the design-system classes. The CSS in
- * styles.css stays the single source of visual truth; this just consolidates the
+ * styles/ stays the single source of visual truth; this just consolidates the
  * variant API and the busy spinner so every action button behaves identically
  * (and folds in what used to be the separate BusyButton).
  *

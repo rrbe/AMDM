@@ -1,0 +1,191 @@
+/* =========================================================================
+   聚合管道构建器 —— PipelineBuilderPanel / StageCard / StageEditor 的作用域样式。
+   本项目首个 CSS Module 范例。何时上 module、何时留全局见根 CLAUDE.md「样式约定」:
+   组件自包含 → 作用域;跨组件复用的共享词汇 → 全局。
+   - 修饰态(.disabled/.error/.dragging/.err)无全局定义,本地化。
+   - .spacer 全局也无独立样式(各处靠 `.父 .spacer{flex:1}`),本地化。
+   - .muted 是真·全局工具类(modals-forms.css),用 :global() 从作用域里消费——
+     这是后续组件引用 .kv-row / .v-* 等共享全局词汇的范式。
+   （切走前在 styles/work-area.css;切换 toggle 按钮仍留全局,它是 .busy-btn 修饰态。）
+   ========================================================================= */
+.pipelinePanel {
+  flex: 0 0 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-1);
+  overflow: hidden;
+}
+.pipelineHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pipelineTitle {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+}
+.pipelineClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--fg-2);
+}
+.pipelineClose:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.pipelineTarget {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pipelineTargetDb {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.pipelineColl {
+  flex: 1;
+  min-width: 0;
+}
+.pipelineStages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pipelineEmpty {
+  padding: 16px;
+  text-align: center;
+}
+.stageCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+.stageCard.disabled {
+  opacity: 0.55;
+}
+.stageCard.error {
+  border-left-color: var(--err);
+}
+.stageCard.dragging {
+  opacity: 0.4;
+}
+.stageHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+}
+.stageHead .spacer {
+  flex: 1;
+}
+.stageDrag {
+  display: inline-flex;
+  cursor: grab;
+  color: var(--fg-3);
+}
+.stageDrag:active {
+  cursor: grabbing;
+}
+.stageNum {
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  min-width: 12px;
+  text-align: center;
+}
+.stageOp {
+  min-width: 124px;
+}
+.stageIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--fg-2);
+}
+.stageIconBtn:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.stageIconBtn:disabled {
+  opacity: 0.4;
+}
+.stageEnable {
+  display: inline-flex;
+  align-items: center;
+}
+.stageEditor {
+  max-height: 220px;
+  overflow: auto;
+}
+.stageEditorLoading {
+  padding: 8px 12px;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+}
+.stagePreview {
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.stagePreview:global(.muted),
+.stagePreview.err {
+  padding: 5px 10px;
+}
+.stagePreview > summary {
+  padding: 5px 10px;
+  cursor: pointer;
+  color: var(--t-number);
+  user-select: none;
+}
+.stagePreview:global(.muted) {
+  color: var(--fg-3);
+}
+.stagePreview.err {
+  color: var(--err);
+  background: var(--err-bg);
+  white-space: pre-wrap;
+}
+.stagePreviewBox {
+  max-height: 160px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-top: 1px solid var(--bg-2);
+  font-family: var(--font-mono);
+}
+.stagePreviewLine {
+  margin: 0;
+  white-space: pre;
+  line-height: 1.4;
+  color: var(--fg-1);
+}
+.pipelineFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.pipelineFoot .spacer {
+  flex: 1;
+}

@@ -1,0 +1,582 @@
+/* ------------------------------------------------------------ result panel */
+.result-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Result-tab strip — one chip per kept run, above the result bar. Visually a
+   smaller sibling of the query-tab strip (.qtab). */
+.result-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 26px;
+  padding: 3px 6px 0;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.result-tabs::-webkit-scrollbar {
+  display: none;
+}
+.rtab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 160px;
+  padding: 0 3px 0 8px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.rtab:hover {
+  background: var(--bg-3);
+  color: var(--fg-1);
+}
+/* The active result needs to pop (the user compares runs by switching here):
+   accent top bar + bold + full-contrast text on the panel background, while
+   inactive chips stay quiet (transparent on the strip's bg-app). */
+.rtab.active {
+  background: var(--bg-1);
+  color: var(--fg-0);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.rtab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rtab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-3);
+  opacity: 0.65;
+}
+.rtab:hover .rtab-close,
+.rtab.active .rtab-close {
+  opacity: 1;
+}
+.rtab-close:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+
+.result-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.view-switch {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.view-switch button {
+  border: none;
+  border-radius: 0;
+  padding: 3px 12px;
+  background: transparent;
+}
+.view-switch button.active {
+  background: var(--accent);
+  color: #fff;
+}
+.result-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.result-meta .truncated {
+  color: var(--warn);
+}
+.result-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+}
+
+/* error panel */
+.error-panel {
+  margin: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--err);
+  background: var(--err-bg);
+  border-radius: 6px;
+  color: var(--fg-0);
+  font-family: var(--font-mono);
+}
+.error-panel .error-name {
+  color: var(--err);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.error-panel .error-msg {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg-1);
+}
+
+/* ack / value plain panel */
+.value-panel {
+  padding: 14px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  overflow: auto;
+  height: 100%;
+}
+
+/* ------------------------------------------------------------- tree result */
+.virtual-scroller {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+}
+/* These scrollers are programmatically focusable (tabIndex=-1) so a grid click
+   claims focus — see TreeView/TableView. Never draw a focus ring around them. */
+.virtual-scroller:focus,
+.table-scroller:focus {
+  outline: none;
+}
+.virtual-inner {
+  position: relative;
+  width: 100%;
+}
+/* Shared virtualized row (JSON view, and the base for .kv-row below). */
+.vrow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  height: var(--row-h);
+  white-space: nowrap;
+}
+
+/* Two-column KEY | VALUE rows. */
+.kv-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  height: var(--row-h);
+  white-space: nowrap;
+  border-bottom: 1px dashed var(--border);
+  /* DESIGN.md §5: data grids own selection via click-to-select + ⌘C, not native
+     text selection — native rubber-banding scatters ::selection tint across the
+     row's short tokens (badge / summary / type). The inline edit input opts back
+     in below. */
+  user-select: none;
+}
+.kv-row:hover {
+  background: var(--bg-2);
+}
+.kv-key {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.kv-key .twisty {
+  width: 14px;
+  flex: 0 0 auto;
+  text-align: center;
+  color: var(--fg-2);
+  font-size: 9px;
+}
+.kv-key .doc-badge {
+  color: var(--fg-3);
+}
+.kv-key-name {
+  color: var(--t-key);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kv-val {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Third column: the value's BSON type, right-aligned. Color comes from the
+   `v-<type>` class (same palette as the value), so e.g. Date reads blue. */
+.kv-type {
+  flex: 0 0 auto;
+  width: 96px;
+  padding: 0 10px;
+  text-align: right;
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 1px dashed var(--border);
+}
+/* Full-height draggable divider at the key/value boundary. */
+.kv-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  transform: translateX(-4px);
+  cursor: col-resize;
+  z-index: 3;
+}
+.kv-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  border-left: 1px dashed var(--border);
+}
+.kv-resizer:hover::before {
+  left: 3px;
+  border-left: 2px solid var(--accent);
+}
+/* Per-doc edit/delete, revealed on row hover at the right edge. */
+/* Inline cell editor (Tree value cell + Table data cell). Fills the cell,
+   monospace, accent ring; red ring when the last commit failed validation. */
+.cell-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: calc(var(--row-h) - 4px);
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+  color: var(--fg-0);
+  background: var(--bg-0);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  outline: none;
+  /* Opt back into text selection: the grid row/table disables it, but you must
+     be able to select/edit text while inline-editing a cell. */
+  user-select: text;
+}
+.cell-edit-input.invalid {
+  border-color: var(--err);
+  background: var(--err-bg);
+}
+.tree-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-summary {
+  color: var(--fg-2);
+}
+
+/* value type colors */
+.v-string {
+  color: var(--t-string);
+}
+.v-number,
+.v-int,
+.v-double,
+.v-long,
+.v-decimal {
+  color: var(--t-number);
+}
+.v-boolean {
+  color: var(--t-boolean);
+}
+.v-null,
+.v-undefined {
+  color: var(--t-null);
+}
+.v-objectId {
+  color: var(--t-objectId);
+}
+.v-date,
+.v-timestamp {
+  color: var(--t-date);
+}
+.v-binary {
+  color: var(--t-binary);
+}
+.v-regex {
+  color: var(--t-regex);
+}
+.v-minKey,
+.v-maxKey,
+.v-symbol,
+.v-code,
+.v-dbref {
+  color: var(--t-special);
+}
+.v-array,
+.v-object {
+  color: var(--fg-2);
+}
+
+/* ------------------------------------------------------------- json result */
+.json-line {
+  cursor: text;
+  padding-right: 12px;
+  font-family: var(--font-mono);
+}
+.json-line:hover {
+  background: var(--bg-1);
+}
+.json-line pre {
+  margin: 0;
+  white-space: pre;
+}
+.json-key {
+  color: var(--t-key);
+}
+.json-punct {
+  color: var(--fg-3);
+}
+
+/* ------------------------------------------------------------ table result */
+.table-scroller {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+  /* DESIGN.md §5: same as the Tree — the Table owns selection (row handle +
+     ⌘/Shift multi-select, cell select, ⌘C). Native text selection is suppressed
+     across header and cells; the inline edit input opts back in below. */
+  user-select: none;
+}
+.tbl {
+  position: relative;
+}
+.tbl-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  background: var(--bg-2);
+  border-bottom: 1px dashed var(--border-strong);
+}
+.tbl-th {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-right: 1px dashed var(--border);
+  font-weight: 600;
+  color: var(--fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Drag the right edge of a header cell to resize that column. */
+.tbl-col-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 1;
+}
+.tbl-col-resizer:hover {
+  background: var(--accent-soft-strong);
+}
+.tbl-th.idx {
+  color: var(--fg-3);
+  font-weight: 400;
+}
+.tbl-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  border-bottom: 1px dashed var(--border);
+}
+.tbl-row:hover {
+  background: var(--bg-1);
+}
+.tbl-td {
+  flex: 0 0 auto;
+  padding: 0 8px;
+  height: var(--row-h);
+  line-height: var(--row-h);
+  border-right: 1px dashed var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-td.idx {
+  color: var(--fg-3);
+  text-align: right;
+}
+.tbl-td .empty {
+  color: var(--fg-3);
+}
+
+/* -------------------------------------------------- result copy / selection */
+/* Click-to-select highlight shared by Tree rows and Table rows/cells. */
+.kv-row.selected,
+.kv-row.selected:hover,
+.tbl-row.selected,
+.tbl-row.selected:hover {
+  background: var(--accent-soft-strong);
+}
+.tbl-td.selected {
+  background: var(--accent-soft-strong);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+/* The # column doubles as a row-select handle (Shift / ⌘ for multi-select). */
+.tbl-td.idx-select {
+  cursor: pointer;
+}
+.tbl-td.idx-select:hover {
+  color: var(--fg-1);
+  background: var(--bg-2);
+}
+
+/* Copy-all button in the result bar. */
+.result-bar-spacer {
+  flex: 1;
+}
+.result-copy {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  color: var(--fg-2);
+}
+.result-copy:hover {
+  color: var(--fg-0);
+}
+
+/* Result paging — prev/next + range, sits in the result bar near the right. */
+.result-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.result-pager button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-2);
+}
+.result-pager button:hover:not(:disabled) {
+  color: var(--fg-0);
+  background: var(--bg-3);
+}
+.result-range {
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: center;
+  color: var(--fg-1);
+}
+/* Per-page doc count. */
+.page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.page-size input {
+  width: 56px;
+  padding: 2px 6px;
+  font-size: var(--fs-sm);
+}
+
+/* JSON view: a wrapper hosts the optional "all selected" hint above the
+   scroller; the scroller flexes to fill the rest (overrides the base 100%). */
+.json-view-wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.json-view-wrap .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.json-body.all-selected .json-line {
+  background: var(--accent-soft);
+}
+
+/* ---------------------------------------------------------- console result */
+.console-view-wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.console-view-wrap .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.console-line pre {
+  color: var(--fg-1);
+}
+.console-line.warn pre {
+  color: var(--warn);
+}
+.console-line.error pre {
+  color: var(--err);
+}
+.console-truncated {
+  padding: 3px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--err-bg);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  flex: 0 0 auto;
+}
+/* Error banner above the console output (a failed run that printed first). */
+.result-error-banner {
+  flex: 0 0 auto;
+  max-height: 160px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+}
+.result-error-banner .error-panel {
+  margin: 8px 12px;
+}
+
+/* ------------------------------------------------------------- empty state */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--fg-2);
+  text-align: center;
+  padding: 40px;
+}
+.empty-state h2 {
+  margin: 0;
+  color: var(--fg-1);
+  font-weight: 600;
+}
+.empty-state p {
+  margin: 0;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
