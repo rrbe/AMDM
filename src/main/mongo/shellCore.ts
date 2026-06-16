@@ -10,6 +10,20 @@
  * We intentionally implement only the focused subset of the mongosh /
  * NoSQLBooster surface the user actually needs; gaps should surface as clear
  * errors, never silent wrong behavior (ADR-0003).
+ *
+ * Shim catalog (the authoritative list CLAUDE.md points here for):
+ *   db layer:      getCollection, getSiblingDB, getCollectionNames,
+ *                  getCollectionInfos, getName, version,
+ *                  runCommand → db.command, adminCommand → db.admin().command
+ *   collection:    find(q, projection) / findOne(q, projection) — 2nd positional
+ *                  arg is a PROJECTION (mongosh semantics, not driver options);
+ *                  getIndexes → indexes; everything else passes through
+ *   cursor proto:  projection → project, pretty → chainable no-op,
+ *                  itcount / size → materialize then count (idempotent patch on
+ *                  FindCursor / AggregationCursor)
+ *   EJSON ctors:   ObjectId, ISODate, NumberLong, NumberInt → Int32,
+ *                  NumberDecimal, UUID, BinData, Timestamp(t, i), MinKey, MaxKey
+ *                  — all wrapped in callableCtor (work with or without `new`)
  */
 import vm from 'node:vm'
 import AsyncWriterModule from '@mongosh/async-rewriter2'

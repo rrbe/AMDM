@@ -11,7 +11,7 @@
 
 一个精简、**性能优先**的 MongoDB 桌面 GUI——个人版 NoSQLBooster 替代品（Electron + React + TypeScript + Vite,经 `electron-vite`）。性能是第一优先级,也是放弃 NoSQLBooster 的直接原因；见下方不可妥协的铁律。Phase 1–3 已完成。
 
-改动前应先读的纲领文档：`SPEC.md`（范围）、`CONTEXT.md`（领域术语——务必沿用其中的精确用词）、`docs/adr/0001`–`0006`（已锁定的决策）。`SPEC.md` §4 列出了剩余待办。
+改动前应先读的纲领文档：`SPEC.md`（范围）、`CONTEXT.md`（领域术语——务必沿用其中的精确用词）、`docs/adr/0001`–`0006`（已锁定的决策）。剩余待办见 `TODO.md`（live backlog）。
 
 ## 常用命令
 
@@ -46,12 +46,11 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 ### Shell-on-driver（ADR-0003）
 拆成两层：**`main/mongo/shellCore.ts`** 是纯执行核心（不依赖 `sessionManager`/electron,所以能在 `vm` 里对真实 `Db` 单测,见 `test/integration/shellCore.test.ts`）；**`main/mongo/shellEngine.ts`** 只是薄封装——从 `sessionManager` 取出活跃 client 再委托给 `runShellOnDb`。这套「纯 core + 薄 session 封装」是全项目可测性约定的范本（见上「可测性是硬约定」）。
 
-核心在 Node `vm` 沙箱里执行用户的 JS,其中 `db` 是官方 driver `Db` 上的 `Proxy`：`db.<任意名>` 解析为真实的 `Collection`(所以 `db.lives.find()` 能用),真正的 `Db` 方法直接透传。为兼容 mongosh / NoSQLBooster 复制来的片段,做了一批 shim：
+核心在 Node `vm` 沙箱里执行用户的 JS,其中 `db` 是官方 driver `Db` 上的 `Proxy`：`db.<任意名>` 解析为真实的 `Collection`(所以 `db.lives.find()` 能用),真正的 `Db` 方法直接透传。为兼容 mongosh / NoSQLBooster 片段做了一批 shim(db 层方法、collection 层 Proxy、cursor 原型 patch、EJSON 构造器四类),**完整清单见 `shellCore.ts` 的 shim 定义**。几个会写错的语义坑:
 
-- **db 层**：`getCollection`、`getSiblingDB`、`getCollectionNames`、`getCollectionInfos`、`getName`、`version`、`runCommand`（→`db.command`）、`adminCommand`（→`db.admin().command`）。
-- **collection 层**（每个集合套一层 Proxy）：`find(q, projection)` / `findOne(q, projection)` 把**第二个位置参数当 projection**（mongosh 语义,而非 driver 的 options),`getIndexes()`（→`indexes()`）,其余方法原样透传。
-- **cursor 层**（patch 到 `FindCursor`/`AggregationCursor` 原型,幂等）：`projection()`（→`project()`）、`pretty()`（链式 no-op）、`itcount()`/`size()`（物化后计数）。
-- **EJSON 构造器**：`ObjectId`/`ISODate`/`NumberLong`/`NumberInt`(→真正的 `Int32`)/`NumberDecimal`/`UUID`/`BinData`/`Timestamp`(支持 mongosh 的 `Timestamp(t, i)` 两参形式)/`MinKey`/`MaxKey`；构造器都包了 `callableCtor`,可带/不带 `new` 调用。
+- `find(q, projection)` / `findOne(q, projection)` 的**第二个位置参数是 projection**(mongosh 语义,而非 driver 的 options)。
+- cursor 层 patch(`projection`→`project`、`pretty` no-op、`itcount`/`size` 物化计数)幂等地打到 `FindCursor`/`AggregationCursor` 原型。
+- EJSON 构造器(`NumberInt`→真正的 `Int32`、`Timestamp(t, i)` 两参形式等)都包了 `callableCtor`,可带/不带 `new` 调用。
 
 我们**有意只实现 shell API 的一个子集**——缺失的应当报错,绝不静默错（典型坑:从前 `db.runCommand(...)` 会被当成名为 "runCommand" 的集合,已修）。注意 `vm` 沙箱里抛出的错误来自**不同 realm**,`instanceof Error` 为 false——`describeError` 用 duck-typing 提取真实 `name`/`message`,否则错误名会被压平成 "Error"。
 
@@ -80,15 +79,15 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 - **`@import` 顺序是层叠契约,别打乱。** `tokens.css` 必须最先;`theme-polish.css`(Slate 后置修饰)必须排在所有功能分区**之后**——它靠源码顺序在**同等权重**下覆盖前面的基础规则(`button`/`input`/`.conn-item`/`.tree-node`/`.view-switch`/`.modal*`/`.tbl-head` 等约 29 个选择器在文件里出现两次:基础在前、polish 在后);`base-ui.css` 收尾。
 - **何时全局 vs CSS Module:**
   - **永远全局**:`tokens.css` 的主题令牌(module 与全局共享的底座)、第三方选择器(CodeMirror `.cm-*`、Base UI `[data-*]`)、跨组件复用的共享基类(`.v-*` value 颜色、`.kv-row`、`.vrow`)。
-  - **用 `Foo.module.css`**(放组件旁,作用域隔离):全新、**自包含**的组件(独立面板/弹窗/小部件)。Vite 开箱支持 `*.module.css`,无需新依赖。
+  - **用 `Foo.module.css`**(放组件旁,作用域隔离):全新、**自包含**的组件(独立面板/弹窗/小部件)。Vite 开箱支持,无需新依赖。**范本见 `components/shell/pipeline/pipeline.module.css`**(项目首个 module):类名 camelCase,本地修饰态直接写,复用 §「永远全局」的共享词汇用 `:global(.muted)`——本地化 vs `:global()` 的取舍细节见该文件头注释。
   - 复用既有 result/tree/table/explorer 词汇的组件 → **留全局**。判断标准是「组件是否自包含」,**不是「新不新」**;不强制回迁老组件。
 
 ## 性能铁律（ADR-0004 —— 不可妥协,每个功能都必须遵守）
 
-1. 所有大列表/树/表格一律虚拟化（`@tanstack/react-virtual`）；DOM 只持有可见行。
-2. 游标流式拉取,在数据层就分页限界——绝不把整库塞进渲染进程。
-3. 重 CPU（BSON↔EJSON、格式化、schema 采样）丢到主线程之外 → 序列化 worker。
-4. schema/字段采样:懒、有界（~50 文档）、异步、缓存（`main/mongo/catalog.ts` 的 `sampleFields`）。
-5. **打开集合不自动查询**——浏览集合只会把 `db.coll.find({})` 填进编辑器,绝不执行。加载保存的查询/历史同理。
-6. 关闭 tab/连接时积极销毁；退出时清理所有 client、SSH 隧道和 worker（`main/index.ts` 的 `will-quit`）。
-7. 保持 Electron 版本新、各目标架构都出原生包（arm64+x64,都不走 Rosetta）,重功能懒加载（CodeMirror 6 即为懒加载）。
+七条全文见 `SPEC.md` §3 / ADR-0004。下面是本仓库的落点锚（改代码时对照）：
+
+1. 大列表/树/表格一律虚拟化（`@tanstack/react-virtual`）——结果三视图 + Console 已用;**目录树尚未,见 `TODO.md`**。
+2. schema/字段采样:懒、有界(~50 文档)、异步、缓存 → `main/mongo/catalog.ts` 的 `sampleFields`。
+3. **打开集合不自动查询**:只把 `db.coll.find({})` 填进编辑器,绝不执行;加载保存的查询/历史同理。
+4. 游标在数据层分页限界、重 CPU 走序列化 worker;关闭 tab/连接即销毁,退出 `will-quit`(`main/index.ts`)清理 client / SSH 隧道 / worker。
+5. 各目标架构出原生包(arm64+x64,不走 Rosetta),重功能懒加载(CodeMirror 6)。
