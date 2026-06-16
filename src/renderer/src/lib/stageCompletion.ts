@@ -11,7 +11,13 @@
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { useAppStore } from '@renderer/store/useAppStore'
-import { AGG_STAGES, AGG_EXPR_OPERATORS, SHELL_GLOBALS, JS_KEYWORDS } from '@renderer/lib/mongoCompletion'
+import {
+  AGG_STAGES,
+  AGG_EXPR_OPERATORS,
+  SHELL_GLOBALS,
+  JS_KEYWORDS,
+  lengthBoost
+} from '@renderer/lib/mongoCompletion'
 
 export interface StageTarget {
   connId: string
@@ -49,7 +55,7 @@ export function makeStageCompletionSource(
       const tgt = target()
       if (tgt) {
         for (const f of useAppStore.getState().getFields(tgt.connId, tgt.db, tgt.coll)) {
-          options.push({ label: f, type: 'variable', detail: 'field' })
+          options.push({ label: f, type: 'variable', detail: 'field', boost: lengthBoost(f) })
         }
       }
       for (const g of SHELL_GLOBALS) options.push({ label: g, type: 'keyword', detail: 'constructor' })

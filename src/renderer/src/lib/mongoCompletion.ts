@@ -111,8 +111,21 @@ export const AGG_EXPR_OPERATORS = [
 // Option builders
 // --------------------------------------------------------------------------
 
-function opt(label: string, type: Completion['type'], detail: string): Completion {
-  return { label, type, detail }
+function opt(label: string, type: Completion['type'], detail: string, boost?: number): Completion {
+  return boost === undefined ? { label, type, detail } : { label, type, detail, boost }
+}
+
+/**
+ * Length-based boost so shorter, closer matches win ties. CodeMirror adds boost
+ * directly to the fuzzy score (`match.score + boost`), and in 6.x a pure prefix
+ * match scores a flat −100 regardless of label length — so without this, equal
+ * prefixes (e.g. `live` → `lives` vs `liveauthorizedviewers`) tie and fall back
+ * to alphabetical order, burying the closer match. Shorter label → higher boost;
+ * kept within [−99, 99] so it only reorders the prefix-tie band, never promotes
+ * a scattered match above a prefix one.
+ */
+export function lengthBoost(label: string): number {
+  return Math.max(-99, 99 - label.length)
 }
 
 type CallContext = 'aggregate' | 'update' | 'query' | null
@@ -292,7 +305,7 @@ export function computeShellCompletion(
   if (dbMember) {
     const word = dbMember[1]
     const options: Completion[] = []
-    for (const name of data.collections) options.push(opt(name, 'class', 'collection'))
+    for (const name of data.collections) options.push(opt(name, 'class', 'collection', lengthBoost(name)))
     for (const m of DB_METHODS) options.push(opt(m, 'method', 'db'))
     return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
   }
@@ -316,7 +329,7 @@ export function computeShellCompletion(
   const options: Completion[] = []
   for (const g of SHELL_GLOBALS) options.push(opt(g, 'keyword', 'constructor'))
   for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'literal'))
-  for (const f of data.fields) options.push(opt(f, 'variable', 'field'))
+  for (const f of data.fields) options.push(opt(f, 'variable', 'field', lengthBoost(f)))
   if (options.length === 0) return null
   return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
 }

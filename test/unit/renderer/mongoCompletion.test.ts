@@ -23,6 +23,18 @@ describe('computeShellCompletion', () => {
     expect(from).toBe(3) // empty word, inserted at the cursor
   })
 
+  it('db.live → shorter collection names get a higher boost (lives > liveauthorizedviewers)', () => {
+    const r = computeShellCompletion('db.live', 'db.live'.length, {
+      collections: ['liveauthorizedviewers', 'lives', 'livepolls'],
+      fields: []
+    })
+    const boostOf = (label: string): number => r!.options.find((o) => o.label === label)!.boost ?? 0
+    // CM scores a pure prefix at a flat -100, so the boost is what breaks the
+    // tie — shorter name → higher boost → ranked first.
+    expect(boostOf('lives')).toBeGreaterThan(boostOf('livepolls'))
+    expect(boostOf('livepolls')).toBeGreaterThan(boostOf('liveauthorizedviewers'))
+  })
+
   it('db.users.fi → collection methods', () => {
     const { labels, from } = complete('db.users.fi')
     expect(labels).toContain('find')
