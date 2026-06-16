@@ -92,8 +92,7 @@ const ZERO_ARG_METHODS = new Set([
 
 function methodSnippet(name: string): string {
   if (METHOD_SNIPPETS[name]) return METHOD_SNIPPETS[name]
-  if (ZERO_ARG_METHODS.has(name)) return `${name}()`
-  return `${name}(\${})` // place the cursor inside the parens
+  return `${name}(\${})` // a `${}` field places the cursor inside the parens
 }
 
 function isMethodKind(kind: string): boolean {
@@ -109,12 +108,14 @@ function mapEntry(e: TsCompletionEntry, onDb: boolean): Completion {
   if (onDb && e.kind === 'property') return { label: e.name, type: 'class', detail: 'collection', boost }
   // Methods insert as call snippets (limit → limit(10), find → find({ })…).
   if (isMethodKind(e.kind)) {
-    return snippetCompletion(methodSnippet(e.name), {
-      label: e.name,
-      type: 'method',
-      detail: onDb ? 'db' : undefined,
-      boost
-    })
+    const detail = onDb ? 'db' : undefined
+    // Zero-arg methods use a plain `name()` apply, NOT a snippet: a field-less
+    // snippet sets no selection, so the cursor would land at the start (`db.|`)
+    // instead of after the parens. A string apply puts the cursor at the end.
+    if (ZERO_ARG_METHODS.has(e.name)) {
+      return { label: e.name, type: 'method', detail, boost, apply: `${e.name}()` }
+    }
+    return snippetCompletion(methodSnippet(e.name), { label: e.name, type: 'method', detail, boost })
   }
   return { label: e.name, type: kindToType(e.kind), boost }
 }

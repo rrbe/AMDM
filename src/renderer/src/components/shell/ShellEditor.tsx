@@ -1,12 +1,18 @@
 import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
-import { acceptCompletion, autocompletion } from '@codemirror/autocomplete'
+import {
+  acceptCompletion,
+  autocompletion,
+  completionStatus,
+  nextSnippetField,
+  prevSnippetField
+} from '@codemirror/autocomplete'
 import { EditorView, keymap } from '@codemirror/view'
-import { Prec, EditorState } from '@codemirror/state'
+import { Prec, EditorState, EditorSelection } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
-import { syntaxTree, indentUnit } from '@codemirror/language'
+import { syntaxTree, indentUnit, getIndentUnit } from '@codemirror/language'
 import { shellCompletionSource } from '@renderer/lib/shellCompletion'
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
@@ -52,6 +58,32 @@ function toggleWordWrap(): void {
 function cycleTabSize(): void {
   const store = useAppStore.getState()
   void store.updateSettings({ editorTabSize: store.settings.editorTabSize === 2 ? 4 : 2 })
+}
+
+/**
+ * Enter that preserves the current line's indentation (the JS language indenter
+ * resets a continued method chain like `.sort(…)` to column 0, losing the
+ * manual indent). Defers to the autocomplete dropdown when it's open (Enter
+ * accepts the suggestion there). Adds one level after an opener `{[(`, and drops
+ * a matching closer to its own line so `{|}` → indented body + closer below.
+ */
+function enterKeepIndent(view: EditorView): boolean {
+  if (completionStatus(view.state) === 'active') return false // let the dropdown accept
+  const { state } = view
+  const indentStr = ' '.repeat(getIndentUnit(state))
+  const spec = state.changeByRange((range) => {
+    const line = state.doc.lineAt(range.head)
+    const curIndent = /^[ \t]*/.exec(line.text)?.[0] ?? ''
+    const before = range.head > line.from ? state.sliceDoc(range.head - 1, range.head) : ''
+    const after = state.sliceDoc(range.head, range.head + 1)
+    const opens = /[{[(]/.test(before)
+    let insert = state.lineBreak + curIndent + (opens ? indentStr : '')
+    const anchor = range.from + insert.length
+    if (opens && /[}\])]/.test(after)) insert += state.lineBreak + curIndent
+    return { changes: { from: range.from, to: range.to, insert }, range: EditorSelection.cursor(anchor) }
+  })
+  view.dispatch({ ...spec, scrollIntoView: true, userEvent: 'input' })
+  return true
 }
 
 interface ShellEditorProps {
@@ -158,13 +190,17 @@ export function ShellEditor({
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
           // here so it works regardless of basicSetup defaults).
           { key: 'Mod-/', run: (view) => toggleComment(view) },
+          // Enter: keep the current line's indentation (continued method chains
+          // otherwise snap to column 0). Yields to the dropdown's Enter-accept.
+          { key: 'Enter', run: enterKeepIndent },
           // Tab: accept the open completion, else accept the inline ghost text,
-          // else insert one indent unit (the configured tab width in spaces, or
-          // indent a multi-line selection).
+          // else jump to the next snippet field (limit(10) / sort({ field: -1 })),
+          // else insert one indent unit. Shift+Tab steps back a field, else dedents.
           {
             key: 'Tab',
-            run: (view) => acceptCompletion(view) || acceptGhost(view) || insertTab(view),
-            shift: indentLess
+            run: (view) =>
+              acceptCompletion(view) || acceptGhost(view) || nextSnippetField(view) || insertTab(view),
+            shift: (view) => prevSnippetField(view) || indentLess(view)
           }
         ])
       )
