@@ -842,3 +842,37 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+describe('REPL commands (show / use)', () => {
+  it('`show collections` lists the db collections as documents', async () => {
+    const r = await run('show collections')
+    expect(r.kind).toBe('documents')
+    const names = (r.data as Array<{ name: string }>).map((d) => d.name)
+    expect(names).toContain('nums')
+  })
+
+  it('`show dbs` returns the database list', async () => {
+    const r = await run('show dbs')
+    expect(r.kind).toBe('documents')
+    expect(Array.isArray(r.data)).toBe(true)
+    expect((r.count ?? 0)).toBeGreaterThan(0)
+  })
+
+  it('trailing semicolon / casing are tolerated', async () => {
+    const r = await run('SHOW Collections;')
+    expect(r.kind).toBe('documents')
+  })
+
+  it('`use <db>` acks and signals a database switch (no query run)', async () => {
+    const r = await run('use reporting')
+    expect(r.kind).toBe('ack')
+    expect(r.useDatabase).toBe('reporting')
+  })
+
+  it('does not treat ordinary JS as a REPL command', async () => {
+    const r = await run('db.nums.find({})')
+    expect(r.kind).toBe('documents')
+    expect(r.useDatabase).toBeUndefined()
+  })
+})

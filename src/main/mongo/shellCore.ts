@@ -912,6 +912,78 @@ export function detectCollection(code: string): string | undefined {
   return undefined
 }
 
+// --------------------------------------------------------------------------
+// mongosh REPL commands (`show dbs`, `use x`). The shell runs JS in a vm, so
+// these aren't valid JS — we intercept a script that is *exactly* one such
+// command and translate it to driver calls. Mixed scripts are left as JS
+// (errors loudly, matching mongosh, which also doesn't mix `use` with code).
+// --------------------------------------------------------------------------
+
+export type ReplCommand = { type: 'show'; what: string } | { type: 'use'; db: string }
+
+/** Parse a whole-script REPL command, or null if it's ordinary JS. */
+export function parseReplCommand(code: string): ReplCommand | null {
+  const t = code.trim().replace(/;+\s*$/, '').trim()
+  const show = /^show\s+(databases|dbs|collections|tables|users|roles|profile)$/i.exec(t)
+  if (show) return { type: 'show', what: show[1].toLowerCase() }
+  const use = /^use\s+([A-Za-z0-9_$.\-]+)$/.exec(t)
+  if (use) return { type: 'use', db: use[1] }
+  return null
+}
+
+async function runReplCommand(
+  db: Db,
+  cmd: ReplCommand,
+  signal: AbortSignal | undefined,
+  started: number
+): Promise<ShellResult> {
+  const docResult = async (docs: unknown[]): Promise<ShellResult> => ({
+    kind: 'documents',
+    data: await serializerPool.serialize(docs),
+    count: docs.length,
+    elapsedMs: Date.now() - started
+  })
+
+  if (cmd.type === 'use') {
+    return {
+      kind: 'ack',
+      data: await serializerPool.serializeOne({ ok: 1, switchedTo: cmd.db }),
+      useDatabase: cmd.db,
+      elapsedMs: Date.now() - started
+    }
+  }
+
+  switch (cmd.what) {
+    case 'dbs':
+    case 'databases': {
+      const res = (await withAbort(db.admin().command({ listDatabases: 1 }), signal)) as {
+        databases?: unknown[]
+      }
+      return docResult(Array.isArray(res.databases) ? res.databases : [])
+    }
+    case 'collections':
+    case 'tables':
+      return docResult(await withAbort(db.listCollections({}, { nameOnly: true }).toArray(), signal))
+    case 'users': {
+      const res = (await withAbort(db.command({ usersInfo: 1 }), signal)) as { users?: unknown[] }
+      return docResult(Array.isArray(res.users) ? res.users : [])
+    }
+    case 'roles': {
+      const res = (await withAbort(db.command({ rolesInfo: 1 }), signal)) as { roles?: unknown[] }
+      return docResult(Array.isArray(res.roles) ? res.roles : [])
+    }
+    case 'profile':
+      return docResult(
+        await withAbort(
+          db.collection('system.profile').find({}).sort({ ts: -1 }).limit(5).toArray(),
+          signal
+        )
+      )
+    default:
+      return { kind: 'error', error: `unsupported command: show ${cmd.what}`, errorName: 'ShellError' }
+  }
+}
+
 export interface RunShellOptions {
   /** Default page size applied to bare cursors (ADR-0004 rule 2). */
   limit?: number
@@ -963,6 +1035,11 @@ async function runShellOnDbImpl(
   }
 
   try {
+    // mongosh REPL commands (`show dbs`, `use x`) — handled before the vm path
+    // since they aren't valid JS. Errors (e.g. auth) fall to the catch below.
+    const repl = parseReplCommand(code)
+    if (repl) return await withOutput(await runReplCommand(db, repl, signal, started))
+
     const sandbox = makeSandbox(db, signal, out)
     const context = vm.createContext(sandbox)
     // Implicit await: run the async-rewriter2 transpilation of the user code.

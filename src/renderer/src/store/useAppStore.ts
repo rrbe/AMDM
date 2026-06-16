@@ -820,6 +820,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       // earlier results stay around for side-by-side comparison.
       const result = await window.api.shell.execute({ ...query, limit, skip: 0, execId })
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      // `use <db>` REPL command: switch the tab's active database (also warms
+      // its collection names for completion via setActiveDatabase).
+      if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
     } catch (e) {
       set((s) =>
         patchTabResults(s, tabId, (t) =>

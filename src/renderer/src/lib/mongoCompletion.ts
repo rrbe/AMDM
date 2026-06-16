@@ -25,6 +25,7 @@ import {
   SHELL_GLOBALS,
   JS_LITERALS,
   JS_KEYWORDS,
+  SHELL_COMMANDS,
   SORT_VALUES,
   PROJECTION_VALUES,
   BOOLEAN_VALUES,
@@ -256,6 +257,12 @@ export function computeShellCompletion(
   for (const kw of JS_LITERALS) options.push(opt(kw, 'keyword', 'literal'))
   for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'keyword'))
   for (const f of data.fields) options.push(opt(f, 'variable', 'field', lengthBoost(f)))
+  // REPL commands only at the start of a statement line (show dbs / use …).
+  if (/(?:^|\n)[ \t]*[\w]*$/.test(before)) {
+    for (const c of SHELL_COMMANDS) {
+      options.push({ label: c.label, type: 'keyword', detail: c.detail, apply: c.apply ?? c.label })
+    }
+  }
   if (options.length === 0) return null
   return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
 }

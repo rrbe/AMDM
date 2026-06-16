@@ -205,6 +205,9 @@ export interface ShellResult {
   /** Populated when kind === 'error'. */
   error?: string
   errorName?: string
+  /** Set by the `use <db>` REPL command — tells the renderer to switch the
+      active database for the tab (mongosh-style). */
+  useDatabase?: string
   /** Captured print/printjson/console output, in call order (bounded). Present
       for every kind — an error still carries the output produced before it. */
   output?: ShellOutputLine[]

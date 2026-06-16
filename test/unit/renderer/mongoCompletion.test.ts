@@ -88,4 +88,17 @@ describe('computeShellCompletion', () => {
     expect(labels).not.toContain('1')
     expect(labels).toContain('ObjectId')
   })
+
+  it('statement-line start → REPL commands + JS keywords', () => {
+    const { labels } = complete('')
+    expect(labels).toContain('show dbs')
+    expect(labels).toContain('use')
+    expect(labels).toContain('const') // JS keyword
+  })
+
+  it('mid-expression → no REPL commands', () => {
+    const { labels } = complete('db.c.find({ na', { fields: ['name'] })
+    expect(labels).not.toContain('show dbs')
+    expect(labels).not.toContain('use')
+  })
 })
