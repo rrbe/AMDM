@@ -8,6 +8,7 @@ import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@co
 import { openSearchPanel, search } from '@codemirror/search'
 import { syntaxTree, indentUnit } from '@codemirror/language'
 import { mongoCompletionSource } from '@renderer/lib/mongoCompletion'
+import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
@@ -111,6 +112,9 @@ export function ShellEditor({
     () => [
       javascript({ typescript: false }),
       autocompletion({ override: [mongoCompletionSource] }),
+      // Inline ghost-text value hints (e.g. `-1` after `sort({ _id: `). Mutually
+      // exclusive with the dropdown above; accepted via the Tab binding below.
+      ghostText(),
       // The CodeMirror content DOM is contenteditable, so macOS attaches its
       // native autocorrect/spellcheck to it — typing then pressing Tab pops the
       // phonetic suggestion box over the code. Code isn't prose; turn all of it
@@ -153,9 +157,14 @@ export function ShellEditor({
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
           // here so it works regardless of basicSetup defaults).
           { key: 'Mod-/', run: (view) => toggleComment(view) },
-          // Tab: accept the open completion, else insert one indent unit (the
-          // configured tab width in spaces, or indent a multi-line selection).
-          { key: 'Tab', run: (view) => acceptCompletion(view) || insertTab(view), shift: indentLess }
+          // Tab: accept the open completion, else accept the inline ghost text,
+          // else insert one indent unit (the configured tab width in spaces, or
+          // indent a multi-line selection).
+          {
+            key: 'Tab',
+            run: (view) => acceptCompletion(view) || acceptGhost(view) || insertTab(view),
+            shift: indentLess
+          }
         ])
       )
     ],

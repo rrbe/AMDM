@@ -5,6 +5,8 @@
  *  - `db.<word>`           → collection names (active db) + Db methods
  *  - `db.<coll>.<word>`    → collection methods (+ warms the field cache)
  *  - `).<word>`            → cursor methods (sort/limit/toArray/…)
+ *  - `<field>: <value>`    → value candidates for the slot we're in
+ *                           (sort→1/-1, projection→1/0, boolean keys→true/false)
  *  - `$<word>`             → MongoDB operators, scoped to the call we're inside
  *                           (find→query ops, update→update ops, aggregate→
  *                           pipeline stages + expression ops); union if unsure
@@ -175,7 +177,152 @@ function lastReferencedCollection(code: string): string | undefined {
 }
 
 // --------------------------------------------------------------------------
-// The source
+// Value-slot detection (shared with the inline ghost-text hint)
+// --------------------------------------------------------------------------
+
+// Keys whose value is a boolean (option flags). Used to offer true/false.
+const BOOLEAN_KEYS = new Set([
+  '$exists', 'upsert', 'multi', 'unique', 'sparse', 'background', 'new',
+  'returnNewDocument', 'allowDiskUse', 'bypassDocumentValidation', 'ordered',
+  'justOne', 'caseSensitive', 'diacriticSensitive', 'showRecordId', 'returnKey'
+])
+
+/** Is the cursor sitting inside an unterminated string literal? (heuristic) */
+function inString(before: string): boolean {
+  let dq = 0
+  let sq = 0
+  for (let i = 0; i < before.length; i++) {
+    const c = before[i]
+    if (c === '\\') {
+      i++ // skip the escaped char
+      continue
+    }
+    if (c === '"') dq++
+    else if (c === "'") sq++
+  }
+  return dq % 2 === 1 || sq % 2 === 1
+}
+
+/**
+ * If the cursor is right after `<key>:` (a value slot, nothing typed yet),
+ * return the key (quotes stripped); else null. Bails inside string literals so
+ * `{ note: "a: ` doesn't look like a value slot.
+ */
+export function atValueSlot(before: string): string | null {
+  if (inString(before)) return null
+  const m = /([A-Za-z_$][\w$.]*|"[^"]+"|'[^']+')\s*:\s*$/.exec(before)
+  if (!m) return null
+  return m[1].replace(/^["']|["']$/g, '')
+}
+
+/** Are we inside a `sort({ … })` spec or a `$sort: { … }` stage body? */
+export function isInsideSort(before: string): boolean {
+  return /\.sort\s*\(\s*\{[^{}]*$/.test(before) || /\$sort\s*:\s*\{[^{}]*$/.test(before)
+}
+
+/** Are we inside a projection — `find(filter, { … })` or `$project: { … }`? */
+export function isInsideProjection(before: string): boolean {
+  if (/\.find\s*\(\s*(\{[^{}]*\})?\s*,\s*\{[^{}]*$/.test(before)) return true
+  if (/\$project\s*:\s*\{[^{}]*$/.test(before)) return true
+  return false
+}
+
+/** Value candidates for the slot we're in, or [] when not at a value slot. */
+function computeValueOptions(before: string): Completion[] {
+  const key = atValueSlot(before)
+  if (key == null) return []
+  if (isInsideSort(before)) return [opt('1', 'text', 'ascending'), opt('-1', 'text', 'descending')]
+  if (isInsideProjection(before)) return [opt('1', 'text', 'include'), opt('0', 'text', 'exclude')]
+  if (BOOLEAN_KEYS.has(key)) return [opt('true', 'text', 'boolean'), opt('false', 'text', 'boolean')]
+  return []
+}
+
+// --------------------------------------------------------------------------
+// The pure decision core
+// --------------------------------------------------------------------------
+
+/** Everything the pure core needs, resolved by the wrapper from the store. */
+export interface CompletionData {
+  /** Collection names for the active db. */
+  collections: string[]
+  /** Cached field names for the last-referenced collection. */
+  fields: string[]
+}
+
+export interface ShellCompletionResult {
+  from: number
+  options: Completion[]
+  validFor: RegExp
+}
+
+/**
+ * Pure: decide shell completions from the text before the cursor + resolved
+ * data. `pos` is the absolute cursor offset (== before.length when `before` is
+ * the full text-before-cursor slice). Returns null when nothing applies.
+ */
+export function computeShellCompletion(
+  before: string,
+  pos: number,
+  data: CompletionData
+): ShellCompletionResult | null {
+  // `db.<coll>.<word>` → collection methods
+  const collMethod = /\bdb\.([A-Za-z_$][\w$]*)\.([\w$]*)$/.exec(before)
+  if (collMethod) {
+    const word = collMethod[2]
+    return {
+      from: pos - word.length,
+      options: COLLECTION_METHODS.map((m) => opt(m, 'method', 'collection')),
+      validFor: /^[\w$]*$/
+    }
+  }
+
+  // `).<word>` → cursor chain methods
+  const cursorMethod = /\)\s*\.([\w$]*)$/.exec(before)
+  if (cursorMethod) {
+    const word = cursorMethod[1]
+    return {
+      from: pos - word.length,
+      options: CURSOR_METHODS.map((m) => opt(m, 'method', 'cursor')),
+      validFor: /^[\w$]*$/
+    }
+  }
+
+  // `db.<word>` → collection names + Db methods
+  const dbMember = /\bdb\.([\w$]*)$/.exec(before)
+  if (dbMember) {
+    const word = dbMember[1]
+    const options: Completion[] = []
+    for (const name of data.collections) options.push(opt(name, 'class', 'collection'))
+    for (const m of DB_METHODS) options.push(opt(m, 'method', 'db'))
+    return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
+  }
+
+  // `<field>: <value>` → value candidates (inserted at the cursor)
+  const valueOptions = computeValueOptions(before)
+  if (valueOptions.length) {
+    return { from: pos, options: valueOptions, validFor: /^[\w$-]*$/ }
+  }
+
+  // `$<word>` → operators (scoped to the enclosing call)
+  const dollar = /(\$[\w$]*)$/.exec(before)
+  if (dollar) {
+    const word = dollar[1]
+    return { from: pos - word.length, options: operatorCompletions(before), validFor: /^\$[\w$]*$/ }
+  }
+
+  // otherwise → globals + literals + cached field names
+  const wordMatch = /([\w$]*)$/.exec(before)
+  const word = wordMatch ? wordMatch[1] : ''
+  const options: Completion[] = []
+  for (const g of SHELL_GLOBALS) options.push(opt(g, 'keyword', 'constructor'))
+  for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'literal'))
+  for (const f of data.fields) options.push(opt(f, 'variable', 'field'))
+  if (options.length === 0) return null
+  return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
+}
+
+// --------------------------------------------------------------------------
+// The source (thin store-reading wrapper around the pure core)
 // --------------------------------------------------------------------------
 
 export function mongoCompletionSource(context: CompletionContext): CompletionResult | null {
@@ -186,65 +333,26 @@ export function mongoCompletionSource(context: CompletionContext): CompletionRes
     const before = context.state.sliceDoc(0, context.pos)
     const ctx = activeContext()
 
-    // `db.<coll>.<word>` → collection methods (+ warm field cache)
-    const collMethod = /\bdb\.([A-Za-z_$][\w$]*)\.([\w$]*)$/.exec(before)
-    if (collMethod) {
-      const coll = collMethod[1]
-      const word = collMethod[2]
-      if (ctx) void useAppStore.getState().sampleFields(ctx.connId, ctx.db, coll)
-      return {
-        from: context.pos - word.length,
-        options: COLLECTION_METHODS.map((m) => opt(m, 'method', 'collection')),
-        validFor: /^[\w$]*$/
-      }
-    }
-
-    // `).<word>` → cursor chain methods
-    const cursorMethod = /\)\s*\.([\w$]*)$/.exec(before)
-    if (cursorMethod) {
-      const word = cursorMethod[1]
-      return {
-        from: context.pos - word.length,
-        options: CURSOR_METHODS.map((m) => opt(m, 'method', 'cursor')),
-        validFor: /^[\w$]*$/
-      }
-    }
-
-    // `db.<word>` → collection names + Db methods
-    const dbMember = /\bdb\.([\w$]*)$/.exec(before)
-    if (dbMember) {
-      const word = dbMember[1]
-      const options: Completion[] = []
-      if (ctx) for (const name of collectionNames(ctx.connId, ctx.db)) options.push(opt(name, 'class', 'collection'))
-      for (const m of DB_METHODS) options.push(opt(m, 'method', 'db'))
-      return { from: context.pos - word.length, options, validFor: /^[\w$]*$/ }
-    }
-
-    // `$<word>` → operators (scoped to the enclosing call)
-    const dollar = /(\$[\w$]*)$/.exec(before)
-    if (dollar) {
-      const word = dollar[1]
-      return {
-        from: context.pos - word.length,
-        options: operatorCompletions(before),
-        validFor: /^\$[\w$]*$/
-      }
-    }
-
-    // otherwise → globals + literals + cached field names
-    const wordMatch = /([\w$]*)$/.exec(before)
-    const word = wordMatch ? wordMatch[1] : ''
-    const options: Completion[] = []
-    for (const g of SHELL_GLOBALS) options.push(opt(g, 'keyword', 'constructor'))
-    for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'literal'))
+    // Resolve the collection whose fields we'd complete: the `db.<coll>.` being
+    // typed, else the last one referenced. Warm its field cache (side effect
+    // kept out of the pure core) and read whatever's cached for the fallback.
+    let fields: string[] = []
     if (ctx) {
-      const coll = lastReferencedCollection(before)
-      if (coll) for (const f of useAppStore.getState().getFields(ctx.connId, ctx.db, coll)) {
-        options.push(opt(f, 'variable', 'field'))
+      const coll =
+        /\bdb\.([A-Za-z_$][\w$]*)\.[\w$]*$/.exec(before)?.[1] ?? lastReferencedCollection(before)
+      if (coll) {
+        void useAppStore.getState().sampleFields(ctx.connId, ctx.db, coll)
+        fields = useAppStore.getState().getFields(ctx.connId, ctx.db, coll)
       }
     }
-    if (options.length === 0) return null
-    return { from: context.pos - word.length, options, validFor: /^[\w$]*$/ }
+
+    const data: CompletionData = {
+      collections: ctx ? collectionNames(ctx.connId, ctx.db) : [],
+      fields
+    }
+
+    const r = computeShellCompletion(before, context.pos, data)
+    return r ? { from: r.from, options: r.options, validFor: r.validFor } : null
   } catch {
     return null
   }

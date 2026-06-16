@@ -168,3 +168,12 @@
   font-family: var(--font-mono);
 }
 
+/* Inline ghost-text value hint (ghostText.ts). Muted token reads correctly in
+   both Pine light/dark; never a pointer/caret target. */
+.editor-wrap .cm-ghost-text {
+  opacity: 0.4;
+  color: var(--fg-2);
+  font-style: italic;
+  pointer-events: none;
+}
+
