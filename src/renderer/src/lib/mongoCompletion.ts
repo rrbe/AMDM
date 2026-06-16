@@ -169,14 +169,14 @@ function operatorCompletions(before: string): Completion[] {
   return [...map.values()]
 }
 
-function activeContext(): { connId: string; db: string } | null {
+export function activeContext(): { connId: string; db: string } | null {
   const s = useAppStore.getState()
   const db = getActiveTab(s).activeDatabase
   if (!s.activeConnectionId || !db) return null
   return { connId: s.activeConnectionId, db }
 }
 
-function collectionNames(connId: string, db: string): string[] {
+export function collectionNames(connId: string, db: string): string[] {
   return (useAppStore.getState().catalogs[connId]?.collections[db] ?? []).map((c) => c.name)
 }
 
@@ -201,7 +201,7 @@ const BOOLEAN_KEYS = new Set([
 ])
 
 /** Is the cursor sitting inside an unterminated string literal? (heuristic) */
-function inString(before: string): boolean {
+export function inString(before: string): boolean {
   let dq = 0
   let sq = 0
   for (let i = 0; i < before.length; i++) {

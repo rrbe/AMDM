@@ -7,7 +7,8 @@ import { Prec, EditorState } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
 import { syntaxTree, indentUnit } from '@codemirror/language'
-import { mongoCompletionSource } from '@renderer/lib/mongoCompletion'
+import { shellCompletionSource } from '@renderer/lib/shellCompletion'
+import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
@@ -111,7 +112,7 @@ export function ShellEditor({
   const extensions = useMemo(
     () => [
       javascript({ typescript: false }),
-      autocompletion({ override: [mongoCompletionSource] }),
+      autocompletion({ override: [shellCompletionSource] }),
       // Inline ghost-text value hints (e.g. `-1` after `sort({ _id: `). Mutually
       // exclusive with the dropdown above; accepted via the Tab binding below.
       ghostText(),
@@ -192,6 +193,9 @@ export function ShellEditor({
           onChange={onChange}
           onCreateEditor={(view) => {
             viewRef.current = view
+            // Pre-spawn the TS-service worker so the heavy `typescript` chunk
+            // loads off the critical path and the service is warm by first use.
+            tsAutocomplete.warm()
           }}
           basicSetup={{
             lineNumbers: true,
