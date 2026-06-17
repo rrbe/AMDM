@@ -129,6 +129,18 @@ class ConnectionStore {
     this.persist()
   }
 
+  /**
+   * Pin the SSH host-key fingerprint learned on first connect (TOFU). No-op if
+   * the connection is gone or already pinned to the same value. The fingerprint
+   * is not a secret, so it lives in plaintext alongside the rest of the config.
+   */
+  recordSshHostKey(id: string, fingerprint: string): void {
+    const stored = this.data.connections.find((c) => c.id === id)
+    if (!stored || stored.ssh.pinnedHostKey === fingerprint) return
+    stored.ssh = { ...stored.ssh, pinnedHostKey: fingerprint }
+    this.persist()
+  }
+
   /** Internal-only: decrypted secrets for use at connect time. Never sent over IPC. */
   getDecrypted(id: string): {
     config: ConnectionConfig

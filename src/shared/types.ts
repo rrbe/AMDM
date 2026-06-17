@@ -33,6 +33,11 @@ export interface SshConfig {
   authMethod?: SshAuthMethod
   /** Path to a private key file on disk (we read it at connect time). */
   privateKeyPath?: string
+  /**
+   * Pinned SHA256 host-key fingerprint (hex). Learned on first connect (TOFU)
+   * and verified thereafter; a mismatch blocks the connection. Not a secret.
+   */
+  pinnedHostKey?: string
 }
 
 export interface TlsConfig {

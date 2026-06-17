@@ -120,7 +120,9 @@
       "privateKeyPath": "Private Key Path",
       "passphrase": "Key Passphrase",
       "passphraseHint": "Leave blank if the key has no passphrase.",
-      "agentHint": "Authenticate with a key already loaded in your local ssh-agent (via SSH_AUTH_SOCK) — no key file or password needed here. Make sure ssh-agent is running and you've run ssh-add."
+      "agentHint": "Authenticate with a key already loaded in your local ssh-agent (via SSH_AUTH_SOCK) — no key file or password needed here. Make sure ssh-agent is running and you've run ssh-add.",
+      "hostKeyTrusted": "Trusted this server's host key fingerprint (SHA256:{{fp}}…); later connections verify it.",
+      "resetHostKey": "Reset the trusted host key (re-trust on next connect)"
     },
     "tls": {
       "enableLabel": "Enable TLS/SSL",

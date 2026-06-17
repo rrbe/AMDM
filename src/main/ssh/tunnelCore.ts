@@ -20,9 +20,29 @@ export interface TunnelOptions {
   passphrase?: string
   /** ssh-agent socket (SSH_AUTH_SOCK) or Windows OpenSSH pipe — for agent auth. */
   agent?: string
+  /** Previously-pinned SHA256 host-key fingerprint (TOFU); undefined on first use. */
+  pinnedHostKey?: string
   /** Final MongoDB host/port to forward to (as seen from the SSH server). */
   destHost: string
   destPort: number
+}
+
+export interface HostKeyVerdict {
+  /** Whether to proceed with the connection. */
+  ok: boolean
+  /** Set only on first use (no prior pin): the fingerprint the caller should persist. */
+  learned?: string
+}
+
+/**
+ * Trust-on-first-use host-key check. With no prior pin we accept and report the
+ * fingerprint to learn; with a pin we accept only an exact match and otherwise
+ * reject (a changed key means the server was rebuilt — or a MITM).
+ */
+export function evaluateHostKey(pinned: string | undefined, presented: string): HostKeyVerdict {
+  if (!pinned) return { ok: true, learned: presented }
+  if (pinned === presented) return { ok: true }
+  return { ok: false }
 }
 
 /**
@@ -72,6 +92,7 @@ export function buildTunnelOptions(
     sshHost: config.ssh.host || '',
     sshPort: config.ssh.port || 22,
     username: config.ssh.username || '',
+    pinnedHostKey: config.ssh.pinnedHostKey,
     destHost: config.host,
     destPort: config.port ?? 27017
   }

@@ -120,7 +120,9 @@
       "privateKeyPath": "私密金鑰路徑",
       "passphrase": "私密金鑰密碼短語",
       "passphraseHint": "若私密金鑰無密碼短語，請留空。",
-      "agentHint": "使用本機 ssh-agent 中已載入的私密金鑰進行驗證（讀取 SSH_AUTH_SOCK），無需在此填寫私密金鑰或密碼。請確認 ssh-agent 正在執行並已透過 ssh-add 新增金鑰。"
+      "agentHint": "使用本機 ssh-agent 中已載入的私密金鑰進行驗證（讀取 SSH_AUTH_SOCK），無需在此填寫私密金鑰或密碼。請確認 ssh-agent 正在執行並已透過 ssh-add 新增金鑰。",
+      "hostKeyTrusted": "已信任此伺服器的主機金鑰指紋（SHA256:{{fp}}…），後續連線將驗證它。",
+      "resetHostKey": "重設已信任的主機金鑰（下次連線重新信任）"
     },
     "tls": {
       "enableLabel": "啟用 TLS/SSL",

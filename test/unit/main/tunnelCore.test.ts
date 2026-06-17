@@ -2,7 +2,12 @@
  * SSH tunnel option assembly — auth-method decision + agent-socket resolution.
  */
 import { describe, it, expect } from 'vitest'
-import { buildTunnelOptions, expandHome, resolveSshAgentSock } from '../../../src/main/ssh/tunnelCore'
+import {
+  buildTunnelOptions,
+  evaluateHostKey,
+  expandHome,
+  resolveSshAgentSock
+} from '../../../src/main/ssh/tunnelCore'
 import type { DecryptedConnection } from '../../../src/main/mongo/uri'
 import type { ConnectionConfig, SshConfig } from '../../../src/shared/types'
 
@@ -102,6 +107,23 @@ describe('buildTunnelOptions — auth methods', () => {
     expect(() => buildTunnelOptions(dec(cfg({ authMethod: 'agent' })), stubKey, () => undefined)).toThrow(
       /agent/i
     )
+  })
+
+  it('threads the pinned host key through', () => {
+    const o = buildTunnelOptions(dec(cfg({ authMethod: 'agent', pinnedHostKey: 'abc123' })), stubKey, () => '/s')
+    expect(o.pinnedHostKey).toBe('abc123')
+  })
+})
+
+describe('evaluateHostKey (TOFU)', () => {
+  it('first use (no pin) accepts and learns the fingerprint', () => {
+    expect(evaluateHostKey(undefined, 'fp1')).toEqual({ ok: true, learned: 'fp1' })
+  })
+  it('a matching pin accepts without re-learning', () => {
+    expect(evaluateHostKey('fp1', 'fp1')).toEqual({ ok: true })
+  })
+  it('a changed key is rejected', () => {
+    expect(evaluateHostKey('fp1', 'fp2')).toEqual({ ok: false })
   })
 })
 

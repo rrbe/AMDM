@@ -99,6 +99,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [sshPasswordTouched, setSshPasswordTouched] = useState(false)
   const [sshPassphrase, setSshPassphrase] = useState('')
   const [sshPassphraseTouched, setSshPassphraseTouched] = useState(false)
+  const [clearHostKey, setClearHostKey] = useState(false)
 
   // ---- TLS ----
   const [tlsEnabled, setTlsEnabled] = useState(editing?.tls.enabled ?? false)
@@ -208,7 +209,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             username: sshUser.trim() || undefined,
             authMethod: sshAuthMethod,
             privateKeyPath:
-              sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined
+              sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined,
+            // Preserve the TOFU-pinned host key across edits; clear it only on request.
+            pinnedHostKey: clearHostKey ? undefined : editing?.ssh.pinnedHostKey
           },
           tls: {
             enabled: tlsEnabled,
@@ -249,6 +252,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       sshPasswordTouched,
       sshPassphrase,
       sshPassphraseTouched,
+      clearHostKey,
       tlsEnabled,
       allowInvalidCertificates,
       caFile,
@@ -553,6 +557,23 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
               {sshAuthMethod === 'agent' && (
                 <div className="hint">{tFn('connection.ssh.agentHint')}</div>
+              )}
+
+              {editing?.ssh.pinnedHostKey && (
+                <>
+                  <div className="hint">
+                    {tFn('connection.ssh.hostKeyTrusted', {
+                      fp: editing.ssh.pinnedHostKey.slice(0, 24)
+                    })}
+                  </div>
+                  <div className="form-row">
+                    <Checkbox
+                      checked={clearHostKey}
+                      onCheckedChange={setClearHostKey}
+                      label={tFn('connection.ssh.resetHostKey')}
+                    />
+                  </div>
+                </>
               )}
             </>
           )}
