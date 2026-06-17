@@ -7,6 +7,8 @@
  * default reader does real disk IO at connect time.
  */
 import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { DecryptedConnection } from '../mongo/uri'
 
 export interface TunnelOptions {
@@ -21,6 +23,18 @@ export interface TunnelOptions {
   /** Final MongoDB host/port to forward to (as seen from the SSH server). */
   destHost: string
   destPort: number
+}
+
+/**
+ * Expand a leading `~` / `~/` to the user's home directory. Node's `fs` does
+ * NOT do this, so a privateKeyPath like `~/.ssh/id_ed25519` (which the form
+ * advertises) would otherwise ENOENT. Only the leading `~` is handled; `~user`
+ * is left untouched.
+ */
+export function expandHome(p: string, home: string = homedir()): string {
+  if (p === '~') return home
+  if (p.startsWith('~/') || p.startsWith('~\\')) return join(home, p.slice(2))
+  return p
 }
 
 /** Windows 10/11 built-in OpenSSH agent named pipe (ssh2 accepts it as `agent`). */
@@ -46,7 +60,7 @@ export function resolveSshAgentSock(
  */
 export function buildTunnelOptions(
   dec: DecryptedConnection,
-  readKey: (path: string) => Buffer = (p) => readFileSync(p),
+  readKey: (path: string) => Buffer = (p) => readFileSync(expandHome(p)),
   resolveAgent: () => string | undefined = resolveSshAgentSock
 ): TunnelOptions {
   const { config } = dec

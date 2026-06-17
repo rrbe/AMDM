@@ -32,15 +32,11 @@ class SessionManager {
     return this.sessions.get(id)?.tunnel?.localPort
   }
 
-  private async openTunnel(dec: DecryptedConnection): Promise<number> {
+  private async openTunnel(dec: DecryptedConnection): Promise<SshTunnel> {
     const tunnel = new SshTunnel()
-    const port = await tunnel.open(buildTunnelOptions(dec))
-    // stash tunnel so we can close it on disconnect
-    this.pendingTunnel = tunnel
-    return port
+    await tunnel.open(buildTunnelOptions(dec))
+    return tunnel
   }
-
-  private pendingTunnel?: SshTunnel
 
   private async probe(client: MongoClient): Promise<{ topology?: string; serverVersion?: string }> {
     try {
@@ -68,11 +64,12 @@ class SessionManager {
       return status
     }
 
+    let tunnel: SshTunnel | undefined
     try {
-      this.pendingTunnel = undefined
       let tunnelPort: number | undefined
       if (dec.config.ssh.enabled) {
-        tunnelPort = await this.openTunnel(dec)
+        tunnel = await this.openTunnel(dec)
+        tunnelPort = tunnel.localPort
       }
 
       const { uri, options } = buildClientArgs(dec, tunnelPort)
@@ -86,12 +83,10 @@ class SessionManager {
         topology: info.topology,
         serverVersion: info.serverVersion
       }
-      this.sessions.set(id, { client, tunnel: this.pendingTunnel, status })
-      this.pendingTunnel = undefined
+      this.sessions.set(id, { client, tunnel, status })
       return status
     } catch (err) {
-      this.pendingTunnel?.close()
-      this.pendingTunnel = undefined
+      tunnel?.close()
       const status: ConnectionStatus = {
         id,
         state: 'error',

@@ -2,7 +2,7 @@
  * SSH tunnel option assembly — auth-method decision + agent-socket resolution.
  */
 import { describe, it, expect } from 'vitest'
-import { buildTunnelOptions, resolveSshAgentSock } from '../../../src/main/ssh/tunnelCore'
+import { buildTunnelOptions, expandHome, resolveSshAgentSock } from '../../../src/main/ssh/tunnelCore'
 import type { DecryptedConnection } from '../../../src/main/mongo/uri'
 import type { ConnectionConfig, SshConfig } from '../../../src/shared/types'
 
@@ -27,6 +27,19 @@ const dec = (config: ConnectionConfig, secrets: Partial<DecryptedConnection> = {
 
 /** Stub reader so the privateKey branch never touches disk. */
 const stubKey = (): Buffer => Buffer.from('PRIV')
+
+describe('expandHome', () => {
+  it('expands a bare ~ to the home dir', () => {
+    expect(expandHome('~', '/home/u')).toBe('/home/u')
+  })
+  it('expands a leading ~/ to home/...', () => {
+    expect(expandHome('~/.ssh/id_ed25519', '/home/u')).toBe('/home/u/.ssh/id_ed25519')
+  })
+  it('leaves absolute and ~user paths untouched', () => {
+    expect(expandHome('/keys/id', '/home/u')).toBe('/keys/id')
+    expect(expandHome('~bob/id', '/home/u')).toBe('~bob/id')
+  })
+})
 
 describe('resolveSshAgentSock', () => {
   it('prefers SSH_AUTH_SOCK when set', () => {
