@@ -95,6 +95,7 @@
       "srvHost": "SRV Host",
       "port": "Port",
       "replicaSet": "Replica Set",
+      "replicaSetSshIgnored": "The replica set name is ignored when the SSH tunnel is enabled (connects to a single node via directConnection).",
       "defaultDatabase": "Default Database",
       "extraOptions": "Extra options: {{opts}}"
     },
@@ -122,7 +123,11 @@
       "passphraseHint": "Leave blank if the key has no passphrase.",
       "agentHint": "Authenticate with a key already loaded in your local ssh-agent (via SSH_AUTH_SOCK) — no key file or password needed here. Make sure ssh-agent is running and you've run ssh-add.",
       "hostKeyTrusted": "Trusted this server's host key fingerprint (SHA256:{{fp}}…); later connections verify it.",
-      "resetHostKey": "Reset the trusted host key (re-trust on next connect)"
+      "resetHostKey": "Reset the trusted host key (re-trust on next connect)",
+      "errHost": "SSH host is required",
+      "errUser": "SSH username is required",
+      "errPort": "SSH port must be an integer between 1 and 65535",
+      "errKey": "Private-key auth requires a key path"
     },
     "tls": {
       "enableLabel": "Enable TLS/SSL",

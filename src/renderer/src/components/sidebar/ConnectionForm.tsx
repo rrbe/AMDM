@@ -101,6 +101,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [sshPassphraseTouched, setSshPassphraseTouched] = useState(false)
   const [clearHostKey, setClearHostKey] = useState(false)
 
+  // Validate SSH fields up front so save fails fast (with a reason) rather than
+  // letting empty/invalid values surface as an opaque error at connect time.
+  const sshError = useMemo<string | undefined>(() => {
+    if (!sshEnabled) return undefined
+    if (!sshHost.trim()) return tFn('connection.ssh.errHost')
+    if (!sshUser.trim()) return tFn('connection.ssh.errUser')
+    const p = Number(sshPort)
+    if (!Number.isInteger(p) || p < 1 || p > 65535) return tFn('connection.ssh.errPort')
+    if (sshAuthMethod === 'privateKey' && !privateKeyPath.trim()) return tFn('connection.ssh.errKey')
+    return undefined
+  }, [sshEnabled, sshHost, sshUser, sshPort, sshAuthMethod, privateKeyPath, tFn])
+
   // ---- TLS ----
   const [tlsEnabled, setTlsEnabled] = useState(editing?.tls.enabled ?? false)
   const [allowInvalidCertificates, setAllowInvalid] = useState(
@@ -301,11 +313,21 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 : tFn('connection.testResult.failed', { error: test.error ?? 'unknown' })}
             </span>
           )}
+          {sshError && (
+            <span className="test-result err" style={{ marginTop: 0, padding: '4px 8px' }}>
+              {sshError}
+            </span>
+          )}
           <span className="spacer" />
           <Button variant="ghost" onClick={onClose}>
             {tFn('connection.action.cancel')}
           </Button>
-          <Button variant="primary" busy={saving} disabled={!host.trim()} onClick={() => void submit()}>
+          <Button
+            variant="primary"
+            busy={saving}
+            disabled={!host.trim() || !!sshError}
+            onClick={() => void submit()}
+          >
             {tFn('connection.action.save')}
           </Button>
         </>
@@ -413,6 +435,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               />
             </Field>
           </div>
+
+          {sshEnabled && replicaSet.trim() && (
+            <div className="hint">{tFn('connection.general.replicaSetSshIgnored')}</div>
+          )}
 
           {Object.keys(options).length > 0 && (
             <div className="hint">

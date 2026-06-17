@@ -95,6 +95,7 @@
       "srvHost": "SRV 主机",
       "port": "端口",
       "replicaSet": "副本集",
+      "replicaSetSshIgnored": "启用 SSH 隧道时副本集名称将被忽略（按单节点 directConnection 连接）。",
       "defaultDatabase": "默认数据库",
       "extraOptions": "额外选项：{{opts}}"
     },
@@ -122,7 +123,11 @@
       "passphraseHint": "如果私钥没有密码短语，请留空。",
       "agentHint": "使用本机 ssh-agent 中已加载的私钥认证（读取 SSH_AUTH_SOCK），无需在此填写私钥或密码。请确保 ssh-agent 正在运行并已通过 ssh-add 添加密钥。",
       "hostKeyTrusted": "已信任此服务器的主机密钥指纹（SHA256:{{fp}}…），后续连接将校验它。",
-      "resetHostKey": "重置已信任的主机密钥（下次连接重新信任）"
+      "resetHostKey": "重置已信任的主机密钥（下次连接重新信任）",
+      "errHost": "请填写 SSH 主机",
+      "errUser": "请填写 SSH 用户名",
+      "errPort": "SSH 端口需为 1–65535 之间的整数",
+      "errKey": "私钥认证需填写私钥路径"
     },
     "tls": {
       "enableLabel": "启用 TLS/SSL",

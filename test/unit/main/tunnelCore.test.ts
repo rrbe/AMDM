@@ -6,6 +6,7 @@ import {
   buildTunnelOptions,
   evaluateHostKey,
   expandHome,
+  readPrivateKey,
   resolveSshAgentSock
 } from '../../../src/main/ssh/tunnelCore'
 import type { DecryptedConnection } from '../../../src/main/mongo/uri'
@@ -43,6 +44,14 @@ describe('expandHome', () => {
   it('leaves absolute and ~user paths untouched', () => {
     expect(expandHome('/keys/id', '/home/u')).toBe('/keys/id')
     expect(expandHome('~bob/id', '/home/u')).toBe('~bob/id')
+  })
+})
+
+describe('readPrivateKey', () => {
+  it('throws an actionable, path-naming error when the key is unreadable', () => {
+    expect(() => readPrivateKey('/no/such/ssh/key/_definitely_missing_')).toThrow(
+      /Cannot read SSH private key at ".*_definitely_missing_"/
+    )
   })
 })
 

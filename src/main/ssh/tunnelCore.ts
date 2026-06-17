@@ -57,6 +57,19 @@ export function expandHome(p: string, home: string = homedir()): string {
   return p
 }
 
+/**
+ * Read a private key file (expanding a leading `~`), turning the raw Node fs
+ * error into an actionable message that names the resolved path.
+ */
+export function readPrivateKey(path: string): Buffer {
+  const full = expandHome(path)
+  try {
+    return readFileSync(full)
+  } catch {
+    throw new Error(`Cannot read SSH private key at "${full}" — check the path and file permissions.`)
+  }
+}
+
 /** Windows 10/11 built-in OpenSSH agent named pipe (ssh2 accepts it as `agent`). */
 const WIN_OPENSSH_AGENT_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
 
@@ -80,7 +93,7 @@ export function resolveSshAgentSock(
  */
 export function buildTunnelOptions(
   dec: DecryptedConnection,
-  readKey: (path: string) => Buffer = (p) => readFileSync(expandHome(p)),
+  readKey: (path: string) => Buffer = readPrivateKey,
   resolveAgent: () => string | undefined = resolveSshAgentSock
 ): TunnelOptions {
   const { config } = dec
