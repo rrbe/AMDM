@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildTunnelOptions,
+  classifyConnError,
   evaluateHostKey,
   expandHome,
   readPrivateKey,
@@ -170,6 +171,27 @@ describe('buildTunnelOptions — jump host (ProxyJump)', () => {
     expect(o.jump?.privateKey?.toString()).toBe('JUMPKEY')
     expect(o.jump?.password).toBeUndefined()
     expect(o.jump?.passphrase).toBeUndefined() // jump secrets are not stored
+  })
+})
+
+describe('classifyConnError', () => {
+  it('maps socket codes to a network kind', () => {
+    expect(classifyConnError({ code: 'ECONNREFUSED' }).kind).toBe('network')
+    expect(classifyConnError({ code: 'EHOSTUNREACH' }).kind).toBe('network')
+    expect(classifyConnError({ code: 'ENETUNREACH' }).kind).toBe('network')
+  })
+  it('maps timeouts and DNS failures', () => {
+    expect(classifyConnError({ code: 'ETIMEDOUT' }).kind).toBe('timeout')
+    expect(classifyConnError({ level: 'client-timeout' }).kind).toBe('timeout')
+    expect(classifyConnError({ code: 'ENOTFOUND' }).kind).toBe('dns')
+  })
+  it('classifies ssh2 auth failures by level or message', () => {
+    expect(classifyConnError({ level: 'client-authentication' }).kind).toBe('auth')
+    expect(classifyConnError(new Error('All configured authentication methods failed')).kind).toBe('auth')
+  })
+  it('recognizes host-key errors and falls back to other', () => {
+    expect(classifyConnError(new Error('Host key verification failed for x')).kind).toBe('hostkey')
+    expect(classifyConnError(new Error('something odd')).kind).toBe('other')
   })
 })
 

@@ -1,7 +1,8 @@
 import net from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Client, type ConnectConfig } from 'ssh2'
-import { evaluateHostKey, type SshHopOptions, type TunnelOptions } from './tunnelCore'
+import { classifyConnError, evaluateHostKey, type SshHopOptions, type TunnelOptions } from './tunnelCore'
+import { tcpProbe } from './diagnose'
 
 export type { TunnelOptions }
 
@@ -30,21 +31,41 @@ export class SshTunnel {
   learnedJumpHostKey?: string
 
   async open(opts: TunnelOptions): Promise<number> {
+    // Network pre-check: fail fast & clearly if the entry hop is unreachable,
+    // so a connectivity problem is obvious (vs. an SSH auth / host-key failure).
+    const entry = opts.jump ?? opts.target
+    await tcpProbe(entry.host, entry.port)
+
     let transport: Duplex | undefined
     if (opts.jump) {
-      const jump = await this.connectHop(opts.jump)
+      const jump = await this.connectHop(opts.jump, undefined, 'jump host')
       this.learnedJumpHostKey = jump.learned
       // Reach the target's SSH port *through* the bastion.
-      transport = await forwardOut(jump.client, opts.target.host, opts.target.port)
+      try {
+        transport = await forwardOut(jump.client, opts.target.host, opts.target.port)
+      } catch (err) {
+        throw new Error(
+          `Cannot reach the target ${opts.target.host}:${opts.target.port} through the jump host — ${classifyConnError(err).message}`
+        )
+      }
     }
-    const target = await this.connectHop(opts.target, transport)
+    const target = await this.connectHop(opts.target, transport, 'target')
     this.learnedHostKey = target.learned
     this.localPort = await this.listenForward(target.client, opts.destHost, opts.destPort)
     return this.localPort
   }
 
-  /** Open one SSH session, optionally tunnelled over an existing transport sock. */
-  private connectHop(hop: SshHopOptions, sock?: Duplex): Promise<{ client: Client; learned?: string }> {
+  /**
+   * Open one SSH session, optionally tunnelled over an existing transport sock.
+   * `role` ("jump host" / "target") labels errors so a multi-hop failure points
+   * at the hop that broke.
+   */
+  private connectHop(
+    hop: SshHopOptions,
+    sock: Duplex | undefined,
+    role: string
+  ): Promise<{ client: Client; learned?: string }> {
+    const where = `${role} ${hop.host}:${hop.port}`
     return new Promise((resolve, reject) => {
       const client = new Client()
       this.clients.push(client)
@@ -71,7 +92,7 @@ export class SshTunnel {
             return true
           }
           hostKeyError = new Error(
-            `Host key verification failed for ${hop.host} — the SSH server's key changed (possible MITM). ` +
+            `Host key verification failed for the ${where} — the SSH server's key changed (possible MITM). ` +
               `Expected SHA256:${hop.pinnedHostKey}, got SHA256:${fingerprint}. ` +
               'If the server was legitimately rebuilt, reset the trusted host key in the connection’s SSH settings.'
           )
@@ -81,7 +102,14 @@ export class SshTunnel {
         keepaliveInterval: 15000
       }
 
-      client.on('error', (err) => reject(hostKeyError ?? err))
+      client.on('error', (err) => {
+        if (hostKeyError) {
+          reject(hostKeyError)
+          return
+        }
+        // Label which hop failed and whether it was network / auth / etc.
+        reject(new Error(`SSH ${where} — ${classifyConnError(err).message}`))
+      })
       client.on('ready', () => resolve({ client, learned }))
       client.connect(cfg)
     })

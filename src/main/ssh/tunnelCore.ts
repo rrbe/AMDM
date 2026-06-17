@@ -54,6 +54,43 @@ export function evaluateHostKey(pinned: string | undefined, presented: string): 
   return { ok: false }
 }
 
+export type ConnErrorKind = 'network' | 'timeout' | 'dns' | 'auth' | 'hostkey' | 'other'
+
+/**
+ * Classify a connection/SSH error so a network problem is distinguishable from
+ * an auth or host-key problem. Pure: maps Node socket `code`s and ssh2
+ * `level`/message shapes to a kind + a short actionable message.
+ */
+export function classifyConnError(err: unknown): { kind: ConnErrorKind; message: string } {
+  const e = (err ?? {}) as { code?: string; level?: string; message?: string }
+  const code = e.code
+  const msg = e.message ?? String(err)
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+    return { kind: 'dns', message: 'host name could not be resolved (DNS)' }
+  }
+  if (code === 'ECONNREFUSED') {
+    return {
+      kind: 'network',
+      message: 'connection refused — nothing is listening on that port, or a firewall rejected it'
+    }
+  }
+  if (code === 'ETIMEDOUT' || code === 'ETIME' || e.level === 'client-timeout') {
+    return { kind: 'timeout', message: 'connection timed out — the host is unreachable or the port is filtered' }
+  }
+  if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH' || code === 'EHOSTDOWN') {
+    return { kind: 'network', message: 'host or network is unreachable' }
+  }
+  if (e.level === 'client-authentication' || /authentication methods failed/i.test(msg)) {
+    return {
+      kind: 'auth',
+      message:
+        'SSH authentication was rejected — check the username, and that your key is loaded in ssh-agent (ssh-add -l) or the key file/passphrase is correct'
+    }
+  }
+  if (/host key/i.test(msg)) return { kind: 'hostkey', message: msg }
+  return { kind: 'other', message: msg }
+}
+
 /**
  * Expand a leading `~` / `~/` to the user's home directory. Node's `fs` does
  * NOT do this, so a privateKeyPath like `~/.ssh/id_ed25519` (which the form
