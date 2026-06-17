@@ -10,6 +10,7 @@ import type {
   ConnectionInput,
   ConnectionStatus,
   DatabaseInfo,
+  OpenFileOptions,
   DataOpResult,
   DocMutateRequest,
   DocMutateResult,
@@ -64,7 +65,9 @@ export const IPC = {
   ioImport: 'io:import',
 
   settingsGet: 'settings:get',
-  settingsUpdate: 'settings:update'
+  settingsUpdate: 'settings:update',
+
+  dialogOpenFile: 'dialog:openFile'
 } as const
 
 /** The API shape exposed on `window.api` (see preload). */
@@ -130,5 +133,9 @@ export interface Api {
     get(): Promise<AppSettings>
     /** Merge a partial patch and return the full updated settings. */
     update(patch: Partial<AppSettings>): Promise<AppSettings>
+  }
+  dialog: {
+    /** Native open-file picker; resolves the chosen absolute path, or null if cancelled. */
+    openFile(opts?: OpenFileOptions): Promise<string | null>
   }
 }

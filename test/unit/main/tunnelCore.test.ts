@@ -156,21 +156,21 @@ describe('buildTunnelOptions — jump host (ProxyJump)', () => {
     })
   })
 
-  it('a jump hop never carries stored password/passphrase (agent/key only)', () => {
+  it('a jump hop carries its own passphrase but never a password', () => {
     const o = buildTunnelOptions(
       dec(
         cfg({
           authMethod: 'agent',
           jump: { host: 'b', username: 'u', authMethod: 'privateKey', privateKeyPath: '/k/jump' }
         }),
-        { sshPassword: 'pw', sshPassphrase: 'pp' }
+        { sshPassword: 'pw', sshPassphrase: 'pp', jumpSshPassphrase: 'jpp' }
       ),
       () => Buffer.from('JUMPKEY'),
       () => '/tmp/agent.sock'
     )
     expect(o.jump?.privateKey?.toString()).toBe('JUMPKEY')
-    expect(o.jump?.password).toBeUndefined()
-    expect(o.jump?.passphrase).toBeUndefined() // jump secrets are not stored
+    expect(o.jump?.passphrase).toBe('jpp') // its own jump passphrase, not the target's
+    expect(o.jump?.password).toBeUndefined() // jump never uses a stored password
   })
 })
 

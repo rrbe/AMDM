@@ -26,8 +26,9 @@ export type SshAuthMethod = 'password' | 'privateKey' | 'agent'
 
 /**
  * A single SSH hop in front of the target (a bastion / jump host, i.e. ProxyJump).
- * Authenticates via agent or a key file only — no password/passphrase is stored
- * for a jump hop, so passphrase-protected keys must be loaded into the agent.
+ * Authenticates via agent or a private key file; a passphrase for that key is
+ * carried out-of-band as `ConnectionInput.jumpSshPassphrase` (encrypted at rest,
+ * like the other secrets) rather than on this config object.
  */
 export interface SshHopConfig {
   host?: string
@@ -97,6 +98,7 @@ export interface ConnectionConfig {
   hasPassword?: boolean
   hasSshPassword?: boolean
   hasSshPassphrase?: boolean
+  hasJumpSshPassphrase?: boolean
 
   createdAt: number
   updatedAt: number
@@ -108,10 +110,22 @@ export interface ConnectionConfig {
  * keep the previously stored value; pass empty string to clear it.
  */
 export interface ConnectionInput
-  extends Omit<ConnectionConfig, 'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'createdAt' | 'updatedAt'> {
+  extends Omit<
+    ConnectionConfig,
+    'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
+  > {
   password?: string
   sshPassword?: string
   sshPassphrase?: string
+  /** Passphrase for the jump host's private key. */
+  jumpSshPassphrase?: string
+}
+
+/** Options for the native "open file" picker exposed over IPC. */
+export interface OpenFileOptions {
+  title?: string
+  defaultPath?: string
+  filters?: { name: string; extensions: string[] }[]
 }
 
 // ---------------------------------------------------------------------------

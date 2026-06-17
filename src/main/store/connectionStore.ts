@@ -8,11 +8,12 @@ interface StoredSecrets {
   encPassword?: string
   encSshPassword?: string
   encSshPassphrase?: string
+  encJumpSshPassphrase?: string
 }
 
 type StoredConnection = Omit<
   ConnectionConfig,
-  'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase'
+  'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase'
 > &
   StoredSecrets
 
@@ -78,12 +79,13 @@ class ConnectionStore {
   }
 
   private sanitize(c: StoredConnection): ConnectionConfig {
-    const { encPassword, encSshPassword, encSshPassphrase, ...rest } = c
+    const { encPassword, encSshPassword, encSshPassphrase, encJumpSshPassphrase, ...rest } = c
     return {
       ...rest,
       hasPassword: !!encPassword,
       hasSshPassword: !!encSshPassword,
-      hasSshPassphrase: !!encSshPassphrase
+      hasSshPassphrase: !!encSshPassphrase,
+      hasJumpSshPassphrase: !!encJumpSshPassphrase
     }
   }
 
@@ -113,6 +115,7 @@ class ConnectionStore {
       encPassword: this.nextSecret(existing?.encPassword, input.password),
       encSshPassword: this.nextSecret(existing?.encSshPassword, input.sshPassword),
       encSshPassphrase: this.nextSecret(existing?.encSshPassphrase, input.sshPassphrase),
+      encJumpSshPassphrase: this.nextSecret(existing?.encJumpSshPassphrase, input.jumpSshPassphrase),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
     }
@@ -155,6 +158,7 @@ class ConnectionStore {
     password?: string
     sshPassword?: string
     sshPassphrase?: string
+    jumpSshPassphrase?: string
   } | null {
     const stored = this.data.connections.find((c) => c.id === id)
     if (!stored) return null
@@ -162,7 +166,8 @@ class ConnectionStore {
       config: this.sanitize(stored),
       password: this.decrypt(stored.encPassword),
       sshPassword: this.decrypt(stored.encSshPassword),
-      sshPassphrase: this.decrypt(stored.encSshPassphrase)
+      sshPassphrase: this.decrypt(stored.encSshPassphrase),
+      jumpSshPassphrase: this.decrypt(stored.encJumpSshPassphrase)
     }
   }
 }

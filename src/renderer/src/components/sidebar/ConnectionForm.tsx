@@ -46,6 +46,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
   const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
+  const pickFile = useAppStore((s) => s.pickFile)
   const updateSettings = useAppStore((s) => s.updateSettings)
   // Remembered "To URL" password choice (persisted in settings.json).
   const rememberedIncludePassword = useAppStore((s) => s.settings.exportIncludeRealPassword)
@@ -110,7 +111,15 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     editing?.ssh.jump?.authMethod ?? 'agent'
   )
   const [jumpKeyPath, setJumpKeyPath] = useState(editing?.ssh.jump?.privateKeyPath ?? '')
+  const [jumpSshPassphrase, setJumpSshPassphrase] = useState('')
+  const [jumpSshPassphraseTouched, setJumpSshPassphraseTouched] = useState(false)
   const [clearJumpHostKey, setClearJumpHostKey] = useState(false)
+
+  // Browse for a private key file via the native picker, default to ~/.ssh.
+  const browseKey = async (setter: (v: string) => void): Promise<void> => {
+    const p = await pickFile({ title: tFn('connection.ssh.pickKey'), defaultPath: '~/.ssh' })
+    if (p) setter(p)
+  }
 
   // Validate SSH fields up front so save fails fast (with a reason) rather than
   // letting empty/invalid values surface as an opaque error at connect time.
@@ -281,6 +290,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         if (passwordTouched) input.password = password
         if (sshPasswordTouched) input.sshPassword = sshPassword
         if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
+        if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
         return input
       },
     [
@@ -316,6 +326,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       jumpUser,
       jumpAuthMethod,
       jumpKeyPath,
+      jumpSshPassphrase,
+      jumpSshPassphraseTouched,
       clearJumpHostKey,
       tlsEnabled,
       allowInvalidCertificates,
@@ -610,11 +622,17 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               {sshAuthMethod === 'privateKey' && (
                 <>
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
-                    <Input
-                      value={privateKeyPath}
-                      onChange={(e) => setPrivateKeyPath(e.target.value)}
-                      placeholder="~/.ssh/id_ed25519"
-                    />
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <Input
+                        style={{ flex: 1, minWidth: 0 }}
+                        value={privateKeyPath}
+                        onChange={(e) => setPrivateKeyPath(e.target.value)}
+                        placeholder="~/.ssh/id_ed25519"
+                      />
+                      <Button variant="ghost" type="button" onClick={() => void browseKey(setPrivateKeyPath)}>
+                        {tFn('connection.ssh.browse')}
+                      </Button>
+                    </div>
                   </Field>
                   <Field
                     label={tFn('connection.ssh.passphrase')}
@@ -695,13 +713,35 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   </div>
 
                   {jumpAuthMethod === 'privateKey' && (
-                    <Field label={tFn('connection.ssh.privateKeyPath')}>
-                      <Input
-                        value={jumpKeyPath}
-                        onChange={(e) => setJumpKeyPath(e.target.value)}
-                        placeholder="~/.ssh/id_ed25519"
-                      />
-                    </Field>
+                    <>
+                      <Field label={tFn('connection.ssh.privateKeyPath')}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <Input
+                            style={{ flex: 1, minWidth: 0 }}
+                            value={jumpKeyPath}
+                            onChange={(e) => setJumpKeyPath(e.target.value)}
+                            placeholder="~/.ssh/id_ed25519"
+                          />
+                          <Button variant="ghost" type="button" onClick={() => void browseKey(setJumpKeyPath)}>
+                            {tFn('connection.ssh.browse')}
+                          </Button>
+                        </div>
+                      </Field>
+                      <Field
+                        label={tFn('connection.ssh.jumpPassphrase')}
+                        hint={tFn('connection.ssh.passphraseHint')}
+                      >
+                        <Input
+                          type="password"
+                          value={jumpSshPassphrase}
+                          placeholder={secretPlaceholder(editing?.hasJumpSshPassphrase)}
+                          onChange={(e) => {
+                            setJumpSshPassphrase(e.target.value)
+                            setJumpSshPassphraseTouched(true)
+                          }}
+                        />
+                      </Field>
+                    </>
                   )}
 
                   {jumpAuthMethod === 'agent' && (

@@ -129,14 +129,17 @@
       "errPort": "SSH 端口需为 1–65535 之间的整数",
       "errKey": "私钥认证需填写私钥路径",
       "jumpEnableLabel": "通过跳板机连接（先连跳板机再到目标）",
-      "jumpHint": "适用于目标主机只能经堡垒机/跳板机访问的场景（等价于 ssh ProxyJump / ProxyCommand -W）。跳板机仅支持 agent 或私钥文件认证；带口令的私钥请先加入 ssh-agent。",
+      "jumpHint": "适用于目标主机只能经堡垒机/跳板机访问的场景（等价于 ssh ProxyJump / ProxyCommand -W）。跳板机支持 agent 或私钥文件；私钥带口令可直接在下方填写。",
       "jumpHost": "跳板机主机",
       "jumpPort": "跳板机端口",
       "jumpUsername": "跳板机用户名",
       "errJumpHost": "请填写跳板机主机",
       "errJumpUser": "请填写跳板机用户名",
       "errJumpPort": "跳板机端口需为 1–65535 之间的整数",
-      "errJumpKey": "跳板机私钥认证需填写私钥路径"
+      "errJumpKey": "跳板机私钥认证需填写私钥路径",
+      "browse": "浏览…",
+      "pickKey": "选择私钥文件",
+      "jumpPassphrase": "跳板机私钥密码短语"
     },
     "tls": {
       "enableLabel": "启用 TLS/SSL",

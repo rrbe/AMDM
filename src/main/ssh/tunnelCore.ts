@@ -84,7 +84,7 @@ export function classifyConnError(err: unknown): { kind: ConnErrorKind; message:
     return {
       kind: 'auth',
       message:
-        'SSH authentication was rejected — check the username, and that your key is loaded in ssh-agent (ssh-add -l) or the key file/passphrase is correct'
+        'SSH authentication was rejected — check the username, or switch the auth method to “Private Key” and pick your key file (with its passphrase) in the connection settings'
     }
   }
   if (/host key/i.test(msg)) return { kind: 'hostkey', message: msg }
@@ -197,7 +197,9 @@ export function buildTunnelOptions(
     readKey,
     resolveAgent
   )
-  const jump = config.ssh.jump ? buildHop(config.ssh.jump, {}, readKey, resolveAgent) : undefined
+  const jump = config.ssh.jump
+    ? buildHop(config.ssh.jump, { passphrase: dec.jumpSshPassphrase }, readKey, resolveAgent)
+    : undefined
 
   return { target, jump, destHost: config.host, destPort: config.port ?? 27017 }
 }

@@ -129,14 +129,17 @@
       "errPort": "SSH port must be an integer between 1 and 65535",
       "errKey": "Private-key auth requires a key path",
       "jumpEnableLabel": "Connect through a jump host (bastion)",
-      "jumpHint": "For a target reachable only via a bastion/jump host (equivalent to ssh ProxyJump / ProxyCommand -W). The jump host supports agent or key-file auth only; load passphrase-protected keys into ssh-agent.",
+      "jumpHint": "For a target reachable only via a bastion/jump host (equivalent to ssh ProxyJump / ProxyCommand -W). The jump host supports agent or a private key file; if the key has a passphrase, enter it below.",
       "jumpHost": "Jump Host",
       "jumpPort": "Jump Port",
       "jumpUsername": "Jump Username",
       "errJumpHost": "Jump host is required",
       "errJumpUser": "Jump username is required",
       "errJumpPort": "Jump port must be an integer between 1 and 65535",
-      "errJumpKey": "Jump private-key auth requires a key path"
+      "errJumpKey": "Jump private-key auth requires a key path",
+      "browse": "Browse…",
+      "pickKey": "Select private key file",
+      "jumpPassphrase": "Jump Key Passphrase"
     },
     "tls": {
       "enableLabel": "Enable TLS/SSL",

@@ -6,6 +6,7 @@ export interface DecryptedConnection {
   password?: string
   sshPassword?: string
   sshPassphrase?: string
+  jumpSshPassphrase?: string
 }
 
 export interface ClientArgs {

@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { homedir } from 'node:os'
 import { IPC } from '../../shared/ipc'
 import { buildMongoUri } from '../../shared/connectionUri'
 import type {
@@ -10,6 +11,7 @@ import type {
   DocUpdateRequest,
   ExportRequest,
   ImportRequest,
+  OpenFileOptions,
   SavedQueryInput,
   ShellRequest
 } from '../../shared/types'
@@ -38,12 +40,13 @@ function historySummary(kind: string, count?: number, elapsedMs?: number, errorN
  * the stored values so "Test" works after editing without re-typing secrets.
  */
 function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
-  const { password, sshPassword, sshPassphrase, ...rest } = input
+  const { password, sshPassword, sshPassphrase, jumpSshPassphrase, ...rest } = input
   const config: ConnectionConfig = {
     ...rest,
     hasPassword: !!password,
     hasSshPassword: !!sshPassword,
     hasSshPassphrase: !!sshPassphrase,
+    hasJumpSshPassphrase: !!jumpSshPassphrase,
     createdAt: 0,
     updatedAt: 0
   }
@@ -51,15 +54,17 @@ function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
   let pw = password
   let sshPw = sshPassword
   let sshPp = sshPassphrase
+  let jumpPp = jumpSshPassphrase
   if (input.id) {
     const stored = connectionStore.getDecrypted(input.id)
     if (stored) {
       if (!pw) pw = stored.password
       if (!sshPw) sshPw = stored.sshPassword
       if (!sshPp) sshPp = stored.sshPassphrase
+      if (!jumpPp) jumpPp = stored.jumpSshPassphrase
     }
   }
-  return { config, password: pw, sshPassword: sshPw, sshPassphrase: sshPp }
+  return { config, password: pw, sshPassword: sshPw, sshPassphrase: sshPp, jumpSshPassphrase: jumpPp }
 }
 
 const PASSWORD_PLACEHOLDER = '<password>'
@@ -123,6 +128,22 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.connectionsImport, () =>
     importConnections(BrowserWindow.getFocusedWindow())
   )
+
+  // Native file picker (e.g. choosing an SSH private key). Returns the absolute
+  // path, or null if cancelled. `~` in defaultPath is expanded here (the OS
+  // dialog does not expand it).
+  ipcMain.handle(IPC.dialogOpenFile, async (_e, opts?: OpenFileOptions) => {
+    const defaultPath = opts?.defaultPath?.replace(/^~(?=$|[/\\])/, homedir())
+    const o: Electron.OpenDialogOptions = {
+      properties: ['openFile'],
+      title: opts?.title,
+      defaultPath,
+      filters: opts?.filters
+    }
+    const win = BrowserWindow.getFocusedWindow()
+    const r = win ? await dialog.showOpenDialog(win, o) : await dialog.showOpenDialog(o)
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
+  })
 
   // session
   ipcMain.handle(IPC.sessionConnect, (_e, id: string) => sessionManager.connect(id))
