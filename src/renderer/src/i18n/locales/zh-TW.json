@@ -115,10 +115,12 @@
       "authMethod": "驗證方式",
       "methodPassword": "密碼",
       "methodPrivateKey": "私密金鑰",
+      "methodAgent": "SSH Agent",
       "password": "SSH 密碼",
       "privateKeyPath": "私密金鑰路徑",
       "passphrase": "私密金鑰密碼短語",
-      "passphraseHint": "若私密金鑰無密碼短語，請留空。"
+      "passphraseHint": "若私密金鑰無密碼短語，請留空。",
+      "agentHint": "使用本機 ssh-agent 中已載入的私密金鑰進行驗證（讀取 SSH_AUTH_SOCK），無需在此填寫私密金鑰或密碼。請確認 ssh-agent 正在執行並已透過 ssh-add 新增金鑰。"
     },
     "tls": {
       "enableLabel": "啟用 TLS/SSL",

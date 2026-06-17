@@ -504,13 +504,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     onChange={setSshAuthMethod}
                     options={[
                       { label: tFn('connection.ssh.methodPassword'), value: 'password' },
-                      { label: tFn('connection.ssh.methodPrivateKey'), value: 'privateKey' }
+                      { label: tFn('connection.ssh.methodPrivateKey'), value: 'privateKey' },
+                      { label: tFn('connection.ssh.methodAgent'), value: 'agent' }
                     ]}
                   />
                 </Field>
               </div>
 
-              {sshAuthMethod === 'password' ? (
+              {sshAuthMethod === 'password' && (
                 <Field label={tFn('connection.ssh.password')}>
                   <Input
                     type="password"
@@ -522,7 +523,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     }}
                   />
                 </Field>
-              ) : (
+              )}
+
+              {sshAuthMethod === 'privateKey' && (
                 <>
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
                     <Input
@@ -546,6 +549,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     />
                   </Field>
                 </>
+              )}
+
+              {sshAuthMethod === 'agent' && (
+                <div className="hint">{tFn('connection.ssh.agentHint')}</div>
               )}
             </>
           )}

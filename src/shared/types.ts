@@ -22,13 +22,14 @@ export interface AuthConfig {
   mechanism?: ScramMechanism
 }
 
-export type SshAuthMethod = 'password' | 'privateKey'
+export type SshAuthMethod = 'password' | 'privateKey' | 'agent'
 
 export interface SshConfig {
   enabled: boolean
   host?: string
   port?: number // default 22
   username?: string
+  /** 'agent' authenticates via the local ssh-agent (SSH_AUTH_SOCK) — no key/password stored. */
   authMethod?: SshAuthMethod
   /** Path to a private key file on disk (we read it at connect time). */
   privateKeyPath?: string

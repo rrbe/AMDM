@@ -115,10 +115,12 @@
       "authMethod": "Auth Method",
       "methodPassword": "Password",
       "methodPrivateKey": "Private Key",
+      "methodAgent": "SSH Agent",
       "password": "SSH Password",
       "privateKeyPath": "Private Key Path",
       "passphrase": "Key Passphrase",
-      "passphraseHint": "Leave blank if the key has no passphrase."
+      "passphraseHint": "Leave blank if the key has no passphrase.",
+      "agentHint": "Authenticate with a key already loaded in your local ssh-agent (via SSH_AUTH_SOCK) — no key file or password needed here. Make sure ssh-agent is running and you've run ssh-add."
     },
     "tls": {
       "enableLabel": "Enable TLS/SSL",

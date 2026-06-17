@@ -115,10 +115,12 @@
       "authMethod": "认证方式",
       "methodPassword": "密码",
       "methodPrivateKey": "私钥",
+      "methodAgent": "SSH Agent",
       "password": "SSH 密码",
       "privateKeyPath": "私钥路径",
       "passphrase": "私钥密码短语",
-      "passphraseHint": "如果私钥没有密码短语，请留空。"
+      "passphraseHint": "如果私钥没有密码短语，请留空。",
+      "agentHint": "使用本机 ssh-agent 中已加载的私钥认证（读取 SSH_AUTH_SOCK），无需在此填写私钥或密码。请确保 ssh-agent 正在运行并已通过 ssh-add 添加密钥。"
     },
     "tls": {
       "enableLabel": "启用 TLS/SSL",

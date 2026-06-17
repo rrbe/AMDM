@@ -1,17 +1,8 @@
 import net from 'node:net'
 import { Client, type ConnectConfig } from 'ssh2'
+import type { TunnelOptions } from './tunnelCore'
 
-export interface TunnelOptions {
-  sshHost: string
-  sshPort: number
-  username: string
-  password?: string
-  privateKey?: Buffer
-  passphrase?: string
-  /** Final MongoDB host/port to forward to (as seen from the SSH server). */
-  destHost: string
-  destPort: number
-}
+export type { TunnelOptions }
 
 /**
  * A local TCP forwarder over SSH. We open an SSH connection, stand up a local
@@ -37,6 +28,7 @@ export class SshTunnel {
         password: opts.password,
         privateKey: opts.privateKey,
         passphrase: opts.passphrase,
+        agent: opts.agent,
         readyTimeout: 20000,
         keepaliveInterval: 15000
       }
