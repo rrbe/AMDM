@@ -4,6 +4,7 @@ import { ClipboardPaste, Link } from 'lucide-react'
 import type {
   ConnectionConfig,
   ConnectionInput,
+  DiagnoseStage,
   ScramMechanism,
   SshAuthMethod,
   TestResult
@@ -47,6 +48,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const testConnection = useAppStore((s) => s.testConnection)
   const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
   const pickFile = useAppStore((s) => s.pickFile)
+  const diagnoseConnection = useAppStore((s) => s.diagnoseConnection)
   const updateSettings = useAppStore((s) => s.updateSettings)
   // Remembered "To URL" password choice (persisted in settings.json).
   const rememberedIncludePassword = useAppStore((s) => s.settings.exportIncludeRealPassword)
@@ -114,6 +116,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [jumpSshPassphrase, setJumpSshPassphrase] = useState('')
   const [jumpSshPassphraseTouched, setJumpSshPassphraseTouched] = useState(false)
   const [clearJumpHostKey, setClearJumpHostKey] = useState(false)
+  const [diagnosing, setDiagnosing] = useState(false)
+  const [diagnosis, setDiagnosis] = useState<DiagnoseStage[] | null>(null)
 
   // Browse for a private key file via the native picker, default to ~/.ssh.
   const browseKey = async (setter: (v: string) => void): Promise<void> => {
@@ -349,6 +353,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     const r = await testConnection(buildInput())
     setTest(r)
     setTesting(false)
+  }
+
+  const runDiagnose = async (): Promise<void> => {
+    setDiagnosing(true)
+    setDiagnosis(null)
+    const stages = await diagnoseConnection(buildInput())
+    setDiagnosis(stages)
+    setDiagnosing(false)
   }
 
   const secretPlaceholder = (has?: boolean): string =>
@@ -765,6 +777,31 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     </>
                   )}
                 </>
+              )}
+
+              {/* Visible connectivity check: per-hop ✓/✗ so the user sees where it breaks. */}
+              <div className="form-row" style={{ marginTop: 8 }}>
+                <Button variant="ghost" type="button" busy={diagnosing} onClick={() => void runDiagnose()}>
+                  {tFn('connection.ssh.diagnose')}
+                </Button>
+              </div>
+              {diagnosis && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                  {diagnosis.map((s) => {
+                    const color =
+                      s.status === 'ok' ? '#4ade80' : s.status === 'fail' ? '#f87171' : '#9ca3af'
+                    const icon = s.status === 'ok' ? '✓' : s.status === 'fail' ? '✗' : '○'
+                    return (
+                      <div key={s.key} style={{ fontSize: 12 }}>
+                        <span style={{ color, fontWeight: 700, marginRight: 6 }}>{icon}</span>
+                        <span>{tFn(`connection.ssh.stage.${s.key}`)}</span>
+                        {s.target && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.target}</span>}
+                        {s.ms != null && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.ms}ms</span>}
+                        {s.detail && <div style={{ marginLeft: 18, color: '#f87171' }}>{s.detail}</div>}
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </>
           )}

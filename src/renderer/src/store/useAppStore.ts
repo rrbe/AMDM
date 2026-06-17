@@ -19,6 +19,7 @@ import type {
   ConnectionStatus,
   DatabaseInfo,
   DataOpResult,
+  DiagnoseStage,
   DocMutateRequest,
   DocMutateResult,
   DocSetFieldRequest,
@@ -163,6 +164,8 @@ interface AppState {
   buildConnectionUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string | null>
   /** Open a native file picker (e.g. SSH private key); resolves the path or null. */
   pickFile(opts?: { title?: string; defaultPath?: string }): Promise<string | null>
+  /** Run a staged SSH-tunnel connectivity check for the current form fields. */
+  diagnoseConnection(input: ConnectionInput): Promise<DiagnoseStage[]>
   /** Back up all connections to a JSON file (secrets excluded). */
   exportConnections(): Promise<void>
   /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
@@ -485,6 +488,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       return await window.api.dialog.openFile(opts)
     } catch {
       return null
+    }
+  },
+
+  async diagnoseConnection(input) {
+    try {
+      return await window.api.connections.diagnose(input)
+    } catch (e) {
+      set({ lastError: tr('notify.diagnoseFailed', { error: errMessage(e) }) })
+      return []
     }
   },
 

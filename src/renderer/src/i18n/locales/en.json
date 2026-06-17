@@ -62,7 +62,8 @@
     "unknown": "unknown",
     "clipboardUnavailable": "Copy failed: clipboard unavailable",
     "copied": "Copied to clipboard",
-    "buildUriFailed": "Failed to build connection string: {{error}}"
+    "buildUriFailed": "Failed to build connection string: {{error}}",
+    "diagnoseFailed": "Connectivity check failed: {{error}}"
   },
   "connection": {
     "title": { "edit": "Edit Connection", "new": "New Connection" },
@@ -139,7 +140,18 @@
       "errJumpKey": "Jump private-key auth requires a key path",
       "browse": "Browse…",
       "pickKey": "Select private key file",
-      "jumpPassphrase": "Jump Key Passphrase"
+      "jumpPassphrase": "Jump Key Passphrase",
+      "diagnose": "Check connectivity",
+      "stage": {
+        "tcp-jump": "TCP reachable: jump host",
+        "ssh-jump": "SSH login: jump host",
+        "tcp-target": "Reach target SSH port via jump",
+        "ssh-target": "SSH login: target",
+        "tcp-ssh": "TCP reachable: SSH host",
+        "ssh": "SSH login",
+        "tcp-mongo": "Reach MongoDB port",
+        "config": "Configuration error"
+      }
     },
     "tls": {
       "enableLabel": "Enable TLS/SSL",

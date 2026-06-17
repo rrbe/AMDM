@@ -1,7 +1,16 @@
 import net from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Client, type ConnectConfig } from 'ssh2'
-import { classifyConnError, evaluateHostKey, type SshHopOptions, type TunnelOptions } from './tunnelCore'
+import type { DiagnoseStage } from '../../shared/types'
+import {
+  buildTunnelOptions,
+  classifyConnError,
+  evaluateHostKey,
+  planDiagnoseStages,
+  type SshHopOptions,
+  type TunnelOptions
+} from './tunnelCore'
+import type { DecryptedConnection } from '../mongo/uri'
 import { tcpProbe } from './diagnose'
 
 export type { TunnelOptions }
@@ -38,7 +47,7 @@ export class SshTunnel {
 
     let transport: Duplex | undefined
     if (opts.jump) {
-      const jump = await this.connectHop(opts.jump, undefined, 'jump host')
+      const jump = await connectHop(opts.jump, undefined, 'jump host', this.clients)
       this.learnedJumpHostKey = jump.learned
       // Reach the target's SSH port *through* the bastion.
       try {
@@ -49,70 +58,10 @@ export class SshTunnel {
         )
       }
     }
-    const target = await this.connectHop(opts.target, transport, 'target')
+    const target = await connectHop(opts.target, transport, 'target', this.clients)
     this.learnedHostKey = target.learned
     this.localPort = await this.listenForward(target.client, opts.destHost, opts.destPort)
     return this.localPort
-  }
-
-  /**
-   * Open one SSH session, optionally tunnelled over an existing transport sock.
-   * `role` ("jump host" / "target") labels errors so a multi-hop failure points
-   * at the hop that broke.
-   */
-  private connectHop(
-    hop: SshHopOptions,
-    sock: Duplex | undefined,
-    role: string
-  ): Promise<{ client: Client; learned?: string }> {
-    const where = `${role} ${hop.host}:${hop.port}`
-    return new Promise((resolve, reject) => {
-      const client = new Client()
-      this.clients.push(client)
-      // Capture host-key rejections so we surface a clear message instead of
-      // ssh2's generic handshake error (the 'error' event fires right after).
-      let hostKeyError: Error | undefined
-      let learned: string | undefined
-
-      const cfg: ConnectConfig = {
-        host: hop.host,
-        port: hop.port,
-        username: hop.username,
-        password: hop.password,
-        privateKey: hop.privateKey,
-        passphrase: hop.passphrase,
-        agent: hop.agent,
-        sock,
-        // hostHash makes ssh2 pass the host key pre-hashed as a hex string.
-        hostHash: 'sha256',
-        hostVerifier: (fingerprint: string): boolean => {
-          const verdict = evaluateHostKey(hop.pinnedHostKey, fingerprint)
-          if (verdict.ok) {
-            if (verdict.learned) learned = verdict.learned
-            return true
-          }
-          hostKeyError = new Error(
-            `Host key verification failed for the ${where} — the SSH server's key changed (possible MITM). ` +
-              `Expected SHA256:${hop.pinnedHostKey}, got SHA256:${fingerprint}. ` +
-              'If the server was legitimately rebuilt, reset the trusted host key in the connection’s SSH settings.'
-          )
-          return false
-        },
-        readyTimeout: 20000,
-        keepaliveInterval: 15000
-      }
-
-      client.on('error', (err) => {
-        if (hostKeyError) {
-          reject(hostKeyError)
-          return
-        }
-        // Label which hop failed and whether it was network / auth / etc.
-        reject(new Error(`SSH ${where} — ${classifyConnError(err).message}`))
-      })
-      client.on('ready', () => resolve({ client, learned }))
-      client.connect(cfg)
-    })
   }
 
   /** Stand up the local listener that forwards each accepted socket to MongoDB. */
@@ -164,4 +113,143 @@ function forwardOut(client: Client, host: string, port: number): Promise<Duplex>
       else resolve(stream)
     })
   })
+}
+
+/**
+ * Open one SSH session, optionally tunnelled over an existing transport sock.
+ * The created client is pushed to `track` immediately so callers can always
+ * tear it down. `role` labels errors so a multi-hop failure points at the hop
+ * that broke. Shared by {@link SshTunnel} and {@link diagnoseConnection}.
+ */
+function connectHop(
+  hop: SshHopOptions,
+  sock: Duplex | undefined,
+  role: string,
+  track: Client[]
+): Promise<{ client: Client; learned?: string }> {
+  const where = `${role} ${hop.host}:${hop.port}`
+  return new Promise((resolve, reject) => {
+    const client = new Client()
+    track.push(client)
+    // Capture host-key rejections so we surface a clear message instead of
+    // ssh2's generic handshake error (the 'error' event fires right after).
+    let hostKeyError: Error | undefined
+    let learned: string | undefined
+
+    const cfg: ConnectConfig = {
+      host: hop.host,
+      port: hop.port,
+      username: hop.username,
+      password: hop.password,
+      privateKey: hop.privateKey,
+      passphrase: hop.passphrase,
+      agent: hop.agent,
+      sock,
+      // hostHash makes ssh2 pass the host key pre-hashed as a hex string.
+      hostHash: 'sha256',
+      hostVerifier: (fingerprint: string): boolean => {
+        const verdict = evaluateHostKey(hop.pinnedHostKey, fingerprint)
+        if (verdict.ok) {
+          if (verdict.learned) learned = verdict.learned
+          return true
+        }
+        hostKeyError = new Error(
+          `Host key verification failed for the ${where} — the SSH server's key changed (possible MITM). ` +
+            `Expected SHA256:${hop.pinnedHostKey}, got SHA256:${fingerprint}. ` +
+            'If the server was legitimately rebuilt, reset the trusted host key in the connection’s SSH settings.'
+        )
+        return false
+      },
+      readyTimeout: 20000,
+      keepaliveInterval: 15000
+    }
+
+    client.on('error', (err) => {
+      if (hostKeyError) {
+        reject(hostKeyError)
+        return
+      }
+      // Label which hop failed and whether it was network / auth / etc.
+      reject(new Error(`SSH ${where} — ${classifyConnError(err).message}`))
+    })
+    client.on('ready', () => resolve({ client, learned }))
+    client.connect(cfg)
+  })
+}
+
+/**
+ * Run a staged connectivity check over the (would-be) tunnel and report each
+ * step's status — so a user sees exactly which hop is reachable and where it
+ * breaks, all from the GUI. Stops at the first failure (later steps → 'skip').
+ * Opens no local listener and tears down every SSH client it created.
+ */
+export async function diagnoseConnection(dec: DecryptedConnection): Promise<DiagnoseStage[]> {
+  let opts: TunnelOptions
+  try {
+    opts = buildTunnelOptions(dec)
+  } catch (err) {
+    return [{ key: 'config', target: '', status: 'fail', detail: (err as Error).message }]
+  }
+
+  const clients: Client[] = []
+  let jumpClient: Client | undefined
+  let targetClient: Client | undefined
+
+  const runStage = async (key: string): Promise<void> => {
+    switch (key) {
+      case 'tcp-jump':
+        return tcpProbe(opts.jump!.host, opts.jump!.port)
+      case 'ssh-jump':
+        jumpClient = (await connectHop(opts.jump!, undefined, 'jump host', clients)).client
+        return
+      case 'tcp-target': {
+        const ch = await forwardOut(jumpClient!, opts.target.host, opts.target.port)
+        ch.destroy()
+        return
+      }
+      case 'ssh-target': {
+        const sock = await forwardOut(jumpClient!, opts.target.host, opts.target.port)
+        targetClient = (await connectHop(opts.target, sock, 'target', clients)).client
+        return
+      }
+      case 'tcp-ssh':
+        return tcpProbe(opts.target.host, opts.target.port)
+      case 'ssh':
+        targetClient = (await connectHop(opts.target, undefined, 'target', clients)).client
+        return
+      case 'tcp-mongo': {
+        const ch = await forwardOut(targetClient!, opts.destHost, opts.destPort)
+        ch.destroy()
+        return
+      }
+    }
+  }
+
+  const results: DiagnoseStage[] = []
+  let stopped = false
+  try {
+    for (const { key, target } of planDiagnoseStages(opts)) {
+      if (stopped) {
+        results.push({ key, target, status: 'skip' })
+        continue
+      }
+      const t0 = Date.now()
+      try {
+        await runStage(key)
+        results.push({ key, target, status: 'ok', ms: Date.now() - t0 })
+      } catch (err) {
+        results.push({ key, target, status: 'fail', ms: Date.now() - t0, detail: classifyConnError(err).message })
+        stopped = true
+      }
+    }
+  } finally {
+    for (const c of clients) {
+      try {
+        c.end()
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return results
 }

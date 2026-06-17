@@ -62,7 +62,8 @@
     "unknown": "未知",
     "clipboardUnavailable": "复制失败：剪贴板不可用",
     "copied": "已复制到剪贴板",
-    "buildUriFailed": "生成连接串失败：{{error}}"
+    "buildUriFailed": "生成连接串失败：{{error}}",
+    "diagnoseFailed": "连通性检测失败：{{error}}"
   },
   "connection": {
     "title": { "edit": "编辑连接", "new": "新建连接" },
@@ -139,7 +140,18 @@
       "errJumpKey": "跳板机私钥认证需填写私钥路径",
       "browse": "浏览…",
       "pickKey": "选择私钥文件",
-      "jumpPassphrase": "跳板机私钥密码短语"
+      "jumpPassphrase": "跳板机私钥密码短语",
+      "diagnose": "检测连通性",
+      "stage": {
+        "tcp-jump": "TCP 可达跳板机",
+        "ssh-jump": "登录跳板机",
+        "tcp-target": "经跳板机到达目标 SSH 端口",
+        "ssh-target": "登录目标主机",
+        "tcp-ssh": "TCP 可达 SSH 主机",
+        "ssh": "登录 SSH 主机",
+        "tcp-mongo": "到达 MongoDB 端口",
+        "config": "配置错误"
+      }
     },
     "tls": {
       "enableLabel": "启用 TLS/SSL",

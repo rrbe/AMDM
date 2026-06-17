@@ -203,3 +203,26 @@ export function buildTunnelOptions(
 
   return { target, jump, destHost: config.host, destPort: config.port ?? 27017 }
 }
+
+/**
+ * The ordered connectivity-check steps for a tunnel — pure, so the stage list is
+ * unit-testable. `key` maps to a localized label in the renderer; `target` is the
+ * host:port that step checks. The effectful runner (diagnoseConnection) executes
+ * each in turn, stopping at the first failure.
+ */
+export function planDiagnoseStages(opts: TunnelOptions): { key: string; target: string }[] {
+  const t = opts.target
+  const stages: { key: string; target: string }[] = []
+  if (opts.jump) {
+    const j = opts.jump
+    stages.push({ key: 'tcp-jump', target: `${j.host}:${j.port}` })
+    stages.push({ key: 'ssh-jump', target: `${j.host}:${j.port}` })
+    stages.push({ key: 'tcp-target', target: `${t.host}:${t.port}` })
+    stages.push({ key: 'ssh-target', target: `${t.host}:${t.port}` })
+  } else {
+    stages.push({ key: 'tcp-ssh', target: `${t.host}:${t.port}` })
+    stages.push({ key: 'ssh', target: `${t.host}:${t.port}` })
+  }
+  stages.push({ key: 'tcp-mongo', target: `${opts.destHost}:${opts.destPort}` })
+  return stages
+}

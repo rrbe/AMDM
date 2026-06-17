@@ -10,6 +10,7 @@ import type {
   ConnectionInput,
   ConnectionStatus,
   DatabaseInfo,
+  DiagnoseStage,
   OpenFileOptions,
   DataOpResult,
   DocMutateRequest,
@@ -33,6 +34,7 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
   connectionsExport: 'connections:export',
   connectionsImport: 'connections:import',
@@ -77,6 +79,8 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    /** Staged SSH-tunnel connectivity check; reports each hop's reachability. */
+    diagnose(input: ConnectionInput): Promise<DiagnoseStage[]>
     /**
      * Build a connection string from the CURRENT form fields ("To URL" export) —
      * works while creating or editing. With `includePassword`, the plaintext

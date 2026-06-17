@@ -19,6 +19,7 @@ import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
 import { settingsStore } from '../store/settingsStore'
 import { sessionManager } from '../mongo/sessionManager'
+import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
 import { listCollections, listDatabases, listIndexes, listUsers, sampleFields } from '../mongo/catalog'
 import { executeShell, abortShell } from '../mongo/shellEngine'
@@ -116,6 +117,9 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
+  )
+  ipcMain.handle(IPC.connectionsDiagnose, (_e, input: ConnectionInput) =>
+    diagnoseConnection(inputToDecrypted(input))
   )
   ipcMain.handle(
     IPC.connectionsBuildUri,

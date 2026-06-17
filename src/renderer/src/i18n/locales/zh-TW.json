@@ -62,7 +62,8 @@
     "unknown": "未知",
     "clipboardUnavailable": "複製失敗：剪貼簿不可用",
     "copied": "已複製到剪貼簿",
-    "buildUriFailed": "產生連線字串失敗：{{error}}"
+    "buildUriFailed": "產生連線字串失敗：{{error}}",
+    "diagnoseFailed": "連通性檢測失敗：{{error}}"
   },
   "connection": {
     "title": { "edit": "編輯連線", "new": "新增連線" },
@@ -139,7 +140,18 @@
       "errJumpKey": "跳板機私密金鑰驗證需填寫金鑰路徑",
       "browse": "瀏覽…",
       "pickKey": "選擇私密金鑰檔",
-      "jumpPassphrase": "跳板機私密金鑰密碼短語"
+      "jumpPassphrase": "跳板機私密金鑰密碼短語",
+      "diagnose": "檢測連通性",
+      "stage": {
+        "tcp-jump": "TCP 可達跳板機",
+        "ssh-jump": "登入跳板機",
+        "tcp-target": "經跳板機到達目標 SSH 連接埠",
+        "ssh-target": "登入目標主機",
+        "tcp-ssh": "TCP 可達 SSH 主機",
+        "ssh": "登入 SSH 主機",
+        "tcp-mongo": "到達 MongoDB 連接埠",
+        "config": "設定錯誤"
+      }
     },
     "tls": {
       "enableLabel": "啟用 TLS/SSL",

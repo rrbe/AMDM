@@ -128,6 +128,19 @@ export interface OpenFileOptions {
   filters?: { name: string; extensions: string[] }[]
 }
 
+/** One step of an SSH-tunnel connectivity diagnosis. `key` maps to a localized label. */
+export interface DiagnoseStage {
+  /** Stable stage id: tcp-jump | ssh-jump | tcp-target | ssh-target | tcp-ssh | ssh | tcp-mongo | config */
+  key: string
+  /** The host:port this step checks (empty for a config error). */
+  target: string
+  status: 'ok' | 'fail' | 'skip'
+  /** Elapsed milliseconds (omitted for skipped steps). */
+  ms?: number
+  /** Failure reason (classified, human-readable) when status is 'fail'. */
+  detail?: string
+}
+
 // ---------------------------------------------------------------------------
 // Live session / catalog
 // ---------------------------------------------------------------------------
