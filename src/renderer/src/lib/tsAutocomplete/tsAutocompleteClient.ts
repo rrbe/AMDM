@@ -16,6 +16,12 @@ export interface TsCompletionResult {
   replacementSpan?: { from: number }
 }
 
+/** A `complete()` promise awaiting its worker reply, with its timeout handle. */
+type PendingEntry = {
+  resolve: (result: TsCompletionResult | null) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
 const REQUEST_TIMEOUT = 2000
 
 class TsAutocompleteClient {
@@ -23,7 +29,16 @@ class TsAutocompleteClient {
   private failed = false
   private seq = 0
   private declsKey = ''
-  private pending = new Map<number, (result: TsCompletionResult | null) => void>()
+  private pending = new Map<number, PendingEntry>()
+
+  /** Resolve and remove a pending request, clearing its timeout. No-op if already settled. */
+  private settle(seq: number, result: TsCompletionResult | null): void {
+    const entry = this.pending.get(seq)
+    if (!entry) return
+    this.pending.delete(seq)
+    clearTimeout(entry.timer)
+    entry.resolve(result)
+  }
 
   /** Spawn the worker if needed. Latches `failed` on any error. */
   private ensure(): void {
@@ -35,11 +50,7 @@ class TsAutocompleteClient {
       this.worker.onmessage = (e: MessageEvent<TsWorkerResponse>): void => {
         const msg = e.data
         if (msg.type === 'result') {
-          const resolve = this.pending.get(msg.seq)
-          if (resolve) {
-            this.pending.delete(msg.seq)
-            resolve({ entries: msg.entries, replacementSpan: msg.replacementSpan })
-          }
+          this.settle(msg.seq, { entries: msg.entries, replacementSpan: msg.replacementSpan })
         }
       }
       this.worker.onerror = (): void => this.die()
@@ -58,8 +69,7 @@ class TsAutocompleteClient {
       /* ignore */
     }
     this.worker = null
-    for (const resolve of this.pending.values()) resolve(null)
-    this.pending.clear()
+    for (const seq of [...this.pending.keys()]) this.settle(seq, null)
   }
 
   /** Pre-spawn + warm the service (call when the editor mounts). */
@@ -81,26 +91,27 @@ class TsAutocompleteClient {
     this.worker?.postMessage({ type: 'decls', text: buildCollectionDecls(names) })
   }
 
-  /** Request completions at `pos` in `code`. Resolves null on failure/timeout. */
+  /** Request completions at `pos` in `code`. Resolves null on failure/timeout/cancel. */
   complete(code: string, pos: number): Promise<TsCompletionResult | null> {
     this.ensure()
     if (!this.worker || this.failed) return Promise.resolve(null)
     const seq = ++this.seq
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        if (this.pending.delete(seq)) resolve(null)
-      }, REQUEST_TIMEOUT)
-      this.pending.set(seq, (result) => {
-        clearTimeout(timer)
-        resolve(result)
-      })
+      const timer = setTimeout(() => this.settle(seq, null), REQUEST_TIMEOUT)
+      this.pending.set(seq, { resolve, timer })
       this.worker!.postMessage({ type: 'complete', seq, code, pos })
     })
   }
 
-  /** Drop a pending request (the result is no longer wanted). */
+  /**
+   * Drop every in-flight request (resolve null → caller uses the regex source).
+   * Wired to CodeMirror's abort (fires on doc change), so requests don't pile up
+   * as the user types: the worker still answers the stale seqs, but `settle` has
+   * already removed them, so those replies are ignored. Nothing to abort
+   * worker-side — it's FIFO and fast, so a worker-side cancel isn't worth it.
+   */
   cancel(): void {
-    // Stale results are ignored by seq bookkeeping; nothing to abort worker-side.
+    for (const seq of [...this.pending.keys()]) this.settle(seq, null)
   }
 }
 

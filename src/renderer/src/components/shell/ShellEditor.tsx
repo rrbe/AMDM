@@ -72,10 +72,12 @@ function enterKeepIndent(view: EditorView): boolean {
   const { state } = view
   const indentStr = ' '.repeat(getIndentUnit(state))
   const spec = state.changeByRange((range) => {
-    const line = state.doc.lineAt(range.head)
+    // Use the replacement boundaries (from/to), not `range.head`, so this is
+    // correct for both an empty cursor and a non-empty selection being replaced.
+    const line = state.doc.lineAt(range.from)
     const curIndent = /^[ \t]*/.exec(line.text)?.[0] ?? ''
-    const before = range.head > line.from ? state.sliceDoc(range.head - 1, range.head) : ''
-    const after = state.sliceDoc(range.head, range.head + 1)
+    const before = range.from > line.from ? state.sliceDoc(range.from - 1, range.from) : ''
+    const after = state.sliceDoc(range.to, range.to + 1)
     const opens = /[{[(]/.test(before)
     let insert = state.lineBreak + curIndent + (opens ? indentStr : '')
     const anchor = range.from + insert.length
@@ -174,7 +176,8 @@ export function ShellEditor({
           { key: 'Mod--', preventDefault: true, run: () => bumpFont(-1) },
           { key: 'Mod-0', preventDefault: true, run: () => bumpFont(0) },
           // Cmd+Enter and Ctrl+Enter both run. Returning true consumes the key
-          // (no blank line); plain Enter is left to CodeMirror as a newline.
+          // (no blank line); plain Enter is handled by the `Enter` binding below
+          // (enterKeepIndent), not inserted here.
           { key: 'Mod-Enter', run: () => runIfReady() },
           { key: 'Ctrl-Enter', run: () => runIfReady() },
           // F6 runs only the statement under the cursor (or the selection),

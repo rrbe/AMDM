@@ -88,9 +88,9 @@ export const AGG_EXPR_OPERATORS = [
   '$allElementsTrue', '$anyElementTrue', '$getField', '$setField', '$literal', '$type', '$isNumber',
   '$convert', '$toBool', '$toDate', '$toDecimal', '$toDouble', '$toInt', '$toLong', '$toObjectId',
   '$toString',
-  // accumulators
+  // accumulators ($mergeObjects also lives in the object/set/type group above)
   '$sum', '$avg', '$push', '$addToSet', '$stdDevPop', '$stdDevSamp', '$count', '$accumulator',
-  '$bottom', '$bottomN', '$top', '$topN', '$mergeObjects',
+  '$bottom', '$bottomN', '$top', '$topN',
   // window / misc
   '$rank', '$denseRank', '$documentNumber', '$shift', '$derivative', '$integral', '$expMovingAvg',
   '$linearFill', '$locf', '$function', '$let', '$meta', '$rand', '$sampleRate'

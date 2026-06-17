@@ -125,7 +125,13 @@ function lastReferencedCollection(code: string): string | undefined {
 // Value-slot detection (shared with the inline ghost-text hint)
 // --------------------------------------------------------------------------
 
-/** Is the cursor sitting inside an unterminated string literal? (heuristic) */
+/**
+ * Is the cursor sitting inside an unterminated string literal? Heuristic: counts
+ * unescaped `'`/`"` and reports odd parity. It doesn't model template literals
+ * (backticks) or comments, so a quote inside those can skew the result — fine in
+ * practice, since a wrong answer only downgrades member/value completion to the
+ * regex fallback, never breaks it.
+ */
 export function inString(before: string): boolean {
   let dq = 0
   let sq = 0
