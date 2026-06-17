@@ -540,6 +540,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           )
         }
         await get().loadDatabases(id)
+        // Prefetch the active db's collection names so `db.` completion works
+        // without expanding the tree (only that db; skip if already cached).
+        const activeDb = getActiveTab(get()).activeDatabase
+        if (activeDb && get().catalogs[id]?.collections[activeDb] === undefined) {
+          void get().loadCollections(id, activeDb)
+        }
       }
     } catch (e) {
       set((s) => ({
@@ -764,6 +770,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveDatabase(db) {
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }))
+    // Warm the new db's collection names for `db.` completion (skip if cached).
+    const connId = get().activeConnectionId
+    if (connId && db && get().catalogs[connId]?.collections[db] === undefined) {
+      void get().loadCollections(connId, db)
+    }
   },
 
   setResultView(view) {
@@ -809,6 +820,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       // earlier results stay around for side-by-side comparison.
       const result = await window.api.shell.execute({ ...query, limit, skip: 0, execId })
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      // `use <db>` REPL command: switch the tab's active database (also warms
+      // its collection names for completion via setActiveDatabase).
+      if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
     } catch (e) {
       set((s) =>
         patchTabResults(s, tabId, (t) =>

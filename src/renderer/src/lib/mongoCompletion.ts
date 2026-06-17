@@ -1,22 +1,43 @@
 /**
- * CodeMirror 6 completion source for the mongo shell editor.
+ * CodeMirror 6 completion source for the mongo shell editor — the regex engine.
+ * It owns the "MQL-string space" the TS language service can't see (operators &
+ * values inside Document literals, field names) and is the transparent fallback
+ * for member access when the TS worker is unavailable (see `shellCompletion.ts`).
  *
  * Decides suggestions from the text immediately before the cursor:
  *  - `db.<word>`           → collection names (active db) + Db methods
  *  - `db.<coll>.<word>`    → collection methods (+ warms the field cache)
  *  - `).<word>`            → cursor methods (sort/limit/toArray/…)
+ *  - `<field>: <value>`    → value candidates for the slot we're in
+ *                           (sort→1/-1, projection→1/0, boolean keys→true/false)
  *  - `$<word>`             → MongoDB operators, scoped to the call we're inside
- *                           (find→query ops, update→update ops, aggregate→
- *                           pipeline stages + expression ops); union if unsure
- *  - otherwise             → shell globals + JS literals + cached field names
+ *  - otherwise             → shell globals + JS keywords/literals + field names
+ *
+ * The completion *data* (operators, globals, keywords, value tables) lives in
+ * `completionRegistry.ts`; this file is the matching/decision logic.
  *
  * Robustness: reads the live store outside React; never throws (returns null).
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
+import {
+  operatorGroups,
+  SHELL_GLOBALS,
+  JS_LITERALS,
+  JS_KEYWORDS,
+  SHELL_COMMANDS,
+  SORT_VALUES,
+  PROJECTION_VALUES,
+  BOOLEAN_VALUES,
+  BOOLEAN_KEYS,
+  type OpContext,
+  type ValueChoice
+} from '@renderer/lib/completionRegistry'
 
 // --------------------------------------------------------------------------
-// Static vocabularies
+// Method vocabularies — the regex-fallback path. The TS engine is the primary
+// source for member access; these mirror the base d.ts subset so completion
+// still works (less precisely) when the worker is unavailable.
 // --------------------------------------------------------------------------
 
 const DB_METHODS = ['getCollection', 'getSiblingDB', 'aggregate', 'runCommand', 'stats', 'listCollections']
@@ -35,88 +56,29 @@ const CURSOR_METHODS = [
   'allowDiskUse', 'maxTimeMS', 'min', 'max', 'returnKey', 'showRecordId', 'tailable', 'addCursorFlag'
 ]
 
-export const SHELL_GLOBALS = [
-  'ObjectId', 'ISODate', 'NumberLong', 'NumberInt', 'NumberDecimal', 'UUID', 'BinData',
-  'Timestamp', 'MinKey', 'MaxKey', 'Date', 'RegExp'
-]
-
-export const JS_KEYWORDS = ['true', 'false', 'null']
-
-// Query operators (find filters / $match).
-const QUERY_OPERATORS = [
-  '$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin',
-  '$and', '$or', '$nor', '$not',
-  '$exists', '$type',
-  '$expr', '$jsonSchema', '$mod', '$regex', '$options', '$text', '$search', '$language',
-  '$caseSensitive', '$diacriticSensitive', '$where', '$comment', '$rand',
-  '$geoWithin', '$geoIntersects', '$near', '$nearSphere', '$geometry', '$center', '$centerSphere',
-  '$box', '$polygon', '$maxDistance', '$minDistance',
-  '$all', '$elemMatch', '$size',
-  '$bitsAllClear', '$bitsAllSet', '$bitsAnyClear', '$bitsAnySet',
-  '$slice', '$meta'
-]
-
-// Update operators.
-const UPDATE_OPERATORS = [
-  '$set', '$unset', '$setOnInsert', '$inc', '$mul', '$min', '$max', '$rename', '$currentDate',
-  '$push', '$pull', '$pullAll', '$pop', '$addToSet',
-  '$each', '$position', '$slice', '$sort', '$bit'
-]
-
-// Aggregation pipeline stages.
-export const AGG_STAGES = [
-  '$addFields', '$bucket', '$bucketAuto', '$changeStream', '$collStats', '$count', '$densify',
-  '$documents', '$facet', '$fill', '$geoNear', '$graphLookup', '$group', '$indexStats', '$limit',
-  '$lookup', '$match', '$merge', '$out', '$project', '$redact', '$replaceRoot', '$replaceWith',
-  '$sample', '$search', '$searchMeta', '$set', '$setWindowFields', '$skip', '$sort', '$sortByCount',
-  '$unionWith', '$unset', '$unwind', '$vectorSearch'
-]
-
-// Aggregation expression / accumulator operators.
-export const AGG_EXPR_OPERATORS = [
-  // arithmetic
-  '$abs', '$add', '$ceil', '$divide', '$exp', '$floor', '$ln', '$log', '$log10', '$mod',
-  '$multiply', '$pow', '$round', '$sqrt', '$subtract', '$trunc',
-  // array
-  '$arrayElemAt', '$arrayToObject', '$concatArrays', '$filter', '$first', '$firstN', '$in',
-  '$indexOfArray', '$isArray', '$last', '$lastN', '$map', '$maxN', '$minN', '$objectToArray',
-  '$range', '$reduce', '$reverseArray', '$size', '$slice', '$sortArray', '$zip',
-  // boolean / comparison / conditional
-  '$and', '$or', '$not', '$cmp', '$eq', '$gt', '$gte', '$lt', '$lte', '$ne',
-  '$cond', '$ifNull', '$switch',
-  // date
-  '$dateAdd', '$dateDiff', '$dateFromParts', '$dateFromString', '$dateSubtract', '$dateToParts',
-  '$dateToString', '$dateTrunc', '$dayOfMonth', '$dayOfWeek', '$dayOfYear', '$hour', '$isoDayOfWeek',
-  '$isoWeek', '$isoWeekYear', '$millisecond', '$minute', '$month', '$second', '$week', '$year',
-  // string
-  '$concat', '$indexOfBytes', '$indexOfCP', '$ltrim', '$regexFind', '$regexFindAll', '$regexMatch',
-  '$replaceOne', '$replaceAll', '$rtrim', '$split', '$strLenBytes', '$strLenCP', '$strcasecmp',
-  '$substr', '$substrBytes', '$substrCP', '$toLower', '$toUpper', '$trim',
-  // object / set / type
-  '$mergeObjects', '$setDifference', '$setEquals', '$setIntersection', '$setIsSubset', '$setUnion',
-  '$allElementsTrue', '$anyElementTrue', '$getField', '$setField', '$literal', '$type', '$isNumber',
-  '$convert', '$toBool', '$toDate', '$toDecimal', '$toDouble', '$toInt', '$toLong', '$toObjectId',
-  '$toString',
-  // accumulators
-  '$sum', '$avg', '$push', '$addToSet', '$stdDevPop', '$stdDevSamp', '$count', '$accumulator',
-  '$bottom', '$bottomN', '$top', '$topN', '$mergeObjects',
-  // window / misc
-  '$rank', '$denseRank', '$documentNumber', '$shift', '$derivative', '$integral', '$expMovingAvg',
-  '$linearFill', '$locf', '$function', '$let', '$meta', '$rand', '$sampleRate'
-]
-
 // --------------------------------------------------------------------------
 // Option builders
 // --------------------------------------------------------------------------
 
-function opt(label: string, type: Completion['type'], detail: string): Completion {
-  return { label, type, detail }
+function opt(label: string, type: Completion['type'], detail: string, boost?: number): Completion {
+  return boost === undefined ? { label, type, detail } : { label, type, detail, boost }
 }
 
-type CallContext = 'aggregate' | 'update' | 'query' | null
+/**
+ * Length-based boost so shorter, closer matches win ties. CodeMirror adds boost
+ * directly to the fuzzy score (`match.score + boost`), and in 6.x a pure prefix
+ * match scores a flat −100 regardless of label length — so without this, equal
+ * prefixes (e.g. `live` → `lives` vs `liveauthorizedviewers`) tie and fall back
+ * to alphabetical order, burying the closer match. Shorter label → higher boost;
+ * kept within [−99, 99] so it only reorders the prefix-tie band, never promotes
+ * a scattered match above a prefix one.
+ */
+export function lengthBoost(label: string): number {
+  return Math.max(-99, 99 - label.length)
+}
 
 /** Which collection method's call are we currently (innermost) inside? */
-function detectCallContext(before: string): CallContext {
+function detectCallContext(before: string): OpContext | null {
   const re =
     /\.(aggregate|find|findOne|updateOne|updateMany|update|replaceOne|findOneAndUpdate|findOneAndReplace|findOneAndDelete|deleteOne|deleteMany|countDocuments|count|distinct|bulkWrite)\s*\(/g
   let m: RegExpExecArray | null
@@ -132,36 +94,21 @@ function detectCallContext(before: string): CallContext {
 
 /** Operator completions scoped to the enclosing call (union if unknown). */
 function operatorCompletions(before: string): Completion[] {
-  const ctx = detectCallContext(before)
   const map = new Map<string, Completion>()
-  const add = (labels: string[], detail: string): void => {
-    for (const l of labels) if (!map.has(l)) map.set(l, opt(l, 'property', detail))
-  }
-  if (ctx === 'aggregate') {
-    add(AGG_STAGES, 'agg stage')
-    add(AGG_EXPR_OPERATORS, 'expr op')
-  } else if (ctx === 'update') {
-    add(UPDATE_OPERATORS, 'update op')
-    add(AGG_EXPR_OPERATORS, 'expr op (pipeline update)')
-  } else if (ctx === 'query') {
-    add(QUERY_OPERATORS, 'query op')
-  } else {
-    add(QUERY_OPERATORS, 'query op')
-    add(UPDATE_OPERATORS, 'update op')
-    add(AGG_STAGES, 'agg stage')
-    add(AGG_EXPR_OPERATORS, 'expr op')
+  for (const group of operatorGroups(detectCallContext(before))) {
+    for (const l of group.labels) if (!map.has(l)) map.set(l, opt(l, 'property', group.detail))
   }
   return [...map.values()]
 }
 
-function activeContext(): { connId: string; db: string } | null {
+export function activeContext(): { connId: string; db: string } | null {
   const s = useAppStore.getState()
   const db = getActiveTab(s).activeDatabase
   if (!s.activeConnectionId || !db) return null
   return { connId: s.activeConnectionId, db }
 }
 
-function collectionNames(connId: string, db: string): string[] {
+export function collectionNames(connId: string, db: string): string[] {
   return (useAppStore.getState().catalogs[connId]?.collections[db] ?? []).map((c) => c.name)
 }
 
@@ -175,7 +122,159 @@ function lastReferencedCollection(code: string): string | undefined {
 }
 
 // --------------------------------------------------------------------------
-// The source
+// Value-slot detection (shared with the inline ghost-text hint)
+// --------------------------------------------------------------------------
+
+/**
+ * Is the cursor sitting inside an unterminated string literal? Heuristic: counts
+ * unescaped `'`/`"` and reports odd parity. It doesn't model template literals
+ * (backticks) or comments, so a quote inside those can skew the result — fine in
+ * practice, since a wrong answer only downgrades member/value completion to the
+ * regex fallback, never breaks it.
+ */
+export function inString(before: string): boolean {
+  let dq = 0
+  let sq = 0
+  for (let i = 0; i < before.length; i++) {
+    const c = before[i]
+    if (c === '\\') {
+      i++ // skip the escaped char
+      continue
+    }
+    if (c === '"') dq++
+    else if (c === "'") sq++
+  }
+  return dq % 2 === 1 || sq % 2 === 1
+}
+
+/**
+ * If the cursor is right after `<key>:` (a value slot, nothing typed yet),
+ * return the key (quotes stripped); else null. Bails inside string literals so
+ * `{ note: "a: ` doesn't look like a value slot.
+ */
+export function atValueSlot(before: string): string | null {
+  if (inString(before)) return null
+  const m = /([A-Za-z_$][\w$.]*|"[^"]+"|'[^']+')\s*:\s*$/.exec(before)
+  if (!m) return null
+  return m[1].replace(/^["']|["']$/g, '')
+}
+
+/** Are we inside a `sort({ … })` spec or a `$sort: { … }` stage body? */
+export function isInsideSort(before: string): boolean {
+  return /\.sort\s*\(\s*\{[^{}]*$/.test(before) || /\$sort\s*:\s*\{[^{}]*$/.test(before)
+}
+
+/** Are we inside a projection — `find(filter, { … })` or `$project: { … }`? */
+export function isInsideProjection(before: string): boolean {
+  if (/\.find\s*\(\s*(\{[^{}]*\})?\s*,\s*\{[^{}]*$/.test(before)) return true
+  if (/\$project\s*:\s*\{[^{}]*$/.test(before)) return true
+  return false
+}
+
+/** Value candidates for the slot we're in, or [] when not at a value slot. */
+function computeValueOptions(before: string): Completion[] {
+  const key = atValueSlot(before)
+  if (key == null) return []
+  const toOpts = (vs: ValueChoice[]): Completion[] => vs.map((v) => opt(v.label, 'text', v.detail))
+  if (isInsideSort(before)) return toOpts(SORT_VALUES)
+  if (isInsideProjection(before)) return toOpts(PROJECTION_VALUES)
+  if (BOOLEAN_KEYS.has(key)) return toOpts(BOOLEAN_VALUES)
+  return []
+}
+
+// --------------------------------------------------------------------------
+// The pure decision core
+// --------------------------------------------------------------------------
+
+/** Everything the pure core needs, resolved by the wrapper from the store. */
+export interface CompletionData {
+  /** Collection names for the active db. */
+  collections: string[]
+  /** Cached field names for the last-referenced collection. */
+  fields: string[]
+}
+
+export interface ShellCompletionResult {
+  from: number
+  options: Completion[]
+  validFor: RegExp
+}
+
+/**
+ * Pure: decide shell completions from the text before the cursor + resolved
+ * data. `pos` is the absolute cursor offset (== before.length when `before` is
+ * the full text-before-cursor slice). Returns null when nothing applies.
+ */
+export function computeShellCompletion(
+  before: string,
+  pos: number,
+  data: CompletionData
+): ShellCompletionResult | null {
+  // `db.<coll>.<word>` → collection methods
+  const collMethod = /\bdb\.([A-Za-z_$][\w$]*)\.([\w$]*)$/.exec(before)
+  if (collMethod) {
+    const word = collMethod[2]
+    return {
+      from: pos - word.length,
+      options: COLLECTION_METHODS.map((m) => opt(m, 'method', 'collection')),
+      validFor: /^[\w$]*$/
+    }
+  }
+
+  // `).<word>` → cursor chain methods
+  const cursorMethod = /\)\s*\.([\w$]*)$/.exec(before)
+  if (cursorMethod) {
+    const word = cursorMethod[1]
+    return {
+      from: pos - word.length,
+      options: CURSOR_METHODS.map((m) => opt(m, 'method', 'cursor')),
+      validFor: /^[\w$]*$/
+    }
+  }
+
+  // `db.<word>` → collection names + Db methods
+  const dbMember = /\bdb\.([\w$]*)$/.exec(before)
+  if (dbMember) {
+    const word = dbMember[1]
+    const options: Completion[] = []
+    for (const name of data.collections) options.push(opt(name, 'class', 'collection', lengthBoost(name)))
+    for (const m of DB_METHODS) options.push(opt(m, 'method', 'db'))
+    return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
+  }
+
+  // `<field>: <value>` → value candidates (inserted at the cursor)
+  const valueOptions = computeValueOptions(before)
+  if (valueOptions.length) {
+    return { from: pos, options: valueOptions, validFor: /^[\w$-]*$/ }
+  }
+
+  // `$<word>` → operators (scoped to the enclosing call)
+  const dollar = /(\$[\w$]*)$/.exec(before)
+  if (dollar) {
+    const word = dollar[1]
+    return { from: pos - word.length, options: operatorCompletions(before), validFor: /^\$[\w$]*$/ }
+  }
+
+  // otherwise → globals + literals + keywords + cached field names
+  const wordMatch = /([\w$]*)$/.exec(before)
+  const word = wordMatch ? wordMatch[1] : ''
+  const options: Completion[] = []
+  for (const g of SHELL_GLOBALS) options.push(opt(g, 'keyword', 'constructor'))
+  for (const kw of JS_LITERALS) options.push(opt(kw, 'keyword', 'literal'))
+  for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'keyword'))
+  for (const f of data.fields) options.push(opt(f, 'variable', 'field', lengthBoost(f)))
+  // REPL commands only at the start of a statement line (show dbs / use …).
+  if (/(?:^|\n)[ \t]*[\w]*$/.test(before)) {
+    for (const c of SHELL_COMMANDS) {
+      options.push({ label: c.label, type: 'keyword', detail: c.detail, apply: c.apply ?? c.label })
+    }
+  }
+  if (options.length === 0) return null
+  return { from: pos - word.length, options, validFor: /^[\w$]*$/ }
+}
+
+// --------------------------------------------------------------------------
+// The source (thin store-reading wrapper around the pure core)
 // --------------------------------------------------------------------------
 
 export function mongoCompletionSource(context: CompletionContext): CompletionResult | null {
@@ -186,65 +285,26 @@ export function mongoCompletionSource(context: CompletionContext): CompletionRes
     const before = context.state.sliceDoc(0, context.pos)
     const ctx = activeContext()
 
-    // `db.<coll>.<word>` → collection methods (+ warm field cache)
-    const collMethod = /\bdb\.([A-Za-z_$][\w$]*)\.([\w$]*)$/.exec(before)
-    if (collMethod) {
-      const coll = collMethod[1]
-      const word = collMethod[2]
-      if (ctx) void useAppStore.getState().sampleFields(ctx.connId, ctx.db, coll)
-      return {
-        from: context.pos - word.length,
-        options: COLLECTION_METHODS.map((m) => opt(m, 'method', 'collection')),
-        validFor: /^[\w$]*$/
-      }
-    }
-
-    // `).<word>` → cursor chain methods
-    const cursorMethod = /\)\s*\.([\w$]*)$/.exec(before)
-    if (cursorMethod) {
-      const word = cursorMethod[1]
-      return {
-        from: context.pos - word.length,
-        options: CURSOR_METHODS.map((m) => opt(m, 'method', 'cursor')),
-        validFor: /^[\w$]*$/
-      }
-    }
-
-    // `db.<word>` → collection names + Db methods
-    const dbMember = /\bdb\.([\w$]*)$/.exec(before)
-    if (dbMember) {
-      const word = dbMember[1]
-      const options: Completion[] = []
-      if (ctx) for (const name of collectionNames(ctx.connId, ctx.db)) options.push(opt(name, 'class', 'collection'))
-      for (const m of DB_METHODS) options.push(opt(m, 'method', 'db'))
-      return { from: context.pos - word.length, options, validFor: /^[\w$]*$/ }
-    }
-
-    // `$<word>` → operators (scoped to the enclosing call)
-    const dollar = /(\$[\w$]*)$/.exec(before)
-    if (dollar) {
-      const word = dollar[1]
-      return {
-        from: context.pos - word.length,
-        options: operatorCompletions(before),
-        validFor: /^\$[\w$]*$/
-      }
-    }
-
-    // otherwise → globals + literals + cached field names
-    const wordMatch = /([\w$]*)$/.exec(before)
-    const word = wordMatch ? wordMatch[1] : ''
-    const options: Completion[] = []
-    for (const g of SHELL_GLOBALS) options.push(opt(g, 'keyword', 'constructor'))
-    for (const kw of JS_KEYWORDS) options.push(opt(kw, 'keyword', 'literal'))
+    // Resolve the collection whose fields we'd complete: the `db.<coll>.` being
+    // typed, else the last one referenced. Warm its field cache (side effect
+    // kept out of the pure core) and read whatever's cached for the fallback.
+    let fields: string[] = []
     if (ctx) {
-      const coll = lastReferencedCollection(before)
-      if (coll) for (const f of useAppStore.getState().getFields(ctx.connId, ctx.db, coll)) {
-        options.push(opt(f, 'variable', 'field'))
+      const coll =
+        /\bdb\.([A-Za-z_$][\w$]*)\.[\w$]*$/.exec(before)?.[1] ?? lastReferencedCollection(before)
+      if (coll) {
+        void useAppStore.getState().sampleFields(ctx.connId, ctx.db, coll)
+        fields = useAppStore.getState().getFields(ctx.connId, ctx.db, coll)
       }
     }
-    if (options.length === 0) return null
-    return { from: context.pos - word.length, options, validFor: /^[\w$]*$/ }
+
+    const data: CompletionData = {
+      collections: ctx ? collectionNames(ctx.connId, ctx.db) : [],
+      fields
+    }
+
+    const r = computeShellCompletion(before, context.pos, data)
+    return r ? { from: r.from, options: r.options, validFor: r.validFor } : null
   } catch {
     return null
   }

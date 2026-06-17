@@ -1,13 +1,21 @@
 import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
-import { acceptCompletion, autocompletion } from '@codemirror/autocomplete'
+import {
+  acceptCompletion,
+  autocompletion,
+  completionStatus,
+  nextSnippetField,
+  prevSnippetField
+} from '@codemirror/autocomplete'
 import { EditorView, keymap } from '@codemirror/view'
-import { Prec, EditorState } from '@codemirror/state'
+import { Prec, EditorState, EditorSelection } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
-import { syntaxTree, indentUnit } from '@codemirror/language'
-import { mongoCompletionSource } from '@renderer/lib/mongoCompletion'
+import { syntaxTree, indentUnit, getIndentUnit } from '@codemirror/language'
+import { shellCompletionSource } from '@renderer/lib/shellCompletion'
+import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
+import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
@@ -50,6 +58,34 @@ function toggleWordWrap(): void {
 function cycleTabSize(): void {
   const store = useAppStore.getState()
   void store.updateSettings({ editorTabSize: store.settings.editorTabSize === 2 ? 4 : 2 })
+}
+
+/**
+ * Enter that preserves the current line's indentation (the JS language indenter
+ * resets a continued method chain like `.sort(…)` to column 0, losing the
+ * manual indent). Defers to the autocomplete dropdown when it's open (Enter
+ * accepts the suggestion there). Adds one level after an opener `{[(`, and drops
+ * a matching closer to its own line so `{|}` → indented body + closer below.
+ */
+function enterKeepIndent(view: EditorView): boolean {
+  if (completionStatus(view.state) === 'active') return false // let the dropdown accept
+  const { state } = view
+  const indentStr = ' '.repeat(getIndentUnit(state))
+  const spec = state.changeByRange((range) => {
+    // Use the replacement boundaries (from/to), not `range.head`, so this is
+    // correct for both an empty cursor and a non-empty selection being replaced.
+    const line = state.doc.lineAt(range.from)
+    const curIndent = /^[ \t]*/.exec(line.text)?.[0] ?? ''
+    const before = range.from > line.from ? state.sliceDoc(range.from - 1, range.from) : ''
+    const after = state.sliceDoc(range.to, range.to + 1)
+    const opens = /[{[(]/.test(before)
+    let insert = state.lineBreak + curIndent + (opens ? indentStr : '')
+    const anchor = range.from + insert.length
+    if (opens && /[}\])]/.test(after)) insert += state.lineBreak + curIndent
+    return { changes: { from: range.from, to: range.to, insert }, range: EditorSelection.cursor(anchor) }
+  })
+  view.dispatch({ ...spec, scrollIntoView: true, userEvent: 'input' })
+  return true
 }
 
 interface ShellEditorProps {
@@ -110,7 +146,10 @@ export function ShellEditor({
   const extensions = useMemo(
     () => [
       javascript({ typescript: false }),
-      autocompletion({ override: [mongoCompletionSource] }),
+      autocompletion({ override: [shellCompletionSource] }),
+      // Inline ghost-text value hints (e.g. `-1` after `sort({ _id: `). Mutually
+      // exclusive with the dropdown above; accepted via the Tab binding below.
+      ghostText(),
       // The CodeMirror content DOM is contenteditable, so macOS attaches its
       // native autocorrect/spellcheck to it — typing then pressing Tab pops the
       // phonetic suggestion box over the code. Code isn't prose; turn all of it
@@ -137,7 +176,8 @@ export function ShellEditor({
           { key: 'Mod--', preventDefault: true, run: () => bumpFont(-1) },
           { key: 'Mod-0', preventDefault: true, run: () => bumpFont(0) },
           // Cmd+Enter and Ctrl+Enter both run. Returning true consumes the key
-          // (no blank line); plain Enter is left to CodeMirror as a newline.
+          // (no blank line); plain Enter is handled by the `Enter` binding below
+          // (enterKeepIndent), not inserted here.
           { key: 'Mod-Enter', run: () => runIfReady() },
           { key: 'Ctrl-Enter', run: () => runIfReady() },
           // F6 runs only the statement under the cursor (or the selection),
@@ -153,9 +193,18 @@ export function ShellEditor({
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
           // here so it works regardless of basicSetup defaults).
           { key: 'Mod-/', run: (view) => toggleComment(view) },
-          // Tab: accept the open completion, else insert one indent unit (the
-          // configured tab width in spaces, or indent a multi-line selection).
-          { key: 'Tab', run: (view) => acceptCompletion(view) || insertTab(view), shift: indentLess }
+          // Enter: keep the current line's indentation (continued method chains
+          // otherwise snap to column 0). Yields to the dropdown's Enter-accept.
+          { key: 'Enter', run: enterKeepIndent },
+          // Tab: accept the open completion, else accept the inline ghost text,
+          // else jump to the next snippet field (limit(10) / sort({ field: -1 })),
+          // else insert one indent unit. Shift+Tab steps back a field, else dedents.
+          {
+            key: 'Tab',
+            run: (view) =>
+              acceptCompletion(view) || acceptGhost(view) || nextSnippetField(view) || insertTab(view),
+            shift: (view) => prevSnippetField(view) || indentLess(view)
+          }
         ])
       )
     ],
@@ -183,6 +232,9 @@ export function ShellEditor({
           onChange={onChange}
           onCreateEditor={(view) => {
             viewRef.current = view
+            // Pre-spawn the TS-service worker so the heavy `typescript` chunk
+            // loads off the critical path and the service is warm by first use.
+            tsAutocomplete.warm()
           }}
           basicSetup={{
             lineNumbers: true,
