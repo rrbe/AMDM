@@ -84,9 +84,12 @@ class SessionManager {
         serverVersion: info.serverVersion
       }
       this.sessions.set(id, { client, tunnel, status })
-      // TOFU: persist the host key learned on first connect so later connects verify it.
+      // TOFU: persist the host key(s) learned on first connect so later connects verify them.
       if (tunnel?.learnedHostKey) {
         connectionStore.recordSshHostKey(id, tunnel.learnedHostKey)
+      }
+      if (tunnel?.learnedJumpHostKey) {
+        connectionStore.recordSshJumpHostKey(id, tunnel.learnedJumpHostKey)
       }
       return status
     } catch (err) {

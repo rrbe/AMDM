@@ -127,7 +127,16 @@
       "errHost": "請填寫 SSH 主機",
       "errUser": "請填寫 SSH 使用者名稱",
       "errPort": "SSH 連接埠需為 1–65535 之間的整數",
-      "errKey": "私密金鑰驗證需填寫金鑰路徑"
+      "errKey": "私密金鑰驗證需填寫金鑰路徑",
+      "jumpEnableLabel": "透過跳板機連線（先連跳板機再到目標）",
+      "jumpHint": "適用於目標主機僅能經堡壘機/跳板機存取的情境（等同 ssh ProxyJump / ProxyCommand -W）。跳板機僅支援 agent 或私密金鑰檔驗證；含密碼的金鑰請先加入 ssh-agent。",
+      "jumpHost": "跳板機主機",
+      "jumpPort": "跳板機連接埠",
+      "jumpUsername": "跳板機使用者名稱",
+      "errJumpHost": "請填寫跳板機主機",
+      "errJumpUser": "請填寫跳板機使用者名稱",
+      "errJumpPort": "跳板機連接埠需為 1–65535 之間的整數",
+      "errJumpKey": "跳板機私密金鑰驗證需填寫金鑰路徑"
     },
     "tls": {
       "enableLabel": "啟用 TLS/SSL",

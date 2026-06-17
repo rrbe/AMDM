@@ -141,6 +141,14 @@ class ConnectionStore {
     this.persist()
   }
 
+  /** Pin the jump (bastion) host-key fingerprint learned on first connect (TOFU). */
+  recordSshJumpHostKey(id: string, fingerprint: string): void {
+    const stored = this.data.connections.find((c) => c.id === id)
+    if (!stored || !stored.ssh.jump || stored.ssh.jump.pinnedHostKey === fingerprint) return
+    stored.ssh = { ...stored.ssh, jump: { ...stored.ssh.jump, pinnedHostKey: fingerprint } }
+    this.persist()
+  }
+
   /** Internal-only: decrypted secrets for use at connect time. Never sent over IPC. */
   getDecrypted(id: string): {
     config: ConnectionConfig

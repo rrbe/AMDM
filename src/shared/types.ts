@@ -24,6 +24,22 @@ export interface AuthConfig {
 
 export type SshAuthMethod = 'password' | 'privateKey' | 'agent'
 
+/**
+ * A single SSH hop in front of the target (a bastion / jump host, i.e. ProxyJump).
+ * Authenticates via agent or a key file only — no password/passphrase is stored
+ * for a jump hop, so passphrase-protected keys must be loaded into the agent.
+ */
+export interface SshHopConfig {
+  host?: string
+  port?: number // default 22
+  username?: string
+  /** 'password' is intentionally unsupported for a jump hop (no stored secret). */
+  authMethod?: SshAuthMethod
+  privateKeyPath?: string
+  /** Pinned SHA256 host-key fingerprint (hex), learned via TOFU. Not a secret. */
+  pinnedHostKey?: string
+}
+
 export interface SshConfig {
   enabled: boolean
   host?: string
@@ -38,6 +54,8 @@ export interface SshConfig {
    * and verified thereafter; a mismatch blocks the connection. Not a secret.
    */
   pinnedHostKey?: string
+  /** Optional single bastion in front of the target (reach the target through it). */
+  jump?: SshHopConfig
 }
 
 export interface TlsConfig {

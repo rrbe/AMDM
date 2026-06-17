@@ -9,11 +9,13 @@
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import type { SshAuthMethod } from '../../shared/types'
 import type { DecryptedConnection } from '../mongo/uri'
 
-export interface TunnelOptions {
-  sshHost: string
-  sshPort: number
+/** Auth + identity for a single SSH hop (a bastion or the terminal host). */
+export interface SshHopOptions {
+  host: string
+  port: number
   username: string
   password?: string
   privateKey?: Buffer
@@ -22,7 +24,14 @@ export interface TunnelOptions {
   agent?: string
   /** Previously-pinned SHA256 host-key fingerprint (TOFU); undefined on first use. */
   pinnedHostKey?: string
-  /** Final MongoDB host/port to forward to (as seen from the SSH server). */
+}
+
+export interface TunnelOptions {
+  /** Terminal SSH host — the machine MongoDB runs on. */
+  target: SshHopOptions
+  /** Optional single bastion in front of the target (ProxyJump / `ssh -W`). */
+  jump?: SshHopOptions
+  /** Final MongoDB host/port to forward to (as seen from the target host). */
   destHost: string
   destPort: number
 }
@@ -87,9 +96,53 @@ export function resolveSshAgentSock(
   return undefined
 }
 
+/** The hop-config fields shared by the target `SshConfig` and a jump hop. */
+interface HopConfigLike {
+  host?: string
+  port?: number
+  username?: string
+  authMethod?: SshAuthMethod
+  privateKeyPath?: string
+  pinnedHostKey?: string
+}
+
+/** Resolve one hop's auth into {@link SshHopOptions}, throwing on missing inputs. */
+function buildHop(
+  hop: HopConfigLike,
+  secrets: { password?: string; passphrase?: string },
+  readKey: (path: string) => Buffer,
+  resolveAgent: () => string | undefined
+): SshHopOptions {
+  const base: SshHopOptions = {
+    host: hop.host || '',
+    port: hop.port || 22,
+    username: hop.username || '',
+    pinnedHostKey: hop.pinnedHostKey
+  }
+  switch (hop.authMethod ?? 'password') {
+    case 'agent': {
+      const agentSock = resolveAgent()
+      if (!agentSock) {
+        throw new Error(
+          'SSH agent is unavailable: no SSH_AUTH_SOCK found. Start your ssh-agent and `ssh-add` your key, or use a private key file.'
+        )
+      }
+      return { ...base, agent: agentSock }
+    }
+    case 'privateKey':
+      if (!hop.privateKeyPath) {
+        throw new Error('SSH private-key auth requires a private key path.')
+      }
+      return { ...base, privateKey: readKey(hop.privateKeyPath), passphrase: secrets.passphrase }
+    default: // 'password'
+      return { ...base, password: secrets.password }
+  }
+}
+
 /**
  * Build {@link TunnelOptions} from a decrypted connection. Throws (rather than
- * silently misconfiguring) when the chosen auth method lacks what it needs.
+ * silently misconfiguring) when an auth method lacks what it needs. An optional
+ * jump hop authenticates via agent or a key file only — no stored secrets.
  */
 export function buildTunnelOptions(
   dec: DecryptedConnection,
@@ -101,31 +154,13 @@ export function buildTunnelOptions(
     throw new Error('SSH tunnel with SRV/Atlas is not supported — use a direct host:port.')
   }
 
-  const base: TunnelOptions = {
-    sshHost: config.ssh.host || '',
-    sshPort: config.ssh.port || 22,
-    username: config.ssh.username || '',
-    pinnedHostKey: config.ssh.pinnedHostKey,
-    destHost: config.host,
-    destPort: config.port ?? 27017
-  }
+  const target = buildHop(
+    config.ssh,
+    { password: dec.sshPassword, passphrase: dec.sshPassphrase },
+    readKey,
+    resolveAgent
+  )
+  const jump = config.ssh.jump ? buildHop(config.ssh.jump, {}, readKey, resolveAgent) : undefined
 
-  switch (config.ssh.authMethod ?? 'password') {
-    case 'agent': {
-      const agentSock = resolveAgent()
-      if (!agentSock) {
-        throw new Error(
-          'SSH agent is unavailable: no SSH_AUTH_SOCK found. Start your ssh-agent and `ssh-add` your key, or use a private key file.'
-        )
-      }
-      return { ...base, agent: agentSock }
-    }
-    case 'privateKey':
-      if (!config.ssh.privateKeyPath) {
-        throw new Error('SSH private-key auth requires a private key path.')
-      }
-      return { ...base, privateKey: readKey(config.ssh.privateKeyPath), passphrase: dec.sshPassphrase }
-    default: // 'password'
-      return { ...base, password: dec.sshPassword }
-  }
+  return { target, jump, destHost: config.host, destPort: config.port ?? 27017 }
 }

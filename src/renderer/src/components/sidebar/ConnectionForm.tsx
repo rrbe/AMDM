@@ -101,17 +101,51 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [sshPassphraseTouched, setSshPassphraseTouched] = useState(false)
   const [clearHostKey, setClearHostKey] = useState(false)
 
+  // ---- SSH jump host (bastion / ProxyJump) — agent or key file only ----
+  const [jumpEnabled, setJumpEnabled] = useState(!!editing?.ssh.jump)
+  const [jumpHost, setJumpHost] = useState(editing?.ssh.jump?.host ?? '')
+  const [jumpPort, setJumpPort] = useState(String(editing?.ssh.jump?.port ?? 22))
+  const [jumpUser, setJumpUser] = useState(editing?.ssh.jump?.username ?? '')
+  const [jumpAuthMethod, setJumpAuthMethod] = useState<SshAuthMethod>(
+    editing?.ssh.jump?.authMethod ?? 'agent'
+  )
+  const [jumpKeyPath, setJumpKeyPath] = useState(editing?.ssh.jump?.privateKeyPath ?? '')
+  const [clearJumpHostKey, setClearJumpHostKey] = useState(false)
+
   // Validate SSH fields up front so save fails fast (with a reason) rather than
   // letting empty/invalid values surface as an opaque error at connect time.
   const sshError = useMemo<string | undefined>(() => {
     if (!sshEnabled) return undefined
+    const portOk = (s: string): boolean => {
+      const p = Number(s)
+      return Number.isInteger(p) && p >= 1 && p <= 65535
+    }
     if (!sshHost.trim()) return tFn('connection.ssh.errHost')
     if (!sshUser.trim()) return tFn('connection.ssh.errUser')
-    const p = Number(sshPort)
-    if (!Number.isInteger(p) || p < 1 || p > 65535) return tFn('connection.ssh.errPort')
+    if (!portOk(sshPort)) return tFn('connection.ssh.errPort')
     if (sshAuthMethod === 'privateKey' && !privateKeyPath.trim()) return tFn('connection.ssh.errKey')
+    if (jumpEnabled) {
+      if (!jumpHost.trim()) return tFn('connection.ssh.errJumpHost')
+      if (!jumpUser.trim()) return tFn('connection.ssh.errJumpUser')
+      if (!portOk(jumpPort)) return tFn('connection.ssh.errJumpPort')
+      if (jumpAuthMethod === 'privateKey' && !jumpKeyPath.trim()) return tFn('connection.ssh.errJumpKey')
+    }
     return undefined
-  }, [sshEnabled, sshHost, sshUser, sshPort, sshAuthMethod, privateKeyPath, tFn])
+  }, [
+    sshEnabled,
+    sshHost,
+    sshUser,
+    sshPort,
+    sshAuthMethod,
+    privateKeyPath,
+    jumpEnabled,
+    jumpHost,
+    jumpUser,
+    jumpPort,
+    jumpAuthMethod,
+    jumpKeyPath,
+    tFn
+  ])
 
   // ---- TLS ----
   const [tlsEnabled, setTlsEnabled] = useState(editing?.tls.enabled ?? false)
@@ -223,7 +257,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             privateKeyPath:
               sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined,
             // Preserve the TOFU-pinned host key across edits; clear it only on request.
-            pinnedHostKey: clearHostKey ? undefined : editing?.ssh.pinnedHostKey
+            pinnedHostKey: clearHostKey ? undefined : editing?.ssh.pinnedHostKey,
+            jump: jumpEnabled
+              ? {
+                  host: jumpHost.trim() || undefined,
+                  port: Number(jumpPort) || 22,
+                  username: jumpUser.trim() || undefined,
+                  authMethod: jumpAuthMethod,
+                  privateKeyPath:
+                    jumpAuthMethod === 'privateKey' ? jumpKeyPath.trim() || undefined : undefined,
+                  pinnedHostKey: clearJumpHostKey ? undefined : editing?.ssh.jump?.pinnedHostKey
+                }
+              : undefined
           },
           tls: {
             enabled: tlsEnabled,
@@ -265,6 +310,13 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       sshPassphrase,
       sshPassphraseTouched,
       clearHostKey,
+      jumpEnabled,
+      jumpHost,
+      jumpPort,
+      jumpUser,
+      jumpAuthMethod,
+      jumpKeyPath,
+      clearJumpHostKey,
       tlsEnabled,
       allowInvalidCertificates,
       caFile,
@@ -599,6 +651,79 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                       label={tFn('connection.ssh.resetHostKey')}
                     />
                   </div>
+                </>
+              )}
+
+              {/* Jump host (bastion / ProxyJump): reach the target through it. */}
+              <div className="form-row" style={{ marginTop: 8 }}>
+                <Checkbox
+                  checked={jumpEnabled}
+                  onCheckedChange={setJumpEnabled}
+                  label={tFn('connection.ssh.jumpEnableLabel')}
+                />
+              </div>
+
+              {jumpEnabled && (
+                <>
+                  <div className="hint">{tFn('connection.ssh.jumpHint')}</div>
+                  <div className="form-grid">
+                    <Field label={tFn('connection.ssh.jumpHost')}>
+                      <Input value={jumpHost} onChange={(e) => setJumpHost(e.target.value)} />
+                    </Field>
+                    <Field label={tFn('connection.ssh.jumpPort')}>
+                      <Input
+                        value={jumpPort}
+                        onChange={(e) => setJumpPort(e.target.value)}
+                        placeholder="22"
+                      />
+                    </Field>
+                  </div>
+                  <div className="form-grid">
+                    <Field label={tFn('connection.ssh.jumpUsername')}>
+                      <Input value={jumpUser} onChange={(e) => setJumpUser(e.target.value)} />
+                    </Field>
+                    <Field label={tFn('connection.ssh.authMethod')}>
+                      <Select<SshAuthMethod>
+                        value={jumpAuthMethod}
+                        onChange={setJumpAuthMethod}
+                        options={[
+                          { label: tFn('connection.ssh.methodAgent'), value: 'agent' },
+                          { label: tFn('connection.ssh.methodPrivateKey'), value: 'privateKey' }
+                        ]}
+                      />
+                    </Field>
+                  </div>
+
+                  {jumpAuthMethod === 'privateKey' && (
+                    <Field label={tFn('connection.ssh.privateKeyPath')}>
+                      <Input
+                        value={jumpKeyPath}
+                        onChange={(e) => setJumpKeyPath(e.target.value)}
+                        placeholder="~/.ssh/id_ed25519"
+                      />
+                    </Field>
+                  )}
+
+                  {jumpAuthMethod === 'agent' && (
+                    <div className="hint">{tFn('connection.ssh.agentHint')}</div>
+                  )}
+
+                  {editing?.ssh.jump?.pinnedHostKey && (
+                    <>
+                      <div className="hint">
+                        {tFn('connection.ssh.hostKeyTrusted', {
+                          fp: editing.ssh.jump.pinnedHostKey.slice(0, 24)
+                        })}
+                      </div>
+                      <div className="form-row">
+                        <Checkbox
+                          checked={clearJumpHostKey}
+                          onCheckedChange={setClearJumpHostKey}
+                          label={tFn('connection.ssh.resetHostKey')}
+                        />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </>
