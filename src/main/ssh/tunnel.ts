@@ -143,7 +143,6 @@ function connectHop(
       password: hop.password,
       privateKey: hop.privateKey,
       passphrase: hop.passphrase,
-      agent: hop.agent,
       sock,
       // hostHash makes ssh2 pass the host key pre-hashed as a hex string.
       hostHash: 'sha256',
@@ -156,7 +155,7 @@ function connectHop(
         hostKeyError = new Error(
           `Host key verification failed for the ${where} — the SSH server's key changed (possible MITM). ` +
             `Expected SHA256:${hop.pinnedHostKey}, got SHA256:${fingerprint}. ` +
-            'If the server was legitimately rebuilt, reset the trusted host key in the connection’s SSH settings.'
+            'If the server was legitimately rebuilt, delete and re-create this connection to trust the new key.'
         )
         return false
       },

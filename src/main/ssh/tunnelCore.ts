@@ -20,8 +20,6 @@ export interface SshHopOptions {
   password?: string
   privateKey?: Buffer
   passphrase?: string
-  /** ssh-agent socket (SSH_AUTH_SOCK) or Windows OpenSSH pipe — for agent auth. */
-  agent?: string
   /** Previously-pinned SHA256 host-key fingerprint (TOFU); undefined on first use. */
   pinnedHostKey?: string
 }
@@ -116,23 +114,6 @@ export function readPrivateKey(path: string): Buffer {
   }
 }
 
-/** Windows 10/11 built-in OpenSSH agent named pipe (ssh2 accepts it as `agent`). */
-const WIN_OPENSSH_AGENT_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
-
-/**
- * Locate the local ssh-agent endpoint. Prefers `SSH_AUTH_SOCK` (set on
- * macOS/Linux and by most Windows agents that bother); falls back to the
- * Windows OpenSSH named pipe. Returns undefined when no agent can be located.
- */
-export function resolveSshAgentSock(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform
-): string | undefined {
-  if (env.SSH_AUTH_SOCK) return env.SSH_AUTH_SOCK
-  if (platform === 'win32') return WIN_OPENSSH_AGENT_PIPE
-  return undefined
-}
-
 /** The hop-config fields shared by the target `SshConfig` and a jump hop. */
 interface HopConfigLike {
   host?: string
@@ -147,8 +128,7 @@ interface HopConfigLike {
 function buildHop(
   hop: HopConfigLike,
   secrets: { password?: string; passphrase?: string },
-  readKey: (path: string) => Buffer,
-  resolveAgent: () => string | undefined
+  readKey: (path: string) => Buffer
 ): SshHopOptions {
   const base: SshHopOptions = {
     host: hop.host || '',
@@ -157,15 +137,6 @@ function buildHop(
     pinnedHostKey: hop.pinnedHostKey
   }
   switch (hop.authMethod ?? 'password') {
-    case 'agent': {
-      const agentSock = resolveAgent()
-      if (!agentSock) {
-        throw new Error(
-          'SSH agent is unavailable: no SSH_AUTH_SOCK found. Start your ssh-agent and `ssh-add` your key, or use a private key file.'
-        )
-      }
-      return { ...base, agent: agentSock }
-    }
     case 'privateKey':
       if (!hop.privateKeyPath) {
         throw new Error('SSH private-key auth requires a private key path.')
@@ -179,26 +150,20 @@ function buildHop(
 /**
  * Build {@link TunnelOptions} from a decrypted connection. Throws (rather than
  * silently misconfiguring) when an auth method lacks what it needs. An optional
- * jump hop authenticates via agent or a key file only — no stored secrets.
+ * jump hop authenticates via a private key file only — no stored password.
  */
 export function buildTunnelOptions(
   dec: DecryptedConnection,
-  readKey: (path: string) => Buffer = readPrivateKey,
-  resolveAgent: () => string | undefined = resolveSshAgentSock
+  readKey: (path: string) => Buffer = readPrivateKey
 ): TunnelOptions {
   const { config } = dec
   if (config.useSrv) {
     throw new Error('SSH tunnel with SRV/Atlas is not supported — use a direct host:port.')
   }
 
-  const target = buildHop(
-    config.ssh,
-    { password: dec.sshPassword, passphrase: dec.sshPassphrase },
-    readKey,
-    resolveAgent
-  )
+  const target = buildHop(config.ssh, { password: dec.sshPassword, passphrase: dec.sshPassphrase }, readKey)
   const jump = config.ssh.jump
-    ? buildHop(config.ssh.jump, { passphrase: dec.jumpSshPassphrase }, readKey, resolveAgent)
+    ? buildHop(config.ssh.jump, { passphrase: dec.jumpSshPassphrase }, readKey)
     : undefined
 
   return { target, jump, destHost: config.host, destPort: config.port ?? 27017 }

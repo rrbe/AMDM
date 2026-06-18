@@ -22,11 +22,11 @@ export interface AuthConfig {
   mechanism?: ScramMechanism
 }
 
-export type SshAuthMethod = 'password' | 'privateKey' | 'agent'
+export type SshAuthMethod = 'password' | 'privateKey'
 
 /**
  * A single SSH hop in front of the target (a bastion / jump host, i.e. ProxyJump).
- * Authenticates via agent or a private key file; a passphrase for that key is
+ * Authenticates via a private key file only; a passphrase for that key is
  * carried out-of-band as `ConnectionInput.jumpSshPassphrase` (encrypted at rest,
  * like the other secrets) rather than on this config object.
  */
@@ -34,7 +34,7 @@ export interface SshHopConfig {
   host?: string
   port?: number // default 22
   username?: string
-  /** 'password' is intentionally unsupported for a jump hop (no stored secret). */
+  /** A jump hop uses a private key file only (no stored password). */
   authMethod?: SshAuthMethod
   privateKeyPath?: string
   /** Pinned SHA256 host-key fingerprint (hex), learned via TOFU. Not a secret. */
@@ -46,7 +46,6 @@ export interface SshConfig {
   host?: string
   port?: number // default 22
   username?: string
-  /** 'agent' authenticates via the local ssh-agent (SSH_AUTH_SOCK) — no key/password stored. */
   authMethod?: SshAuthMethod
   /** Path to a private key file on disk (we read it at connect time). */
   privateKeyPath?: string

@@ -1,5 +1,5 @@
 /**
- * SSH tunnel option assembly — auth-method decision + agent-socket resolution.
+ * SSH tunnel option assembly — auth-method decision + host-key TOFU + diagnosis plan.
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -8,8 +8,7 @@ import {
   evaluateHostKey,
   expandHome,
   planDiagnoseStages,
-  readPrivateKey,
-  resolveSshAgentSock
+  readPrivateKey
 } from '../../../src/main/ssh/tunnelCore'
 import type { DecryptedConnection } from '../../../src/main/mongo/uri'
 import type { ConnectionConfig, SshConfig } from '../../../src/shared/types'
@@ -57,20 +56,8 @@ describe('readPrivateKey', () => {
   })
 })
 
-describe('resolveSshAgentSock', () => {
-  it('prefers SSH_AUTH_SOCK when set', () => {
-    expect(resolveSshAgentSock({ SSH_AUTH_SOCK: '/tmp/agent.sock' }, 'darwin')).toBe('/tmp/agent.sock')
-  })
-  it('falls back to the Windows OpenSSH named pipe on win32', () => {
-    expect(resolveSshAgentSock({}, 'win32')).toBe('\\\\.\\pipe\\openssh-ssh-agent')
-  })
-  it('returns undefined on posix without SSH_AUTH_SOCK', () => {
-    expect(resolveSshAgentSock({}, 'linux')).toBeUndefined()
-  })
-})
-
 describe('buildTunnelOptions — target auth methods', () => {
-  it('password: carries sshPassword, no key/agent', () => {
+  it('password: carries sshPassword, no key', () => {
     const o = buildTunnelOptions(dec(cfg({ authMethod: 'password' }), { sshPassword: 'pw' }), stubKey)
     expect(o.target).toMatchObject({
       host: 'gw.example.com',
@@ -82,7 +69,6 @@ describe('buildTunnelOptions — target auth methods', () => {
     expect(o.destPort).toBe(27017)
     expect(o.jump).toBeUndefined()
     expect(o.target.privateKey).toBeUndefined()
-    expect(o.target.agent).toBeUndefined()
   })
 
   it('defaults to password when authMethod is unset', () => {
@@ -101,73 +87,63 @@ describe('buildTunnelOptions — target auth methods', () => {
     expect(o.target.privateKey?.toString()).toBe('PRIV')
     expect(o.target.passphrase).toBe('pp')
     expect(o.target.password).toBeUndefined()
-    expect(o.target.agent).toBeUndefined()
   })
 
   it('privateKey without a path throws', () => {
     expect(() => buildTunnelOptions(dec(cfg({ authMethod: 'privateKey' })), stubKey)).toThrow(/private key/i)
   })
 
-  it('agent: carries the resolved socket, no key/password', () => {
-    const o = buildTunnelOptions(dec(cfg({ authMethod: 'agent' })), stubKey, () => '/tmp/agent.sock')
-    expect(o.target.agent).toBe('/tmp/agent.sock')
-    expect(o.target.privateKey).toBeUndefined()
-    expect(o.target.password).toBeUndefined()
-  })
-
-  it('agent without a resolvable socket throws', () => {
-    expect(() => buildTunnelOptions(dec(cfg({ authMethod: 'agent' })), stubKey, () => undefined)).toThrow(
-      /agent/i
-    )
-  })
-
   it('threads the pinned host key through', () => {
-    const o = buildTunnelOptions(dec(cfg({ authMethod: 'agent', pinnedHostKey: 'abc123' })), stubKey, () => '/s')
+    const o = buildTunnelOptions(
+      dec(cfg({ authMethod: 'privateKey', privateKeyPath: '/k', pinnedHostKey: 'abc123' })),
+      stubKey
+    )
     expect(o.target.pinnedHostKey).toBe('abc123')
   })
 })
 
 describe('buildTunnelOptions — jump host (ProxyJump)', () => {
-  it('builds a jump hop alongside the target, with its own auth + pin', () => {
+  it('builds a jump hop alongside the target, with its own key + pin', () => {
     const o = buildTunnelOptions(
       dec(
         cfg({
-          authMethod: 'agent',
+          authMethod: 'privateKey',
+          privateKeyPath: '/k/target',
           pinnedHostKey: 'target-fp',
           jump: {
             host: 'bastion.example.com',
             port: 3522,
             username: 'shawn',
-            authMethod: 'agent',
+            authMethod: 'privateKey',
+            privateKeyPath: '/k/jump',
             pinnedHostKey: 'jump-fp'
           }
         }),
         {}
       ),
-      stubKey,
-      () => '/tmp/agent.sock'
+      stubKey
     )
-    expect(o.target).toMatchObject({ host: 'gw.example.com', agent: '/tmp/agent.sock', pinnedHostKey: 'target-fp' })
+    expect(o.target).toMatchObject({ host: 'gw.example.com', pinnedHostKey: 'target-fp' })
+    expect(o.target.privateKey?.toString()).toBe('PRIV')
     expect(o.jump).toMatchObject({
       host: 'bastion.example.com',
       port: 3522,
       username: 'shawn',
-      agent: '/tmp/agent.sock',
       pinnedHostKey: 'jump-fp'
     })
+    expect(o.jump?.privateKey?.toString()).toBe('PRIV')
   })
 
   it('a jump hop carries its own passphrase but never a password', () => {
     const o = buildTunnelOptions(
       dec(
         cfg({
-          authMethod: 'agent',
+          authMethod: 'password',
           jump: { host: 'b', username: 'u', authMethod: 'privateKey', privateKeyPath: '/k/jump' }
         }),
         { sshPassword: 'pw', sshPassphrase: 'pp', jumpSshPassphrase: 'jpp' }
       ),
-      () => Buffer.from('JUMPKEY'),
-      () => '/tmp/agent.sock'
+      () => Buffer.from('JUMPKEY')
     )
     expect(o.jump?.privateKey?.toString()).toBe('JUMPKEY')
     expect(o.jump?.passphrase).toBe('jpp') // its own jump passphrase, not the target's
@@ -243,9 +219,8 @@ describe('buildTunnelOptions — guards & defaults', () => {
 
   it('defaults ssh port to 22 and dest port to 27017', () => {
     const o = buildTunnelOptions(
-      dec(cfg({ authMethod: 'agent', port: undefined }, { port: undefined })),
-      stubKey,
-      () => '/s'
+      dec(cfg({ authMethod: 'password', port: undefined }, { port: undefined })),
+      stubKey
     )
     expect(o.target.port).toBe(22)
     expect(o.destPort).toBe(27017)
