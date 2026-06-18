@@ -153,24 +153,13 @@ body {
   color: var(--fg-0);
 }
 
-/* ---- Modal: light paper, soft border, large radius + shadow ---- */
+/* ---- Modal backdrop (the .modal box itself is now Tailwind in common/Modal) ---- */
 .modal-backdrop {
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(3px);
 }
 [data-theme='dark'] .modal-backdrop {
   background: rgba(0, 0, 0, 0.6);
-}
-.modal {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-}
-.modal-header {
-  border-bottom: 1px solid var(--border);
-  font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
 /* ---- Sidebar footer: app-level theme cycle (System / Light / Dark icon) ---- */
