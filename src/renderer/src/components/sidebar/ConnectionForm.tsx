@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp, ClipboardPaste, Link } from 'lucide-react'
+import { ClipboardPaste, Link, MessageSquareText } from 'lucide-react'
 import type {
   ConnectionConfig,
   ConnectionInput,
@@ -96,10 +96,10 @@ function DiagnoseControl({
                 background: 'none',
                 border: 'none',
                 padding: 0,
-                color: 'inherit'
+                color: open ? 'inherit' : 'var(--fg-3, #9ca3af)'
               }}
             >
-              {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <MessageSquareText size={16} />
             </button>
           </>
         )}
