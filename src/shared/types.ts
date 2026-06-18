@@ -34,8 +34,8 @@ export interface SshHopConfig {
   host?: string
   port?: number // default 22
   username?: string
-  /** A jump hop uses a private key file only (no stored password). */
-  authMethod?: SshAuthMethod
+  /** Always 'privateKey' — a jump hop never uses password auth (a bastion should be key-secured). */
+  authMethod?: 'privateKey'
   privateKeyPath?: string
   /** Pinned SHA256 host-key fingerprint (hex), learned via TOFU. Not a secret. */
   pinnedHostKey?: string

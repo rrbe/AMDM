@@ -20,12 +20,12 @@
 
 ## 3. SSH 隧道增强（PR #14 之后的后续）　`[难度: 中–高] [风险: 中]`
 
-PR #14（`feat/ssh-agent-auth`，待合并）已实现:主机密钥 TOFU 校验（静默，无 UI，仅首连学习、变更即拒）/ 跳板机（**单跳** ProxyJump，ssh2 嵌套连接，私钥认证）/ `~` 展开与并发隧道句柄竞态修复 / SSH 表单校验 + 连通性预检 / 副本集+隧道告警 / 私钥友好报错。**SSH 认证仅密码 + 私钥两种（ssh-agent 已移除）。** 隧道核心已拆为 `main/ssh/tunnelCore.ts`（纯函数，有单测）+ `tunnel.ts`（ssh2 副作用）。以下为**尚未做**的:
+PR #14（`feat/ssh-agent-auth`，待合并）已实现:主机密钥 TOFU 校验（静默，无 UI，仅首连学习、变更即拒）/ 跳板机（**单跳** ProxyJump，ssh2 嵌套连接，私钥认证）/ `~` 展开与并发隧道句柄竞态修复 / SSH 表单校验 / 连接前 TCP 预检 / 逐跳连通性检测（Check connectivity，SSH 主机与跳板机各自检测、结果默认折叠）/ 副本集+隧道告警 / 私钥友好报错 + 文件选择器。**SSH 认证仅密码 + 私钥两种（ssh-agent 已移除）。** 隧道核心已拆为 `main/ssh/tunnelCore.ts`（纯函数，有单测）+ `tunnel.ts`（ssh2 副作用）。以下为**尚未做**的:
 
 - **运行期 SSH 掉线上报**　`[难度: 中] [风险: 中–高]` —— 隧道在 `ready` 之后掉线不翻状态，`getStatus` 仍报 connected（“假在线”），查询被 30s `serverSelectionTimeout` 拖死。根因:`tunnel.ts` 仅 open 期监听 client error、resolve 后无 close/error 处理；`sessionManager` 不挂运行期监听。**卡点是架构**——本仓目前纯拉取式 IPC，全仓 0 处 `webContents.send`，要把“隧道断→状态 error”推给渲染层需新增一条**单向推送通道**（动 `shared/ipc.ts` + `preload` + `registerIpc` + store 订阅），这条通道也是未来一切实时状态推送的地基。**价值最高的下一步。**
 - **多跳跳板链**　`[难度: 中] [风险: 低]` —— 现仅支持单跳 `SshConfig.jump`。多跳需把 jump 改为链（数组或递归）并在 `tunnel.ts` 顺序嵌套 `connectHop`/`forwardOut`。
 - **跳板机密码认证**　`[难度: 中] [风险: 中]` —— 当前跳板机仅私钥文件认证（带口令私钥已支持，走 `encJumpSshPassphrase`）。要支持跳板机密码，需扩 `connectionStore` 的密钥模型（加 `encJumpSshPassword`）+ ConnectionInput/sanitize/表单。
-- **私钥粘贴内容 / 文件选择器**　`[难度: 低–中] [风险: 低]` —— 私钥现只支持磁盘路径手输。可加 textarea 粘贴内容（走 safeStorage 加密）+ 一个通用 `dialog:openFile` IPC 供“浏览”。
+- **私钥粘贴内容（textarea）**　`[难度: 低–中] [风险: 低]` —— 文件选择器（`dialog:openFile` IPC + 「浏览…」按钮）已实现;尚缺 textarea 直接粘贴私钥内容（走 safeStorage 加密），供不便提供文件路径的场景。
 - **连接总超时 + 取消**　`[难度: 低] [风险: 低]` —— 隧道 20s + mongo 30s 串行最坏 ~50s，renderer 停在 'connecting' 无取消入口。加统一 deadline（`Promise.race` + AbortSignal）+ 取消按钮（参考 `shellEngine` 的 abort 模式）。
 - **隧道 / 驱动自动重连**　`[难度: 中] [风险: 中]` —— 断线后有限次自动重建隧道 + 重连（依赖上面的掉线事件机制）。
 
