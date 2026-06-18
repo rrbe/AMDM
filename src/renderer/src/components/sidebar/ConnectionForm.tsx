@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardPaste, Link } from 'lucide-react'
+import { ClipboardPaste, Link, MessageSquareText } from 'lucide-react'
 import type {
   ConnectionConfig,
   ConnectionInput,
+  DiagnoseStage,
   ScramMechanism,
   SshAuthMethod,
   TestResult
@@ -30,6 +31,84 @@ interface ConnectionFormProps {
   onClose: () => void
 }
 
+/** Per-step ✓/✗ list for one hop's connectivity check (shared by SSH + jump). */
+function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+      {stages.map((s) => {
+        const color = s.status === 'ok' ? '#4ade80' : s.status === 'fail' ? '#f87171' : '#9ca3af'
+        const icon = s.status === 'ok' ? '✓' : s.status === 'fail' ? '✗' : '○'
+        return (
+          <div key={s.key} style={{ fontSize: 12 }}>
+            <span style={{ color, fontWeight: 700, marginRight: 6 }}>{icon}</span>
+            <span>{t(`connection.ssh.stage.${s.key}`)}</span>
+            {s.target && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.target}</span>}
+            {s.ms != null && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.ms}ms</span>}
+            {s.detail && <div style={{ marginLeft: 18, color: '#f87171' }}>{s.detail}</div>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * "Check connectivity" trigger + an overall ✓/✗ and a chevron that toggles the
+ * per-step log — so a passing check stays quiet (just ✓) instead of dumping the
+ * whole list. A fresh result auto-opens on failure and collapses when all-ok.
+ */
+function DiagnoseControl({
+  busy,
+  stages,
+  onRun
+}: {
+  busy: boolean
+  stages: DiagnoseStage[] | null
+  onRun: () => void
+}): JSX.Element {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (stages) setOpen(stages.some((s) => s.status === 'fail'))
+  }, [stages])
+  const allOk = stages != null && stages.every((s) => s.status === 'ok')
+  return (
+    <>
+      <div className="form-row" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Button variant="ghost" type="button" busy={busy} onClick={onRun}>
+          {t('connection.ssh.diagnose')}
+        </Button>
+        {stages != null && !busy && (
+          <>
+            <span style={{ color: allOk ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+              {allOk ? '✓' : '✗'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
+              data-tip={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: open ? 'inherit' : 'var(--fg-3, #9ca3af)'
+              }}
+            >
+              <MessageSquareText size={16} />
+            </button>
+          </>
+        )}
+      </div>
+      {open && stages != null && <DiagnoseResult stages={stages} />}
+    </>
+  )
+}
+
 /**
  * Create / edit a connection. Secret fields (password, sshPassword,
  * sshPassphrase) come back BLANK on edit (the sanitized config only carries
@@ -46,6 +125,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
   const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
+  const pickFile = useAppStore((s) => s.pickFile)
+  const diagnoseConnection = useAppStore((s) => s.diagnoseConnection)
   const updateSettings = useAppStore((s) => s.updateSettings)
   // Remembered "To URL" password choice (persisted in settings.json).
   const rememberedIncludePassword = useAppStore((s) => s.settings.exportIncludeRealPassword)
@@ -99,6 +180,59 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [sshPasswordTouched, setSshPasswordTouched] = useState(false)
   const [sshPassphrase, setSshPassphrase] = useState('')
   const [sshPassphraseTouched, setSshPassphraseTouched] = useState(false)
+
+  // ---- SSH jump host (bastion / ProxyJump) — private key file only ----
+  const [jumpEnabled, setJumpEnabled] = useState(!!editing?.ssh.jump)
+  const [jumpHost, setJumpHost] = useState(editing?.ssh.jump?.host ?? '')
+  const [jumpPort, setJumpPort] = useState(String(editing?.ssh.jump?.port ?? 22))
+  const [jumpUser, setJumpUser] = useState(editing?.ssh.jump?.username ?? '')
+  const [jumpKeyPath, setJumpKeyPath] = useState(editing?.ssh.jump?.privateKeyPath ?? '')
+  const [jumpSshPassphrase, setJumpSshPassphrase] = useState('')
+  const [jumpSshPassphraseTouched, setJumpSshPassphraseTouched] = useState(false)
+  const [sshDiagBusy, setSshDiagBusy] = useState(false)
+  const [sshDiag, setSshDiag] = useState<DiagnoseStage[] | null>(null)
+  const [jumpDiagBusy, setJumpDiagBusy] = useState(false)
+  const [jumpDiag, setJumpDiag] = useState<DiagnoseStage[] | null>(null)
+
+  // Browse for a private key file via the native picker, default to ~/.ssh.
+  const browseKey = async (setter: (v: string) => void): Promise<void> => {
+    const p = await pickFile({ title: tFn('connection.ssh.pickKey'), defaultPath: '~/.ssh' })
+    if (p) setter(p)
+  }
+
+  // Validate SSH fields up front so save fails fast (with a reason) rather than
+  // letting empty/invalid values surface as an opaque error at connect time.
+  const sshError = useMemo<string | undefined>(() => {
+    if (!sshEnabled) return undefined
+    const portOk = (s: string): boolean => {
+      const p = Number(s)
+      return Number.isInteger(p) && p >= 1 && p <= 65535
+    }
+    if (!sshHost.trim()) return tFn('connection.ssh.errHost')
+    if (!sshUser.trim()) return tFn('connection.ssh.errUser')
+    if (!portOk(sshPort)) return tFn('connection.ssh.errPort')
+    if (sshAuthMethod === 'privateKey' && !privateKeyPath.trim()) return tFn('connection.ssh.errKey')
+    if (jumpEnabled) {
+      if (!jumpHost.trim()) return tFn('connection.ssh.errJumpHost')
+      if (!jumpUser.trim()) return tFn('connection.ssh.errJumpUser')
+      if (!portOk(jumpPort)) return tFn('connection.ssh.errJumpPort')
+      if (!jumpKeyPath.trim()) return tFn('connection.ssh.errJumpKey')
+    }
+    return undefined
+  }, [
+    sshEnabled,
+    sshHost,
+    sshUser,
+    sshPort,
+    sshAuthMethod,
+    privateKeyPath,
+    jumpEnabled,
+    jumpHost,
+    jumpUser,
+    jumpPort,
+    jumpKeyPath,
+    tFn
+  ])
 
   // ---- TLS ----
   const [tlsEnabled, setTlsEnabled] = useState(editing?.tls.enabled ?? false)
@@ -208,7 +342,19 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             username: sshUser.trim() || undefined,
             authMethod: sshAuthMethod,
             privateKeyPath:
-              sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined
+              sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined,
+            // Preserve the TOFU-pinned host key across edits (verified silently at connect).
+            pinnedHostKey: editing?.ssh.pinnedHostKey,
+            jump: jumpEnabled
+              ? {
+                  host: jumpHost.trim() || undefined,
+                  port: Number(jumpPort) || 22,
+                  username: jumpUser.trim() || undefined,
+                  authMethod: 'privateKey',
+                  privateKeyPath: jumpKeyPath.trim() || undefined,
+                  pinnedHostKey: editing?.ssh.jump?.pinnedHostKey
+                }
+              : undefined
           },
           tls: {
             enabled: tlsEnabled,
@@ -221,6 +367,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         if (passwordTouched) input.password = password
         if (sshPasswordTouched) input.sshPassword = sshPassword
         if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
+        if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
         return input
       },
     [
@@ -249,6 +396,13 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       sshPasswordTouched,
       sshPassphrase,
       sshPassphraseTouched,
+      jumpEnabled,
+      jumpHost,
+      jumpPort,
+      jumpUser,
+      jumpKeyPath,
+      jumpSshPassphrase,
+      jumpSshPassphraseTouched,
       tlsEnabled,
       allowInvalidCertificates,
       caFile,
@@ -269,6 +423,20 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     const r = await testConnection(buildInput())
     setTest(r)
     setTesting(false)
+  }
+
+  const runSshDiag = async (): Promise<void> => {
+    setSshDiagBusy(true)
+    setSshDiag(null)
+    setSshDiag(await diagnoseConnection(buildInput(), 'ssh'))
+    setSshDiagBusy(false)
+  }
+
+  const runJumpDiag = async (): Promise<void> => {
+    setJumpDiagBusy(true)
+    setJumpDiag(null)
+    setJumpDiag(await diagnoseConnection(buildInput(), 'jump'))
+    setJumpDiagBusy(false)
   }
 
   const secretPlaceholder = (has?: boolean): string =>
@@ -297,11 +465,21 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 : tFn('connection.testResult.failed', { error: test.error ?? 'unknown' })}
             </span>
           )}
+          {sshError && (
+            <span className="test-result err" style={{ marginTop: 0, padding: '4px 8px' }}>
+              {sshError}
+            </span>
+          )}
           <span className="spacer" />
           <Button variant="ghost" onClick={onClose}>
             {tFn('connection.action.cancel')}
           </Button>
-          <Button variant="primary" busy={saving} disabled={!host.trim()} onClick={() => void submit()}>
+          <Button
+            variant="primary"
+            busy={saving}
+            disabled={!host.trim() || !!sshError}
+            onClick={() => void submit()}
+          >
             {tFn('connection.action.save')}
           </Button>
         </>
@@ -410,6 +588,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             </Field>
           </div>
 
+          {sshEnabled && replicaSet.trim() && (
+            <div className="hint">{tFn('connection.general.replicaSetSshIgnored')}</div>
+          )}
+
           {Object.keys(options).length > 0 && (
             <div className="hint">
               {tFn('connection.general.extraOptions', { opts: Object.entries(options).map(([k, v]) => `${k}=${v}`).join(' · ') })}
@@ -510,7 +692,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 </Field>
               </div>
 
-              {sshAuthMethod === 'password' ? (
+              {sshAuthMethod === 'password' && (
                 <Field label={tFn('connection.ssh.password')}>
                   <Input
                     type="password"
@@ -522,29 +704,100 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     }}
                   />
                 </Field>
-              ) : (
+              )}
+
+              {sshAuthMethod === 'privateKey' && (
                 <>
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
-                    <Input
-                      value={privateKeyPath}
-                      onChange={(e) => setPrivateKeyPath(e.target.value)}
-                      placeholder="~/.ssh/id_ed25519"
-                    />
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <Input
+                        style={{ flex: 1, minWidth: 0 }}
+                        value={privateKeyPath}
+                        onChange={(e) => setPrivateKeyPath(e.target.value)}
+                        placeholder="~/.ssh/id_ed25519"
+                      />
+                      <Button variant="ghost" type="button" onClick={() => void browseKey(setPrivateKeyPath)}>
+                        {tFn('connection.ssh.browse')}
+                      </Button>
+                    </div>
                   </Field>
-                  <Field
-                    label={tFn('connection.ssh.passphrase')}
-                    hint={tFn('connection.ssh.passphraseHint')}
-                  >
+                  <Field label={tFn('connection.ssh.passphrase')}>
                     <Input
                       type="password"
                       value={sshPassphrase}
-                      placeholder={secretPlaceholder(editing?.hasSshPassphrase)}
+                      placeholder={
+                        secretPlaceholder(editing?.hasSshPassphrase) ||
+                        tFn('connection.ssh.passphraseHint')
+                      }
                       onChange={(e) => {
                         setSshPassphrase(e.target.value)
                         setSshPassphraseTouched(true)
                       }}
                     />
                   </Field>
+                </>
+              )}
+
+              {/* Connectivity check for the SSH/target host (through the jump if one is set). */}
+              <DiagnoseControl busy={sshDiagBusy} stages={sshDiag} onRun={() => void runSshDiag()} />
+
+              {/* Jump host (bastion / ProxyJump): reach the target through it. */}
+              <div className="form-row" style={{ marginTop: 8 }}>
+                <Checkbox
+                  checked={jumpEnabled}
+                  onCheckedChange={setJumpEnabled}
+                  label={tFn('connection.ssh.jumpEnableLabel')}
+                />
+              </div>
+
+              {jumpEnabled && (
+                <>
+                  <div className="form-grid">
+                    <Field label={tFn('connection.ssh.jumpHost')}>
+                      <Input value={jumpHost} onChange={(e) => setJumpHost(e.target.value)} />
+                    </Field>
+                    <Field label={tFn('connection.ssh.jumpPort')}>
+                      <Input
+                        value={jumpPort}
+                        onChange={(e) => setJumpPort(e.target.value)}
+                        placeholder="22"
+                      />
+                    </Field>
+                  </div>
+                  <Field label={tFn('connection.ssh.jumpUsername')}>
+                    <Input value={jumpUser} onChange={(e) => setJumpUser(e.target.value)} />
+                  </Field>
+
+                  <Field label={tFn('connection.ssh.privateKeyPath')}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <Input
+                        style={{ flex: 1, minWidth: 0 }}
+                        value={jumpKeyPath}
+                        onChange={(e) => setJumpKeyPath(e.target.value)}
+                        placeholder="~/.ssh/id_ed25519"
+                      />
+                      <Button variant="ghost" type="button" onClick={() => void browseKey(setJumpKeyPath)}>
+                        {tFn('connection.ssh.browse')}
+                      </Button>
+                    </div>
+                  </Field>
+                  <Field label={tFn('connection.ssh.jumpPassphrase')}>
+                    <Input
+                      type="password"
+                      value={jumpSshPassphrase}
+                      placeholder={
+                        secretPlaceholder(editing?.hasJumpSshPassphrase) ||
+                        tFn('connection.ssh.passphraseHint')
+                      }
+                      onChange={(e) => {
+                        setJumpSshPassphrase(e.target.value)
+                        setJumpSshPassphraseTouched(true)
+                      }}
+                    />
+                  </Field>
+
+                  {/* Connectivity check for the jump host alone. */}
+                  <DiagnoseControl busy={jumpDiagBusy} stages={jumpDiag} onRun={() => void runJumpDiag()} />
                 </>
               )}
             </>

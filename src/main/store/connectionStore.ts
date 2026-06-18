@@ -8,11 +8,12 @@ interface StoredSecrets {
   encPassword?: string
   encSshPassword?: string
   encSshPassphrase?: string
+  encJumpSshPassphrase?: string
 }
 
 type StoredConnection = Omit<
   ConnectionConfig,
-  'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase'
+  'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase'
 > &
   StoredSecrets
 
@@ -78,12 +79,13 @@ class ConnectionStore {
   }
 
   private sanitize(c: StoredConnection): ConnectionConfig {
-    const { encPassword, encSshPassword, encSshPassphrase, ...rest } = c
+    const { encPassword, encSshPassword, encSshPassphrase, encJumpSshPassphrase, ...rest } = c
     return {
       ...rest,
       hasPassword: !!encPassword,
       hasSshPassword: !!encSshPassword,
-      hasSshPassphrase: !!encSshPassphrase
+      hasSshPassphrase: !!encSshPassphrase,
+      hasJumpSshPassphrase: !!encJumpSshPassphrase
     }
   }
 
@@ -113,6 +115,7 @@ class ConnectionStore {
       encPassword: this.nextSecret(existing?.encPassword, input.password),
       encSshPassword: this.nextSecret(existing?.encSshPassword, input.sshPassword),
       encSshPassphrase: this.nextSecret(existing?.encSshPassphrase, input.sshPassphrase),
+      encJumpSshPassphrase: this.nextSecret(existing?.encJumpSshPassphrase, input.jumpSshPassphrase),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
     }
@@ -129,12 +132,33 @@ class ConnectionStore {
     this.persist()
   }
 
+  /**
+   * Pin the SSH host-key fingerprint learned on first connect (TOFU). No-op if
+   * the connection is gone or already pinned to the same value. The fingerprint
+   * is not a secret, so it lives in plaintext alongside the rest of the config.
+   */
+  recordSshHostKey(id: string, fingerprint: string): void {
+    const stored = this.data.connections.find((c) => c.id === id)
+    if (!stored || stored.ssh.pinnedHostKey === fingerprint) return
+    stored.ssh = { ...stored.ssh, pinnedHostKey: fingerprint }
+    this.persist()
+  }
+
+  /** Pin the jump (bastion) host-key fingerprint learned on first connect (TOFU). */
+  recordSshJumpHostKey(id: string, fingerprint: string): void {
+    const stored = this.data.connections.find((c) => c.id === id)
+    if (!stored || !stored.ssh.jump || stored.ssh.jump.pinnedHostKey === fingerprint) return
+    stored.ssh = { ...stored.ssh, jump: { ...stored.ssh.jump, pinnedHostKey: fingerprint } }
+    this.persist()
+  }
+
   /** Internal-only: decrypted secrets for use at connect time. Never sent over IPC. */
   getDecrypted(id: string): {
     config: ConnectionConfig
     password?: string
     sshPassword?: string
     sshPassphrase?: string
+    jumpSshPassphrase?: string
   } | null {
     const stored = this.data.connections.find((c) => c.id === id)
     if (!stored) return null
@@ -142,7 +166,8 @@ class ConnectionStore {
       config: this.sanitize(stored),
       password: this.decrypt(stored.encPassword),
       sshPassword: this.decrypt(stored.encSshPassword),
-      sshPassphrase: this.decrypt(stored.encSshPassphrase)
+      sshPassphrase: this.decrypt(stored.encSshPassphrase),
+      jumpSshPassphrase: this.decrypt(stored.encJumpSshPassphrase)
     }
   }
 }

@@ -19,6 +19,8 @@ import type {
   ConnectionStatus,
   DatabaseInfo,
   DataOpResult,
+  DiagnoseScope,
+  DiagnoseStage,
   DocMutateRequest,
   DocMutateResult,
   DocSetFieldRequest,
@@ -161,6 +163,10 @@ interface AppState {
   testConnection(input: ConnectionInput): Promise<TestResult>
   /** Build a connection string from the current form fields ("To URL"). */
   buildConnectionUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string | null>
+  /** Open a native file picker (e.g. SSH private key); resolves the path or null. */
+  pickFile(opts?: { title?: string; defaultPath?: string }): Promise<string | null>
+  /** Run a single-hop SSH connectivity check (target or jump) for the form fields. */
+  diagnoseConnection(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
   /** Back up all connections to a JSON file (secrets excluded). */
   exportConnections(): Promise<void>
   /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
@@ -475,6 +481,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       set({ lastError: tr('notify.buildUriFailed', { error: errMessage(e) }) })
       return null
+    }
+  },
+
+  async pickFile(opts) {
+    try {
+      return await window.api.dialog.openFile(opts)
+    } catch {
+      return null
+    }
+  },
+
+  async diagnoseConnection(input, scope) {
+    try {
+      return await window.api.connections.diagnose(input, scope)
+    } catch (e) {
+      set({ lastError: tr('notify.diagnoseFailed', { error: errMessage(e) }) })
+      return []
     }
   },
 

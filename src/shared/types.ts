@@ -24,6 +24,23 @@ export interface AuthConfig {
 
 export type SshAuthMethod = 'password' | 'privateKey'
 
+/**
+ * A single SSH hop in front of the target (a bastion / jump host, i.e. ProxyJump).
+ * Authenticates via a private key file only; a passphrase for that key is
+ * carried out-of-band as `ConnectionInput.jumpSshPassphrase` (encrypted at rest,
+ * like the other secrets) rather than on this config object.
+ */
+export interface SshHopConfig {
+  host?: string
+  port?: number // default 22
+  username?: string
+  /** Always 'privateKey' — a jump hop never uses password auth (a bastion should be key-secured). */
+  authMethod?: 'privateKey'
+  privateKeyPath?: string
+  /** Pinned SHA256 host-key fingerprint (hex), learned via TOFU. Not a secret. */
+  pinnedHostKey?: string
+}
+
 export interface SshConfig {
   enabled: boolean
   host?: string
@@ -32,6 +49,13 @@ export interface SshConfig {
   authMethod?: SshAuthMethod
   /** Path to a private key file on disk (we read it at connect time). */
   privateKeyPath?: string
+  /**
+   * Pinned SHA256 host-key fingerprint (hex). Learned on first connect (TOFU)
+   * and verified thereafter; a mismatch blocks the connection. Not a secret.
+   */
+  pinnedHostKey?: string
+  /** Optional single bastion in front of the target (reach the target through it). */
+  jump?: SshHopConfig
 }
 
 export interface TlsConfig {
@@ -73,6 +97,7 @@ export interface ConnectionConfig {
   hasPassword?: boolean
   hasSshPassword?: boolean
   hasSshPassphrase?: boolean
+  hasJumpSshPassphrase?: boolean
 
   createdAt: number
   updatedAt: number
@@ -84,10 +109,38 @@ export interface ConnectionConfig {
  * keep the previously stored value; pass empty string to clear it.
  */
 export interface ConnectionInput
-  extends Omit<ConnectionConfig, 'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'createdAt' | 'updatedAt'> {
+  extends Omit<
+    ConnectionConfig,
+    'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
+  > {
   password?: string
   sshPassword?: string
   sshPassphrase?: string
+  /** Passphrase for the jump host's private key. */
+  jumpSshPassphrase?: string
+}
+
+/** Options for the native "open file" picker exposed over IPC. */
+export interface OpenFileOptions {
+  title?: string
+  defaultPath?: string
+  filters?: { name: string; extensions: string[] }[]
+}
+
+/** Which hop a connectivity check targets: the SSH/target host, or the jump host. */
+export type DiagnoseScope = 'ssh' | 'jump'
+
+/** One step of an SSH-tunnel connectivity diagnosis. `key` maps to a localized label. */
+export interface DiagnoseStage {
+  /** Stable stage id: tcp-jump | ssh-jump | tcp-target | ssh-target | tcp-ssh | ssh | config */
+  key: string
+  /** The host:port this step checks (empty for a config error). */
+  target: string
+  status: 'ok' | 'fail' | 'skip'
+  /** Elapsed milliseconds (omitted for skipped steps). */
+  ms?: number
+  /** Failure reason (classified, human-readable) when status is 'fail'. */
+  detail?: string
 }
 
 // ---------------------------------------------------------------------------

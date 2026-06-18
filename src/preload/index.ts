@@ -12,6 +12,7 @@ const api: Api = {
     save: (input) => ipcRenderer.invoke(IPC.connectionsSave, input),
     delete: (id) => ipcRenderer.invoke(IPC.connectionsDelete, id),
     test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input),
+    diagnose: (input, scope) => ipcRenderer.invoke(IPC.connectionsDiagnose, input, scope),
     buildUri: (input, opts) => ipcRenderer.invoke(IPC.connectionsBuildUri, input, opts),
     export: () => ipcRenderer.invoke(IPC.connectionsExport),
     import: () => ipcRenderer.invoke(IPC.connectionsImport)
@@ -56,6 +57,9 @@ const api: Api = {
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch)
+  },
+  dialog: {
+    openFile: (opts) => ipcRenderer.invoke(IPC.dialogOpenFile, opts)
   }
 }
 

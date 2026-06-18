@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { MongoClient } from 'mongodb'
 import type { ConnectionStatus, TestResult } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { SshTunnel } from '../ssh/tunnel'
+import { buildTunnelOptions } from '../ssh/tunnelCore'
 import { buildClientArgs, type DecryptedConnection } from './uri'
 
 interface Session {
@@ -32,31 +32,11 @@ class SessionManager {
     return this.sessions.get(id)?.tunnel?.localPort
   }
 
-  private async openTunnel(dec: DecryptedConnection): Promise<number> {
-    const { config } = dec
-    if (config.useSrv) {
-      throw new Error('SSH tunnel with SRV/Atlas is not supported — use a direct host:port.')
-    }
+  private async openTunnel(dec: DecryptedConnection): Promise<SshTunnel> {
     const tunnel = new SshTunnel()
-    const port = await tunnel.open({
-      sshHost: config.ssh.host || '',
-      sshPort: config.ssh.port || 22,
-      username: config.ssh.username || '',
-      password: config.ssh.authMethod === 'password' ? dec.sshPassword : undefined,
-      privateKey:
-        config.ssh.authMethod === 'privateKey' && config.ssh.privateKeyPath
-          ? readFileSync(config.ssh.privateKeyPath)
-          : undefined,
-      passphrase: dec.sshPassphrase,
-      destHost: config.host,
-      destPort: config.port ?? 27017
-    })
-    // stash tunnel so we can close it on disconnect
-    this.pendingTunnel = tunnel
-    return port
+    await tunnel.open(buildTunnelOptions(dec))
+    return tunnel
   }
-
-  private pendingTunnel?: SshTunnel
 
   private async probe(client: MongoClient): Promise<{ topology?: string; serverVersion?: string }> {
     try {
@@ -84,11 +64,12 @@ class SessionManager {
       return status
     }
 
+    let tunnel: SshTunnel | undefined
     try {
-      this.pendingTunnel = undefined
       let tunnelPort: number | undefined
       if (dec.config.ssh.enabled) {
-        tunnelPort = await this.openTunnel(dec)
+        tunnel = await this.openTunnel(dec)
+        tunnelPort = tunnel.localPort
       }
 
       const { uri, options } = buildClientArgs(dec, tunnelPort)
@@ -102,12 +83,17 @@ class SessionManager {
         topology: info.topology,
         serverVersion: info.serverVersion
       }
-      this.sessions.set(id, { client, tunnel: this.pendingTunnel, status })
-      this.pendingTunnel = undefined
+      this.sessions.set(id, { client, tunnel, status })
+      // TOFU: persist the host key(s) learned on first connect so later connects verify them.
+      if (tunnel?.learnedHostKey) {
+        connectionStore.recordSshHostKey(id, tunnel.learnedHostKey)
+      }
+      if (tunnel?.learnedJumpHostKey) {
+        connectionStore.recordSshJumpHostKey(id, tunnel.learnedJumpHostKey)
+      }
       return status
     } catch (err) {
-      this.pendingTunnel?.close()
-      this.pendingTunnel = undefined
+      tunnel?.close()
       const status: ConnectionStatus = {
         id,
         state: 'error',
@@ -135,21 +121,8 @@ class SessionManager {
     try {
       let tunnelPort: number | undefined
       if (dec.config.ssh.enabled) {
-        if (dec.config.useSrv) throw new Error('SSH tunnel with SRV/Atlas is not supported.')
         tunnel = new SshTunnel()
-        tunnelPort = await tunnel.open({
-          sshHost: dec.config.ssh.host || '',
-          sshPort: dec.config.ssh.port || 22,
-          username: dec.config.ssh.username || '',
-          password: dec.config.ssh.authMethod === 'password' ? dec.sshPassword : undefined,
-          privateKey:
-            dec.config.ssh.authMethod === 'privateKey' && dec.config.ssh.privateKeyPath
-              ? readFileSync(dec.config.ssh.privateKeyPath)
-              : undefined,
-          passphrase: dec.sshPassphrase,
-          destHost: dec.config.host,
-          destPort: dec.config.port ?? 27017
-        })
+        tunnelPort = await tunnel.open(buildTunnelOptions(dec))
       }
       const { uri, options } = buildClientArgs(dec, tunnelPort)
       client = new MongoClient(uri, options)

@@ -62,7 +62,8 @@
     "unknown": "未知",
     "clipboardUnavailable": "複製失敗：剪貼簿不可用",
     "copied": "已複製到剪貼簿",
-    "buildUriFailed": "產生連線字串失敗：{{error}}"
+    "buildUriFailed": "產生連線字串失敗：{{error}}",
+    "diagnoseFailed": "連通性檢測失敗：{{error}}"
   },
   "connection": {
     "title": { "edit": "編輯連線", "new": "新增連線" },
@@ -95,6 +96,7 @@
       "srvHost": "SRV 主機",
       "port": "連接埠",
       "replicaSet": "副本集",
+      "replicaSetSshIgnored": "啟用 SSH 通道時副本集名稱將被忽略（以單節點 directConnection 連線）。",
       "defaultDatabase": "預設資料庫",
       "extraOptions": "額外選項：{{opts}}"
     },
@@ -118,7 +120,34 @@
       "password": "SSH 密碼",
       "privateKeyPath": "私密金鑰路徑",
       "passphrase": "私密金鑰密碼短語",
-      "passphraseHint": "若私密金鑰無密碼短語，請留空。"
+      "passphraseHint": "若私密金鑰無密碼短語，請留空。",
+      "errHost": "請填寫 SSH 主機",
+      "errUser": "請填寫 SSH 使用者名稱",
+      "errPort": "SSH 連接埠需為 1–65535 之間的整數",
+      "errKey": "私密金鑰驗證需填寫金鑰路徑",
+      "jumpEnableLabel": "透過跳板機連線（先連跳板機再到目標）",
+      "jumpHost": "跳板機主機",
+      "jumpPort": "跳板機連接埠",
+      "jumpUsername": "跳板機使用者名稱",
+      "errJumpHost": "請填寫跳板機主機",
+      "errJumpUser": "請填寫跳板機使用者名稱",
+      "errJumpPort": "跳板機連接埠需為 1–65535 之間的整數",
+      "errJumpKey": "跳板機私密金鑰驗證需填寫金鑰路徑",
+      "browse": "瀏覽…",
+      "pickKey": "選擇私密金鑰檔",
+      "jumpPassphrase": "跳板機私密金鑰密碼短語",
+      "diagnose": "檢測連通性",
+      "diagShow": "展開詳情",
+      "diagHide": "收起詳情",
+      "stage": {
+        "tcp-jump": "TCP 可達跳板機",
+        "ssh-jump": "登入跳板機",
+        "tcp-target": "經跳板機到達目標 SSH 連接埠",
+        "ssh-target": "登入目標主機",
+        "tcp-ssh": "TCP 可達 SSH 主機",
+        "ssh": "登入 SSH 主機",
+        "config": "設定錯誤"
+      }
     },
     "tls": {
       "enableLabel": "啟用 TLS/SSL",

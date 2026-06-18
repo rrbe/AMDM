@@ -62,7 +62,8 @@
     "unknown": "未知",
     "clipboardUnavailable": "复制失败：剪贴板不可用",
     "copied": "已复制到剪贴板",
-    "buildUriFailed": "生成连接串失败：{{error}}"
+    "buildUriFailed": "生成连接串失败：{{error}}",
+    "diagnoseFailed": "连通性检测失败：{{error}}"
   },
   "connection": {
     "title": { "edit": "编辑连接", "new": "新建连接" },
@@ -95,6 +96,7 @@
       "srvHost": "SRV 主机",
       "port": "端口",
       "replicaSet": "副本集",
+      "replicaSetSshIgnored": "启用 SSH 隧道时副本集名称将被忽略（按单节点 directConnection 连接）。",
       "defaultDatabase": "默认数据库",
       "extraOptions": "额外选项：{{opts}}"
     },
@@ -118,7 +120,34 @@
       "password": "SSH 密码",
       "privateKeyPath": "私钥路径",
       "passphrase": "私钥密码短语",
-      "passphraseHint": "如果私钥没有密码短语，请留空。"
+      "passphraseHint": "如果私钥没有密码短语，请留空。",
+      "errHost": "请填写 SSH 主机",
+      "errUser": "请填写 SSH 用户名",
+      "errPort": "SSH 端口需为 1–65535 之间的整数",
+      "errKey": "私钥认证需填写私钥路径",
+      "jumpEnableLabel": "通过跳板机连接（先连跳板机再到目标）",
+      "jumpHost": "跳板机主机",
+      "jumpPort": "跳板机端口",
+      "jumpUsername": "跳板机用户名",
+      "errJumpHost": "请填写跳板机主机",
+      "errJumpUser": "请填写跳板机用户名",
+      "errJumpPort": "跳板机端口需为 1–65535 之间的整数",
+      "errJumpKey": "跳板机私钥认证需填写私钥路径",
+      "browse": "浏览…",
+      "pickKey": "选择私钥文件",
+      "jumpPassphrase": "跳板机私钥密码短语",
+      "diagnose": "检测连通性",
+      "diagShow": "展开详情",
+      "diagHide": "收起详情",
+      "stage": {
+        "tcp-jump": "TCP 可达跳板机",
+        "ssh-jump": "登录跳板机",
+        "tcp-target": "经跳板机到达目标 SSH 端口",
+        "ssh-target": "登录目标主机",
+        "tcp-ssh": "TCP 可达 SSH 主机",
+        "ssh": "登录 SSH 主机",
+        "config": "配置错误"
+      }
     },
     "tls": {
       "enableLabel": "启用 TLS/SSL",

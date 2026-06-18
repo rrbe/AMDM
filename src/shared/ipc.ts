@@ -10,6 +10,9 @@ import type {
   ConnectionInput,
   ConnectionStatus,
   DatabaseInfo,
+  DiagnoseScope,
+  DiagnoseStage,
+  OpenFileOptions,
   DataOpResult,
   DocMutateRequest,
   DocMutateResult,
@@ -32,6 +35,7 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
   connectionsExport: 'connections:export',
   connectionsImport: 'connections:import',
@@ -64,7 +68,9 @@ export const IPC = {
   ioImport: 'io:import',
 
   settingsGet: 'settings:get',
-  settingsUpdate: 'settings:update'
+  settingsUpdate: 'settings:update',
+
+  dialogOpenFile: 'dialog:openFile'
 } as const
 
 /** The API shape exposed on `window.api` (see preload). */
@@ -74,6 +80,8 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    /** Single-hop SSH connectivity check (`scope`: the target host or the jump host). */
+    diagnose(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
     /**
      * Build a connection string from the CURRENT form fields ("To URL" export) —
      * works while creating or editing. With `includePassword`, the plaintext
@@ -130,5 +138,9 @@ export interface Api {
     get(): Promise<AppSettings>
     /** Merge a partial patch and return the full updated settings. */
     update(patch: Partial<AppSettings>): Promise<AppSettings>
+  }
+  dialog: {
+    /** Native open-file picker; resolves the chosen absolute path, or null if cancelled. */
+    openFile(opts?: OpenFileOptions): Promise<string | null>
   }
 }
