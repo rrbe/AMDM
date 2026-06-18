@@ -47,8 +47,14 @@
   align-items: center;
   justify-content: center;
   padding: 3px;
+  border: none;
+  background: transparent;
   border-radius: var(--radius-sm);
   color: var(--fg-2);
+}
+.side-section-more:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
 }
 .side-section-more svg {
   display: block;
@@ -216,6 +222,9 @@
   right: 4px;
   padding: 3px;
   line-height: 1;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
   color: var(--fg-3);
   opacity: 0;
 }
