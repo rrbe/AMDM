@@ -9,23 +9,25 @@
 }
 
 /* ---- query tab strip (multi-tab workspace) ----
-   Modern rounded "pill" tabs: inactive transparent + muted, active lifts to the
-   content surface with a soft shadow. Close / new are bare icon buttons (border
-   + bg explicitly cleared so the @layer base button box doesn't leak through). */
+   Folder tabs, UNIFIED with the result-tab strip (.rtab in results.css uses the
+   same declarations). The active tab lifts to the header surface below it
+   (--bg-1) with a blue top-rule — the single signal of "this tab's content is
+   showing". Close / new are bare icon buttons (border + bg cleared so the
+   @layer base button box can't leak). */
 .tab-bar {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 36px;
-  padding: 0 8px;
+  align-items: stretch;
+  gap: 2px;
+  height: 32px;
+  padding: 6px 8px 0;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
 }
 .tab-strip {
   display: flex;
-  align-items: center;
-  gap: 3px;
+  align-items: stretch;
+  gap: 2px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -39,9 +41,11 @@
   align-items: center;
   gap: 6px;
   max-width: 200px;
-  height: 26px;
-  padding: 0 5px 0 10px;
-  border-radius: var(--radius-sm);
+  padding: 0 6px 0 11px;
+  /* Pull over the strip's bottom rule so the active tab merges into the header
+     surface below (folder-tab connection). */
+  margin-bottom: -1px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: transparent;
   color: var(--fg-2);
   font-size: var(--fs-sm);
@@ -57,9 +61,11 @@
   color: var(--fg-1);
 }
 .qtab.active {
-  background: var(--bg-0);
+  position: relative;
+  z-index: 1;
+  background: var(--bg-1);
   color: var(--fg-0);
-  box-shadow: var(--shadow-sm);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 .qtab-label {
   overflow: hidden;

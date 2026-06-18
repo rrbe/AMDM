@@ -6,14 +6,14 @@
   flex-direction: column;
   overflow: hidden;
 }
-/* Result-tab strip — one chip per kept run, above the result bar. Visually a
-   smaller sibling of the query-tab strip (.qtab). */
+/* Result-tab strip — one chip per kept run, above the result bar. UNIFIED with
+   the query-tab strip (.qtab in work-area.css): identical folder-tab styling. */
 .result-tabs {
   display: flex;
   align-items: stretch;
-  gap: 3px;
-  height: 26px;
-  padding: 3px 6px 0;
+  gap: 2px;
+  height: 32px;
+  padding: 6px 8px 0;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
@@ -26,28 +26,32 @@
 .rtab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 160px;
-  padding: 0 3px 0 8px;
+  gap: 6px;
+  max-width: 200px;
+  padding: 0 6px 0 11px;
+  margin-bottom: -1px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: transparent;
-  color: var(--fg-3);
+  color: var(--fg-2);
   font-size: var(--fs-sm);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 .rtab:hover {
-  background: var(--bg-3);
+  background: var(--bg-2);
   color: var(--fg-1);
 }
-/* The active result needs to pop (the user compares runs by switching here):
-   accent top bar + bold + full-contrast text on the panel background, while
-   inactive chips stay quiet (transparent on the strip's bg-app). */
+/* Active = lifted to the header surface (--bg-1) with the blue top-rule — the one
+   signal of which run is shown. Identical to .qtab.active. */
 .rtab.active {
+  position: relative;
+  z-index: 1;
   background: var(--bg-1);
   color: var(--fg-0);
-  font-weight: 600;
   box-shadow: inset 0 2px 0 var(--accent);
 }
 .rtab-label {
@@ -58,10 +62,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
   border-radius: var(--radius-sm);
   color: var(--fg-3);
-  opacity: 0.65;
+  opacity: 0.7;
 }
 .rtab:hover .rtab-close,
 .rtab.active .rtab-close {
