@@ -1,19 +1,39 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, shell, nativeImage } from 'electron'
+import { app, BrowserWindow, shell, nativeImage, screen } from 'electron'
 import appIcon from '../../resources/icon.png?asset'
 import { connectionStore } from './store/connectionStore'
 import { queryStore } from './store/queryStore'
 import { settingsStore } from './store/settingsStore'
+import { windowStateStore } from './store/windowStateStore'
+import { resolveWindowBounds } from './store/windowStateCore'
 import { sessionManager } from './mongo/sessionManager'
 import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
 
+// Default geometry, also the floor on size. Saved bounds are reconciled against
+// these + the connected displays in windowStateCore (off-screen safety).
+const WINDOW_DEFAULTS = { width: 1440, height: 920, minWidth: 980, minHeight: 620 }
+
 function createWindow(): void {
+  const saved = windowStateStore.get()
+  const bounds = resolveWindowBounds(
+    saved.bounds,
+    screen.getAllDisplays().map((d) => d.workArea),
+    {
+      minWidth: WINDOW_DEFAULTS.minWidth,
+      minHeight: WINDOW_DEFAULTS.minHeight,
+      defaultWidth: WINDOW_DEFAULTS.width,
+      defaultHeight: WINDOW_DEFAULTS.height
+    }
+  )
+
   const win = new BrowserWindow({
-    width: 1440,
-    height: 920,
-    minWidth: 980,
-    minHeight: 620,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
+    minWidth: WINDOW_DEFAULTS.minWidth,
+    minHeight: WINDOW_DEFAULTS.minHeight,
     show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     // Vertically center the traffic lights within the slim 30px title bar
@@ -30,7 +50,30 @@ function createWindow(): void {
     }
   })
 
+  if (saved.isMaximized) win.maximize()
+
   win.on('ready-to-show', () => win.show())
+
+  // Remember the window geometry across launches. getNormalBounds() returns the
+  // restored (un-maximized) rect, so re-maximizing next launch still restores to
+  // a sane size. Debounced because resize/move fire in bursts while dragging.
+  let persistTimer: ReturnType<typeof setTimeout> | null = null
+  const persistBounds = (): void => {
+    if (win.isDestroyed()) return
+    windowStateStore.save({ bounds: win.getNormalBounds(), isMaximized: win.isMaximized() })
+  }
+  const schedulePersist = (): void => {
+    if (persistTimer) clearTimeout(persistTimer)
+    persistTimer = setTimeout(persistBounds, 400)
+  }
+  win.on('resize', schedulePersist)
+  win.on('move', schedulePersist)
+  win.on('maximize', schedulePersist)
+  win.on('unmaximize', schedulePersist)
+  win.on('close', () => {
+    if (persistTimer) clearTimeout(persistTimer)
+    persistBounds() // flush synchronously before the window goes away
+  })
 
   // Dev diagnostics: surface renderer console + crashes in the terminal.
   // (Open DevTools yourself with Cmd/Ctrl+Alt+I when you need them.)
@@ -73,6 +116,7 @@ app.whenReady().then(() => {
   connectionStore.init()
   queryStore.init()
   settingsStore.init()
+  windowStateStore.init()
   registerIpc()
   createWindow()
 
