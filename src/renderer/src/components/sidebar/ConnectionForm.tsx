@@ -36,17 +36,19 @@ interface ConnectionFormProps {
 function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): JSX.Element {
   const { t } = useTranslation()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+    <div className="mt-1 flex flex-col gap-1">
       {stages.map((s) => {
-        const color = s.status === 'ok' ? '#4ade80' : s.status === 'fail' ? '#f87171' : '#9ca3af'
+        const color = s.status === 'ok' ? 'var(--ok)' : s.status === 'fail' ? 'var(--err)' : 'var(--fg-3)'
         const icon = s.status === 'ok' ? '✓' : s.status === 'fail' ? '✗' : '○'
         return (
-          <div key={s.key} style={{ fontSize: 12 }}>
-            <span style={{ color, fontWeight: 700, marginRight: 6 }}>{icon}</span>
+          <div key={s.key} className="text-[12px]">
+            <span className="mr-1.5 font-bold" style={{ color }}>
+              {icon}
+            </span>
             <span>{t(`connection.ssh.stage.${s.key}`)}</span>
-            {s.target && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.target}</span>}
-            {s.ms != null && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.ms}ms</span>}
-            {s.detail && <div style={{ marginLeft: 18, color: '#f87171' }}>{s.detail}</div>}
+            {s.target && <span className="ml-1.5 opacity-60">{s.target}</span>}
+            {s.ms != null && <span className="ml-1.5 opacity-60">{s.ms}ms</span>}
+            {s.detail && <div className="ml-[18px] text-destructive">{s.detail}</div>}
           </div>
         )
       })}
@@ -76,13 +78,13 @@ function DiagnoseControl({
   const allOk = stages != null && stages.every((s) => s.status === 'ok')
   return (
     <>
-      <div className="form-row" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="mt-2 flex items-center gap-2">
         <Button variant="ghost" type="button" busy={busy} onClick={onRun}>
           {t('connection.ssh.diagnose')}
         </Button>
         {stages != null && !busy && (
           <>
-            <span style={{ color: allOk ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+            <span className="font-bold" style={{ color: allOk ? 'var(--ok)' : 'var(--err)' }}>
               {allOk ? '✓' : '✗'}
             </span>
             <button
@@ -90,15 +92,10 @@ function DiagnoseControl({
               onClick={() => setOpen((v) => !v)}
               aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
               data-tip={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                color: open ? 'inherit' : 'var(--fg-3, #9ca3af)'
-              }}
+              className={cn(
+                'inline-flex cursor-pointer items-center border-0 bg-transparent p-0',
+                open ? 'text-foreground' : 'text-[var(--fg-3)]'
+              )}
             >
               <MessageSquareText size={16} />
             </button>
@@ -733,9 +730,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               {sshAuthMethod === 'privateKey' && (
                 <>
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div className="flex items-center gap-2">
                       <Input
-                        style={{ flex: 1, minWidth: 0 }}
+                        className="min-w-0 flex-1"
                         value={privateKeyPath}
                         onChange={(e) => setPrivateKeyPath(e.target.value)}
                         placeholder="~/.ssh/id_ed25519"
@@ -793,9 +790,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   </Field>
 
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div className="flex items-center gap-2">
                       <Input
-                        style={{ flex: 1, minWidth: 0 }}
+                        className="min-w-0 flex-1"
                         value={jumpKeyPath}
                         onChange={(e) => setJumpKeyPath(e.target.value)}
                         placeholder="~/.ssh/id_ed25519"
