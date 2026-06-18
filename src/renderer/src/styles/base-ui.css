@@ -11,19 +11,15 @@
 
 /* ---- Dialog (ui/Dialog → backs common/Modal + the url-popups) ----
    Backdrop + Popup are Portal siblings, so the popup owns its own fixed
-   centering; the box look comes from the consumer's Tailwind classes (Modal)
-   or the .url-popup rules (modals-forms.css, not yet migrated). */
+   centering; the box look comes from the consumer's Tailwind classes. (Nested
+   dialogs like the url-popups lift their own z-index past this 1001 via a
+   `z-[1101]!` utility, since this unlayered rule outranks @layer utilities.) */
 .ui-dialog {
   position: fixed;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 1001;
-}
-/* url-popup is a nested dialog over the connection form; lift it above the form
-   dialog (1001) and its own backdrop (.url-popup-backdrop, z 1100). */
-.ui-dialog.url-popup {
-  z-index: 1101;
 }
 
 /* Children of a 2-col .form-grid (ui/Field carries its own bottom margin) would
@@ -53,55 +49,6 @@
 }
 .ctx-item[data-disabled][data-highlighted] {
   background: transparent;
-}
-
-/* ---- NumberField (ui/NumberField) — input flanked by −/+ steppers ---- */
-.ui-number {
-  display: inline-flex;
-  align-items: stretch;
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-2);
-  overflow: hidden;
-}
-.ui-number:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-.ui-number-input {
-  flex: 1;
-  min-width: 0;
-  width: auto;
-  border: none;
-  background: transparent;
-  border-radius: 0;
-  text-align: center;
-  padding: 5px 4px;
-}
-.ui-number-input:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-.ui-number-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  flex: 0 0 auto;
-  border: none;
-  background: transparent;
-  color: var(--fg-2);
-  cursor: pointer;
-}
-.ui-number-btn:hover {
-  background: var(--bg-3);
-  color: var(--fg-0);
-}
-.ui-number-btn[data-disabled] {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* ---- Tooltip (ui/Tooltip) — popup look reused from .app-tooltip; reset its

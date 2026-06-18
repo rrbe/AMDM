@@ -875,18 +875,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="url-popup"
-        backdropClassName="url-popup-backdrop"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.5)]"
+        backdropClassName="fixed inset-0 z-[1100] bg-black/35"
       >
-        <div className="url-popup-head">
-          <ClipboardPaste size={16} />
-          <div className="url-popup-titles">
-            <span className="url-popup-title">{tFn('connection.uri.fromUrlTitle')}</span>
-            <span className="url-popup-sub">{tFn('connection.uri.fromUrlHint')}</span>
+        <div className="flex items-start gap-3">
+          <ClipboardPaste size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold">{tFn('connection.uri.fromUrlTitle')}</span>
+            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.fromUrlHint')}</span>
           </div>
         </div>
         <textarea
-          className="url-popup-input mono"
+          className="w-full resize-y rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
           autoFocus
           rows={3}
           spellCheck={false}
@@ -897,9 +897,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           onChange={(e) => setFromText(e.target.value)}
           placeholder={tFn('connection.uri.placeholder')}
         />
-        {fromError && <div className="url-popup-err">{fromError}</div>}
-        <div className="url-popup-foot">
-          <span className="spacer" />
+        {fromError && (
+          <div className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">{fromError}</div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="flex-1" />
           <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
             {tFn('connection.action.cancel')}
           </Button>
@@ -915,20 +917,20 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="url-popup"
-        backdropClassName="url-popup-backdrop"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.5)]"
+        backdropClassName="fixed inset-0 z-[1100] bg-black/35"
       >
-        <div className="url-popup-head">
-          <Link size={16} />
-          <div className="url-popup-titles">
-            <span className="url-popup-title">{tFn('connection.uri.toUrlTitle')}</span>
-            <span className="url-popup-sub">{tFn('connection.uri.toUrlHint')}</span>
+        <div className="flex items-start gap-3">
+          <Link size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold">{tFn('connection.uri.toUrlTitle')}</span>
+            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.toUrlHint')}</span>
           </div>
         </div>
         {/* Editable: regenerated on open / password-toggle, but the user can tweak
             it before copying. Copy uses whatever is in the box. */}
         <textarea
-          className="url-popup-input mono"
+          className="w-full resize-y rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
           rows={3}
           spellCheck={false}
           autoComplete="off"
@@ -949,9 +951,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             label={tFn('connection.uri.includePassword')}
           />
         )}
-        <div className="url-popup-foot">
-          {toCopied && <span className="url-popup-ok">{tFn('connection.uri.copied')}</span>}
-          <span className="spacer" />
+        <div className="flex items-center gap-2">
+          {toCopied && <span className="text-[11px] text-[var(--ok)]">{tFn('connection.uri.copied')}</span>}
+          <span className="flex-1" />
           <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
             {tFn('connection.action.cancel')}
           </Button>
