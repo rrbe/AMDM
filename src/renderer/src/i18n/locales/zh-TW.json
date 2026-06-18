@@ -126,7 +126,6 @@
       "errPort": "SSH 連接埠需為 1–65535 之間的整數",
       "errKey": "私密金鑰驗證需填寫金鑰路徑",
       "jumpEnableLabel": "透過跳板機連線（先連跳板機再到目標）",
-      "jumpHint": "適用於目標主機僅能經堡壘機/跳板機存取的情境（等同 ssh ProxyJump / ProxyCommand -W）。跳板機使用私密金鑰檔；金鑰若有密碼，可直接在下方填寫。",
       "jumpHost": "跳板機主機",
       "jumpPort": "跳板機連接埠",
       "jumpUsername": "跳板機使用者名稱",
@@ -138,6 +137,8 @@
       "pickKey": "選擇私密金鑰檔",
       "jumpPassphrase": "跳板機私密金鑰密碼短語",
       "diagnose": "檢測連通性",
+      "diagShow": "展開詳情",
+      "diagHide": "收起詳情",
       "stage": {
         "tcp-jump": "TCP 可達跳板機",
         "ssh-jump": "登入跳板機",
@@ -145,7 +146,6 @@
         "ssh-target": "登入目標主機",
         "tcp-ssh": "TCP 可達 SSH 主機",
         "ssh": "登入 SSH 主機",
-        "tcp-mongo": "到達 MongoDB 連接埠",
         "config": "設定錯誤"
       }
     },

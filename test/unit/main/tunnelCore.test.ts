@@ -179,22 +179,22 @@ describe('planDiagnoseStages', () => {
     destHost: '127.0.0.1',
     destPort: 27017
   })
-  it('plans tcp→ssh→mongo without a jump', () => {
-    const keys = planDiagnoseStages(opts()).map((s) => s.key)
-    expect(keys).toEqual(['tcp-ssh', 'ssh', 'tcp-mongo'])
+  it('ssh scope without a jump: direct tcp + ssh to the target (no mongo step)', () => {
+    const keys = planDiagnoseStages(opts(), 'ssh').map((s) => s.key)
+    expect(keys).toEqual(['tcp-ssh', 'ssh'])
   })
-  it('plans both hops when a jump is present, with correct targets', () => {
-    const stages = planDiagnoseStages(opts({ host: 'cao', port: 3522, username: 'shawn' }))
-    expect(stages.map((s) => s.key)).toEqual([
-      'tcp-jump',
-      'ssh-jump',
-      'tcp-target',
-      'ssh-target',
-      'tcp-mongo'
-    ])
-    expect(stages.find((s) => s.key === 'tcp-jump')?.target).toBe('cao:3522')
+  it('ssh scope with a jump: reaches the target through the jump', () => {
+    const stages = planDiagnoseStages(opts({ host: 'cao', port: 3522, username: 'shawn' }), 'ssh')
+    expect(stages.map((s) => s.key)).toEqual(['tcp-target', 'ssh-target'])
     expect(stages.find((s) => s.key === 'tcp-target')?.target).toBe('cai:22')
-    expect(stages.find((s) => s.key === 'tcp-mongo')?.target).toBe('127.0.0.1:27017')
+  })
+  it('jump scope: only the bastion hop', () => {
+    const stages = planDiagnoseStages(opts({ host: 'cao', port: 3522, username: 'shawn' }), 'jump')
+    expect(stages.map((s) => s.key)).toEqual(['tcp-jump', 'ssh-jump'])
+    expect(stages.find((s) => s.key === 'tcp-jump')?.target).toBe('cao:3522')
+  })
+  it('jump scope with no jump configured: empty', () => {
+    expect(planDiagnoseStages(opts(), 'jump')).toEqual([])
   })
 })
 

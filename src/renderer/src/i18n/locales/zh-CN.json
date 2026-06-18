@@ -126,7 +126,6 @@
       "errPort": "SSH 端口需为 1–65535 之间的整数",
       "errKey": "私钥认证需填写私钥路径",
       "jumpEnableLabel": "通过跳板机连接（先连跳板机再到目标）",
-      "jumpHint": "适用于目标主机只能经堡垒机/跳板机访问的场景（等价于 ssh ProxyJump / ProxyCommand -W）。跳板机使用私钥文件；私钥带口令可直接在下方填写。",
       "jumpHost": "跳板机主机",
       "jumpPort": "跳板机端口",
       "jumpUsername": "跳板机用户名",
@@ -138,6 +137,8 @@
       "pickKey": "选择私钥文件",
       "jumpPassphrase": "跳板机私钥密码短语",
       "diagnose": "检测连通性",
+      "diagShow": "展开详情",
+      "diagHide": "收起详情",
       "stage": {
         "tcp-jump": "TCP 可达跳板机",
         "ssh-jump": "登录跳板机",
@@ -145,7 +146,6 @@
         "ssh-target": "登录目标主机",
         "tcp-ssh": "TCP 可达 SSH 主机",
         "ssh": "登录 SSH 主机",
-        "tcp-mongo": "到达 MongoDB 端口",
         "config": "配置错误"
       }
     },

@@ -6,6 +6,7 @@ import type {
   AppSettings,
   ConnectionConfig,
   ConnectionInput,
+  DiagnoseScope,
   DocMutateRequest,
   DocSetFieldRequest,
   DocUpdateRequest,
@@ -118,8 +119,8 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
   )
-  ipcMain.handle(IPC.connectionsDiagnose, (_e, input: ConnectionInput) =>
-    diagnoseConnection(inputToDecrypted(input))
+  ipcMain.handle(IPC.connectionsDiagnose, (_e, input: ConnectionInput, scope: DiagnoseScope) =>
+    diagnoseConnection(inputToDecrypted(input), scope)
   )
   ipcMain.handle(
     IPC.connectionsBuildUri,

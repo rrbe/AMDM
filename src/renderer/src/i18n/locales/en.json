@@ -126,7 +126,6 @@
       "errPort": "SSH port must be an integer between 1 and 65535",
       "errKey": "Private-key auth requires a key path",
       "jumpEnableLabel": "Connect through a jump host (bastion)",
-      "jumpHint": "For a target reachable only via a bastion/jump host (equivalent to ssh ProxyJump / ProxyCommand -W). The jump host uses a private key file; if the key has a passphrase, enter it below.",
       "jumpHost": "Jump Host",
       "jumpPort": "Jump Port",
       "jumpUsername": "Jump Username",
@@ -138,6 +137,8 @@
       "pickKey": "Select private key file",
       "jumpPassphrase": "Jump Key Passphrase",
       "diagnose": "Check connectivity",
+      "diagShow": "Show details",
+      "diagHide": "Hide details",
       "stage": {
         "tcp-jump": "TCP reachable: jump host",
         "ssh-jump": "SSH login: jump host",
@@ -145,7 +146,6 @@
         "ssh-target": "SSH login: target",
         "tcp-ssh": "TCP reachable: SSH host",
         "ssh": "SSH login",
-        "tcp-mongo": "Reach MongoDB port",
         "config": "Configuration error"
       }
     },

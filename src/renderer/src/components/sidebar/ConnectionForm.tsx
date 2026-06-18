@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardPaste, Link } from 'lucide-react'
+import { ChevronDown, ChevronUp, ClipboardPaste, Link } from 'lucide-react'
 import type {
   ConnectionConfig,
   ConnectionInput,
@@ -29,6 +29,84 @@ function genId(): string {
 interface ConnectionFormProps {
   editing?: ConnectionConfig
   onClose: () => void
+}
+
+/** Per-step ✓/✗ list for one hop's connectivity check (shared by SSH + jump). */
+function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+      {stages.map((s) => {
+        const color = s.status === 'ok' ? '#4ade80' : s.status === 'fail' ? '#f87171' : '#9ca3af'
+        const icon = s.status === 'ok' ? '✓' : s.status === 'fail' ? '✗' : '○'
+        return (
+          <div key={s.key} style={{ fontSize: 12 }}>
+            <span style={{ color, fontWeight: 700, marginRight: 6 }}>{icon}</span>
+            <span>{t(`connection.ssh.stage.${s.key}`)}</span>
+            {s.target && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.target}</span>}
+            {s.ms != null && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.ms}ms</span>}
+            {s.detail && <div style={{ marginLeft: 18, color: '#f87171' }}>{s.detail}</div>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * "Check connectivity" trigger + an overall ✓/✗ and a chevron that toggles the
+ * per-step log — so a passing check stays quiet (just ✓) instead of dumping the
+ * whole list. A fresh result auto-opens on failure and collapses when all-ok.
+ */
+function DiagnoseControl({
+  busy,
+  stages,
+  onRun
+}: {
+  busy: boolean
+  stages: DiagnoseStage[] | null
+  onRun: () => void
+}): JSX.Element {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (stages) setOpen(stages.some((s) => s.status === 'fail'))
+  }, [stages])
+  const allOk = stages != null && stages.every((s) => s.status === 'ok')
+  return (
+    <>
+      <div className="form-row" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Button variant="ghost" type="button" busy={busy} onClick={onRun}>
+          {t('connection.ssh.diagnose')}
+        </Button>
+        {stages != null && !busy && (
+          <>
+            <span style={{ color: allOk ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+              {allOk ? '✓' : '✗'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
+              data-tip={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: 'inherit'
+              }}
+            >
+              {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </>
+        )}
+      </div>
+      {open && stages != null && <DiagnoseResult stages={stages} />}
+    </>
+  )
 }
 
 /**
@@ -111,8 +189,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [jumpKeyPath, setJumpKeyPath] = useState(editing?.ssh.jump?.privateKeyPath ?? '')
   const [jumpSshPassphrase, setJumpSshPassphrase] = useState('')
   const [jumpSshPassphraseTouched, setJumpSshPassphraseTouched] = useState(false)
-  const [diagnosing, setDiagnosing] = useState(false)
-  const [diagnosis, setDiagnosis] = useState<DiagnoseStage[] | null>(null)
+  const [sshDiagBusy, setSshDiagBusy] = useState(false)
+  const [sshDiag, setSshDiag] = useState<DiagnoseStage[] | null>(null)
+  const [jumpDiagBusy, setJumpDiagBusy] = useState(false)
+  const [jumpDiag, setJumpDiag] = useState<DiagnoseStage[] | null>(null)
 
   // Browse for a private key file via the native picker, default to ~/.ssh.
   const browseKey = async (setter: (v: string) => void): Promise<void> => {
@@ -345,12 +425,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     setTesting(false)
   }
 
-  const runDiagnose = async (): Promise<void> => {
-    setDiagnosing(true)
-    setDiagnosis(null)
-    const stages = await diagnoseConnection(buildInput())
-    setDiagnosis(stages)
-    setDiagnosing(false)
+  const runSshDiag = async (): Promise<void> => {
+    setSshDiagBusy(true)
+    setSshDiag(null)
+    setSshDiag(await diagnoseConnection(buildInput(), 'ssh'))
+    setSshDiagBusy(false)
+  }
+
+  const runJumpDiag = async (): Promise<void> => {
+    setJumpDiagBusy(true)
+    setJumpDiag(null)
+    setJumpDiag(await diagnoseConnection(buildInput(), 'jump'))
+    setJumpDiagBusy(false)
   }
 
   const secretPlaceholder = (has?: boolean): string =>
@@ -652,6 +738,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 </>
               )}
 
+              {/* Connectivity check for the SSH/target host (through the jump if one is set). */}
+              <DiagnoseControl busy={sshDiagBusy} stages={sshDiag} onRun={() => void runSshDiag()} />
+
               {/* Jump host (bastion / ProxyJump): reach the target through it. */}
               <div className="form-row" style={{ marginTop: 8 }}>
                 <Checkbox
@@ -663,7 +752,6 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
               {jumpEnabled && (
                 <>
-                  <div className="hint">{tFn('connection.ssh.jumpHint')}</div>
                   <div className="form-grid">
                     <Field label={tFn('connection.ssh.jumpHost')}>
                       <Input value={jumpHost} onChange={(e) => setJumpHost(e.target.value)} />
@@ -707,32 +795,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                       }}
                     />
                   </Field>
-                </>
-              )}
 
-              {/* Visible connectivity check: per-hop ✓/✗ so the user sees where it breaks. */}
-              <div className="form-row" style={{ marginTop: 8 }}>
-                <Button variant="ghost" type="button" busy={diagnosing} onClick={() => void runDiagnose()}>
-                  {tFn('connection.ssh.diagnose')}
-                </Button>
-              </div>
-              {diagnosis && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                  {diagnosis.map((s) => {
-                    const color =
-                      s.status === 'ok' ? '#4ade80' : s.status === 'fail' ? '#f87171' : '#9ca3af'
-                    const icon = s.status === 'ok' ? '✓' : s.status === 'fail' ? '✗' : '○'
-                    return (
-                      <div key={s.key} style={{ fontSize: 12 }}>
-                        <span style={{ color, fontWeight: 700, marginRight: 6 }}>{icon}</span>
-                        <span>{tFn(`connection.ssh.stage.${s.key}`)}</span>
-                        {s.target && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.target}</span>}
-                        {s.ms != null && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.ms}ms</span>}
-                        {s.detail && <div style={{ marginLeft: 18, color: '#f87171' }}>{s.detail}</div>}
-                      </div>
-                    )
-                  })}
-                </div>
+                  {/* Connectivity check for the jump host alone. */}
+                  <DiagnoseControl busy={jumpDiagBusy} stages={jumpDiag} onRun={() => void runJumpDiag()} />
+                </>
               )}
             </>
           )}

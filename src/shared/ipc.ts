@@ -10,6 +10,7 @@ import type {
   ConnectionInput,
   ConnectionStatus,
   DatabaseInfo,
+  DiagnoseScope,
   DiagnoseStage,
   OpenFileOptions,
   DataOpResult,
@@ -79,8 +80,8 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
-    /** Staged SSH-tunnel connectivity check; reports each hop's reachability. */
-    diagnose(input: ConnectionInput): Promise<DiagnoseStage[]>
+    /** Single-hop SSH connectivity check (`scope`: the target host or the jump host). */
+    diagnose(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
     /**
      * Build a connection string from the CURRENT form fields ("To URL" export) —
      * works while creating or editing. With `includePassword`, the plaintext

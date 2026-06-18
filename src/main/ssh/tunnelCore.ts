@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { SshAuthMethod } from '../../shared/types'
+import type { DiagnoseScope, SshAuthMethod } from '../../shared/types'
 import type { DecryptedConnection } from '../mongo/uri'
 
 /** Auth + identity for a single SSH hop (a bastion or the terminal host). */
@@ -170,24 +170,40 @@ export function buildTunnelOptions(
 }
 
 /**
- * The ordered connectivity-check steps for a tunnel — pure, so the stage list is
+ * The ordered connectivity-check steps for one hop — pure, so the stage list is
  * unit-testable. `key` maps to a localized label in the renderer; `target` is the
- * host:port that step checks. The effectful runner (diagnoseConnection) executes
- * each in turn, stopping at the first failure.
+ * host:port that step checks. Each check is scoped to a single hop so it stays
+ * distinct from "Test connection" (which exercises the whole path to MongoDB):
+ *
+ *  - `jump`: TCP + SSH login to the bastion (direct).
+ *  - `ssh`:  TCP + SSH login to the target — *through* the jump if one is set,
+ *            else direct. Never probes the MongoDB port.
+ *
+ * The effectful runner (diagnoseConnection) executes each in turn, stopping at
+ * the first failure.
  */
-export function planDiagnoseStages(opts: TunnelOptions): { key: string; target: string }[] {
+export function planDiagnoseStages(
+  opts: TunnelOptions,
+  scope: DiagnoseScope
+): { key: string; target: string }[] {
   const t = opts.target
-  const stages: { key: string; target: string }[] = []
-  if (opts.jump) {
+  if (scope === 'jump') {
+    if (!opts.jump) return []
     const j = opts.jump
-    stages.push({ key: 'tcp-jump', target: `${j.host}:${j.port}` })
-    stages.push({ key: 'ssh-jump', target: `${j.host}:${j.port}` })
-    stages.push({ key: 'tcp-target', target: `${t.host}:${t.port}` })
-    stages.push({ key: 'ssh-target', target: `${t.host}:${t.port}` })
-  } else {
-    stages.push({ key: 'tcp-ssh', target: `${t.host}:${t.port}` })
-    stages.push({ key: 'ssh', target: `${t.host}:${t.port}` })
+    return [
+      { key: 'tcp-jump', target: `${j.host}:${j.port}` },
+      { key: 'ssh-jump', target: `${j.host}:${j.port}` }
+    ]
   }
-  stages.push({ key: 'tcp-mongo', target: `${opts.destHost}:${opts.destPort}` })
-  return stages
+  // scope === 'ssh' — the target hop only (through the jump when configured).
+  if (opts.jump) {
+    return [
+      { key: 'tcp-target', target: `${t.host}:${t.port}` },
+      { key: 'ssh-target', target: `${t.host}:${t.port}` }
+    ]
+  }
+  return [
+    { key: 'tcp-ssh', target: `${t.host}:${t.port}` },
+    { key: 'ssh', target: `${t.host}:${t.port}` }
+  ]
 }

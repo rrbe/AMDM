@@ -1,7 +1,7 @@
 import net from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Client, type ConnectConfig } from 'ssh2'
-import type { DiagnoseStage } from '../../shared/types'
+import type { DiagnoseScope, DiagnoseStage } from '../../shared/types'
 import {
   buildTunnelOptions,
   classifyConnError,
@@ -177,12 +177,15 @@ function connectHop(
 }
 
 /**
- * Run a staged connectivity check over the (would-be) tunnel and report each
- * step's status — so a user sees exactly which hop is reachable and where it
- * breaks, all from the GUI. Stops at the first failure (later steps → 'skip').
- * Opens no local listener and tears down every SSH client it created.
+ * Run a single hop's connectivity check (see {@link planDiagnoseStages} for the
+ * `scope` semantics) and report each step's status — so a user sees exactly
+ * where it breaks, from the GUI. Stops at the first failure (later steps →
+ * 'skip'). Opens no local listener and tears down every SSH client it created.
  */
-export async function diagnoseConnection(dec: DecryptedConnection): Promise<DiagnoseStage[]> {
+export async function diagnoseConnection(
+  dec: DecryptedConnection,
+  scope: DiagnoseScope
+): Promise<DiagnoseStage[]> {
   let opts: TunnelOptions
   try {
     opts = buildTunnelOptions(dec)
@@ -192,33 +195,35 @@ export async function diagnoseConnection(dec: DecryptedConnection): Promise<Diag
 
   const clients: Client[] = []
   let jumpClient: Client | undefined
-  let targetClient: Client | undefined
+
+  // Connect the bastion lazily, on the first target step that needs it (the
+  // 'ssh' scope reaches the target *through* the jump). Cached so both target
+  // steps share one jump connection; a failure here surfaces on that step.
+  const ensureJump = async (): Promise<Client> => {
+    if (!jumpClient) jumpClient = (await connectHop(opts.jump!, undefined, 'jump host', clients)).client
+    return jumpClient
+  }
 
   const runStage = async (key: string): Promise<void> => {
     switch (key) {
       case 'tcp-jump':
         return tcpProbe(opts.jump!.host, opts.jump!.port)
       case 'ssh-jump':
-        jumpClient = (await connectHop(opts.jump!, undefined, 'jump host', clients)).client
+        await connectHop(opts.jump!, undefined, 'jump host', clients)
+        return
+      case 'tcp-ssh':
+        return tcpProbe(opts.target.host, opts.target.port)
+      case 'ssh':
+        await connectHop(opts.target, undefined, 'target', clients)
         return
       case 'tcp-target': {
-        const ch = await forwardOut(jumpClient!, opts.target.host, opts.target.port)
+        const ch = await forwardOut(await ensureJump(), opts.target.host, opts.target.port)
         ch.destroy()
         return
       }
       case 'ssh-target': {
-        const sock = await forwardOut(jumpClient!, opts.target.host, opts.target.port)
-        targetClient = (await connectHop(opts.target, sock, 'target', clients)).client
-        return
-      }
-      case 'tcp-ssh':
-        return tcpProbe(opts.target.host, opts.target.port)
-      case 'ssh':
-        targetClient = (await connectHop(opts.target, undefined, 'target', clients)).client
-        return
-      case 'tcp-mongo': {
-        const ch = await forwardOut(targetClient!, opts.destHost, opts.destPort)
-        ch.destroy()
+        const sock = await forwardOut(await ensureJump(), opts.target.host, opts.target.port)
+        await connectHop(opts.target, sock, 'target', clients)
         return
       }
     }
@@ -227,7 +232,7 @@ export async function diagnoseConnection(dec: DecryptedConnection): Promise<Diag
   const results: DiagnoseStage[] = []
   let stopped = false
   try {
-    for (const { key, target } of planDiagnoseStages(opts)) {
+    for (const { key, target } of planDiagnoseStages(opts, scope)) {
       if (stopped) {
         results.push({ key, target, status: 'skip' })
         continue
