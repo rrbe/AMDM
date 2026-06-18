@@ -25,7 +25,6 @@ export function SettingsModal({ onClose }: { onClose: () => void }): JSX.Element
   return (
     <Modal
       title={t('settings.title')}
-      small
       onClose={onClose}
       footer={
         <>

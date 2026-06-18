@@ -234,6 +234,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--fg-1);
   font-size: var(--fs-sm);
@@ -417,6 +418,9 @@
   gap: 5px;
   height: var(--row-h);
   padding: 0 8px;
+  /* Rounded inset "pill" hover (Outerbase/Linear style). The row already sits
+     inside .explorer-body's 6px side padding, so no extra margin is needed. */
+  border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
   color: var(--fg-1);

@@ -1,23 +1,15 @@
 /* =========================================================================
-   Mongo Shell GUI — global styles
-   Light-first, dense, developer-tool aesthetic. No Tailwind, no UI lib.
-   Layout: [ Explorer (connections + catalog, one tree) | Work area ]
-   ========================================================================= */
-
-/* ---------------------------------------------------------------------------
-   Design tokens — the "Slate" system: a calm, neutral, professional
-   database-tool look (TablePlus / Navicat / TinyRDM lineage). Light-first
-   (default in :root): pure white content on tint-free neutral-gray chrome,
-   near-black neutral ink, and a restrained graphite accent (selection /
-   primary button / focus ring); plus a neutral dark mode under
-   [data-theme='dark']. Deliberately drops the old green-tinted "cement" grays.
-   Semantic token names are preserved so every component rule inherits the
-   palette unchanged; the dark block only re-points the palette, so toggling
-   back to light falls through to :root. The CodeMirror editor carries its own
-   resolved palette in lib/pineEditorTheme.ts — keep the two in sync.
+   AMDM — 设计令牌（Zinc + Blue 体系）
+   代号：Zinc。Outerbase 风的现代数据库工具外观——真中性 zinc 表面（无暖/绿
+   色偏），单一蓝/靛强调色只用于主操作 / 选中 / 焦点环；语法/数据着色保留语义
+   彩（绿字符串、蓝数字、橙红 ObjectId…）。亮暗两套同等对待（亮 = :root 默认，
+   暗 = [data-theme='dark']，只重指调色板，切回亮色自然落回 :root）。
+   - 语义令牌名保持不变 → 全部既有手写 CSS 不改即随令牌重新上色（换肤=纯令牌级）。
+   - Tailwind/shadcn 工具类经 styles/index.css 的 @theme inline 映射到这里的令牌。
+   - CodeMirror 编辑器在 lib/pineEditorTheme.ts 另持一份解析 hex —— 改这里务必同步。
    --------------------------------------------------------------------------- */
 :root {
-  /* Shape + type (theme-independent) */
+  /* ---- Shape + type (theme-independent) ---- */
   --radius: 5px;
   --radius-sm: 4px;
   --radius-lg: 9px;
@@ -26,53 +18,67 @@
   --sidebar-width: 300px;
   --editor-height: 160px;
   --font-ui: 'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --font-mono: 'Source Code Pro', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
   --fs: 12px;
   --fs-sm: 11px;
+
+  /* Typography scale (NEW — was scattered as literals across partitions). */
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-normal: 1.45;
+  --lh-relaxed: 1.6;
+  --ls-tight: -0.01em;
+  --ls-normal: 0;
+  --ls-wide: 0.01em;
+
   --accent-fg: #ffffff;
 
-  /* ---- LIGHT · Slate (default) ---- */
-  /* Surfaces — pure white content on tint-free neutral gray chrome */
-  --bg-app: #ececee; /* window chrome behind panels */
+  /* ---- LIGHT · Zinc (default) ---- */
+  /* Surfaces — pure white content on neutral zinc chrome */
+  --bg-app: #f4f4f5; /* window chrome behind panels (zinc-100) */
   --bg-0: #ffffff; /* primary content surface (work area, lists, results) */
-  --bg-1: #f6f6f8; /* sidebar / header chrome */
-  --bg-2: #eeeef1; /* raised / inset (inputs, table head, segmented) */
-  --bg-3: #e6e6ea; /* hover */
-  --bg-elevated: #ffffff; /* menus, modal, active segment */
-  --bg-sel: rgba(63, 71, 84, 0.1); /* selected row tint (graphite) */
+  --bg-1: #fafafa; /* sidebar / header chrome (zinc-50) */
+  --bg-2: #f4f4f5; /* raised / inset (inputs, table head, segmented) */
+  --bg-3: #e4e4e7; /* hover (zinc-200) */
+  --bg-elevated: #ffffff; /* menus, modal, popover, active segment */
+  --bg-sel: rgba(47, 107, 255, 0.1); /* selected row tint (blue) */
   --bg-editor: #ffffff;
 
   /* Borders + the hairline rule */
-  --border: #e6e6ea;
-  --border-strong: #cfcfd6;
-  --rule: #d6d6dc; /* light hairline under title bars / column heads */
+  --border: #e4e4e7; /* zinc-200 */
+  --border-strong: #d4d4d8; /* zinc-300 */
+  --rule: #e4e4e7; /* hairline under title bars / column heads */
 
-  /* Text — neutral ink (near-black, no hue) */
-  --fg-0: #1d1d20;
-  --fg-1: #3a3a40;
-  --fg-2: #6a6a73; /* muted */
-  --fg-3: #9a9aa3; /* very muted */
+  /* Text — neutral zinc ink */
+  --fg-0: #18181b; /* zinc-900 */
+  --fg-1: #3f3f46; /* zinc-700 */
+  --fg-2: #71717a; /* zinc-500 · muted */
+  --fg-3: #a1a1aa; /* zinc-400 · very muted */
 
-  /* Accent — graphite (restrained, near-monochrome) */
-  --accent: #3f4754;
-  --accent-hover: #2c333d;
-  --accent-soft: rgba(63, 71, 84, 0.1);
-  --accent-soft-strong: rgba(63, 71, 84, 0.16);
+  /* Accent — blue (the single brand hue; structural, not decorative) */
+  --accent: #2f6bff;
+  --accent-hover: #1f5bef;
+  --accent-soft: rgba(47, 107, 255, 0.1);
+  --accent-soft-strong: rgba(47, 107, 255, 0.16);
 
   /* Status */
-  --ok: #1a8f4c;
-  --warn: #b5701a;
-  --err: #d23b3b;
-  --err-bg: rgba(210, 59, 59, 0.08);
+  --ok: #16a34a;
+  --warn: #b45309;
+  --err: #dc2626;
+  --err-bg: rgba(220, 38, 38, 0.08);
 
-  /* Value type colors (Tree/Table/JSON) — clean syntax palette */
+  /* Value type colors (Tree/Table/JSON) — semantic syntax palette */
   --t-string: #1a8f4c;
   --t-number: #2563eb;
   --t-boolean: #8a3fd0;
-  --t-null: #9a9aa3;
+  --t-null: #a1a1aa;
   --t-objectId: #c0481f;
   --t-date: #2563eb;
-  --t-key: #1d1d20;
+  --t-key: #18181b;
   --t-binary: #c0481f;
   --t-regex: #8a3fd0;
   --t-special: #c0481f;
@@ -83,39 +89,38 @@
   --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
 
   /* Dot halos (status glow) */
-  --halo-ok: rgba(26, 143, 76, 0.18);
-  --halo-warn: rgba(181, 112, 26, 0.18);
-  --halo-err: rgba(210, 59, 59, 0.16);
+  --halo-ok: rgba(22, 163, 74, 0.18);
+  --halo-warn: rgba(180, 83, 9, 0.18);
+  --halo-err: rgba(220, 38, 38, 0.16);
 }
 
-/* ---- DARK · Slate Night ---- */
+/* ---- DARK · Zinc Night (Outerbase-style near-black) ---- */
 [data-theme='dark'] {
-  --bg-app: #161618;
-  --bg-0: #1c1c1f; /* neutral content surface */
-  --bg-1: #232327;
-  --bg-2: #2a2a2f;
-  --bg-3: #34343b;
-  --bg-elevated: #2a2a2f;
-  --bg-sel: rgba(174, 183, 198, 0.16);
-  --bg-editor: #19191c;
+  --bg-app: #09090b; /* zinc-950-ish */
+  --bg-0: #101012; /* content surface */
+  --bg-1: #18181b; /* sidebar / header (zinc-900) */
+  --bg-2: #27272a; /* inputs, table head (zinc-800) */
+  --bg-3: #323238; /* hover */
+  --bg-elevated: #1c1c20; /* menus, modal, popover */
+  --bg-sel: rgba(79, 127, 255, 0.18);
+  --bg-editor: #0d0d0f;
 
-  --border: #303036;
-  --border-strong: #45454d;
-  --rule: #3a3a42;
+  --border: #27272a; /* zinc-800 */
+  --border-strong: #3f3f46; /* zinc-700 */
+  --rule: #232327;
 
-  --fg-0: #ececee;
-  --fg-1: #c4c4cb;
-  --fg-2: #9a9aa3;
-  --fg-3: #6c6c75;
+  --fg-0: #fafafa;
+  --fg-1: #d4d4d8;
+  --fg-2: #a1a1aa;
+  --fg-3: #71717a;
 
-  /* Light-slate graphite on dark, with dark ink text */
-  --accent: #aeb7c6;
-  --accent-hover: #9aa4b6;
-  --accent-soft: rgba(174, 183, 198, 0.14);
-  --accent-soft-strong: rgba(174, 183, 198, 0.24);
-  --accent-fg: #1b1d22;
+  --accent: #4f7fff;
+  --accent-hover: #6690ff;
+  --accent-soft: rgba(79, 127, 255, 0.16);
+  --accent-soft-strong: rgba(79, 127, 255, 0.26);
+  --accent-fg: #ffffff;
 
-  --ok: #3ec98a;
+  --ok: #34d399;
   --warn: #e0a23a;
   --err: #ff6f5c;
   --err-bg: rgba(255, 111, 92, 0.13);
@@ -123,20 +128,19 @@
   --t-string: #5fd39a;
   --t-number: #74a8ff;
   --t-boolean: #c79bff;
-  --t-null: #6c6c75;
+  --t-null: #71717a;
   --t-objectId: #ff8a5c;
   --t-date: #74a8ff;
-  --t-key: #ececee;
+  --t-key: #fafafa;
   --t-binary: #ff8a5c;
   --t-regex: #c79bff;
   --t-special: #ff8a5c;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.66), 0 6px 16px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.7), 0 6px 16px rgba(0, 0, 0, 0.6);
 
-  --halo-ok: rgba(62, 201, 138, 0.22);
+  --halo-ok: rgba(52, 211, 153, 0.22);
   --halo-warn: rgba(224, 162, 58, 0.22);
   --halo-err: rgba(255, 111, 92, 0.22);
 }
-

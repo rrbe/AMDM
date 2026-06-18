@@ -9,43 +9,50 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Inset form fields with a pine focus ring. */
-input,
-select,
-textarea {
-  background: var(--bg-2);
-  border-radius: var(--radius);
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s,
-    background 0.12s;
-}
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
+/* Generic element rules scoped to @layer base so they stay BELOW Tailwind
+   utilities — migrated Tailwind primitives (Button/Input/Select/…) win, while
+   raw <button>/<input> elements still pick up these defaults. (Without the
+   layer, `button { background: --bg-elevated }` clobbered the cva Button's
+   `bg-primary`, leaving white text on a white primary button in light mode.) */
+@layer base {
+  /* Inset form fields with a pine focus ring. */
+  input,
+  select,
+  textarea {
+    background: var(--bg-2);
+    border-radius: var(--radius);
+    transition:
+      border-color 0.12s,
+      box-shadow 0.12s,
+      background 0.12s;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
 
-/* Buttons: elevated surface; pine primary with a subtle lift. */
-button {
-  background: var(--bg-elevated);
-  border-radius: var(--radius);
-  transition:
-    background 0.12s,
-    border-color 0.12s,
-    color 0.12s;
-}
-button.primary {
-  color: var(--accent-fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-}
-button.ghost {
-  background: transparent;
-}
-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  /* Buttons: elevated surface; pine primary with a subtle lift. */
+  button {
+    background: var(--bg-elevated);
+    border-radius: var(--radius);
+    transition:
+      background 0.12s,
+      border-color 0.12s,
+      color 0.12s;
+  }
+  button.primary {
+    color: var(--accent-fg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  }
+  button.ghost {
+    background: transparent;
+  }
+  button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
 }
 
 /* Scrollbars — track blends into the surface; thumb is a soft hairline. */

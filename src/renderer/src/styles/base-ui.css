@@ -47,9 +47,9 @@
 .field-err:empty {
   display: none;
 }
-/* ui/Field renders a .form-row; inside a 2-col .form-grid the row's own bottom
-   margin would add a stray gap, so neutralise it (the grid gap handles spacing). */
-.form-grid .form-row {
+/* Children of a 2-col .form-grid (ui/Field carries its own bottom margin) would
+   add a stray gap, so neutralise it — the grid gap handles spacing. */
+.form-grid > * {
   margin-bottom: 0;
 }
 

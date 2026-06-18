@@ -64,13 +64,13 @@
    the Base UI wrappers section near the end of this file. */
 
 .form-row {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 .hint {
   color: var(--fg-3);

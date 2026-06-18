@@ -1,16 +1,15 @@
 import { type ReactNode } from 'react'
 import { Checkbox as BaseCheckbox } from '@base-ui/react/checkbox'
 import { Check } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
 
 /**
  * Thin wrapper over Base UI Checkbox — a labelled checkbox where the whole row is
  * the clickable control (Base UI renders a `role="checkbox"` button, so wrapping
- * the box + label inside `Checkbox.Root` makes both toggle it). Replaces the raw
- * `<input type="checkbox">` + sibling `<label>` pattern, fixing the flaky native
- * label/click behaviour the migration plan calls out.
+ * the box + label inside `Checkbox.Root` makes both toggle it).
  *
- * Styling lives in styles/base-ui.css under `.ui-check*`; checked state is driven by the
- * `data-checked` attribute Base UI sets on the root.
+ * shadcn-style Tailwind skin: the box fills with the blue accent when checked
+ * (driven by the root's `data-checked`, read via the `group` pattern).
  */
 interface CheckboxProps {
   checked: boolean
@@ -34,19 +33,25 @@ export function Checkbox({
 }: CheckboxProps): JSX.Element {
   return (
     <BaseCheckbox.Root
-      className={['ui-check', className].filter(Boolean).join(' ')}
+      className={cn(
+        'group m-0 inline-flex w-auto cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left text-[13px] text-foreground/90 outline-none hover:bg-transparent disabled:cursor-default disabled:opacity-55',
+        className
+      )}
       checked={checked}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
       id={id}
       name={name}
     >
-      <span className="ui-check-box" aria-hidden>
-        <BaseCheckbox.Indicator className="ui-check-ind">
+      <span
+        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--border-strong)] bg-secondary transition-colors group-data-[checked]:border-[var(--accent)] group-data-[checked]:bg-[var(--accent)] group-focus-visible:border-[var(--accent)] group-focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
+        aria-hidden
+      >
+        <BaseCheckbox.Indicator className="inline-flex text-[var(--accent-fg)]">
           <Check size={12} strokeWidth={3} />
         </BaseCheckbox.Indicator>
       </span>
-      {label != null && <span className="ui-check-label">{label}</span>}
+      {label != null && <span className="select-none">{label}</span>}
     </BaseCheckbox.Root>
   )
 }
