@@ -14,27 +14,33 @@ import { cn } from '@renderer/lib/utils'
  * distinct patterns and stay as raw `<button>`.
  */
 const buttonVariants = cva(
-  'busy-btn relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium leading-none select-none outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] disabled:opacity-50 disabled:cursor-default [&_svg]:size-4 [&_svg]:shrink-0',
+  'busy-btn relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium leading-none select-none outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] disabled:opacity-50 disabled:cursor-default [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default:
-          'h-8 px-3 border border-border bg-secondary text-foreground hover:bg-accent hover:border-[var(--border-strong)]',
-        primary: 'h-8 px-3.5 bg-primary text-primary-foreground shadow-sm hover:bg-[var(--accent-hover)]',
-        ghost: 'h-8 px-3 text-foreground hover:bg-accent',
-        danger: 'h-8 px-3 text-destructive hover:bg-destructive/10'
+        default: 'border border-border bg-secondary text-foreground hover:bg-accent hover:border-[var(--border-strong)]',
+        primary: 'bg-primary text-primary-foreground shadow-sm hover:bg-[var(--accent-hover)]',
+        ghost: 'text-foreground hover:bg-accent',
+        danger: 'text-destructive hover:bg-destructive/10'
+      },
+      size: {
+        default: 'h-8 px-3 text-[13px] [&_svg]:size-4',
+        sm: 'h-7 px-2.5 text-[12px] [&_svg]:size-3.5'
       }
     },
-    defaultVariants: { variant: 'default' }
+    defaultVariants: { variant: 'default', size: 'default' }
   }
 )
 
 export type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>
+export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>['size']>
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Styled tooltip text (forwarded as a `data-tip` attr; see TooltipLayer). */
   'data-tip'?: string
   variant?: ButtonVariant
+  /** `default` (h-8) for dialogs/toolbars; `sm` (h-7) for compact strips. */
+  size?: ButtonSize
   /** While true the label is kept in the layout (preserving width) but hidden,
       a spinner overlays it, and the button auto-disables (DESIGN.md §4). */
   busy?: boolean
@@ -43,6 +49,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({
   variant = 'default',
+  size = 'default',
   busy = false,
   disabled,
   className,
@@ -52,7 +59,7 @@ export function Button({
   return (
     <button
       {...rest}
-      className={cn(buttonVariants({ variant }), busy && 'is-busy', className)}
+      className={cn(buttonVariants({ variant, size }), busy && 'is-busy', className)}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
     >

@@ -66,6 +66,7 @@ export function ShellWorkspace(): JSX.Element {
         />
         <span className="spacer" />
         <Button
+          size="sm"
           className={pipelineOpen ? 'pipeline-toggle is-active' : 'pipeline-toggle'}
           onClick={() => togglePipeline()}
           data-tip={t('builder.toggleTip')}
@@ -73,20 +74,20 @@ export function ShellWorkspace(): JSX.Element {
         >
           <Workflow size={14} /> {t('builder.toggleBtn')}
         </Button>
-        <Button disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
+        <Button size="sm" disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
           {t('shell.saveBtn')}
         </Button>
-        <Button disabled={busy} onClick={() => void runExplain()} data-tip={t('shell.explainTip')}>
+        <Button size="sm" disabled={busy} onClick={() => void runExplain()} data-tip={t('shell.explainTip')}>
           {t('shell.explainBtn')}
         </Button>
         {running ? (
           // Swap Run → Stop while a query is in flight, so a runaway
           // find/aggregate can be cancelled server-side (driver AbortSignal).
-          <Button variant="danger" onClick={() => void stopShell()} data-tip={t('shell.stopTip')}>
+          <Button size="sm" variant="danger" onClick={() => void stopShell()} data-tip={t('shell.stopTip')}>
             {t('shell.stopBtn')}
           </Button>
         ) : (
-          <Button variant="primary" disabled={busy} onClick={() => void runShell()}>
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => void runShell()}>
             {t('shell.runBtn')}
           </Button>
         )}
