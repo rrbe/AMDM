@@ -50,17 +50,25 @@ function createWindow(): void {
     }
   })
 
-  if (saved.isMaximized) win.maximize()
+  // Full screen and maximize are mutually exclusive; full screen wins so the
+  // restored geometry matches how the window was left.
+  if (saved.isFullScreen) win.setFullScreen(true)
+  else if (saved.isMaximized) win.maximize()
 
   win.on('ready-to-show', () => win.show())
 
   // Remember the window geometry across launches. getNormalBounds() returns the
-  // restored (un-maximized) rect, so re-maximizing next launch still restores to
-  // a sane size. Debounced because resize/move fire in bursts while dragging.
+  // restored (un-maximized, un-fullscreen) rect, so re-maximizing / re-entering
+  // full screen next launch still restores to a sane size. Debounced because
+  // resize/move fire in bursts while dragging.
   let persistTimer: ReturnType<typeof setTimeout> | null = null
   const persistBounds = (): void => {
     if (win.isDestroyed()) return
-    windowStateStore.save({ bounds: win.getNormalBounds(), isMaximized: win.isMaximized() })
+    windowStateStore.save({
+      bounds: win.getNormalBounds(),
+      isMaximized: win.isMaximized(),
+      isFullScreen: win.isFullScreen()
+    })
   }
   const schedulePersist = (): void => {
     if (persistTimer) clearTimeout(persistTimer)
@@ -70,6 +78,8 @@ function createWindow(): void {
   win.on('move', schedulePersist)
   win.on('maximize', schedulePersist)
   win.on('unmaximize', schedulePersist)
+  win.on('enter-full-screen', schedulePersist)
+  win.on('leave-full-screen', schedulePersist)
   win.on('close', () => {
     if (persistTimer) clearTimeout(persistTimer)
     persistBounds() // flush synchronously before the window goes away

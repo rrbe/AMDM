@@ -5,10 +5,12 @@ import type { WindowBounds } from './windowStateCore'
 
 interface WindowStateFile {
   version: 1
-  /** Last *normal* (un-maximized) bounds; null until the user resizes once. */
+  /** Last *normal* (un-maximized, un-fullscreen) bounds; null until first resize. */
   bounds: WindowBounds | null
   /** Re-maximize on next launch if the window was maximized at close. */
   isMaximized: boolean
+  /** Re-enter native full screen on next launch if it was full screen at close. */
+  isFullScreen: boolean
 }
 
 /**
@@ -19,7 +21,7 @@ interface WindowStateFile {
  */
 class WindowStateStore {
   private filePath = ''
-  private data: WindowStateFile = { version: 1, bounds: null, isMaximized: false }
+  private data: WindowStateFile = { version: 1, bounds: null, isMaximized: false, isFullScreen: false }
 
   init(): void {
     this.filePath = join(app.getPath('userData'), 'window-state.json')
@@ -29,7 +31,8 @@ class WindowStateStore {
         this.data = {
           version: 1,
           bounds: parsed.bounds ?? null,
-          isMaximized: parsed.isMaximized ?? false
+          isMaximized: parsed.isMaximized ?? false,
+          isFullScreen: parsed.isFullScreen ?? false
         }
       } catch {
         // Corrupt file → fall back to defaults (window state is non-critical).
@@ -41,8 +44,13 @@ class WindowStateStore {
     return this.data
   }
 
-  save(state: { bounds: WindowBounds; isMaximized: boolean }): void {
-    this.data = { version: 1, bounds: state.bounds, isMaximized: state.isMaximized }
+  save(state: { bounds: WindowBounds; isMaximized: boolean; isFullScreen: boolean }): void {
+    this.data = {
+      version: 1,
+      bounds: state.bounds,
+      isMaximized: state.isMaximized,
+      isFullScreen: state.isFullScreen
+    }
     try {
       writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8')
     } catch {
