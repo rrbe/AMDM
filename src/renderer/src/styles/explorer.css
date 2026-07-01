@@ -303,7 +303,7 @@
   overflow: hidden;
   line-height: 1.3;
   /* Side panel: connection name + host:port render in the code font
-     (Source Code Pro); the catalog tree (db / collection names) stays on the
+     (JetBrains Mono); the catalog tree (db / collection names) stays on the
      UI font, and the editor / data views are untouched. */
   font-family: var(--font-mono);
 }
@@ -488,4 +488,3 @@
   font-size: var(--fs-sm);
   margin-left: auto;
 }
-
