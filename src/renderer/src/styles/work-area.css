@@ -8,13 +8,18 @@
   overflow: hidden;
 }
 
-/* ---- query tab strip (multi-tab workspace) ---- */
+/* ---- query tab strip (multi-tab workspace) ----
+   Folder tabs, UNIFIED with the result-tab strip (.rtab in results.css uses the
+   same declarations). The active tab lifts to the header surface below it
+   (--bg-1) with a blue top-rule — the single signal of "this tab's content is
+   showing". Close / new are bare icon buttons (border + bg cleared so the
+   @layer base button box can't leak). */
 .tab-bar {
   display: flex;
   align-items: stretch;
-  gap: 4px;
+  gap: 2px;
   height: 32px;
-  padding: 4px 6px 0;
+  padding: 6px 8px 0;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
@@ -22,7 +27,7 @@
 .tab-strip {
   display: flex;
   align-items: stretch;
-  gap: 3px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -34,23 +39,33 @@
 .qtab {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   max-width: 200px;
-  padding: 0 4px 0 10px;
+  padding: 0 6px 0 11px;
+  /* Pull over the strip's bottom rule so the active tab merges into the header
+     surface below (folder-tab connection). */
+  margin-bottom: -1px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: var(--bg-2);
+  background: transparent;
   color: var(--fg-2);
   font-size: var(--fs-sm);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 .qtab:hover {
-  background: var(--bg-3);
+  background: var(--bg-2);
+  color: var(--fg-1);
 }
 .qtab.active {
-  background: var(--bg-0);
+  position: relative;
+  z-index: 1;
+  background: var(--bg-1);
   color: var(--fg-0);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 .qtab-label {
   overflow: hidden;
@@ -67,10 +82,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
   border-radius: var(--radius-sm);
   color: var(--fg-3);
-  opacity: 0.65;
+  opacity: 0.7;
 }
 .qtab:hover .qtab-close,
 .qtab.active .qtab-close {
@@ -85,13 +104,17 @@
   align-items: center;
   justify-content: center;
   align-self: center;
-  padding: 4px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
   border-radius: var(--radius-sm);
   color: var(--fg-2);
   flex: 0 0 auto;
 }
 .qtab-new:hover {
-  background: var(--bg-3);
+  background: var(--bg-2);
   color: var(--fg-0);
 }
 
@@ -115,6 +138,9 @@
 .work-header .db-select {
   width: auto;
   min-width: 140px;
+  /* Compact for the toolbar — override ui/Select's form-height (h-9 = 36px),
+     which reads oversized in the 38px work-header. */
+  height: 30px;
 }
 .work-header .spacer {
   flex: 1;

@@ -5,8 +5,24 @@
    前面的基础规则);base-ui 收尾。改某一区样式只需改对应分区文件。
    约定见项目根 CLAUDE.md「样式约定」。
    ========================================================================= */
+/* ---------------------------------------------------------------------------
+   Tailwind v4 (CSS-first). During the staged migration we import only the
+   `theme` + `utilities` layers and DELIBERATELY OMIT preflight — the existing
+   hand-written CSS already resets box-sizing/margins (see base.css) and a full
+   preflight reset would shift not-yet-migrated surfaces. Un-layered legacy CSS
+   outranks @layer utilities, so legacy rules keep winning until each area is
+   rebuilt and its old CSS deleted. Re-evaluate enabling preflight in Phase 5.
+   The design-token @theme block lives in tokens.css (processed by the plugin).
+   --------------------------------------------------------------------------- */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
 @import './tokens.css';
-@import './base.css';
+/* base.css demoted into @layer base so its bare element rules (button/input/
+   select/label) sit BELOW Tailwind utilities — migrated components styled with
+   utilities now win, while non-migrated raw elements still get the defaults. */
+@import './base.css' layer(base);
 @import './app-shell.css';
 @import './explorer.css';
 @import './work-area.css';
@@ -16,3 +32,40 @@
 @import './phase3.css';
 @import './theme-polish.css';
 @import './base-ui.css';
+
+/* ---------------------------------------------------------------------------
+   Bridge Tailwind/shadcn utility color names → our semantic tokens (defined in
+   tokens.css). `inline` makes utilities reference var(--*) directly so they
+   re-skin under [data-theme='dark']. NAMING NOTE: our --accent is the brand
+   blue → mapped to shadcn `primary`; shadcn's `accent` (subtle hover surface)
+   maps to --bg-3. shadcn `input`/`ring` borrow --border-strong/--accent.
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--bg-0);
+  --color-foreground: var(--fg-0);
+  --color-card: var(--bg-elevated);
+  --color-card-foreground: var(--fg-0);
+  --color-popover: var(--bg-elevated);
+  --color-popover-foreground: var(--fg-0);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-secondary: var(--bg-2);
+  --color-secondary-foreground: var(--fg-0);
+  --color-muted: var(--bg-1);
+  --color-muted-foreground: var(--fg-2);
+  --color-accent: var(--bg-3);
+  --color-accent-foreground: var(--fg-0);
+  --color-destructive: var(--err);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--border);
+  --color-input: var(--border-strong);
+  --color-ring: var(--accent);
+
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: 12px;
+}

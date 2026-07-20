@@ -2,14 +2,15 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from '@renderer/App'
 import { ErrorBoundary } from '@renderer/components/common/ErrorBoundary'
-// Fonts — matched to MongoDB Compass / LeafyGreen.
-// UI uses LeafyGreen's system stack (Euclid Circular A if installed, else
-// Helvetica Neue) so no UI webfont is bundled — proprietary, can't ship it.
-// Source Code Pro is Compass's data/code font; bundled offline via @fontsource
-// because the renderer CSP forbids remote font CDNs.
-import '@fontsource/source-code-pro/400.css'
-import '@fontsource/source-code-pro/500.css'
-import '@fontsource/source-code-pro/600.css'
+// Fonts.
+// UI chrome keeps a system sans stack (Euclid Circular A if installed, else
+// Helvetica Neue) — proprietary, no UI webfont bundled.
+// JetBrains Mono is the data/code font (editor, results, ObjectId, etc.);
+// bundled offline via @fontsource because the renderer CSP forbids remote
+// font CDNs. OFL-1.1, free for commercial bundling.
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
+import '@fontsource/jetbrains-mono/600.css'
 import { setLanguage } from '@renderer/i18n'
 import { useAppStore } from '@renderer/store/useAppStore'
 import './styles/index.css'

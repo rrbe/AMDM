@@ -1,15 +1,15 @@
 /**
- * Slate CodeMirror themes — light + dark variants that match the app's
- * "Slate" design system (see styles/tokens.css): a calm, neutral, professional
- * database-tool look. We build them with @uiw/codemirror-themes' `createTheme`
- * so the editor reads as part of the same surface rather than CodeMirror's
- * generic light/dark defaults.
+ * CodeMirror themes — light + dark variants that match the app's "Zinc + Blue"
+ * design system (see styles/tokens.css): neutral zinc surfaces, a single blue
+ * accent (caret / selection), and semantic syntax colors. We build them with
+ * @uiw/codemirror-themes' `createTheme` so the editor reads as part of the same
+ * surface rather than CodeMirror's generic light/dark defaults.
  *
  * Two explicit themes (resolved hex, not CSS vars) keep rendering predictable:
- * ShellEditor swaps between them on the persisted `theme` preference. Colors
- * mirror the styles/tokens.css value-type palette — green strings, blue numbers,
- * purple booleans/keywords, orange ObjectId/types, near-neutral method calls,
- * and a graphite caret. Keep these in sync with the --t-* tokens.
+ * ShellEditor swaps between them on the persisted `theme` preference. Syntax
+ * colors mirror the styles/tokens.css --t-* value-type palette — green strings,
+ * blue numbers, purple booleans/keywords, orange ObjectId/types, near-neutral
+ * method calls — with a blue caret. Keep these in sync with the --t-* tokens.
  */
 import { createTheme } from '@uiw/codemirror-themes'
 import { tags as t } from '@lezer/highlight'
@@ -37,37 +37,37 @@ interface PinePalette {
 const LIGHT: PinePalette = {
   base: 'light',
   bg: '#ffffff',
-  text: '#1d1d20',
-  caret: '#3f4754',
-  selection: 'rgba(63, 71, 84, 0.16)',
+  text: '#18181b',
+  caret: '#2f6bff',
+  selection: 'rgba(47, 107, 255, 0.16)',
   lineHighlight: 'rgba(0, 0, 0, 0.035)',
-  gutterFg: '#9a9aa3',
+  gutterFg: '#a1a1aa',
   keyword: '#8a3fd0',
   string: '#1a8f4c',
   number: '#2563eb',
   bool: '#8a3fd0',
-  property: '#1d1d20',
-  punct: '#6a6a73',
-  comment: '#9a9aa3',
+  property: '#18181b',
+  punct: '#71717a',
+  comment: '#a1a1aa',
   type: '#c0481f',
   regexp: '#8a3fd0'
 }
 
 const DARK: PinePalette = {
   base: 'dark',
-  bg: '#19191c',
-  text: '#ececee',
-  caret: '#aeb7c6',
-  selection: 'rgba(174, 183, 198, 0.2)',
+  bg: '#0d0d0f',
+  text: '#fafafa',
+  caret: '#4f7fff',
+  selection: 'rgba(79, 127, 255, 0.24)',
   lineHighlight: 'rgba(255, 255, 255, 0.045)',
-  gutterFg: '#6c6c75',
+  gutterFg: '#71717a',
   keyword: '#c79bff',
   string: '#5fd39a',
   number: '#74a8ff',
   bool: '#c79bff',
-  property: '#ececee',
-  punct: '#9a9aa3',
-  comment: '#6c6c75',
+  property: '#fafafa',
+  punct: '#a1a1aa',
+  comment: '#71717a',
   type: '#ff8a5c',
   regexp: '#c79bff'
 }

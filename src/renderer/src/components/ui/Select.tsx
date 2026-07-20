@@ -1,19 +1,17 @@
 import { type ReactNode } from 'react'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { ChevronDown, Check } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
 
 /**
  * Thin wrapper over Base UI Select — replaces the raw `<select>` elements. Driven
  * by a simple `value / onChange / options` API; the trigger auto-renders the
  * selected option's label via the `items` prop.
  *
- * Styling (styles/base-ui.css `.ui-select-*`): the trigger mimics the inset `input`/`select`
- * look (bg-2 + border + focus ring); the popup mimics `.ctx-menu`; highlighted
- * items (`[data-highlighted]`, keyboard/hover) use `--bg-3`. The popup is body-
- * portaled, so its positioner carries a z-index above dialogs (see styles/base-ui.css).
- *
- * Values are strings/numbers in this app (auth type, theme, db name, …), so the
- * generic defaults to `string`.
+ * shadcn-style Tailwind skin: the trigger mimics the inset input (zinc + blue
+ * focus ring); the popup is a bordered elevated card, highlighted items
+ * (`[data-highlighted]`) use the subtle accent surface. The popup is body-portaled,
+ * so its positioner carries a z-index above dialogs.
  */
 export interface SelectOption<T> {
   label: ReactNode
@@ -60,34 +58,40 @@ export function Select<T extends string | number = string>({
       name={name}
     >
       <BaseSelect.Trigger
-        className={['ui-select-trigger', className].filter(Boolean).join(' ')}
+        className={cn(
+          'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 text-left text-[13px] text-foreground outline-none transition-[border-color,box-shadow] hover:border-[var(--border-strong)] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] data-[popup-open]:border-[var(--accent)] data-[popup-open]:shadow-[0_0_0_3px_var(--accent-soft)] data-[disabled]:cursor-default data-[disabled]:opacity-55',
+          className
+        )}
         aria-label={ariaLabel}
         data-tip={dataTip}
       >
-        <BaseSelect.Value placeholder={placeholder} />
-        <BaseSelect.Icon className="ui-select-icon">
+        <BaseSelect.Value
+          placeholder={placeholder}
+          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+        />
+        <BaseSelect.Icon className="flex shrink-0 text-muted-foreground">
           <ChevronDown size={14} />
         </BaseSelect.Icon>
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner
-          className="ui-select-positioner"
+          className="z-[2000]"
           side="bottom"
           align="start"
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <BaseSelect.Popup className="ui-select-popup">
+          <BaseSelect.Popup className="max-h-[var(--available-height)] min-w-[var(--anchor-width)] overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
             <BaseSelect.List>
               {options.map((o) => (
                 <BaseSelect.Item
                   key={String(o.value)}
                   value={o.value}
                   disabled={o.disabled}
-                  className="ui-select-item"
+                  className="flex cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-accent data-[highlighted]:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-50"
                 >
                   <BaseSelect.ItemText>{o.label}</BaseSelect.ItemText>
-                  <BaseSelect.ItemIndicator className="ui-select-ind">
+                  <BaseSelect.ItemIndicator className="ml-auto inline-flex text-[var(--accent)]">
                     <Check size={14} />
                   </BaseSelect.ItemIndicator>
                 </BaseSelect.Item>

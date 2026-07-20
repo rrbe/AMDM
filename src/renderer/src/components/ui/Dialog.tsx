@@ -10,16 +10,17 @@ import { Dialog as BaseDialog } from '@base-ui/react/dialog'
  * pointer-press dismiss for free (Base UI default), so consumers can drop their
  * ad-hoc keydown/backdrop handlers.
  *
- * Styling reuses the existing `.modal-backdrop` (overlay) and whatever class the
- * consumer passes for the popup box (`.modal` / `.modal.small`); the `.ui-dialog`
- * base class only adds the fixed centering + z-index, because with Base UI the
- * Backdrop and Popup are Portal siblings (the Popup can't rely on the backdrop's
- * old flex centering).
+ * Styling: the `.modal-backdrop` overlay (default) + whatever the consumer passes
+ * for the popup box (common/Modal passes Tailwind box classes; the url-popups
+ * still pass `.url-popup`). The `.ui-dialog` base class only adds the fixed
+ * centering + z-index, because with Base UI the Backdrop and Popup are Portal
+ * siblings (the Popup can't rely on the backdrop's old flex centering).
  */
 interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Extra class(es) for the popup box — typically `'modal'` or `'modal small'`. */
+  /** Tailwind/CSS class(es) for the popup box (Modal passes its sizing/border/
+      shadow; the url-popups pass `.url-popup`). */
   className?: string
   /** Class for the backdrop overlay. Defaults to `'modal-backdrop'`; a nested
       dialog can pass its own (e.g. `'url-popup-backdrop'`) for a higher z-index. */

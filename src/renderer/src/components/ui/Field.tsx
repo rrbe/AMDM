@@ -1,14 +1,17 @@
 import { type CSSProperties, type ReactNode } from 'react'
 import { Field as BaseField } from '@base-ui/react/field'
+import { cn } from '@renderer/lib/utils'
 
 /**
  * Thin wrapper over Base UI Field — a labelled form row (label + control + hint +
- * error) in one place. Reuses the existing `.form-row` / `label` / `.hint` styles
- * so it looks identical to the hand-rolled rows it replaces, while gaining proper
- * label↔control wiring and (optional) validation.
+ * error) in one place, with proper label↔control wiring and (optional) validation.
+ *
+ * shadcn-style Tailwind layout: a vertical stack with a small muted label. The
+ * default bottom margin keeps stacked forms spaced; inside a grid pass
+ * `className="mb-0"` (tailwind-merge drops the default).
  *
  * The control is passed as `children` (a `ui/Input`, `ui/Select`, `ui/Checkbox`,
- * …); Base UI auto-associates the label and aria with it. Two error channels:
+ * …). Two error channels:
  *  - Base-UI-driven validation via `validate` / `validationMode` → rendered by the
  *    built-in `<Field.Error>` (self-hides when valid).
  *  - A manually-computed `error` string (most existing forms do their own checks)
@@ -18,9 +21,9 @@ type ValidationMode = 'onSubmit' | 'onBlur' | 'onChange'
 
 interface FieldProps {
   label?: ReactNode
-  /** Muted helper text under the control (`.hint`). */
+  /** Muted helper text under the control. */
   hint?: ReactNode
-  /** Manually-controlled error text, always shown when present (`--err`). */
+  /** Manually-controlled error text, always shown when present. */
   error?: ReactNode
   /** The form control element (ui/Input, ui/Select, ui/Checkbox, …). */
   children: ReactNode
@@ -32,9 +35,9 @@ interface FieldProps {
     formValues: Record<string, unknown>
   ) => string | string[] | null | Promise<string | string[] | null>
   disabled?: boolean
-  /** Extra class(es) merged onto the `.form-row` wrapper. */
+  /** Extra class(es) merged onto the row wrapper. */
   className?: string
-  /** Inline style on the row wrapper (e.g. `gridColumn` inside a `.form-grid`). */
+  /** Inline style on the row wrapper (e.g. `gridColumn` inside a grid). */
   style?: CSSProperties
 }
 
@@ -52,18 +55,20 @@ export function Field({
 }: FieldProps): JSX.Element {
   return (
     <BaseField.Root
-      className={['form-row', className].filter(Boolean).join(' ')}
+      className={cn('mb-3 flex flex-col gap-1.5', className)}
       style={style}
       name={name}
       validationMode={validationMode}
       validate={validate}
       disabled={disabled}
     >
-      {label != null && <BaseField.Label>{label}</BaseField.Label>}
+      {label != null && (
+        <BaseField.Label className="mb-0 text-[11px] font-medium text-muted-foreground">{label}</BaseField.Label>
+      )}
       {children}
-      {hint != null && <BaseField.Description className="hint">{hint}</BaseField.Description>}
-      <BaseField.Error className="field-err" />
-      {error != null && <div className="field-err">{error}</div>}
+      {hint != null && <BaseField.Description className="text-[11px] text-[var(--fg-3)]">{hint}</BaseField.Description>}
+      <BaseField.Error className="text-[11px] text-destructive empty:hidden" />
+      {error != null && <div className="text-[11px] text-destructive">{error}</div>}
     </BaseField.Root>
   )
 }

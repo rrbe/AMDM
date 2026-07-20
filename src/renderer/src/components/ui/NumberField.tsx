@@ -1,11 +1,12 @@
 import { NumberField as BaseNumberField } from '@base-ui/react/number-field'
 import { Minus, Plus } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
 
 /**
  * Thin wrapper over Base UI NumberField — a numeric input with −/+ steppers and
  * built-in clamping/keyboard/scrub behaviour. Used for the small integer settings
- * (page size, font size). Styling lives under `.ui-number-*`; the input reuses the
- * global `input` look.
+ * (page size, font size). shadcn-style Tailwind skin matching ui/Input (zinc inset,
+ * blue focus ring on the group); the inner input is borderless.
  */
 interface NumberFieldProps {
   value: number | null
@@ -43,12 +44,26 @@ export function NumberField({
       id={id}
       name={name}
     >
-      <BaseNumberField.Group className={['ui-number', className].filter(Boolean).join(' ')}>
-        <BaseNumberField.Decrement className="ui-number-btn" aria-label="Decrease">
+      <BaseNumberField.Group
+        className={cn(
+          'flex h-9 w-full items-stretch overflow-hidden rounded-md border border-border bg-secondary transition-[border-color,box-shadow] focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-soft)]',
+          className
+        )}
+      >
+        <BaseNumberField.Decrement
+          className="inline-flex w-8 shrink-0 items-center justify-center border-0 bg-transparent text-muted-foreground transition-colors hover:bg-[var(--bg-3)] hover:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-40"
+          aria-label="Decrease"
+        >
           <Minus size={13} />
         </BaseNumberField.Decrement>
-        <BaseNumberField.Input className="ui-number-input" aria-label={ariaLabel} />
-        <BaseNumberField.Increment className="ui-number-btn" aria-label="Increase">
+        <BaseNumberField.Input
+          className="min-w-0 flex-1 border-0 bg-transparent px-1 text-center text-[13px] text-foreground outline-none focus:border-0 focus:shadow-none"
+          aria-label={ariaLabel}
+        />
+        <BaseNumberField.Increment
+          className="inline-flex w-8 shrink-0 items-center justify-center border-0 bg-transparent text-muted-foreground transition-colors hover:bg-[var(--bg-3)] hover:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-40"
+          aria-label="Increase"
+        >
           <Plus size={13} />
         </BaseNumberField.Increment>
       </BaseNumberField.Group>

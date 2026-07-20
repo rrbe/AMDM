@@ -74,13 +74,21 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 
 ## 样式（CSS）约定
 
-全局样式拆分在 `src/renderer/src/styles/`,由 `index.css` 按固定顺序 `@import` 11 个分区文件汇总(`main.tsx` 只引 `./styles/index.css`)。分区:`tokens`(设计令牌)、`base`(reset/按钮/输入/滚动条)、`app-shell`、`explorer`、`work-area`、`results`、`modals-forms`、`phase2`、`phase3`、`theme-polish`、`base-ui`。改某一区样式只需改对应分区文件。
+视觉层正从「纯手写 CSS」迁移到 **Tailwind v4 + shadcn 风原语（基于 `@base-ui/react`）**,当前是**混合态**:共享表单/弹窗原语(`components/ui/*` + `common/Button`)与连接弹窗已 Tailwind 化;其余功能分区仍是手写 CSS(已被令牌重新上色)。设计令牌体系见 `DESIGN.md`——**Zinc + Blue**(中性 zinc 表面 + 单一蓝强调,亮暗平等;数据/代码字体 **JetBrains Mono**)。
 
-- **`@import` 顺序是层叠契约,别打乱。** `tokens.css` 必须最先;`theme-polish.css`(Slate 后置修饰)必须排在所有功能分区**之后**——它靠源码顺序在**同等权重**下覆盖前面的基础规则(`button`/`input`/`.conn-item`/`.tree-node`/`.view-switch`/`.modal*`/`.tbl-head` 等约 29 个选择器在文件里出现两次:基础在前、polish 在后);`base-ui.css` 收尾。
-- **何时全局 vs CSS Module:**
-  - **永远全局**:`tokens.css` 的主题令牌(module 与全局共享的底座)、第三方选择器(CodeMirror `.cm-*`、Base UI `[data-*]`)、跨组件复用的共享基类(`.v-*` value 颜色、`.kv-row`、`.vrow`)。
-  - **用 `Foo.module.css`**(放组件旁,作用域隔离):全新、**自包含**的组件(独立面板/弹窗/小部件)。Vite 开箱支持,无需新依赖。**范本见 `components/shell/pipeline/pipeline.module.css`**(项目首个 module):类名 camelCase,本地修饰态直接写,复用 §「永远全局」的共享词汇用 `:global(.muted)`——本地化 vs `:global()` 的取舍细节见该文件头注释。
-  - 复用既有 result/tree/table/explorer 词汇的组件 → **留全局**。判断标准是「组件是否自包含」,**不是「新不新」**;不强制回迁老组件。
+**Tailwind 接入(CSS-first,无 `tailwind.config`):**
+- `@tailwindcss/vite` 挂在 `electron.vite.config.ts` 的 `renderer.plugins`;`@` 别名指向 `src/renderer/src`(`tsconfig.web.json` + vite 对称,shadcn 约定)。
+- `styles/index.css` 顶部**只引 Tailwind 的 theme + utilities 层、不引 preflight**(迁移期避免全局 reset 扰动未迁移的手写 CSS);末尾 `@theme inline` 把 shadcn 色名映射到我们的语义令牌。**命名坑:** 我们的 `--accent`=品牌蓝 → 映射成 shadcn `primary`;shadcn 的 `accent`(hover 底)→ `--bg-3`。
+- **关键层叠规则:** 未分层的手写 CSS 优先级**高于** `@layer utilities`。所以裸元素默认规则(`base.css` 全文 + `theme-polish.css` 的通用 `button/input/select/textarea` 块)都收进 **`@layer base`**,迁移组件的 Tailwind 工具类才能盖过它们;原生元素仍取默认。**新组件用 Tailwind 即可生效;若被某条手写规则压住,多半是那条裸元素规则没进 base 层。**
+- shadcn 风原语 = `@base-ui/react` 无样式原语 + Tailwind 工具类 + `cva` 变体(范本 `common/Button.tsx`);class 合并用 `lib/utils.ts` 的 `cn()`(clsx + tailwind-merge)。门面在 `components/ui/*`(对外 props 不变,业务**不**直接 import Base UI)。
+
+**仍在用的手写分区(`styles/`,`index.css` 固定顺序 @import):** `tokens`(令牌底座) → `base`(@layer base) → `app-shell`/`explorer`/`work-area`/`results`/`modals-forms`/`phase2`/`phase3` → `theme-polish`(后置修饰) → `base-ui`(收尾)。**@import 顺序仍是层叠契约,别打乱**(`tokens` 最先、`theme-polish` 在功能分区之后);这些分区随迁移逐步清退到 Tailwind。
+
+- **何时 Tailwind vs 全局 vs CSS Module:**
+  - **新组件 / 重做组件 → Tailwind 工具类 + `cva`**(首选,见 `components/ui/*`)。
+  - **永远全局**:`tokens.css` 令牌、第三方选择器(CodeMirror `.cm-*`、Base UI `[data-*]`)、跨组件复用的共享数据词汇(`.v-*` 类型色、`.kv-row`、`.vrow`)。
+  - **CSS Module**(`Foo.module.css`,作用域隔离):自包含组件,范本 `components/shell/pipeline/pipeline.module.css`。
+  - 复用既有 result/tree/table/explorer 词汇的老组件 → 暂留全局,随迁移再说;不强制回迁。
 
 ## 性能铁律（ADR-0004 —— 不可妥协,每个功能都必须遵守）
 

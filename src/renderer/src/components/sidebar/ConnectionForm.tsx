@@ -18,6 +18,7 @@ import { Field } from '@renderer/components/ui/Field'
 import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { cn } from '@renderer/lib/utils'
 import { parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
@@ -35,17 +36,19 @@ interface ConnectionFormProps {
 function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): JSX.Element {
   const { t } = useTranslation()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+    <div className="mt-1 flex flex-col gap-1">
       {stages.map((s) => {
-        const color = s.status === 'ok' ? '#4ade80' : s.status === 'fail' ? '#f87171' : '#9ca3af'
+        const color = s.status === 'ok' ? 'var(--ok)' : s.status === 'fail' ? 'var(--err)' : 'var(--fg-3)'
         const icon = s.status === 'ok' ? '✓' : s.status === 'fail' ? '✗' : '○'
         return (
-          <div key={s.key} style={{ fontSize: 12 }}>
-            <span style={{ color, fontWeight: 700, marginRight: 6 }}>{icon}</span>
+          <div key={s.key} className="text-[12px]">
+            <span className="mr-1.5 font-bold" style={{ color }}>
+              {icon}
+            </span>
             <span>{t(`connection.ssh.stage.${s.key}`)}</span>
-            {s.target && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.target}</span>}
-            {s.ms != null && <span style={{ marginLeft: 6, opacity: 0.6 }}>{s.ms}ms</span>}
-            {s.detail && <div style={{ marginLeft: 18, color: '#f87171' }}>{s.detail}</div>}
+            {s.target && <span className="ml-1.5 opacity-60">{s.target}</span>}
+            {s.ms != null && <span className="ml-1.5 opacity-60">{s.ms}ms</span>}
+            {s.detail && <div className="ml-[18px] text-destructive">{s.detail}</div>}
           </div>
         )
       })}
@@ -75,13 +78,13 @@ function DiagnoseControl({
   const allOk = stages != null && stages.every((s) => s.status === 'ok')
   return (
     <>
-      <div className="form-row" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="mt-2 flex items-center gap-2">
         <Button variant="ghost" type="button" busy={busy} onClick={onRun}>
           {t('connection.ssh.diagnose')}
         </Button>
         {stages != null && !busy && (
           <>
-            <span style={{ color: allOk ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+            <span className="font-bold" style={{ color: allOk ? 'var(--ok)' : 'var(--err)' }}>
               {allOk ? '✓' : '✗'}
             </span>
             <button
@@ -89,15 +92,10 @@ function DiagnoseControl({
               onClick={() => setOpen((v) => !v)}
               aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
               data-tip={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                color: open ? 'inherit' : 'var(--fg-3, #9ca3af)'
-              }}
+              className={cn(
+                'inline-flex cursor-pointer items-center border-0 bg-transparent p-0',
+                open ? 'text-foreground' : 'text-[var(--fg-3)]'
+              )}
             >
               <MessageSquareText size={16} />
             </button>
@@ -446,6 +444,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     <Modal
       title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
       onClose={handleModalClose}
+      size="lg"
       footer={
         <>
           <Button variant="ghost" busy={testing} onClick={() => void runTest()}>
@@ -453,8 +452,12 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           </Button>
           {test && (
             <span
-              className={test.ok ? 'test-result ok' : 'test-result err'}
-              style={{ marginTop: 0, padding: '4px 8px' }}
+              className={cn(
+                'rounded-md px-2 py-1 font-mono text-[12px]',
+                test.ok
+                  ? 'border border-[var(--ok)]/40 bg-[var(--ok)]/10 text-[var(--ok)]'
+                  : 'border border-destructive/50 bg-destructive/10 text-destructive'
+              )}
             >
               {test.ok
                 ? [
@@ -466,11 +469,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             </span>
           )}
           {sshError && (
-            <span className="test-result err" style={{ marginTop: 0, padding: '4px 8px' }}>
+            <span className="rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1 font-mono text-[12px] text-destructive">
               {sshError}
             </span>
           )}
-          <span className="spacer" />
+          <span className="flex-1" />
           <Button variant="ghost" onClick={onClose}>
             {tFn('connection.action.cancel')}
           </Button>
@@ -488,10 +491,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       {/* From URL / To URL: two independent one-way helpers, each in its own
           popup. From URL parses a pasted string INTO the fields; To URL exports
           the current fields OUT as a connection string. */}
-      <div className="url-actions">
+      <div className="mb-5 flex items-center gap-2">
         <button
           type="button"
-          className="url-action-btn"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-3 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
           onClick={() => {
             setFromError(null)
             setUrlPanel('from')
@@ -500,16 +503,21 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           <ClipboardPaste size={15} />
           <span>{tFn('connection.uri.fromUrl')}</span>
         </button>
-        <button type="button" className="url-action-btn" onClick={openToUrl}>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-3 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
+          onClick={openToUrl}
+        >
           <Link size={15} />
           <span>{tFn('connection.uri.toUrl')}</span>
         </button>
-        {parseNote && <span className="url-actions-note">{parseNote}</span>}
+        {parseNote && <span className="ml-1 text-[12px] text-[var(--ok)]">{parseNote}</span>}
       </div>
 
       <Tabs<Tab>
         value={tab}
         onChange={setTab}
+        className="mb-5"
         items={[
           { value: 'general', label: tFn('connection.tab.general') },
           { value: 'auth', label: tFn('connection.tab.auth') },
@@ -524,21 +532,34 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             <Field label={tFn('connection.general.name')}>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My MongoDB" />
             </Field>
-            <div>
-              <label>{tFn('connection.general.color')}</label>
-              <div className="color-swatches">
+            <div className="flex flex-col gap-1.5">
+              <label className="mb-0 text-[11px] font-medium text-muted-foreground">
+                {tFn('connection.general.color')}
+              </label>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
                 <button
                   type="button"
-                  className={`color-swatch none ${color === '' ? 'selected' : ''}`}
+                  className={cn(
+                    'relative size-6 shrink-0 rounded-full border-2 border-border bg-secondary p-0 transition-colors hover:border-[var(--border-strong)]',
+                    color === '' && 'border-[var(--fg-0)]'
+                  )}
                   data-tip={tFn('connection.general.noColor')}
                   aria-label={tFn('connection.general.noColor')}
                   onClick={() => setColor('')}
-                />
+                >
+                  <span
+                    className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
+                    aria-hidden
+                  />
+                </button>
                 {PRESET_COLORS.map((c) => (
                   <button
                     type="button"
                     key={c}
-                    className={`color-swatch ${color === c ? 'selected' : ''}`}
+                    className={cn(
+                      'size-6 shrink-0 rounded-full border-2 border-transparent p-0 transition hover:border-[var(--border-strong)]',
+                      color === c && 'border-[var(--fg-0)] shadow-[0_0_0_2px_var(--bg-1)]'
+                    )}
                     style={{ background: c }}
                     data-tip={c}
                     aria-label={c}
@@ -709,9 +730,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               {sshAuthMethod === 'privateKey' && (
                 <>
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div className="flex items-center gap-2">
                       <Input
-                        style={{ flex: 1, minWidth: 0 }}
+                        className="min-w-0 flex-1"
                         value={privateKeyPath}
                         onChange={(e) => setPrivateKeyPath(e.target.value)}
                         placeholder="~/.ssh/id_ed25519"
@@ -769,9 +790,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   </Field>
 
                   <Field label={tFn('connection.ssh.privateKeyPath')}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div className="flex items-center gap-2">
                       <Input
-                        style={{ flex: 1, minWidth: 0 }}
+                        className="min-w-0 flex-1"
                         value={jumpKeyPath}
                         onChange={(e) => setJumpKeyPath(e.target.value)}
                         placeholder="~/.ssh/id_ed25519"
@@ -851,18 +872,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="url-popup"
-        backdropClassName="url-popup-backdrop"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.5)]"
+        backdropClassName="fixed inset-0 z-[1100] bg-black/35"
       >
-        <div className="url-popup-head">
-          <ClipboardPaste size={16} />
-          <div className="url-popup-titles">
-            <span className="url-popup-title">{tFn('connection.uri.fromUrlTitle')}</span>
-            <span className="url-popup-sub">{tFn('connection.uri.fromUrlHint')}</span>
+        <div className="flex items-start gap-3">
+          <ClipboardPaste size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold">{tFn('connection.uri.fromUrlTitle')}</span>
+            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.fromUrlHint')}</span>
           </div>
         </div>
         <textarea
-          className="url-popup-input mono"
+          className="w-full resize-y rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
           autoFocus
           rows={3}
           spellCheck={false}
@@ -873,9 +894,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           onChange={(e) => setFromText(e.target.value)}
           placeholder={tFn('connection.uri.placeholder')}
         />
-        {fromError && <div className="url-popup-err">{fromError}</div>}
-        <div className="url-popup-foot">
-          <span className="spacer" />
+        {fromError && (
+          <div className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">{fromError}</div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="flex-1" />
           <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
             {tFn('connection.action.cancel')}
           </Button>
@@ -891,20 +914,20 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="url-popup"
-        backdropClassName="url-popup-backdrop"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.5)]"
+        backdropClassName="fixed inset-0 z-[1100] bg-black/35"
       >
-        <div className="url-popup-head">
-          <Link size={16} />
-          <div className="url-popup-titles">
-            <span className="url-popup-title">{tFn('connection.uri.toUrlTitle')}</span>
-            <span className="url-popup-sub">{tFn('connection.uri.toUrlHint')}</span>
+        <div className="flex items-start gap-3">
+          <Link size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold">{tFn('connection.uri.toUrlTitle')}</span>
+            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.toUrlHint')}</span>
           </div>
         </div>
         {/* Editable: regenerated on open / password-toggle, but the user can tweak
             it before copying. Copy uses whatever is in the box. */}
         <textarea
-          className="url-popup-input mono"
+          className="w-full resize-y rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
           rows={3}
           spellCheck={false}
           autoComplete="off"
@@ -919,15 +942,15 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         />
         {hasPasswordAuth && (
           <Checkbox
-            className="url-popup-check"
+            className="w-full gap-2.5 rounded-md border border-border bg-secondary px-3 py-2.5 hover:border-[var(--border-strong)]"
             checked={toIncludePassword}
             onCheckedChange={setIncludePassword}
             label={tFn('connection.uri.includePassword')}
           />
         )}
-        <div className="url-popup-foot">
-          {toCopied && <span className="url-popup-ok">{tFn('connection.uri.copied')}</span>}
-          <span className="spacer" />
+        <div className="flex items-center gap-2">
+          {toCopied && <span className="text-[11px] text-[var(--ok)]">{tFn('connection.uri.copied')}</span>}
+          <span className="flex-1" />
           <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
             {tFn('connection.action.cancel')}
           </Button>
