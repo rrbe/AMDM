@@ -19,9 +19,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'border border-border bg-secondary text-foreground hover:bg-accent hover:border-[var(--border-strong)]',
-        primary: 'bg-primary text-primary-foreground shadow-sm hover:bg-[var(--accent-hover)]',
-        ghost: 'text-foreground hover:bg-accent',
-        danger: 'text-destructive hover:bg-destructive/10'
+        primary: 'border border-[var(--accent)] bg-primary text-primary-foreground shadow-sm hover:bg-[var(--accent-hover)]',
+        ghost: 'border border-transparent bg-transparent text-foreground hover:bg-accent',
+        danger: 'border border-transparent bg-transparent text-destructive hover:bg-destructive/10'
       },
       size: {
         default: 'h-8 px-3 text-[13px] [&_svg]:size-4',

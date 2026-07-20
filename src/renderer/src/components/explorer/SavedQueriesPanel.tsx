@@ -273,7 +273,7 @@ function HistoryTab({
     <>
       <div className="sq-toolbar">
         <span className="spacer" />
-        <Button variant="ghost" className="danger" onClick={onClear}>
+        <Button variant="danger" onClick={onClear}>
           {t('savedQueries.clearHistory')}
         </Button>
       </div>

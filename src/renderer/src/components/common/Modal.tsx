@@ -48,7 +48,7 @@ export function Modal({ title, onClose, children, footer, small, size }: ModalPr
       <div className="flex items-center justify-between border-b border-border px-6 py-4 text-[15px] font-semibold">
         <DialogTitle render={<span />}>{title}</DialogTitle>
         <DialogClose
-          className="-mr-1.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
+          className="-mr-1.5 inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
           aria-label={t('common.close')}
         >
           ✕
