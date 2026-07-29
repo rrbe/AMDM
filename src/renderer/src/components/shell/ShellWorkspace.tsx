@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, X, Workflow } from 'lucide-react'
+import { LoaderCircle, Plus, X, Workflow } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabLabel } from '@renderer/lib/tabs'
@@ -72,7 +72,23 @@ export function ShellWorkspace(): JSX.Element {
           aria-label={t('shell.activeDatabaseTip')}
           data-tip={t('shell.activeDatabaseTip')}
         />
-        <span className="spacer" />
+        {running ? (
+          // Keep Stop in Run's primary position and add motion so an in-flight
+          // query is visible at a glance.
+          <Button size="sm" variant="danger" onClick={() => void stopShell()} data-tip={t('shell.stopTip')}>
+            <LoaderCircle className="animate-spin" aria-hidden /> {t('shell.stopTip')}
+          </Button>
+        ) : (
+          <Button size="sm" variant="primary" disabled={busy} onClick={runEditor}>
+            {t('shell.runBtn')}
+          </Button>
+        )}
+        <Button size="sm" disabled={busy} onClick={() => void runExplain()} data-tip={t('shell.explainTip')}>
+          {t('shell.explainBtn')}
+        </Button>
+        <Button size="sm" disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
+          {t('shell.saveBtn')}
+        </Button>
         <Button
           size="sm"
           className={pipelineOpen ? 'pipeline-toggle is-active' : 'pipeline-toggle'}
@@ -82,23 +98,6 @@ export function ShellWorkspace(): JSX.Element {
         >
           <Workflow size={14} /> {t('builder.toggleBtn')}
         </Button>
-        <Button size="sm" disabled={busy} onClick={() => setShowSave(true)} data-tip={t('shell.saveQueryTip')}>
-          {t('shell.saveBtn')}
-        </Button>
-        <Button size="sm" disabled={busy} onClick={() => void runExplain()} data-tip={t('shell.explainTip')}>
-          {t('shell.explainBtn')}
-        </Button>
-        {running ? (
-          // Swap Run → Stop while a query is in flight, so a runaway
-          // find/aggregate can be cancelled server-side (driver AbortSignal).
-          <Button size="sm" variant="danger" onClick={() => void stopShell()} data-tip={t('shell.stopTip')}>
-            {t('shell.stopBtn')}
-          </Button>
-        ) : (
-          <Button size="sm" variant="primary" disabled={busy} onClick={runEditor}>
-            {t('shell.runBtn')}
-          </Button>
-        )}
       </div>
 
       {/* Editor + optional pipeline-builder panel share one resizable row. Key

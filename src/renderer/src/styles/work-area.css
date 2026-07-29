@@ -141,9 +141,6 @@
      which reads oversized in the 38px work-header. */
   height: 30px;
 }
-.work-header .spacer {
-  flex: 1;
-}
 
 /* Editor + optional pipeline panel share one resizable row (the height var the
    ResizeHandle drives now lives here; the editor flexes, the panel is fixed). */
