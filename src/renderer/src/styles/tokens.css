@@ -17,10 +17,10 @@
   /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
   --sidebar-width: 300px;
   --editor-height: 160px;
-  --font-ui: 'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-ui: system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
-  --fs: 12px;
-  --fs-sm: 11px;
+  --fs: 13px;
+  --fs-sm: 12px;
 
   /* Typography scale (NEW — was scattered as literals across partitions). */
   --fw-normal: 400;

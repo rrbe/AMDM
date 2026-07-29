@@ -872,7 +872,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.5)]"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[var(--shadow-lg)]"
         backdropClassName="fixed inset-0 z-[1100] bg-black/35"
       >
         <div className="flex items-start gap-3">
@@ -914,7 +914,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.5)]"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[var(--shadow-lg)]"
         backdropClassName="fixed inset-0 z-[1100] bg-black/35"
       >
         <div className="flex items-start gap-3">

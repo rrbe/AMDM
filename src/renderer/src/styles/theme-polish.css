@@ -33,7 +33,7 @@ body {
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
 
-  /* Buttons: elevated surface; pine primary with a subtle lift. */
+  /* Buttons stay flat; color and border carry their state. */
   button {
     background: var(--bg-elevated);
     border-radius: var(--radius);
@@ -44,7 +44,6 @@ body {
   }
   button.primary {
     color: var(--accent-fg);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   }
   button.ghost {
     background: transparent;
@@ -70,10 +69,9 @@ body {
   background: var(--accent-soft-strong);
 }
 
-/* ---- Editorial ink rule under the top title bars ---- */
-.app-titlebar,
+/* ---- Hairline under the work toolbar ---- */
 .work-header {
-  border-bottom: 1.5px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
 }
 
 /* ---- Connection rows: full-bleed sticky band, active accent outline ----
@@ -114,7 +112,6 @@ body {
 .view-switch button.active {
   background: var(--bg-elevated);
   color: var(--fg-0);
-  box-shadow: var(--shadow-sm);
 }
 [data-theme='dark'] .view-switch button.active {
   background: var(--accent);
@@ -138,19 +135,6 @@ body {
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--fg-2);
-}
-
-/* ---- Empty state: soft accent halo + editorial heading ---- */
-.empty-state {
-  background:
-    radial-gradient(58% 48% at 50% 40%, var(--accent-soft) 0%, transparent 70%),
-    var(--bg-0);
-}
-.empty-state h2 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--fg-0);
 }
 
 /* ---- Modal backdrop (the .modal box itself is now Tailwind in common/Modal) ---- */
@@ -213,24 +197,16 @@ body {
   position: fixed;
   z-index: 3000;
   max-width: 360px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--fg-0);
-  color: var(--bg-0);
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--shadow-md);
+  padding: 4px 7px;
+  border: 1px solid #b8b8b8;
+  border-radius: 3px;
+  background: #fff;
+  color: #222;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 14%);
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
   pointer-events: none;
-  animation: tip-in 90ms ease-out;
-}
-@keyframes tip-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }

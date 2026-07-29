@@ -71,24 +71,24 @@
 
 ### 阴影
 
-`--shadow-sm/md/lg` 为中性纯黑 rgba（无色调）。多数表面扁平、靠边框定义；阴影只留给真正悬浮的东西（菜单、弹窗）。
+`--shadow-sm/md/lg` 为中性纯黑 rgba（无色调）。常驻表面、按钮和分段控件保持扁平，靠背景与边框定义；阴影只留给真正悬浮的东西（菜单、弹窗）。
 
 ---
 
 ## 2. 排版
 
 ```
---font-ui:   'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;  /* UI chrome */
+--font-ui:   system-ui, sans-serif;                                                 /* UI chrome */
 --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Monaco, monospace;  /* 数据 / 代码 */
---fs: 12px;  --fs-sm: 11px;
+--fs: 13px;  --fs-sm: 12px;
 /* 排版尺度令牌（替代散落字面量）：*/
 --fw-normal/medium/semibold/bold: 400/500/600/700;
 --lh-tight/snug/normal/relaxed:   1.2/1.35/1.45/1.6;
 --ls-tight/normal/wide:           -0.01em/0/0.01em;
 ```
 
-- **UI sans（Euclid Circular A）** — 所有 chrome（标签、按钮、标题、连接名）。专有字体不内置，回退 Helvetica Neue。
-- **JetBrains Mono（OFL-1.1，可商用，`@fontsource` 离线打包）** — *所有数据与代码*（编辑器、结果表、ObjectId、host、库名 chip）。侧栏连接名也走等宽。
+- **系统 sans** — 通用 chrome（标签、按钮、标题），在 macOS 上自然使用系统字体；连接列表单独使用 Helvetica Neue。
+- **JetBrains Mono（OFL-1.1，可商用，`@fontsource` 离线打包）** — *所有数据与代码*（编辑器、结果表、ObjectId、库名 chip）。
 - **不使用纯英文大写**（`text-transform: uppercase` 全站清除）；层级靠字重 + 颜色 + 细微字距，标签一律**大驼峰**。
 
 ---
@@ -136,7 +136,7 @@
 - 目录树行 / 分组头：**圆角内嵌药丸** hover（`--bg-3`/`--bg-2`）。状态点（在线/错误/连接中/离线）= 颜色 + 光晕。
 
 ### 分段控件 / 结果（`.view-switch`、`results.css`）
-- 视图切换（Tree/JSON/Table）：轨道 `--bg-2`，激活段在亮色取 `--bg-elevated`+阴影、暗色取蓝填充。
+- 视图切换（Tree/JSON/Table）：轨道 `--bg-2`，激活段在亮色取 `--bg-elevated`，暗色取蓝填充。
 - 结果表/树：**虚线网格**（`1px dashed var(--border)`，刻意保留）、KEY|VALUE|TYPE 三列、`--t-*` 类型着色、粘性表头。
 
 ### 主题切换

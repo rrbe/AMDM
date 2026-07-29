@@ -36,7 +36,7 @@ export function Modal({ title, onClose, children, footer, small, size }: ModalPr
         if (!open) onClose()
       }}
       className={cn(
-        'flex max-h-[88vh] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[var(--border-strong)] bg-card text-foreground shadow-[0_24px_64px_rgba(0,0,0,0.5)]',
+        'flex max-h-[88vh] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[var(--border-strong)] bg-card text-foreground shadow-[var(--shadow-lg)]',
         width === 'sm' && 'w-[480px]',
         width === 'md' && 'w-[660px]',
         width === 'lg' && 'w-[760px]'

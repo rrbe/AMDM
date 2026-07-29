@@ -3,8 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from '@renderer/App'
 import { ErrorBoundary } from '@renderer/components/common/ErrorBoundary'
 // Fonts.
-// UI chrome keeps a system sans stack (Euclid Circular A if installed, else
-// Helvetica Neue) — proprietary, no UI webfont bundled.
+// UI chrome uses the platform system font.
 // JetBrains Mono is the data/code font (editor, results, ObjectId, etc.);
 // bundled offline via @fontsource because the renderer CSP forbids remote
 // font CDNs. OFL-1.1, free for commercial bundling.
