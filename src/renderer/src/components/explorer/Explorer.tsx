@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import i18n from '@renderer/i18n'
 import {
   ChevronRight,
   Clock,
@@ -182,27 +181,27 @@ export function Explorer(): JSX.Element {
       items: [
         disconnectable
           ? {
-              label: t('explorer.disconnect'),
+              label: 'Disconnect',
               icon: <Unplug size={14} />,
               onClick: () => void disconnect(row.id)
             }
           : {
-              label: t('explorer.connect'),
+              label: 'Connect',
               icon: <Plug size={14} />,
               onClick: () => void connect(row.id)
             },
         'separator',
         {
-          label: t('explorer.edit'),
+          label: 'Edit',
           icon: <Pencil size={14} />,
           onClick: () => setConnForm({ open: true, editing: row.conn })
         },
         {
-          label: t('explorer.delete'),
+          label: 'Delete',
           icon: <Trash2 size={14} />,
           danger: true,
           onClick: () => {
-            if (confirm(t('explorer.deleteConfirm', { name: row.conn.name })))
+            if (confirm(`Delete connection "${row.conn.name}"?`))
               void deleteConnection(row.id)
           }
         }
@@ -222,13 +221,13 @@ export function Explorer(): JSX.Element {
       y: e.clientY,
       items: [
         {
-          label: t('explorer.exportCollection'),
+          label: 'Export collection…',
           icon: <Download size={14} />,
           onClick: () =>
             setIoModal({ mode: 'export', connId, db: coll.db, collection: coll.name })
         },
         {
-          label: t('explorer.importCollection'),
+          label: 'Import into collection…',
           icon: <Upload size={14} />,
           onClick: () =>
             setIoModal({ mode: 'import', connId, db: coll.db, collection: coll.name })
@@ -279,11 +278,11 @@ export function Explorer(): JSX.Element {
     <div className="explorer">
       <div className="side-section side-section--conns">
         <div className="side-section-head app-drag">
-          <span className="side-section-title">{t('explorer.connections')}</span>
+          <span className="side-section-title">Connections</span>
           <button
             className="ghost side-section-more"
-            data-tip={t('explorer.backupRestore')}
-            aria-label={t('explorer.backupRestore')}
+            data-tip="Back up / restore connections"
+            aria-label="Back up / restore connections"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
               setCtxMenu({
@@ -291,12 +290,12 @@ export function Explorer(): JSX.Element {
                 y: r.bottom + 4,
                 items: [
                   {
-                    label: t('explorer.exportConnections'),
+                    label: 'Export connections…',
                     icon: <Download size={14} />,
                     onClick: () => void exportConnections()
                   },
                   {
-                    label: t('explorer.importConnections'),
+                    label: 'Import connections…',
                     icon: <Upload size={14} />,
                     onClick: () => void importConnections()
                   }
@@ -308,16 +307,16 @@ export function Explorer(): JSX.Element {
           </button>
           <button
             className="primary btn-new-conn"
-            data-tip={t('explorer.newConnectionTip')}
+            data-tip="New connection"
             onClick={() => setConnForm({ open: true })}
           >
             <Plus size={15} />
-            <span>{t('explorer.new')}</span>
+            <span>New</span>
           </button>
         </div>
         <div className="explorer-body">
           {connections.length === 0 && (
-            <div className="explorer-empty">{t('explorer.noConnections')}</div>
+            <div className="explorer-empty">No connections. Click "New" to add one.</div>
           )}
 
           {rows.map((row) =>
@@ -436,7 +435,6 @@ function ConnectionRow({
   onConnect: () => void
   onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
-  const { t } = useTranslation()
   const { conn, state, expandable, expanded } = row
   const isConnected = state === 'connected'
   const sub = conn.useSrv ? `srv · ${conn.host}` : `${conn.host}:${conn.port ?? 27017}`
@@ -476,7 +474,18 @@ function ConnectionRow({
           <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} />
         ) : null}
       </span>
-      <span className="conn-status" data-tip={t(`explorer.state.${state}`)}>
+      <span
+        className="conn-status"
+        data-tip={
+          state === 'connected'
+            ? 'Connected'
+            : state === 'connecting'
+              ? 'Connecting…'
+              : state === 'error'
+                ? 'Connection error'
+                : 'Disconnected'
+        }
+      >
         <span className={signalClass} />
       </span>
       <div className="conn-text">
@@ -494,7 +503,6 @@ function CatalogRow({
   row: TreeRow
   onContextMenu: (e: MouseEvent, coll: { db: string; name: string }, connId: string) => void
 }): JSX.Element {
-  const { t } = useTranslation()
   const coll = row.collection
   const isNote = row.kind === 'leaf'
   const className =
@@ -507,7 +515,7 @@ function CatalogRow({
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
       onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
-      data-tip={isNote ? undefined : row.empty ? t('explorer.emptyDb', { name: row.label }) : row.label}
+      data-tip={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
     >
       <span
         className="tree-twisty"
@@ -613,7 +621,7 @@ function flattenCatalog(
           id: `${usersNodeId}:${u.db}.${u.user}`,
           connId,
           depth: 3,
-          label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || i18n.t('explorer.noRoles')})`,
+          label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || 'no roles'})`,
           icon: 'user',
           kind: 'leaf',
           expandable: false,
@@ -622,7 +630,7 @@ function flattenCatalog(
         })
       }
       if (usersList.length === 0) {
-        rows.push(leafNote(`${usersNodeId}:empty`, connId, 3, i18n.t('explorer.noUsers')))
+        rows.push(leafNote(`${usersNodeId}:empty`, connId, 3, 'no users'))
       }
     }
 
@@ -665,7 +673,7 @@ function flattenCatalog(
         id: idxNodeId,
         connId,
         depth: 3,
-        label: i18n.t('explorer.indexes'),
+        label: 'Indexes',
         icon: 'indexes',
         kind: 'indexes',
         expandable: true,
@@ -687,7 +695,7 @@ function flattenCatalog(
             id: `${idxNodeId}:${ix.name}`,
             connId,
             depth: 4,
-            label: `${ix.name} { ${keySpec} }${ix.unique ? i18n.t('explorer.indexUnique') : ''}`,
+            label: `${ix.name} { ${keySpec} }${ix.unique ? ' · unique' : ''}`,
             icon: 'index',
             kind: 'leaf',
             expandable: false,
@@ -696,13 +704,13 @@ function flattenCatalog(
           })
         }
         if (idxList.length === 0) {
-          rows.push(leafNote(`${idxNodeId}:empty`, connId, 4, i18n.t('explorer.noIndexes')))
+          rows.push(leafNote(`${idxNodeId}:empty`, connId, 4, 'no indexes'))
         }
       }
     }
 
     if (colls.length === 0) {
-      rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, i18n.t('explorer.noCollections')))
+      rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, 'no collections'))
     }
   }
 
