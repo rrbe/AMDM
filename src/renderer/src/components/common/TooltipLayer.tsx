@@ -12,7 +12,7 @@ import { createPortal } from 'react-dom'
  * The bubble is portaled to <body> so `overflow:hidden` ancestors never clip it,
  * and positioned from the trigger's live rect (measured, then clamped on-screen).
  */
-const SHOW_DELAY = 350
+const SHOW_DELAY = 700
 const GAP = 6
 const MARGIN = 8
 
@@ -95,8 +95,7 @@ export function TooltipLayer(): JSX.Element | null {
     }
   }, [])
 
-  // Measure the rendered bubble, then place it above (or below if no room) the
-  // trigger, centered and clamped into the viewport.
+  // Place the bubble to the right, falling back to the left at the viewport edge.
   useLayoutEffect(() => {
     if (!active || !boxRef.current) {
       setStyle((s) => (s.visible ? { ...s, visible: false } : s))
@@ -104,10 +103,15 @@ export function TooltipLayer(): JSX.Element | null {
     }
     const box = boxRef.current.getBoundingClientRect()
     const { rect } = active
-    const above = rect.top >= box.height + GAP + MARGIN
-    const top = above ? rect.top - box.height - GAP : rect.bottom + GAP
-    const centered = rect.left + rect.width / 2 - box.width / 2
-    const left = Math.max(MARGIN, Math.min(centered, window.innerWidth - box.width - MARGIN))
+    const top = Math.max(
+      MARGIN,
+      Math.min(rect.top + rect.height / 2 - box.height / 2, window.innerHeight - box.height - MARGIN)
+    )
+    const right = rect.right + GAP
+    const left =
+      right + box.width <= window.innerWidth - MARGIN
+        ? right
+        : Math.max(MARGIN, rect.left - box.width - GAP)
     setStyle({ top, left, visible: true })
   }, [active])
 
