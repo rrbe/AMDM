@@ -29,6 +29,7 @@ describe('createTab', () => {
     const t = createTab('a')
     expect(t).toMatchObject({
       id: 'a',
+      connectionId: null,
       code: '',
       activeDatabase: '',
       pristine: true,
@@ -45,39 +46,69 @@ describe('createTab', () => {
 })
 
 describe('pickFillTarget', () => {
-  const SEED = { database: 'shop', code: 'db.orders.find({})' }
+  const SEED = { connectionId: 'c1', database: 'shop', code: 'db.orders.find({})' }
 
   it('focuses a tab that already holds exactly this fill', () => {
-    const browse = createTab('b', { activeDatabase: 'shop', code: SEED.code })
+    const browse = createTab('b', {
+      connectionId: 'c1',
+      activeDatabase: 'shop',
+      code: SEED.code
+    })
     const edited = createTab('e', { code: 'db.users.find({ x: 1 })', pristine: false })
     expect(pickFillTarget([edited, browse], 'e', SEED)).toEqual({ focusId: 'b' })
   })
   it('matches the fill on database too, not just code', () => {
-    const otherDb = createTab('b', { activeDatabase: 'archive', code: SEED.code, pristine: false })
+    const otherDb = createTab('b', {
+      connectionId: 'c1',
+      activeDatabase: 'archive',
+      code: SEED.code,
+      pristine: false
+    })
     expect(pickFillTarget([otherDb], 'b', SEED)).toEqual({})
   })
+  it('does not focus or reuse a tab bound to another connection', () => {
+    const otherConnection = createTab('b', {
+      connectionId: 'c2',
+      activeDatabase: 'shop',
+      code: SEED.code
+    })
+    expect(pickFillTarget([otherConnection], 'b', SEED)).toEqual({})
+  })
   it('reuses the active tab while it is pristine with no results', () => {
-    const blank = createTab('a')
+    const blank = createTab('a', { connectionId: 'c1' })
     expect(pickFillTarget([blank], 'a', SEED)).toEqual({ reuseId: 'a' })
     // An untouched seed for another collection is equally disposable.
-    const seeded = createTab('a', { activeDatabase: 'shop', code: 'db.users.find({})' })
+    const seeded = createTab('a', {
+      connectionId: 'c1',
+      activeDatabase: 'shop',
+      code: 'db.users.find({})'
+    })
     expect(pickFillTarget([seeded], 'a', SEED)).toEqual({ reuseId: 'a' })
   })
   it('never reuses a tab the user edited', () => {
-    const edited = createTab('a', { code: 'db.users.find({ x: 1 })', pristine: false })
+    const edited = createTab('a', {
+      connectionId: 'c1',
+      code: 'db.users.find({ x: 1 })',
+      pristine: false
+    })
     expect(pickFillTarget([edited], 'a', SEED)).toEqual({})
   })
   it('never reuses a pristine tab that has results', () => {
-    const ran = { ...createTab('a'), ...appendResult(createTab('a'), 'r1', docsResult(), null) }
+    const blank = createTab('a', { connectionId: 'c1' })
+    const ran = { ...blank, ...appendResult(blank, 'r1', docsResult(), null) }
     expect(pickFillTarget([ran], 'a', SEED)).toEqual({})
   })
   it('only ever reuses the ACTIVE tab', () => {
-    const blank = createTab('a')
+    const blank = createTab('a', { connectionId: 'c1' })
     const edited = createTab('e', { code: 'let x = 1', pristine: false })
     expect(pickFillTarget([blank, edited], 'e', SEED)).toEqual({})
   })
   it('skips the focus scan when no match is given (query/history loads)', () => {
-    const browse = createTab('b', { activeDatabase: 'shop', code: SEED.code })
+    const browse = createTab('b', {
+      connectionId: 'c1',
+      activeDatabase: 'shop',
+      code: SEED.code
+    })
     const edited = createTab('e', { code: 'let x = 1', pristine: false })
     expect(pickFillTarget([browse, edited], 'e')).toEqual({})
   })

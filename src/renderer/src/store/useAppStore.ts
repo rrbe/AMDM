@@ -454,9 +454,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { [id]: _removedStatus, ...statuses } = s.statuses
         const expandedConnections = new Set(s.expandedConnections)
         expandedConnections.delete(id)
+        const tabs = s.tabs.map((tab) =>
+          tab.connectionId === id ? { ...tab, connectionId: null } : tab
+        )
         return {
           catalogs,
           statuses,
+          tabs,
           expandedConnections,
           activeConnectionId: s.activeConnectionId === id ? null : s.activeConnectionId
         }
@@ -545,12 +549,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (status.state === 'connected') expandedConnections.add(id)
         return {
           statuses: { ...s.statuses, [id]: status },
-          activeConnectionId: id,
           catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() },
           expandedConnections
         }
       })
       if (status.state === 'connected') {
+        get().setActiveConnection(id)
         // Default the active tab's database to the connection's preferred db,
         // unless that tab already has one chosen (don't clobber an explicit pick).
         const conn = get().connections.find((c) => c.id === id)
@@ -598,7 +602,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setActiveConnection(id) {
-    set({ activeConnectionId: id })
+    if (id === null) {
+      set({ activeConnectionId: null })
+      return
+    }
+    set((s) => {
+      const active = getActiveTab(s)
+      if (active.connectionId === id) return { activeConnectionId: id }
+      const existing = s.tabs.find((tab) => tab.connectionId === id)
+      if (existing) return { activeConnectionId: id, activeTabId: existing.id }
+      if (active.connectionId === null && active.pristine && active.results.length === 0) {
+        return {
+          activeConnectionId: id,
+          tabs: patchTab(s.tabs, active.id, { connectionId: id })
+        }
+      }
+      const tab = createTab(newTabId(), { connectionId: id })
+      return { activeConnectionId: id, tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
   },
 
   toggleConnectionExpanded(id) {
@@ -732,12 +753,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---------------------------------------------------------------------- tabs
   newTab() {
-    const tab = createTab(newTabId())
+    const tab = createTab(newTabId(), { connectionId: get().activeConnectionId })
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
   },
 
   setActiveTab(id) {
-    set({ activeTabId: id })
+    set((s) => {
+      const tab = s.tabs.find((item) => item.id === id)
+      return tab ? { activeTabId: id, activeConnectionId: tab.connectionId } : {}
+    })
   },
 
   closeTab(id) {
@@ -749,11 +773,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Free any per-stage previews the closed tab's builder was holding.
       const pipelinePreviews = dropPreviews(s.pipelinePreviews, closing?.pipeline?.stages)
       if (remaining.length === 0) {
-        const fresh = createTab(newTabId())
+        const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id, pipelinePreviews }
       }
       const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
-      return { tabs: remaining, activeTabId: nextActive, pipelinePreviews }
+      const activeConnectionId =
+        remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
+      return { tabs: remaining, activeTabId: nextActive, activeConnectionId, pipelinePreviews }
     })
   },
 
@@ -794,7 +820,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveDatabase(db) {
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }))
     // Warm the new db's collection names for `db.` completion (skip if cached).
-    const connId = get().activeConnectionId
+    const connId = getActiveTab(get()).connectionId
     if (connId && db && get().catalogs[connId]?.collections[db] === undefined) {
       void get().loadCollections(connId, db)
     }
@@ -809,23 +835,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     // a pristine tab, so browsing the catalog can't overwrite user code.
     const seed = `db.${coll}.find({})`
     set((s) => {
+      const connectionId = getActiveTab(s).connectionId
+      if (!connectionId) return {}
       const { focusId, reuseId } = pickFillTarget(s.tabs, s.activeTabId, {
+        connectionId,
         database: db,
         code: seed
       })
       if (focusId) return { activeTabId: focusId }
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
-      const tab = createTab(newTabId(), { activeDatabase: db, code: seed })
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
   },
 
   async runShell(codeOverride) {
-    const { activeConnectionId } = get()
     const tab = getActiveTab(get())
+    const connectionId = tab.connectionId
     const tabId = tab.id
     const code = codeOverride ?? tab.code
-    if (!activeConnectionId) {
+    if (!connectionId) {
       set({ lastError: tr('notify.noActiveConnection') })
       return
     }
@@ -837,7 +866,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
       lastError: null
     }))
-    const query = { connectionId: activeConnectionId, database, code }
+    const query = { connectionId, database, code }
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
       // earlier results stay around for side-by-side comparison.
@@ -908,11 +937,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async runExplain() {
-    const { activeConnectionId } = get()
     const tab = getActiveTab(get())
+    const connectionId = tab.connectionId
     const tabId = tab.id
     const code = tab.code
-    if (!activeConnectionId) {
+    if (!connectionId) {
       set({ lastError: tr('notify.noActiveConnection') })
       return
     }
@@ -923,7 +952,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
       lastError: null
     }))
-    const query = { connectionId: activeConnectionId, database, code }
+    const query = { connectionId, database, code }
     try {
       const result = await window.api.shell.execute({ ...query, explain: true, execId })
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
@@ -1022,10 +1051,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
     set((s) => {
-      const activeDatabase = database || getActiveTab(s).activeDatabase
+      const active = getActiveTab(s)
+      const activeDatabase = database || active.activeDatabase
       const { reuseId } = pickFillTarget(s.tabs, s.activeTabId)
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { code, activeDatabase }) }
-      const tab = createTab(newTabId(), { code, activeDatabase })
+      const tab = createTab(newTabId(), {
+        connectionId: active.connectionId,
+        code,
+        activeDatabase
+      })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
   },
@@ -1136,14 +1170,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tab = getActiveTab(s)
     const p = tab.pipeline
     const stage = p?.stages[index]
-    if (!p || !stage || !s.activeConnectionId || !p.collection) return
+    if (!p || !stage || !tab.connectionId || !p.collection) return
     const stageId = stage.id
     const code = buildPreviewCode(p.collection, p.stages, index)
     const database = tab.activeDatabase || 'test'
     set((st) => ({ pipelinePreviews: { ...st.pipelinePreviews, [stageId]: { loading: true } } }))
     try {
       const result = await window.api.shell.execute({
-        connectionId: s.activeConnectionId,
+        connectionId: tab.connectionId,
         database,
         code,
         limit: PREVIEW_LIMIT,

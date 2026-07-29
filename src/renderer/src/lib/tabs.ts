@@ -34,6 +34,8 @@ export const MAX_RESULT_TABS = 8
 
 export interface QueryTab {
   id: string
+  /** Connection this tab executes against. */
+  connectionId: string | null
   /** Per-tab active database (the db selector is scoped to the tab). */
   activeDatabase: string
   code: string
@@ -62,6 +64,7 @@ export interface QueryTab {
 export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
   return {
     id,
+    connectionId: null,
     activeDatabase: '',
     code: '',
     pristine: true,
@@ -85,14 +88,24 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
 export function pickFillTarget(
   tabs: QueryTab[],
   activeTabId: string,
-  match?: { database: string; code: string }
+  match?: { connectionId: string; database: string; code: string }
 ): { focusId?: string; reuseId?: string } {
   if (match) {
-    const existing = tabs.find((t) => t.activeDatabase === match.database && t.code === match.code)
+    const existing = tabs.find(
+      (t) =>
+        t.connectionId === match.connectionId &&
+        t.activeDatabase === match.database &&
+        t.code === match.code
+    )
     if (existing) return { focusId: existing.id }
   }
   const active = tabs.find((t) => t.id === activeTabId)
-  if (active?.pristine && active.results.length === 0) return { reuseId: active.id }
+  if (
+    active?.pristine &&
+    active.results.length === 0 &&
+    (!match || active.connectionId === match.connectionId)
+  )
+    return { reuseId: active.id }
   return {}
 }
 
