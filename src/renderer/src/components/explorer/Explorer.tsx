@@ -175,12 +175,12 @@ export function Explorer(): JSX.Element {
   // The row itself carries nothing but the live status signal — no hover buttons.
   const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
     e.preventDefault()
-    const connected = row.state === 'connected'
+    const disconnectable = row.state === 'connected' || row.state === 'connecting'
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
       items: [
-        connected
+        disconnectable
           ? {
               label: t('explorer.disconnect'),
               icon: <Unplug size={14} />,
@@ -459,7 +459,7 @@ function ConnectionRow({
       className={isActive ? 'conn-item active' : 'conn-item'}
       data-tip={sub}
       onClick={onSelect}
-      onDoubleClick={() => (isConnected ? onToggle() : onConnect())}
+      onDoubleClick={() => (isConnected ? onToggle() : state !== 'connecting' && onConnect())}
       onContextMenu={onContextMenu}
       style={conn.color ? { borderLeftColor: conn.color } : undefined}
     >

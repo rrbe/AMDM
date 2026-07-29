@@ -543,6 +543,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
     try {
       const status = await window.api.session.connect(id)
+      // A disconnect may have won while the IPC connect call was still pending.
+      if (get().statuses[id]?.state !== 'connecting') return
       set((s) => {
         // Auto-expand the connection in the explorer so its databases appear.
         const expandedConnections = new Set(s.expandedConnections)
@@ -575,6 +577,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
     } catch (e) {
+      if (get().statuses[id]?.state !== 'connecting') return
       set((s) => ({
         statuses: { ...s.statuses, [id]: { id, state: 'error', error: errMessage(e) } }
       }))
@@ -582,22 +585,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async disconnect(id) {
+    // Update immediately; closing an in-flight driver connection may finish asynchronously.
+    set((s) => {
+      const { [id]: _removed, ...catalogs } = s.catalogs
+      const expandedConnections = new Set(s.expandedConnections)
+      expandedConnections.delete(id)
+      return {
+        statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
+        catalogs,
+        expandedConnections
+      }
+    })
     try {
       await window.api.session.disconnect(id)
     } catch (e) {
       set({ lastError: tr('notify.disconnectFailed', { error: errMessage(e) }) })
-    } finally {
-      // Dispose catalog cache for this connection (ADR-0004 rule 6).
-      set((s) => {
-        const { [id]: _removed, ...catalogs } = s.catalogs
-        const expandedConnections = new Set(s.expandedConnections)
-        expandedConnections.delete(id)
-        return {
-          statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
-          catalogs,
-          expandedConnections
-        }
-      })
     }
   },
 

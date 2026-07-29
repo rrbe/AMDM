@@ -11,11 +11,18 @@ interface Session {
   status: ConnectionStatus
 }
 
+interface PendingSession {
+  client?: MongoClient
+  tunnel?: SshTunnel
+}
+
 /** Owns all live MongoClient connections and their SSH tunnels. */
-class SessionManager {
+export class SessionManager {
   private sessions = new Map<string, Session>()
+  private pending = new Map<string, PendingSession>()
 
   getStatus(id: string): ConnectionStatus {
+    if (this.pending.has(id)) return { id, state: 'connecting' }
     return this.sessions.get(id)?.status ?? { id, state: 'disconnected' }
   }
 
@@ -30,12 +37,6 @@ class SessionManager {
   /** Local forwarded port if this connection runs over an SSH tunnel. */
   getTunnelPort(id: string): number | undefined {
     return this.sessions.get(id)?.tunnel?.localPort
-  }
-
-  private async openTunnel(dec: DecryptedConnection): Promise<SshTunnel> {
-    const tunnel = new SshTunnel()
-    await tunnel.open(buildTunnelOptions(dec))
-    return tunnel
   }
 
   private async probe(client: MongoClient): Promise<{ topology?: string; serverVersion?: string }> {
@@ -64,18 +65,34 @@ class SessionManager {
       return status
     }
 
+    const pending: PendingSession = {}
+    this.pending.set(id, pending)
     let tunnel: SshTunnel | undefined
+    let client: MongoClient | undefined
     try {
       let tunnelPort: number | undefined
       if (dec.config.ssh.enabled) {
-        tunnel = await this.openTunnel(dec)
+        tunnel = new SshTunnel()
+        pending.tunnel = tunnel
+        await tunnel.open(buildTunnelOptions(dec))
+        if (this.pending.get(id) !== pending) {
+          tunnel.close()
+          return { id, state: 'disconnected' }
+        }
         tunnelPort = tunnel.localPort
       }
 
       const { uri, options } = buildClientArgs(dec, tunnelPort)
-      const client = new MongoClient(uri, options)
+      client = new MongoClient(uri, options)
+      pending.client = client
       await client.connect()
       const info = await this.probe(client)
+
+      if (this.pending.get(id) !== pending) {
+        await client.close().catch(() => {})
+        tunnel?.close()
+        return { id, state: 'disconnected' }
+      }
 
       const status: ConnectionStatus = {
         id,
@@ -83,6 +100,7 @@ class SessionManager {
         topology: info.topology,
         serverVersion: info.serverVersion
       }
+      this.pending.delete(id)
       this.sessions.set(id, { client, tunnel, status })
       // TOFU: persist the host key(s) learned on first connect so later connects verify them.
       if (tunnel?.learnedHostKey) {
@@ -93,7 +111,11 @@ class SessionManager {
       }
       return status
     } catch (err) {
+      const cancelled = this.pending.get(id) !== pending
+      if (!cancelled) this.pending.delete(id)
+      await client?.close().catch(() => {})
       tunnel?.close()
+      if (cancelled) return { id, state: 'disconnected' }
       const status: ConnectionStatus = {
         id,
         state: 'error',
@@ -104,15 +126,17 @@ class SessionManager {
   }
 
   async disconnect(id: string): Promise<void> {
+    const pending = this.pending.get(id)
+    this.pending.delete(id)
     const s = this.sessions.get(id)
-    if (!s) return
     this.sessions.delete(id)
+    pending?.tunnel?.close()
+    s?.tunnel?.close()
     try {
-      await s.client.close()
+      await Promise.all([pending?.client?.close(), s?.client.close()])
     } catch {
       /* ignore */
     }
-    s.tunnel?.close()
   }
 
   async test(dec: DecryptedConnection): Promise<TestResult> {
@@ -138,8 +162,8 @@ class SessionManager {
   }
 
   async closeAll(): Promise<void> {
-    const ids = [...this.sessions.keys()]
-    await Promise.all(ids.map((id) => this.disconnect(id)))
+    const ids = new Set([...this.pending.keys(), ...this.sessions.keys()])
+    await Promise.all([...ids].map((id) => this.disconnect(id)))
   }
 }
 
