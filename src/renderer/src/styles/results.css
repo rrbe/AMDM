@@ -6,14 +6,13 @@
   flex-direction: column;
   overflow: hidden;
 }
-/* Result-tab strip — one chip per kept run, above the result bar. UNIFIED with
-   the query-tab strip (.qtab in work-area.css): identical folder-tab styling. */
+/* Result-tab strip — one inset pill per kept run, matching query tabs. */
 .result-tabs {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 2px;
-  height: 32px;
-  padding: 6px 8px 0;
+  min-height: 40px;
+  padding: 6px 8px;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
@@ -28,9 +27,9 @@
   align-items: center;
   gap: 6px;
   max-width: 200px;
-  padding: 0 6px 0 11px;
-  margin-bottom: -1px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  height: 28px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-2);
   font-size: var(--fs-sm);
@@ -45,14 +44,9 @@
   background: var(--bg-2);
   color: var(--fg-1);
 }
-/* Active = lifted to the header surface (--bg-1) with the blue top-rule — the one
-   signal of which run is shown. Identical to .qtab.active. */
 .rtab.active {
-  position: relative;
-  z-index: 1;
-  background: var(--bg-1);
+  background: var(--bg-sel);
   color: var(--fg-0);
-  box-shadow: inset 0 2px 0 var(--accent);
 }
 .rtab-label {
   overflow: hidden;
@@ -591,4 +585,3 @@
   max-width: 360px;
   line-height: 1.5;
 }
-

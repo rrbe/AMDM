@@ -15,6 +15,7 @@ import {
   Pencil,
   Plug,
   Plus,
+  Search,
   Settings,
   Sun,
   Table2,
@@ -22,16 +23,19 @@ import {
   Unplug,
   Upload,
   User as UserIcon,
-  Users as UsersIcon
+  Users as UsersIcon,
+  X
 } from 'lucide-react'
 import type { CollectionSort, ConnectionConfig, ConnectionState } from '@shared/types'
 import {
   useAppStore,
+  getActiveTab,
   type CatalogState,
   type NodeKind,
   type NodePayload
 } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
+import { tabCollection } from '@renderer/lib/tabs'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -132,6 +136,7 @@ export function Explorer(): JSX.Element {
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
   const theme = useAppStore((s) => s.settings.theme)
+  const activeTab = useAppStore(getActiveTab)
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -149,6 +154,8 @@ export function Explorer(): JSX.Element {
   // default and independently toggled.
   const [savedOpen, setSavedOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const [connForm, setConnForm] = useState<{ open: boolean; editing?: ConnectionConfig }>({
     open: false
   })
@@ -273,11 +280,61 @@ export function Explorer(): JSX.Element {
     setActiveDatabase,
     browseCollection
   ])
+  const visibleRows = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    if (!query) return rows
+    return rows.filter((row) =>
+      row.type === 'connection'
+        ? `${row.conn.name} ${row.conn.host}`.toLocaleLowerCase().includes(query)
+        : row.label.toLocaleLowerCase().includes(query)
+    )
+  }, [rows, search])
+  const activeCollection = tabCollection(activeTab)
 
   return (
     <div className="explorer">
+      <div className="explorer-head app-drag">
+        <div className="app-brand">
+          <span className="app-mark" aria-hidden />
+          <span>AMDM</span>
+        </div>
+        <button
+          className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
+          data-tip={t('explorer.search')}
+          aria-label={t('explorer.search')}
+          aria-pressed={searchOpen}
+          onClick={() => {
+            if (searchOpen) setSearch('')
+            setSearchOpen((open) => !open)
+          }}
+        >
+          <Search size={16} />
+        </button>
+      </div>
+      {searchOpen && (
+        <div className="explorer-search">
+          <Search size={14} aria-hidden />
+          <input
+            autoFocus
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t('explorer.searchPlaceholder')}
+            aria-label={t('explorer.search')}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              aria-label={t('explorer.clearSearch')}
+              data-tip={t('explorer.clearSearch')}
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="side-section side-section--conns">
-        <div className="side-section-head app-drag">
+        <div className="side-section-head">
           <span className="side-section-title">Connections</span>
           <button
             className="ghost side-section-more"
@@ -305,21 +362,17 @@ export function Explorer(): JSX.Element {
           >
             <MoreVertical size={15} />
           </button>
-          <button
-            className="primary btn-new-conn"
-            data-tip="New connection"
-            onClick={() => setConnForm({ open: true })}
-          >
-            <Plus size={15} />
-            <span>New</span>
-          </button>
         </div>
         <div className="explorer-body">
           {connections.length === 0 && (
             <div className="explorer-empty">No connections. Click "New" to add one.</div>
           )}
 
-          {rows.map((row) =>
+          {search.trim() && visibleRows.length === 0 && (
+            <div className="explorer-empty">{t('explorer.noSearchResults')}</div>
+          )}
+
+          {visibleRows.map((row) =>
             row.type === 'connection' ? (
               <ConnectionRow
                 key={row.id}
@@ -331,7 +384,18 @@ export function Explorer(): JSX.Element {
                 onContextMenu={(e) => openConnMenu(e, row)}
               />
             ) : (
-              <CatalogRow key={row.id} row={row} onContextMenu={openCollMenu} />
+              <CatalogRow
+                key={row.id}
+                row={row}
+                isActive={
+                  row.connId === activeConnectionId &&
+                  (row.collection
+                    ? row.collection.db === activeTab.activeDatabase &&
+                      row.collection.name === activeCollection
+                    : row.kind === 'database' && row.label === activeTab.activeDatabase)
+                }
+                onContextMenu={openCollMenu}
+              />
             )
           )}
         </div>
@@ -347,8 +411,18 @@ export function Explorer(): JSX.Element {
         <HistoryPanel open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
       </div>
 
-      {/* App-level controls live in the sidebar footer (VS Code pattern), out of
-          the way of the query actions. The theme is a persisted preference. */}
+      <div className="explorer-create">
+        <button
+          className="primary btn-new-conn"
+          data-tip={t('explorer.newConnection')}
+          onClick={() => setConnForm({ open: true })}
+        >
+          <Plus size={15} />
+          <span>{t('explorer.newConnection')}</span>
+        </button>
+      </div>
+
+      {/* App-level controls stay in the quiet footer. */}
       <div className="side-foot">
         <button
           className="theme-cycle"
@@ -474,6 +548,10 @@ function ConnectionRow({
           <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} />
         ) : null}
       </span>
+      <div className="conn-text">
+        <div className="conn-name">{conn.name}</div>
+        <div className="conn-sub">{sub}</div>
+      </div>
       <span
         className="conn-status"
         data-tip={
@@ -488,25 +566,24 @@ function ConnectionRow({
       >
         <span className={signalClass} />
       </span>
-      <div className="conn-text">
-        <div className="conn-name">{conn.name}</div>
-        <div className="conn-sub">{sub}</div>
-      </div>
     </div>
   )
 }
 
 function CatalogRow({
   row,
+  isActive,
   onContextMenu
 }: {
   row: TreeRow
+  isActive: boolean
   onContextMenu: (e: MouseEvent, coll: { db: string; name: string }, connId: string) => void
 }): JSX.Element {
   const coll = row.collection
   const isNote = row.kind === 'leaf'
   const className =
     'tree-node' +
+    (isActive ? ' active' : '') +
     (row.empty ? ' tree-node--empty' : '') +
     (isNote ? ' tree-node--note' : '')
   return (

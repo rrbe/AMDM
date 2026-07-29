@@ -12,6 +12,9 @@
   min-width: 0;
   display: flex;
 }
+.app svg {
+  stroke-width: 1.75;
+}
 
 .pane-divider {
   width: 1px;
@@ -75,7 +78,7 @@
 
 /* The two existing top rows double as the macOS drag surface. Traffic lights
    occupy the leading edge of the sidebar; query tabs remain clickable. */
-.is-mac .side-section-head.app-drag {
+.is-mac .explorer-head.app-drag {
   padding-left: 78px;
 }
 .is-mac .app-drag .qtab {

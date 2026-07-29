@@ -158,6 +158,11 @@
     }
   },
   "explorer": {
+    "search": "搜索当前可见目录",
+    "searchPlaceholder": "搜索当前可见的连接和目录…",
+    "clearSearch": "清除搜索",
+    "noSearchResults": "没有匹配的已加载项目。",
+    "newConnection": "新建连接",
     "theme": {
       "system": "主题：系统 — 点击切换为浅色",
       "light": "主题：浅色 — 点击切换为深色",
@@ -175,8 +180,8 @@
     "explainTip": "运行 explain('executionStats')",
     "explainBtn": "Explain",
     "stopTip": "停止执行",
-    "stopBtn": "■ 停止",
-    "runBtn": "▶ 运行",
+    "stopBtn": "停止",
+    "runBtn": "运行",
     "resizeEditor": "调整编辑器大小",
     "closeTab": "关闭标签页",
     "newTabTip": "新建查询标签页 (⌘T)",
@@ -204,6 +209,29 @@
       "copy": "复制",
       "paste": "粘贴",
       "selectAll": "全选"
+    }
+  },
+  "context": {
+    "title": "详情",
+    "toggle": "切换详情栏",
+    "close": "关闭详情栏",
+    "target": "当前上下文",
+    "connection": "连接",
+    "deployment": "部署",
+    "database": "数据库",
+    "collection": "集合",
+    "type": "类型",
+    "documents": "文档数",
+    "indexes": "索引",
+    "notLoaded": "未加载",
+    "lastResult": "最近结果",
+    "result": "结果",
+    "elapsed": "耗时",
+    "noResult": "尚未运行",
+    "collectionType": {
+      "collection": "集合",
+      "view": "视图",
+      "timeseries": "时序集合"
     }
   },
   "result": {

@@ -8,25 +8,48 @@
   overflow: hidden;
 }
 
+.shell-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+.shell-main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+}
+.context-rail {
+  width: 300px;
+  max-width: 32vw;
+  flex: 0 0 300px;
+  min-width: 0;
+  display: flex;
+  border-left: 1px solid var(--border);
+  background: var(--bg-1);
+  overflow: hidden;
+}
+
 /* ---- query tab strip (multi-tab workspace) ----
-   Folder tabs, UNIFIED with the result-tab strip (.rtab in results.css uses the
-   same declarations). The active tab lifts to the header surface below it
-   (--bg-1) with a blue top-rule — the single signal of "this tab's content is
-   showing". Close / new are bare icon buttons (border + bg cleared so the
-   @layer base button box can't leak). */
+   Tabs sit as quiet inset pills, matching the reference app's low-contrast
+   chrome. Close / new are bare icon buttons so global button chrome cannot leak. */
 .tab-bar {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 2px;
-  height: 32px;
-  padding: 6px 8px 0;
+  height: 44px;
+  padding: 7px 8px;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
 }
 .tab-strip {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 2px;
   flex: 1;
   min-width: 0;
@@ -41,11 +64,9 @@
   align-items: center;
   gap: 6px;
   max-width: 200px;
-  padding: 0 6px 0 11px;
-  /* Pull over the strip's bottom rule so the active tab merges into the header
-     surface below (folder-tab connection). */
-  margin-bottom: -1px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  height: 28px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-2);
   font-size: var(--fs-sm);
@@ -61,11 +82,8 @@
   color: var(--fg-1);
 }
 .qtab.active {
-  position: relative;
-  z-index: 1;
-  background: var(--bg-1);
+  background: var(--bg-sel);
   color: var(--fg-0);
-  box-shadow: inset 0 2px 0 var(--accent);
 }
 .qtab-label {
   overflow: hidden;
@@ -121,29 +139,84 @@
 .work-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   /* The work area's own sub-header (connection · db · actions), under the tab
      strip. Window dragging is handled by the tab strip and sidebar header. */
-  height: 38px;
-  padding: 0 10px;
+  height: 44px;
+  padding: 0 8px 0 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-1);
   flex: 0 0 auto;
 }
+.work-breadcrumb {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-3);
+}
 .work-header .conn-title {
-  font-weight: 600;
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  font-weight: 500;
   color: var(--fg-0);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .work-header .db-select {
   width: auto;
-  min-width: 140px;
-  /* Compact for the toolbar — override ui/Select's form-height (h-9 = 36px),
-     which reads oversized in the 38px work-header. */
-  height: 30px;
+  min-width: 120px;
+  max-width: 180px;
+  height: 28px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.work-header .db-select:hover {
+  background: var(--bg-2);
+}
+.collection-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.work-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+}
+.work-icon-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.work-icon-btn.is-active {
+  border-color: transparent;
+  background: var(--bg-sel);
+  color: var(--fg-0);
 }
 
-/* Editor + optional pipeline panel share one resizable row (the height var the
-   ResizeHandle drives now lives here; the editor flexes, the panel is fixed). */
+/* The editor keeps its own resizable row; the Pipeline Builder now lives in
+   the right context rail instead of shrinking the editor. */
 .editor-row {
   display: flex;
   flex: 0 0 auto;
@@ -171,19 +244,6 @@
   height: 100%;
 }
 
-/* ---- Pipeline builder toggle button (ShellWorkspace) ----
-   只剩 .busy-btn 修饰态留全局;面板本体样式已迁到
-   components/shell/pipeline/pipeline.module.css(本项目首个 CSS Module)。 */
-.pipeline-toggle .busy-btn-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.busy-btn.pipeline-toggle.is-active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--fg-0);
-}
 .editor-loading {
   padding: 14px;
   color: var(--fg-2);
@@ -248,4 +308,24 @@
 .cm-tooltip-autocomplete .cm-completionIcon-namespace::after,
 .cm-tooltip-autocomplete .cm-completionIcon-type::after {
   content: '';
+}
+
+/* Keep the data workspace usable at compact window widths. Details disappear;
+   an explicitly-open Pipeline Builder becomes a temporary right overlay. */
+@media (max-width: 1199px) {
+  .context-rail:not(.is-pipeline) {
+    display: none;
+  }
+  .context-rail.is-pipeline {
+    position: absolute;
+    z-index: 20;
+    inset: 0 0 0 auto;
+    width: min(360px, 100%);
+    max-width: 100%;
+    flex-basis: auto;
+    box-shadow: var(--shadow-lg);
+  }
+  .context-toggle {
+    display: none;
+  }
 }

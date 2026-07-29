@@ -8,7 +8,7 @@ import { cn } from '@renderer/lib/utils'
  * by a simple `value / onChange / options` API; the trigger auto-renders the
  * selected option's label via the `items` prop.
  *
- * shadcn-style Tailwind skin: the trigger mimics the inset input (zinc + blue
+ * shadcn-style Tailwind skin: the trigger mimics the inset input (Stone + Ink
  * focus ring); the popup is a bordered elevated card, highlighted items
  * (`[data-highlighted]`) use the subtle accent surface. The popup is body-portaled,
  * so its positioner carries a z-index above dialogs.

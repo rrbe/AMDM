@@ -9,19 +9,22 @@
    （切走前在 styles/work-area.css;切换 toggle 按钮仍留全局,它是 .busy-btn 修饰态。）
    ========================================================================= */
 .pipelinePanel {
-  flex: 0 0 360px;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--border);
   background: var(--bg-1);
   overflow: hidden;
 }
 .pipelineHead {
+  height: 44px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px 6px 12px;
+  padding: 0 8px 0 12px;
   border-bottom: 1px solid var(--border);
 }
 .pipelineTitle {

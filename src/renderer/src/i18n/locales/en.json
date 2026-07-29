@@ -158,6 +158,11 @@
     }
   },
   "explorer": {
+    "search": "Search visible catalog",
+    "searchPlaceholder": "Search visible connections and catalog…",
+    "clearSearch": "Clear search",
+    "noSearchResults": "No matching loaded items.",
+    "newConnection": "New Connection",
     "theme": {
       "system": "Theme: System — click for Light",
       "light": "Theme: Light — click for Dark",
@@ -175,8 +180,8 @@
     "explainTip": "Run explain('executionStats')",
     "explainBtn": "Explain",
     "stopTip": "Stop",
-    "stopBtn": "■ Stop",
-    "runBtn": "▶ Run",
+    "stopBtn": "Stop",
+    "runBtn": "Run",
     "resizeEditor": "Resize editor",
     "closeTab": "Close tab",
     "newTabTip": "New query tab (⌘T)",
@@ -204,6 +209,29 @@
       "copy": "Copy",
       "paste": "Paste",
       "selectAll": "Select all"
+    }
+  },
+  "context": {
+    "title": "Details",
+    "toggle": "Toggle details",
+    "close": "Close details",
+    "target": "Current Context",
+    "connection": "Connection",
+    "deployment": "Deployment",
+    "database": "Database",
+    "collection": "Collection",
+    "type": "Type",
+    "documents": "Documents",
+    "indexes": "Indexes",
+    "notLoaded": "Not loaded",
+    "lastResult": "Last Result",
+    "result": "Result",
+    "elapsed": "Elapsed",
+    "noResult": "Not run yet",
+    "collectionType": {
+      "collection": "Collection",
+      "view": "View",
+      "timeseries": "Time Series"
     }
   },
   "result": {

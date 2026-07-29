@@ -14,6 +14,7 @@ import {
   pickActiveAfterClose,
   pickFillTarget,
   resultTabLabel,
+  tabCollection,
   tabLabel,
   type ResultTab
 } from '../../../src/renderer/src/lib/tabs'
@@ -159,6 +160,14 @@ describe('tabLabel', () => {
   it('ignores db helper methods and falls back to a numbered label', () => {
     expect(tabLabel(createTab('a', { code: 'db.runCommand({ ping: 1 })' }), 0)).toBe('查询 1')
     expect(tabLabel(createTab('a', { code: '' }), 2)).toBe('查询 3')
+  })
+})
+
+describe('tabCollection', () => {
+  it('returns the collection without inventing a fallback label', () => {
+    expect(tabCollection(createTab('a', { code: 'db.orders.find({})' }))).toBe('orders')
+    expect(tabCollection(createTab('a', { code: 'db.runCommand({ ping: 1 })' }))).toBeNull()
+    expect(tabCollection(createTab('a', { code: '' }))).toBeNull()
   })
 })
 

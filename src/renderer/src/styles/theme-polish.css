@@ -1,5 +1,5 @@
 /* ============================================================================
-   Slate theme — structural touches & component polish
+   Warm Stone theme — structural touches & component polish
    Appended last so these win at equal specificity over the base rules above.
    ============================================================================ */
 
@@ -74,14 +74,12 @@ body {
   border-bottom: 1px solid var(--rule);
 }
 
-/* ---- Connection rows: full-bleed sticky band, active accent outline ----
-   Squared corners (no radius): the rows span the sidebar edge to edge so they
-   read as section-header bands when pinned by sticky scroll. */
+/* ---- Connection rows: inset sticky band with a quiet selected outline ---- */
 .conn-item {
-  border-radius: 0;
+  border-radius: var(--radius-sm);
 }
 .conn-item.active {
-  box-shadow: inset 0 0 0 1px var(--accent-soft-strong);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
 /* ---- Catalog tree rows ---- */
@@ -114,9 +112,9 @@ body {
   color: var(--fg-0);
 }
 [data-theme='dark'] .view-switch button.active {
-  background: var(--accent);
-  color: var(--accent-fg);
-  box-shadow: none;
+  background: var(--bg-elevated);
+  color: var(--fg-0);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 /* ---- Result meta: warm "truncated" amber ---- */
@@ -198,11 +196,11 @@ body {
   z-index: 3000;
   max-width: 360px;
   padding: 4px 7px;
-  border: 1px solid #b8b8b8;
-  border-radius: 3px;
-  background: #fff;
-  color: #222;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 14%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--fg-0);
+  box-shadow: var(--shadow-md);
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
   line-height: 1.4;

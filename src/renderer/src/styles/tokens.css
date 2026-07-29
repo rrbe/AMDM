@@ -1,23 +1,22 @@
 /* =========================================================================
-   AMDM — 设计令牌（Zinc + Blue 体系）
-   代号：Zinc。Outerbase 风的现代数据库工具外观——真中性 zinc 表面（无暖/绿
-   色偏），单一蓝/靛强调色只用于主操作 / 选中 / 焦点环；语法/数据着色保留语义
-   彩（绿字符串、蓝数字、橙红 ObjectId…）。亮暗两套同等对待（亮 = :root 默认，
-   暗 = [data-theme='dark']，只重指调色板，切回亮色自然落回 :root）。
+   AMDM — 设计令牌（Warm Stone + Ink 体系）
+   暖灰纸面承载内容，石墨色负责主操作 / 选中 / 焦点环；语法/数据着色继续保留
+   语义彩（绿字符串、蓝数字、橙红 ObjectId…）。亮暗两套同等对待（亮 = :root
+   默认，暗 = [data-theme='dark']，只重指调色板，切回亮色自然落回 :root）。
    - 语义令牌名保持不变 → 全部既有手写 CSS 不改即随令牌重新上色（换肤=纯令牌级）。
    - Tailwind/shadcn 工具类经 styles/index.css 的 @theme inline 映射到这里的令牌。
    - CodeMirror 编辑器在 lib/pineEditorTheme.ts 另持一份解析 hex —— 改这里务必同步。
    --------------------------------------------------------------------------- */
 :root {
   /* ---- Shape + type (theme-independent) ---- */
-  --radius: 5px;
-  --radius-sm: 4px;
-  --radius-lg: 9px;
+  --radius: 7px;
+  --radius-sm: 6px;
+  --radius-lg: 10px;
   --row-h: 24px;
   /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
-  --sidebar-width: 300px;
+  --sidebar-width: 280px;
   --editor-height: 120px;
-  --font-ui: system-ui, sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
   --fs: 13px;
   --fs-sm: 12px;
@@ -37,33 +36,32 @@
 
   --accent-fg: #ffffff;
 
-  /* ---- LIGHT · Zinc (default) ---- */
-  /* Surfaces — pure white content on neutral zinc chrome */
-  --bg-app: #f4f4f5; /* window chrome behind panels (zinc-100) */
-  --bg-0: #ffffff; /* primary content surface (work area, lists, results) */
-  --bg-1: #fafafa; /* sidebar / header chrome (zinc-50) */
-  --bg-2: #f4f4f5; /* raised / inset (inputs, table head, segmented) */
-  --bg-3: #e4e4e7; /* hover (zinc-200) */
-  --bg-elevated: #ffffff; /* menus, modal, popover, active segment */
-  --bg-sel: rgba(47, 107, 255, 0.1); /* selected row tint (blue) */
-  --bg-editor: #ffffff;
+  /* ---- LIGHT · Warm Stone (default) ---- */
+  --bg-app: #e1e2dd; /* window chrome behind panels */
+  --bg-0: #edece8; /* primary content surface (work area, lists, results) */
+  --bg-1: #e6e7e2; /* sidebar / header chrome */
+  --bg-2: #dedfda; /* raised / inset (inputs, table head, segmented) */
+  --bg-3: #d3d4ce; /* hover */
+  --bg-elevated: #f2f2ee; /* menus, modal, popover, active segment */
+  --bg-sel: rgba(37, 38, 35, 0.09); /* selected row tint */
+  --bg-editor: #f2f2ee;
 
   /* Borders + the hairline rule */
-  --border: #e4e4e7; /* zinc-200 */
-  --border-strong: #d4d4d8; /* zinc-300 */
-  --rule: #e4e4e7; /* hairline under title bars / column heads */
+  --border: #d1d2cc;
+  --border-strong: #c1c2bb;
+  --rule: #d7d8d2; /* hairline under title bars / column heads */
 
-  /* Text — neutral zinc ink */
-  --fg-0: #18181b; /* zinc-900 */
-  --fg-1: #3f3f46; /* zinc-700 */
-  --fg-2: #71717a; /* zinc-500 · muted */
-  --fg-3: #a1a1aa; /* zinc-400 · very muted */
+  /* Text — warm graphite ink */
+  --fg-0: #20211f;
+  --fg-1: #444640;
+  --fg-2: #72746d;
+  --fg-3: #9d9f97;
 
-  /* Accent — blue (the single brand hue; structural, not decorative) */
-  --accent: #2f6bff;
-  --accent-hover: #1f5bef;
-  --accent-soft: rgba(47, 107, 255, 0.1);
-  --accent-soft-strong: rgba(47, 107, 255, 0.16);
+  /* Accent — graphite; semantic data colors remain independent below. */
+  --accent: #252623;
+  --accent-hover: #11120f;
+  --accent-soft: rgba(37, 38, 35, 0.1);
+  --accent-soft-strong: rgba(37, 38, 35, 0.16);
 
   /* Status */
   --ok: #16a34a;
@@ -78,7 +76,7 @@
   --t-null: #a1a1aa;
   --t-objectId: #c0481f;
   --t-date: #2563eb;
-  --t-key: #18181b;
+  --t-key: #20211f;
   --t-binary: #c0481f;
   --t-regex: #8a3fd0;
   --t-special: #c0481f;
@@ -94,31 +92,31 @@
   --halo-err: rgba(220, 38, 38, 0.16);
 }
 
-/* ---- DARK · Zinc Night (Outerbase-style near-black) ---- */
+/* ---- DARK · Warm Stone Night ---- */
 [data-theme='dark'] {
-  --bg-app: #09090b; /* zinc-950-ish */
-  --bg-0: #101012; /* content surface */
-  --bg-1: #18181b; /* sidebar / header (zinc-900) */
-  --bg-2: #27272a; /* inputs, table head (zinc-800) */
-  --bg-3: #323238; /* hover */
-  --bg-elevated: #1c1c20; /* menus, modal, popover */
-  --bg-sel: rgba(79, 127, 255, 0.18);
-  --bg-editor: #0d0d0f;
+  --bg-app: #141512;
+  --bg-0: #191a17;
+  --bg-1: #20211d;
+  --bg-2: #2a2b26;
+  --bg-3: #35362f;
+  --bg-elevated: #242520;
+  --bg-sel: rgba(239, 239, 233, 0.1);
+  --bg-editor: #171815;
 
-  --border: #27272a; /* zinc-800 */
-  --border-strong: #3f3f46; /* zinc-700 */
-  --rule: #232327;
+  --border: #30312c;
+  --border-strong: #484a42;
+  --rule: #2b2c27;
 
-  --fg-0: #fafafa;
-  --fg-1: #d4d4d8;
-  --fg-2: #a1a1aa;
-  --fg-3: #71717a;
+  --fg-0: #efefe9;
+  --fg-1: #d4d5ce;
+  --fg-2: #a1a39a;
+  --fg-3: #73756d;
 
-  --accent: #4f7fff;
-  --accent-hover: #6690ff;
-  --accent-soft: rgba(79, 127, 255, 0.16);
-  --accent-soft-strong: rgba(79, 127, 255, 0.26);
-  --accent-fg: #ffffff;
+  --accent: #efefe9;
+  --accent-hover: #ffffff;
+  --accent-soft: rgba(239, 239, 233, 0.1);
+  --accent-soft-strong: rgba(239, 239, 233, 0.16);
+  --accent-fg: #20211f;
 
   --ok: #34d399;
   --warn: #e0a23a;
@@ -131,7 +129,7 @@
   --t-null: #71717a;
   --t-objectId: #ff8a5c;
   --t-date: #74a8ff;
-  --t-key: #fafafa;
+  --t-key: #efefe9;
   --t-binary: #ff8a5c;
   --t-regex: #c79bff;
   --t-special: #ff8a5c;

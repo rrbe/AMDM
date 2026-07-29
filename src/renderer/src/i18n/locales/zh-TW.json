@@ -158,6 +158,11 @@
     }
   },
   "explorer": {
+    "search": "搜尋目前可見目錄",
+    "searchPlaceholder": "搜尋目前可見的連線與目錄…",
+    "clearSearch": "清除搜尋",
+    "noSearchResults": "沒有相符的已載入項目。",
+    "newConnection": "新增連線",
     "theme": {
       "system": "佈景：系統 — 點擊切換為亮色",
       "light": "佈景：亮色 — 點擊切換為暗色",
@@ -175,8 +180,8 @@
     "explainTip": "執行 explain('executionStats')",
     "explainBtn": "Explain",
     "stopTip": "停止執行",
-    "stopBtn": "■ 停止",
-    "runBtn": "▶ 執行",
+    "stopBtn": "停止",
+    "runBtn": "執行",
     "resizeEditor": "調整編輯器大小",
     "closeTab": "關閉分頁",
     "newTabTip": "新增查詢分頁 (⌘T)",
@@ -204,6 +209,29 @@
       "copy": "複製",
       "paste": "貼上",
       "selectAll": "全選"
+    }
+  },
+  "context": {
+    "title": "詳細資料",
+    "toggle": "切換詳細資料欄",
+    "close": "關閉詳細資料欄",
+    "target": "目前內容",
+    "connection": "連線",
+    "deployment": "部署",
+    "database": "資料庫",
+    "collection": "集合",
+    "type": "類型",
+    "documents": "文件數",
+    "indexes": "索引",
+    "notLoaded": "尚未載入",
+    "lastResult": "最近結果",
+    "result": "結果",
+    "elapsed": "耗時",
+    "noResult": "尚未執行",
+    "collectionType": {
+      "collection": "集合",
+      "view": "檢視",
+      "timeseries": "時間序列集合"
     }
   },
   "result": {

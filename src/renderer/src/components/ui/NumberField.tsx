@@ -5,8 +5,8 @@ import { cn } from '@renderer/lib/utils'
 /**
  * Thin wrapper over Base UI NumberField — a numeric input with −/+ steppers and
  * built-in clamping/keyboard/scrub behaviour. Used for the small integer settings
- * (page size, font size). shadcn-style Tailwind skin matching ui/Input (zinc inset,
- * blue focus ring on the group); the inner input is borderless.
+ * (page size, font size). shadcn-style Tailwind skin matching ui/Input (Stone inset,
+ * Ink focus ring on the group); the inner input is borderless.
  */
 interface NumberFieldProps {
   value: number | null

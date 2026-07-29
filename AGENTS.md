@@ -78,11 +78,11 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 
 ## 样式（CSS）约定
 
-视觉层正从「纯手写 CSS」迁移到 **Tailwind v4 + shadcn 风原语（基于 `@base-ui/react`）**,当前是**混合态**:共享表单/弹窗原语(`components/ui/*` + `common/Button`)与连接弹窗已 Tailwind 化;其余功能分区仍是手写 CSS(已被令牌重新上色)。设计令牌体系见 `DESIGN.md`——**Zinc + Blue**(中性 zinc 表面 + 单一蓝强调,亮暗平等;数据/代码字体 **JetBrains Mono**)。
+视觉层正从「纯手写 CSS」迁移到 **Tailwind v4 + shadcn 风原语（基于 `@base-ui/react`）**,当前是**混合态**:共享表单/弹窗原语(`components/ui/*` + `common/Button`)与连接弹窗已 Tailwind 化;其余分区仍是手写 CSS(已被令牌重新上色)。设计令牌体系见 `DESIGN.md`——**Warm Stone + Ink**(暖灰纸面 + 石墨结构强调,亮暗平等;数据/代码字体 **JetBrains Mono**)。
 
 **Tailwind 接入(CSS-first,无 `tailwind.config`):**
 - `@tailwindcss/vite` 挂在 `electron.vite.config.ts` 的 `renderer.plugins`;`@` 别名指向 `src/renderer/src`(`tsconfig.web.json` + vite 对称,shadcn 约定)。
-- `styles/index.css` 顶部**只引 Tailwind 的 theme + utilities 层、不引 preflight**(迁移期避免全局 reset 扰动未迁移的手写 CSS);末尾 `@theme inline` 把 shadcn 色名映射到我们的语义令牌。**命名坑:** 我们的 `--accent`=品牌蓝 → 映射成 shadcn `primary`;shadcn 的 `accent`(hover 底)→ `--bg-3`。
+- `styles/index.css` 顶部**只引 Tailwind 的 theme + utilities 层、不引 preflight**(迁移期避免全局 reset 扰动未迁移的手写 CSS);末尾 `@theme inline` 把 shadcn 色名映射到我们的语义令牌。**命名坑:** 我们的 `--accent`=品牌 Ink → 映射成 shadcn `primary`;shadcn 的 `accent`(hover 底)→ `--bg-3`。
 - **关键层叠规则:** 未分层的手写 CSS 优先级**高于** `@layer utilities`。所以裸元素默认规则(`base.css` 全文 + `theme-polish.css` 的通用 `button/input/select/textarea` 块)都收进 **`@layer base`**,迁移组件的 Tailwind 工具类才能盖过它们;原生元素仍取默认。**新组件用 Tailwind 即可生效;若被某条手写规则压住,多半是那条裸元素规则没进 base 层。**
 - shadcn 风原语 = `@base-ui/react` 无样式原语 + Tailwind 工具类 + `cva` 变体(范本 `common/Button.tsx`);class 合并用 `lib/utils.ts` 的 `cn()`(clsx + tailwind-merge)。门面在 `components/ui/*`(对外 props 不变,业务**不**直接 import Base UI)。
 

@@ -192,8 +192,8 @@ export function resultTabLabel(rt: ResultTab): string {
   return coll ? `${coll} ${rt.seq}` : `结果 ${rt.seq}`
 }
 
-/** Short display label for a tab: the targeted collection, else "查询 N". */
-export function tabLabel(tab: QueryTab, index: number): string {
+/** Collection referenced by the tab's Shell code, when it uses a supported db form. */
+export function tabCollection(tab: QueryTab): string | null {
   // Order matters: match `getCollection("x")` and `db["x"]` BEFORE the generic
   // `db.<name>` (else `.getCollection` is captured as the name).
   const m =
@@ -202,6 +202,10 @@ export function tabLabel(tab: QueryTab, index: number): string {
     )
   const coll = m?.[1] ?? m?.[2] ?? m?.[3]
   const reserved = new Set(['getCollection', 'getSiblingDB', 'runCommand', 'adminCommand'])
-  if (coll && !reserved.has(coll)) return coll
-  return `查询 ${index + 1}`
+  return coll && !reserved.has(coll) ? coll : null
+}
+
+/** Short display label for a tab: the targeted collection, else "查询 N". */
+export function tabLabel(tab: QueryTab, index: number): string {
+  return tabCollection(tab) ?? `查询 ${index + 1}`
 }

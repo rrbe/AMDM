@@ -389,7 +389,7 @@ export type CollectionSort = 'natural' | 'alpha'
 
 /**
  * UI color theme. 'system' (default) follows the OS appearance and reacts to
- * OS changes live; 'light'/'dark' pin the Pine light / Pine Night palettes.
+ * OS changes live; 'light'/'dark' pin the Stone light / Stone Night palettes.
  */
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -402,7 +402,7 @@ export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 export interface AppSettings {
   /** 'natural' = server order; 'alpha' = A→Z by name. */
   collectionSort: CollectionSort
-  /** 'system' = follow OS (default); 'light' = Pine; 'dark' = Pine Night. */
+  /** 'system' = follow OS (default); 'light' = Stone; 'dark' = Stone Night. */
   theme: ThemeMode
   /** UI language. 'system' (default) follows the OS/app locale. */
   language: Language
@@ -428,7 +428,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   collectionSort: 'natural',
   theme: 'system',
   language: 'system',
-  sidebarWidth: 300,
+  sidebarWidth: 280,
   editorHeight: 120,
   queryLimit: 50,
   editorFontSize: 13,

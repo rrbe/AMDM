@@ -1,7 +1,8 @@
 /**
- * CodeMirror themes — light + dark variants that match the app's "Zinc + Blue"
- * design system (see styles/tokens.css): neutral zinc surfaces, a single blue
- * accent (caret / selection), and semantic syntax colors. We build them with
+ * CodeMirror themes — light + dark variants that match the app's
+ * "Warm Stone + Ink" design system (see styles/tokens.css): warm paper
+ * surfaces, a graphite accent (caret / selection), and semantic syntax colors.
+ * We build them with
  * @uiw/codemirror-themes' `createTheme` so the editor reads as part of the same
  * surface rather than CodeMirror's generic light/dark defaults.
  *
@@ -9,7 +10,7 @@
  * ShellEditor swaps between them on the persisted `theme` preference. Syntax
  * colors mirror the styles/tokens.css --t-* value-type palette — green strings,
  * blue numbers, purple booleans/keywords, orange ObjectId/types, near-neutral
- * method calls — with a blue caret. Keep these in sync with the --t-* tokens.
+ * method calls — with a graphite caret. Keep these in sync with the --t-* tokens.
  */
 import { createTheme } from '@uiw/codemirror-themes'
 import { tags as t } from '@lezer/highlight'
@@ -36,38 +37,38 @@ interface PinePalette {
 
 const LIGHT: PinePalette = {
   base: 'light',
-  bg: '#ffffff',
-  text: '#18181b',
-  caret: '#2f6bff',
-  selection: 'rgba(47, 107, 255, 0.16)',
+  bg: '#f2f2ee',
+  text: '#20211f',
+  caret: '#252623',
+  selection: 'rgba(37, 38, 35, 0.16)',
   lineHighlight: 'rgba(0, 0, 0, 0.035)',
-  gutterFg: '#a1a1aa',
+  gutterFg: '#9d9f97',
   keyword: '#8a3fd0',
   string: '#1a8f4c',
   number: '#2563eb',
   bool: '#8a3fd0',
-  property: '#18181b',
-  punct: '#71717a',
-  comment: '#a1a1aa',
+  property: '#20211f',
+  punct: '#72746d',
+  comment: '#9d9f97',
   type: '#c0481f',
   regexp: '#8a3fd0'
 }
 
 const DARK: PinePalette = {
   base: 'dark',
-  bg: '#0d0d0f',
-  text: '#fafafa',
-  caret: '#4f7fff',
-  selection: 'rgba(79, 127, 255, 0.24)',
+  bg: '#171815',
+  text: '#efefe9',
+  caret: '#efefe9',
+  selection: 'rgba(239, 239, 233, 0.16)',
   lineHighlight: 'rgba(255, 255, 255, 0.045)',
-  gutterFg: '#71717a',
+  gutterFg: '#73756d',
   keyword: '#c79bff',
   string: '#5fd39a',
   number: '#74a8ff',
   bool: '#c79bff',
-  property: '#fafafa',
-  punct: '#a1a1aa',
-  comment: '#71717a',
+  property: '#efefe9',
+  punct: '#a1a39a',
+  comment: '#73756d',
   type: '#ff8a5c',
   regexp: '#c79bff'
 }

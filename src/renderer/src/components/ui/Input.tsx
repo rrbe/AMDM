@@ -5,7 +5,7 @@ import { cn } from '@renderer/lib/utils'
 /**
  * Thin wrapper over Base UI Input — a native `<input>` that auto-wires id / aria
  * / validation state when rendered inside a `ui/Field`. shadcn-style Tailwind
- * skin: zinc inset field, blue focus ring.
+ * skin: Stone inset field, Ink focus ring.
  *
  * Accepts the usual native props (`value`, `onChange`, `placeholder`, …); Base UI
  * additionally exposes `onValueChange(value)` if you prefer the value directly.
