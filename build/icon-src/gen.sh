@@ -50,10 +50,9 @@ node mkico.js "$BUILD/icon.ico" px-16.png px-32.png px-48.png px-64.png px-128.p
 
 echo "› placing png masters (Linux + electron-builder base)"
 cp px-1024.png "$BUILD/icon.png"
-cp px-512.png  "$BUILD/icon-512.png"
 
 echo "› cleaning intermediates"
 rm -rf icon.iconset _wrap.html full-1024.png small-1024.png px-*.png
 
 echo "› done"
-ls -la "$BUILD"/icon.icns "$BUILD"/icon.ico "$BUILD"/icon.png "$BUILD"/icon-512.png
+ls -la "$BUILD"/icon.icns "$BUILD"/icon.ico "$BUILD"/icon.png

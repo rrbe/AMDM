@@ -5,7 +5,7 @@ name: Release
 # GitHub Release，把安装包作为附件挂上去。
 #
 # 平台产物由 electron-builder.yml 决定:
-#   macOS   -> .dmg + .zip (arm64)
+#   macOS   -> .dmg + .zip (arm64 + x64)
 #   Windows -> .exe (NSIS, x64)
 #   Linux   -> .AppImage
 #

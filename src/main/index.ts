@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, shell, nativeImage, screen } from 'electron'
-import appIcon from '../../resources/icon.png?asset'
+import appIcon from '../../build/icon.png?asset'
 import { connectionStore } from './store/connectionStore'
 import { queryStore } from './store/queryStore'
 import { settingsStore } from './store/settingsStore'

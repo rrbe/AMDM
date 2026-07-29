@@ -1,6 +1,6 @@
 # TODO — 待办 backlog（live）
 
-> 更新于 2026-06-17。本文件**只列尚未做的事**；已交付功能见 git 历史 / PR / `SPEC.md`。
+> 更新于 2026-07-29。本文件**只列尚未做的事**；已交付功能见 git 历史 / PR / `SPEC.md`。
 > 标签：`[难度]` = 编码与设计复杂度；`[风险]` = 回归影响面（尤其是否动到有测试的 shell 核心 / 主进程）。
 
 **现状**：`SPEC.md` §2 的功能范围已基本交付完（连接管理 / 浏览 / Shell / 补全 / 保存查询+文件夹 / 导入导出含原生 BSON / 三视图 / explain 可视化 / 文档·单元格编辑 / 多 tab / i18n / 集中设置 / 聚合管道构建器）。剩下的是**性能加固与健壮性**两个缺口，都不紧急。
@@ -18,9 +18,9 @@
 
 导出已流式有界，但导入仍是「整个文件 `readFileSync` + 全部文档一次进内存再分批 insert」（`bsonFileCore` 及各格式导入路径）。.bson / JSON 上 GB 时会顶内存。理想形态：边解析 buffer 边按 1000 批量插（批量 insert 逻辑已有，缺的是流式读）。与既有 JSON/CSV/XLSX 导入同形状，非回归，优先级低。
 
-## 3. SSH 隧道增强（PR #14 之后的后续）　`[难度: 中–高] [风险: 中]`
+## 3. SSH 隧道增强后续　`[难度: 中–高] [风险: 中]`
 
-PR #14（`feat/ssh-agent-auth`，待合并）已实现:主机密钥 TOFU 校验（静默，无 UI，仅首连学习、变更即拒）/ 跳板机（**单跳** ProxyJump，ssh2 嵌套连接，私钥认证）/ `~` 展开与并发隧道句柄竞态修复 / SSH 表单校验 / 连接前 TCP 预检 / 逐跳连通性检测（Check connectivity，SSH 主机与跳板机各自检测、结果默认折叠）/ 副本集+隧道告警 / 私钥友好报错 + 文件选择器。**SSH 认证仅密码 + 私钥两种（ssh-agent 已移除）。** 隧道核心已拆为 `main/ssh/tunnelCore.ts`（纯函数，有单测）+ `tunnel.ts`（ssh2 副作用）。以下为**尚未做**的:
+现有实现已包含:主机密钥 TOFU 校验（静默，无 UI，仅首连学习、变更即拒）/ 跳板机（**单跳** ProxyJump，ssh2 嵌套连接，私钥认证）/ `~` 展开与并发隧道句柄竞态修复 / SSH 表单校验 / 连接前 TCP 预检 / 逐跳连通性检测（Check connectivity，SSH 主机与跳板机各自检测、结果默认折叠）/ 副本集+隧道告警 / 私钥友好报错 + 文件选择器。**SSH 认证仅密码 + 私钥两种（ssh-agent 已移除）。** 隧道核心已拆为 `main/ssh/tunnelCore.ts`（纯函数，有单测）+ `tunnel.ts`（ssh2 副作用）。以下为**尚未做**的:
 
 - **运行期 SSH 掉线上报**　`[难度: 中] [风险: 中–高]` —— 隧道在 `ready` 之后掉线不翻状态，`getStatus` 仍报 connected（“假在线”），查询被 30s `serverSelectionTimeout` 拖死。根因:`tunnel.ts` 仅 open 期监听 client error、resolve 后无 close/error 处理；`sessionManager` 不挂运行期监听。**卡点是架构**——本仓目前纯拉取式 IPC，全仓 0 处 `webContents.send`，要把“隧道断→状态 error”推给渲染层需新增一条**单向推送通道**（动 `shared/ipc.ts` + `preload` + `registerIpc` + store 订阅），这条通道也是未来一切实时状态推送的地基。**价值最高的下一步。**
 - **多跳跳板链**　`[难度: 中] [风险: 低]` —— 现仅支持单跳 `SshConfig.jump`。多跳需把 jump 改为链（数组或递归）并在 `tunnel.ts` 顺序嵌套 `connectHop`/`forwardOut`。

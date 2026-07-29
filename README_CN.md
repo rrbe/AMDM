@@ -12,6 +12,8 @@
 pnpm install         # 使用 pnpm
 pnpm dev             # 启动应用并热重载
 pnpm build           # 生产构建到 ./out
+pnpm dist:dir --arm64 # 打包 Apple Silicon 免安装应用
+pnpm clean           # 清理构建产物
 ```
 
 ## 功能
@@ -20,7 +22,7 @@ pnpm build           # 生产构建到 ./out
 - 数据内联编辑，多标签页查看
 - `vm` 沙箱 Shell，运行 mongosh 风格的 JS（`find` / `aggregate` / `runCommand` …）
 - 支持自动补全，保存常用查询、查看历史
-- 数据导入 / 导出（JSON / CSV / XLSX 原生，支持 mongodump / mongorestore 等官方工具）
+- 原生导入 / 导出 JSON / CSV / XLSX / BSON
 - Tree / JSON / Table 结果视图
 - 可视化 explain
 

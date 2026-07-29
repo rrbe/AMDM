@@ -12,6 +12,8 @@ A lean, performance-first MongoDB desktop GUI, powered by Electron.
 pnpm install         # uses pnpm
 pnpm dev             # launch the app with hot reload
 pnpm build           # production build into ./out
+pnpm dist:dir --arm64 # package an unpacked Apple Silicon app
+pnpm clean           # remove generated build files
 ```
 
 ## Features
@@ -20,7 +22,7 @@ pnpm build           # production build into ./out
 - Inline document editing, multi-tab views
 - A `vm`-sandboxed shell that runs mongosh-style JS (`find` / `aggregate` / `runCommand` …)
 - Autocomplete, saved queries, and history
-- Import / export (JSON / CSV / XLSX native; mongodump / mongorestore and other official tools supported)
+- Native import / export for JSON / CSV / XLSX / BSON
 - Tree / JSON / Table result views
 - Visual explain
 

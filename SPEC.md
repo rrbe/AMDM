@@ -26,7 +26,7 @@
 ## 2. 功能范围(逐条对应你的需求)
 
 ### #1 连接管理
-- 保存/编辑连接;**按颜色分组**(颜色挂在 Connection Group 上,不在单个连接上)。
+- 保存/编辑连接;颜色直接挂在每个 Connection 上。
 - 认证/接入:**SCRAM(用户名密码)**、**SSH 隧道**(密码或私钥)、**TLS/SSL(含自签 CA / 客户端证书)**、**Replica Set / `mongodb+srv`(Atlas)**。
 - **不做** 企业认证(x.509 / LDAP / AWS IAM / Kerberos)。
 - 密码进 Keychain;其余配置本地 JSON,可导出/备份连接配置。
@@ -42,7 +42,7 @@
 
 ### #4 代码补全
 - CodeMirror 6 补全源:JS/shell API 关键字 + 驱动方法 + 当前库集合名 + **懒采样**得到的字段名(有界、缓存、Worker 中采样)。
-- 不上重型 TS 语言服务(保持轻量)。
+- TypeScript 语言服务在 Web Worker 中按需运行，避免阻塞 UI。
 
 ### #5 保存查询
 - 两级:按连接 + 全局;文件夹组织。
@@ -51,7 +51,7 @@
 
 ### #6 导入 / 导出(双向)
 - **JSON/EJSON、CSV、XLSX**:原生 JS 进程内流式读写,复用现有连接(含 SSH 隧道),无外部二进制。
-- **BSON**:包裹官方 `mongodump`/`mongorestore`;自动探测系统已装工具,没有则按需下载对应版本缓存,**不内置进安装包**。SSH 隧道时指向本地转发端口。
+- **BSON**:使用现有 `bson` 包在进程内读写 plain `.bson` 文档流，不依赖外部工具。
 
 ### #7 结果视图(照抄 NoSQLBooster)
 - **Tree**:虚拟化,嵌套懒展开。
@@ -65,7 +65,7 @@
 ### 数据编辑(范围决策)
 - **文档级编辑**:双击文档打开 JSON 编辑器,改完保存。
 - **删除文档**。
-- **不做**表格内联单元格编辑(后续可加)。
+- **表格内联单元格编辑**。
 
 ---
 
@@ -88,7 +88,7 @@
 - **Phase 2** ✅ 已完成
   代码补全 + 保存查询/历史 + explain 可视化 + 文档编辑/删除。
 - **Phase 3** ✅ 已完成
-  导入导出(JSON/CSV/XLSX 原生 + BSON 包裹官方 mongodump/mongorestore,见 ADR-0005)。
+  导入导出(JSON/CSV/XLSX/BSON 均为进程内原生实现,见 ADR-0005)。
   入口:目录树集合节点 hover 的 Export/Import 按钮 → 弹窗选格式/过滤/limit。
   (连接颜色已改为每连接直选,Group 概念移除,见 CONTEXT.md。)
 

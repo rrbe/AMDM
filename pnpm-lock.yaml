@@ -11,6 +11,19 @@ importers:
       '@babel/parser':
         specifier: ^7.29.7
         version: 7.29.7
+      bson:
+        specifier: ^6.9.0
+        version: 6.10.4
+      mongodb:
+        specifier: ^6.10.0
+        version: 6.21.0
+      ssh2:
+        specifier: ^1.16.0
+        version: 1.17.0
+    devDependencies:
+      '@babel/preset-typescript':
+        specifier: ^7.29.7
+        version: 7.29.7(@babel/core@7.29.7)
       '@base-ui/react':
         specifier: 1.5.0
         version: 1.5.0(@types/react@18.3.30)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -41,52 +54,12 @@ importers:
       '@mongosh/async-rewriter2':
         specifier: ^2.4.15
         version: 2.4.15
-      '@tanstack/react-virtual':
-        specifier: ^3.10.9
-        version: 3.14.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@uiw/codemirror-themes':
-        specifier: ^4.25.10
-        version: 4.25.10(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
-      '@uiw/react-codemirror':
-        specifier: ^4.23.6
-        version: 4.25.10(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.2)(@codemirror/language@6.12.3)(@codemirror/lint@6.9.6)(@codemirror/search@6.7.0)(@codemirror/state@6.6.0)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.0)(codemirror@6.0.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      bson:
-        specifier: ^6.9.0
-        version: 6.10.4
-      class-variance-authority:
-        specifier: ^0.7.1
-        version: 0.7.1
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
-      i18next:
-        specifier: ^26.3.1
-        version: 26.3.1(typescript@5.9.3)
-      lucide-react:
-        specifier: ^1.17.0
-        version: 1.17.0(react@18.3.1)
-      mongodb:
-        specifier: ^6.10.0
-        version: 6.21.0
-      prettier:
-        specifier: ^3.8.3
-        version: 3.8.3
-      react-i18next:
-        specifier: ^17.0.8
-        version: 17.0.8(i18next@26.3.1(typescript@5.9.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
-      ssh2:
-        specifier: ^1.16.0
-        version: 1.17.0
-      tailwind-merge:
-        specifier: ^3.6.0
-        version: 3.6.0
-    devDependencies:
-      '@babel/preset-typescript':
-        specifier: ^7.29.7
-        version: 7.29.7(@babel/core@7.29.7)
       '@tailwindcss/vite':
         specifier: ^4.3.1
         version: 4.3.1(vite@7.3.5(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0))
+      '@tanstack/react-virtual':
+        specifier: ^3.10.9
+        version: 3.14.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
         specifier: ^22.9.0
         version: 22.19.19
@@ -99,12 +72,24 @@ importers:
       '@types/ssh2':
         specifier: ^1.15.1
         version: 1.15.5
+      '@uiw/codemirror-themes':
+        specifier: ^4.25.10
+        version: 4.25.10(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+      '@uiw/react-codemirror':
+        specifier: ^4.23.6
+        version: 4.25.10(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.2)(@codemirror/language@6.12.3)(@codemirror/lint@6.9.6)(@codemirror/search@6.7.0)(@codemirror/state@6.6.0)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.0)(codemirror@6.0.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@vitejs/plugin-react':
         specifier: ^5.2.0
         version: 5.2.0(vite@7.3.5(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0))
       '@vitest/coverage-v8':
         specifier: ^4.1.8
         version: 4.1.8(vitest@4.1.8)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       electron:
         specifier: ^33.2.0
         version: 33.4.11
@@ -117,15 +102,30 @@ importers:
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
+      i18next:
+        specifier: ^26.3.1
+        version: 26.3.1(typescript@5.9.3)
+      lucide-react:
+        specifier: ^1.17.0
+        version: 1.17.0(react@18.3.1)
       mongodb-memory-server:
         specifier: ^11.2.0
         version: 11.2.0
+      prettier:
+        specifier: ^3.8.3
+        version: 3.8.3
       react:
         specifier: ^18.3.1
         version: 18.3.1
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      react-i18next:
+        specifier: ^17.0.8
+        version: 17.0.8(i18next@26.3.1(typescript@5.9.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
+      tailwind-merge:
+        specifier: ^3.6.0
+        version: 3.6.0
       tailwindcss:
         specifier: ^4.3.1
         version: 4.3.1

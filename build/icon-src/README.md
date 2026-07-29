@@ -13,7 +13,6 @@
 | `icon.icns` | macOS(electron-builder 自动识别) |
 | `icon.ico` | Windows,内嵌 16/32/48/64/128/256 多尺寸 PNG |
 | `icon.png` | 1024×1024,Linux + electron-builder 基准图 |
-| `icon-512.png` | 512×512 备用 |
 
 `build/` 是 electron-builder 默认的图标查找目录,接好打包后**无需额外配置**即会被采用。
 
