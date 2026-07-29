@@ -596,7 +596,7 @@ function flattenCatalog(
       id: usersNodeId,
       connId,
       depth: 2,
-      label: i18n.t('explorer.users'),
+      label: 'Users',
       icon: 'users',
       kind: 'users',
       expandable: true,
