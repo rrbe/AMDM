@@ -123,8 +123,7 @@
   align-items: center;
   gap: 10px;
   /* The work area's own sub-header (connection · db · actions), under the tab
-     strip. Window dragging is handled by the global .app-titlebar, so this no
-     longer needs to be a drag region. */
+     strip. Window dragging is handled by the tab strip and sidebar header. */
   height: 38px;
   padding: 0 10px;
   border-bottom: 1px solid var(--border);
@@ -253,4 +252,3 @@
 .cm-tooltip-autocomplete .cm-completionIcon-type::after {
   content: '';
 }
-

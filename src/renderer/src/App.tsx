@@ -53,12 +53,6 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      {/* One consistent, full-width drag strip across the very top of the window
-          (the macOS traffic lights live in its reserved left inset). Below it,
-          the explorer/work split fills the rest. */}
-      <header className="app-titlebar app-drag">
-        <span className="app-titlebar-brand">AMDM</span>
-      </header>
       <div className="app-body">
         <Explorer />
         <ResizeHandle
@@ -86,7 +80,6 @@ function WorkspaceEmptyState(): JSX.Element {
   return (
     <div className="work">
       <div className="empty-state">
-        <h2>AMDM</h2>
         <p>{connections.length === 0 ? t('app.emptyNoConn') : t('app.emptyHasConn')}</p>
       </div>
     </div>

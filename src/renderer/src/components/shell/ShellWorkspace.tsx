@@ -169,7 +169,7 @@ function TabBar(): JSX.Element {
   }, [])
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar app-drag">
       <div className="tab-strip">
         {tabs.map((tab, i) => (
           <div
