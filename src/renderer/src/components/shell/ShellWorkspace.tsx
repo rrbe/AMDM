@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X, Workflow } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
@@ -37,10 +37,18 @@ export function ShellWorkspace(): JSX.Element {
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [showSave, setShowSave] = useState(false)
+  const selectedCode = useRef<string>()
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const busy = running || !code.trim()
   const databases = activeConnectionId ? catalogs[activeConnectionId]?.databases ?? [] : []
+  const runEditor = (): void => {
+    void runShell(selectedCode.current)
+  }
+
+  useEffect(() => {
+    selectedCode.current = undefined
+  }, [activeTabId])
 
   // Database options: loaded databases, ensuring the active one is always shown.
   const dbOptions = useMemo(() => {
@@ -87,7 +95,7 @@ export function ShellWorkspace(): JSX.Element {
             {t('shell.stopBtn')}
           </Button>
         ) : (
-          <Button size="sm" variant="primary" disabled={busy} onClick={() => void runShell()}>
+          <Button size="sm" variant="primary" disabled={busy} onClick={runEditor}>
             {t('shell.runBtn')}
           </Button>
         )}
@@ -101,7 +109,10 @@ export function ShellWorkspace(): JSX.Element {
           key={activeTabId}
           value={code}
           onChange={setCode}
-          onRun={() => void runShell()}
+          onSelectionChange={(selected) => {
+            selectedCode.current = selected
+          }}
+          onRun={(selected) => void runShell(selected)}
           onRunStatement={(c) => void runShell(c)}
           onSave={() => setShowSave(true)}
           onExplain={() => void runExplain()}

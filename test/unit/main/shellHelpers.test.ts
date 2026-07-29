@@ -9,7 +9,8 @@ import {
   detectCollection,
   markSyntheticPromise,
   patchAsyncAwareArray,
-  shellRunScope
+  shellRunScope,
+  transpileShellCode
 } from '../../../src/main/mongo/shellCore'
 
 describe('describeError', () => {
@@ -52,6 +53,18 @@ describe('detectCollection', () => {
   })
   it('returns undefined when no collection is referenced', () => {
     expect(detectCollection('const x = 1')).toBeUndefined()
+  })
+})
+
+describe('transpileShellCode', () => {
+  it('接受聚合管道中的行注释', () => {
+    expect(() =>
+      transpileShellCode(`db.orders.aggregate([
+        { $limit: 1 },
+        // sdfsdf
+        { $match: { active: true } },
+      ])`)
+    ).not.toThrow()
   })
 })
 

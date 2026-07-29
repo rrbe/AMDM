@@ -19,6 +19,7 @@ import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
+import { selectionCode } from '@renderer/lib/shellSelection'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 
 /**
@@ -91,7 +92,8 @@ function enterKeepIndent(view: EditorView): boolean {
 interface ShellEditorProps {
   value: string
   onChange: (value: string) => void
-  onRun: () => void
+  onSelectionChange: (code: string | undefined) => void
+  onRun: (code?: string) => void
   /** Run just the current statement / selection (right-click menu, F6). */
   onRunStatement: (code: string) => void
   onSave: () => void
@@ -110,6 +112,7 @@ interface ShellEditorProps {
 export function ShellEditor({
   value,
   onChange,
+  onSelectionChange,
   onRun,
   onRunStatement,
   onSave,
@@ -136,6 +139,8 @@ export function ShellEditor({
   // read the selection / locate the current statement for "Run Current Statement".
   const viewRef = useRef<EditorView | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const selectionHandler = useRef(onSelectionChange)
+  selectionHandler.current = onSelectionChange
 
   // Hold the latest callbacks in a ref so the keymap extension can stay a stable
   // reference — recreating `extensions` would reconfigure CodeMirror on every
@@ -146,6 +151,11 @@ export function ShellEditor({
   const extensions = useMemo(
     () => [
       javascript({ typescript: false }),
+      EditorView.updateListener.of((update) => {
+        if (update.selectionSet || update.docChanged) {
+          selectionHandler.current(selectionCode(update.state))
+        }
+      }),
       autocompletion({ override: [shellCompletionSource] }),
       // Inline ghost-text value hints (e.g. `-1` after `sort({ _id: `). Mutually
       // exclusive with the dropdown above; accepted via the Tab binding below.
@@ -232,6 +242,7 @@ export function ShellEditor({
           onChange={onChange}
           onCreateEditor={(view) => {
             viewRef.current = view
+            selectionHandler.current(selectionCode(view.state))
             // Pre-spawn the TS-service worker so the heavy `typescript` chunk
             // loads off the critical path and the service is warm by first use.
             tsAutocomplete.warm()
@@ -254,6 +265,10 @@ export function ShellEditor({
   // Defined after the return-bearing render but hoisted: these read the ref so
   // they always see the current props, and always return true to consume the key.
   function runIfReady(): boolean {
+    if (!handlers.current.busy) handlers.current.onRun(selectionCode(viewRef.current?.state))
+    return true
+  }
+  function runScriptIfReady(): boolean {
     if (!handlers.current.busy) handlers.current.onRun()
     return true
   }
@@ -298,7 +313,12 @@ export function ShellEditor({
     const { busy: isBusy, running: isRunning } = handlers.current
     const hasSel = viewRef.current ? !viewRef.current.state.selection.main.empty : false
     return [
-      { label: t('shell.menu.runScript'), shortcut: '⌘↵', disabled: isBusy, onClick: () => runIfReady() },
+      {
+        label: t('shell.menu.runScript'),
+        shortcut: hasSel ? undefined : '⌘↵',
+        disabled: isBusy,
+        onClick: () => runScriptIfReady()
+      },
       {
         label: hasSel ? t('shell.menu.runSelected') : t('shell.menu.runStatement'),
         shortcut: 'F6',
