@@ -172,8 +172,17 @@ body {
   border-top: 1px solid var(--border);
   background: var(--bg-1);
 }
-.side-foot .spacer {
+.side-foot-build {
+  min-width: 0;
   flex: 1;
+  overflow: hidden;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* App-level theme control: a single icon button cycling System → Light → Dark. */
 .theme-cycle {
@@ -225,4 +234,3 @@ body {
     opacity: 1;
   }
 }
-

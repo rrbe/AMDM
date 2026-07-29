@@ -377,7 +377,9 @@ export function Explorer(): JSX.Element {
             <Moon size={16} />
           )}
         </button>
-        <span className="spacer" />
+        <span className="side-foot-build" title={__BUILD_ID__}>
+          {__BUILD_ID__}
+        </span>
         <button
           className="theme-cycle"
           data-tip={t('common.settings')}

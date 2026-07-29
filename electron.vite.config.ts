@@ -1,7 +1,20 @@
 import { resolve } from 'path'
+import { execFileSync } from 'node:child_process'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+const buildTime = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Shanghai',
+  dateStyle: 'short',
+  timeStyle: 'short',
+  hourCycle: 'h23'
+})
+  .format(new Date())
+  .replace(/-/g, '')
+  .replace(' ', '-')
+  .replace(':', '')
+const buildId = `${buildTime}-${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
 
 export default defineConfig({
   main: {
@@ -48,6 +61,9 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    define: {
+      __BUILD_ID__: JSON.stringify(buildId)
+    },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),
