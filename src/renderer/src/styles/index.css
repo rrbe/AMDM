@@ -37,7 +37,7 @@
    Bridge Tailwind/shadcn utility color names → our semantic tokens (defined in
    tokens.css). `inline` makes utilities reference var(--*) directly so they
    re-skin under [data-theme='dark']. NAMING NOTE: our --accent is the brand
-   blue → mapped to shadcn `primary`; shadcn's `accent` (subtle hover surface)
+   Ink → mapped to shadcn `primary`; shadcn's `accent` (subtle hover surface)
    maps to --bg-3. shadcn `input`/`ring` borrow --border-strong/--accent.
    --------------------------------------------------------------------------- */
 @theme inline {

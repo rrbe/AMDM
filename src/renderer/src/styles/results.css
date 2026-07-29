@@ -442,6 +442,9 @@
   background: var(--accent-soft-strong);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
+[data-theme='dark'] .tbl-td.selected {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
 /* The # column doubles as a row-select handle (Shift / ⌘ for multi-select). */
 .tbl-td.idx-select {
   cursor: pointer;

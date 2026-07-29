@@ -23,10 +23,10 @@
 
 | Token | Light | Dark | 用途 |
 |---|---|---|---|
-| `--accent` | `#252623` | `#efefe9` | 主操作、激活、焦点环 |
-| `--accent-hover` | `#11120f` | `#ffffff` | 强调面 hover |
-| `--accent-soft` | `rgba(37,38,35,.10)` | `rgba(239,239,233,.10)` | 焦点环、激活行/标签底 |
-| `--accent-soft-strong` | `rgba(37,38,35,.16)` | `rgba(239,239,233,.16)` | 选中高亮 |
+| `--accent` | `#252623` | `#deded7` | 主操作、激活、焦点环 |
+| `--accent-hover` | `#11120f` | `#ecece5` | 强调面 hover |
+| `--accent-soft` | `rgba(37,38,35,.10)` | `rgba(222,222,215,.09)` | 焦点环、激活行/标签底 |
+| `--accent-soft-strong` | `rgba(37,38,35,.16)` | `rgba(222,222,215,.14)` | 选中高亮 |
 | `--accent-fg` | `#ffffff` | `#20211f` | Ink 填充上的文字/图标 |
 
 ### 表面（Surfaces，Warm Stone）
@@ -39,7 +39,7 @@
 | `--bg-2` | `#dedfda` | `#2a2b26` | 凸起/内凹（输入、表头、分段） |
 | `--bg-3` | `#d3d4ce` | `#35362f` | 行/按钮 hover（= shadcn `accent`） |
 | `--bg-elevated` | `#f2f2ee` | `#242520` | 弹窗、菜单、popover |
-| `--bg-sel` | `rgba(37,38,35,.09)` | `rgba(239,239,233,.10)` | 选中行底 |
+| `--bg-sel` | `rgba(37,38,35,.09)` | `rgba(222,222,215,.09)` | 选中行底 |
 | `--bg-editor` | `#f2f2ee` | `#171815` | 查询编辑器（CodeMirror，另见 §6） |
 
 ### 边框 / 文字 / 状态
