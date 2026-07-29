@@ -147,7 +147,7 @@
 .editor-row {
   display: flex;
   flex: 0 0 auto;
-  height: var(--editor-height, 160px);
+  height: var(--editor-height);
   min-height: 80px;
   /* Keep the result panel usable; mirrors the JS drag clamp in ShellWorkspace. */
   max-height: calc(100vh - 300px);

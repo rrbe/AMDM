@@ -429,7 +429,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   language: 'system',
   sidebarWidth: 300,
-  editorHeight: 160,
+  editorHeight: 120,
   queryLimit: 50,
   editorFontSize: 13,
   editorWordWrap: false,

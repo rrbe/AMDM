@@ -16,7 +16,7 @@
   --row-h: 24px;
   /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
   --sidebar-width: 300px;
-  --editor-height: 160px;
+  --editor-height: 120px;
   --font-ui: system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
   --fs: 13px;

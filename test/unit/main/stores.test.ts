@@ -65,7 +65,12 @@ describe('queryStore — history', () => {
 
 describe('settingsStore', () => {
   it('returns defaults when nothing is stored', () => {
-    expect(settingsStore.get()).toMatchObject({ queryLimit: 50, theme: 'system', sidebarWidth: 300 })
+    expect(settingsStore.get()).toMatchObject({
+      queryLimit: 50,
+      theme: 'system',
+      sidebarWidth: 300,
+      editorHeight: 120
+    })
   })
   it('merges + persists an update', () => {
     const next = settingsStore.update({ queryLimit: 100 })
