@@ -87,7 +87,6 @@ export function ShellWorkspace(): JSX.Element {
                 placeholder={dbOptions.length === 0 ? t('shell.noDatabase') : t('shell.selectDatabase')}
                 disabled={dbOptions.length === 0}
                 aria-label={t('shell.activeDatabaseTip')}
-                data-tip={t('shell.activeDatabaseTip')}
               />
               {targetCollection && (
                 <>
@@ -103,7 +102,6 @@ export function ShellWorkspace(): JSX.Element {
                   size="sm"
                   variant="danger"
                   onClick={() => void stopShell()}
-                  data-tip={t('shell.stopTip')}
                 >
                   <LoaderCircle className="animate-spin" aria-hidden /> {t('shell.stopTip')}
                 </Button>
@@ -244,7 +242,6 @@ function TabBar(): JSX.Element {
                 closeTab(tab.id)
               }
             }}
-            data-tip={tabLabel(tab, i)}
           >
             {tab.running && <span className="qtab-dot" aria-hidden />}
             <span className="qtab-label">{tabLabel(tab, i)}</span>

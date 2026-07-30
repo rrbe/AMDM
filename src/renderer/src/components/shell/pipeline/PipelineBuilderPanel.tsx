@@ -86,9 +86,7 @@ export function PipelineBuilderPanel(): JSX.Element | null {
       </div>
 
       <div className={styles.pipelineTarget}>
-        <span className={styles.pipelineTargetDb} data-tip={t('builder.collection')}>
-          {activeDatabase || t('builder.noDb')}
-        </span>
+        <span className={styles.pipelineTargetDb}>{activeDatabase || t('builder.noDb')}</span>
         <Select
           className={styles.pipelineColl}
           value={collection}
@@ -121,7 +119,7 @@ export function PipelineBuilderPanel(): JSX.Element | null {
       </div>
 
       <div className={styles.pipelineFoot}>
-        <Button onClick={() => addStage()} data-tip={t('builder.addStageTip')}>
+        <Button onClick={() => addStage()}>
           <Plus size={14} /> {t('builder.addStage')}
         </Button>
         <span className={styles.spacer} />

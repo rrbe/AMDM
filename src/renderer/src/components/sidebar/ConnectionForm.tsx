@@ -561,7 +561,6 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                       color === c && 'border-[var(--fg-0)] shadow-[0_0_0_2px_var(--bg-1)]'
                     )}
                     style={{ background: c }}
-                    data-tip={c}
                     aria-label={c}
                     onClick={() => setColor(c)}
                   />

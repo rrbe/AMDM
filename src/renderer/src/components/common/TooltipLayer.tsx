@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
  * A single, app-wide styled tooltip — the lightweight replacement for native
  * `title=` (which is slow to appear, unstyled, and ignores dark mode). Mount it
  * once at the app root; any element carrying a non-empty `data-tip="…"` gets a
- * delayed, themed tooltip on hover/focus.
+ * delayed, themed tooltip on hover/focus. `data-tip-overflow` limits it to
+ * content that is actually clipped.
  *
  * Event-delegation (one set of document listeners) rather than a wrapper
  * component per trigger, so adopting it is just renaming `title` → `data-tip`.
@@ -43,7 +44,16 @@ export function TooltipLayer(): JSX.Element | null {
       setActive(null)
     }
 
-    const tipOf = (el: Element | null): string => el?.getAttribute('data-tip')?.trim() ?? ''
+    const tipOf = (el: Element | null): string => {
+      const text = el?.getAttribute('data-tip')?.trim() ?? ''
+      if (
+        el?.hasAttribute('data-tip-overflow') &&
+        el.scrollWidth <= el.clientWidth &&
+        el.scrollHeight <= el.clientHeight
+      )
+        return ''
+      return text
+    }
 
     const onOver = (e: MouseEvent): void => {
       const el = (e.target as Element | null)?.closest('[data-tip]') ?? null

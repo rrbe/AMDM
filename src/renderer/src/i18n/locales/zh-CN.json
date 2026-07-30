@@ -258,7 +258,6 @@
     "elapsed": "{{ms}} ms",
     "prevPage": "上一页",
     "nextPage": "下一页",
-    "pageSizeTip": "每页条数（回车应用）",
     "pageSizeLabel": "每页",
     "errorName": "错误",
     "errorUnknown": "发生了未知错误。"
@@ -287,7 +286,6 @@
     "empty": "暂无阶段。",
     "stageType": "阶段类型",
     "addStage": "添加阶段",
-    "addStageTip": "追加一个管道阶段",
     "removeStage": "删除阶段",
     "drag": "拖拽排序",
     "enableTip": "启用 / 禁用此阶段",

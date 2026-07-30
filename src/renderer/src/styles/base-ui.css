@@ -50,13 +50,3 @@
 .ctx-item[data-disabled][data-highlighted] {
   background: transparent;
 }
-
-/* ---- Tooltip (ui/Tooltip) — popup look reused from .app-tooltip; reset its
-   `position: fixed` since the positioner places it. (Not wired in yet.) ---- */
-.ui-tooltip-positioner {
-  z-index: 3000;
-}
-.ui-tooltip-popup {
-  position: static;
-  pointer-events: none;
-}

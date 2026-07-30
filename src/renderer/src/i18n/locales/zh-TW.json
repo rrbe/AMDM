@@ -258,7 +258,6 @@
     "elapsed": "{{ms}} ms",
     "prevPage": "上一頁",
     "nextPage": "下一頁",
-    "pageSizeTip": "每頁筆數（按 Enter 套用）",
     "pageSizeLabel": "每頁",
     "errorName": "錯誤",
     "errorUnknown": "發生了未知錯誤。"
@@ -287,7 +286,6 @@
     "empty": "尚無階段。",
     "stageType": "階段類型",
     "addStage": "新增階段",
-    "addStageTip": "附加一個管道階段",
     "removeStage": "刪除階段",
     "drag": "拖曳排序",
     "enableTip": "啟用 / 停用此階段",

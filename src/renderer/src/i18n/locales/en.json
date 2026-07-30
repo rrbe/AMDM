@@ -258,7 +258,6 @@
     "elapsed": "{{ms}} ms",
     "prevPage": "Previous page",
     "nextPage": "Next page",
-    "pageSizeTip": "Rows per page (press Enter to apply)",
     "pageSizeLabel": "Per page",
     "errorName": "Error",
     "errorUnknown": "An unknown error occurred."
@@ -287,7 +286,6 @@
     "empty": "No stages yet.",
     "stageType": "Stage type",
     "addStage": "Add stage",
-    "addStageTip": "Append a pipeline stage",
     "removeStage": "Remove stage",
     "drag": "Drag to reorder",
     "enableTip": "Enable / disable this stage",

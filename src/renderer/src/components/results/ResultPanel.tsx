@@ -233,9 +233,10 @@ function ResultTabStrip({
               closeResultTab(r.id)
             }
           }}
-          data-tip={r.query ? firstLine(r.query.code) : undefined}
         >
-          <span className="rtab-label">{resultTabLabel(r)}</span>
+          <span className="rtab-label" data-tip={r.query ? firstLine(r.query.code) : undefined}>
+            {resultTabLabel(r)}
+          </span>
           <button
             className="rtab-close"
             aria-label={t('result.closeTab')}
@@ -364,7 +365,7 @@ function PageSizeControl(): JSX.Element {
     if (n !== limit) void setQueryLimit(n)
   }
   return (
-    <label className="page-size" data-tip={t('result.pageSizeTip')}>
+    <label className="page-size">
       <span>{t('result.pageSizeLabel')}</span>
       <input
         type="number"

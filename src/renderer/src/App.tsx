@@ -78,7 +78,7 @@ function WorkspaceEmptyState(): JSX.Element {
   const connections = useAppStore((s) => s.connections)
   const { t } = useTranslation()
   return (
-    <div className="work">
+    <div className="work app-drag">
       <div className="empty-state">
         <p>{connections.length === 0 ? t('app.emptyNoConn') : t('app.emptyHasConn')}</p>
       </div>

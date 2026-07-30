@@ -414,7 +414,6 @@ export function Explorer(): JSX.Element {
       <div className="explorer-create">
         <button
           className="primary btn-new-conn"
-          data-tip={t('explorer.newConnection')}
           onClick={() => setConnForm({ open: true })}
         >
           <Plus size={15} />
@@ -529,7 +528,6 @@ function ConnectionRow({
   return (
     <div
       className={isActive ? 'conn-item active' : 'conn-item'}
-      data-tip={sub}
       onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : state !== 'connecting' && onConnect())}
       onContextMenu={onContextMenu}
@@ -550,7 +548,9 @@ function ConnectionRow({
       </span>
       <div className="conn-text">
         <div className="conn-name">{conn.name}</div>
-        <div className="conn-sub">{sub}</div>
+        <div className="conn-sub" data-tip={sub} data-tip-overflow="">
+          {sub}
+        </div>
       </div>
       <span
         className="conn-status"
@@ -592,7 +592,6 @@ function CatalogRow({
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
       onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
-      data-tip={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
     >
       <span
         className="tree-twisty"
@@ -612,7 +611,13 @@ function CatalogRow({
           <TreeIcon name={row.icon} />
         </span>
       )}
-      <span className="tree-label">{row.label}</span>
+      <span
+        className="tree-label"
+        data-tip={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
+        data-tip-overflow={isNote || row.empty ? undefined : ''}
+      >
+        {row.label}
+      </span>
       {typeof row.count === 'number' && <span className="tree-count">{row.count}</span>}
       {row.loading && (
         <span className="tree-spinner">
