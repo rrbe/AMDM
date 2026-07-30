@@ -52,6 +52,8 @@ export interface QueryTab {
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
+  /** True when the last completed run failed; user-initiated Stop is not a failure. */
+  runFailed: boolean
   /** execId of this tab's in-flight run, for Stop / cleanup on close. */
   runningExecId: string | null
   /** Aggregation pipeline builder state for this tab (absent until opened). The
@@ -72,9 +74,15 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     activeResultId: null,
     resultSeq: 0,
     running: false,
+    runFailed: false,
     runningExecId: null,
     ...init
   }
+}
+
+/** Whether a completed run should leave the query tab's red failure dot on. */
+export function isRunFailure(result: ShellResult): boolean {
+  return result.kind === 'error' && result.errorName !== 'Aborted'
 }
 
 /**

@@ -204,7 +204,7 @@ export function ShellWorkspace(): JSX.Element {
 
 /**
  * The query-tab strip: one chip per open tab (label derived from its code), a
- * running dot while it executes, a close ✕, and a trailing "+" to open a tab.
+ * fixed status slot (spinner / failure dot), a close ✕, and a trailing "+".
  */
 function TabBar(): JSX.Element {
   const { t } = useTranslation()
@@ -243,7 +243,13 @@ function TabBar(): JSX.Element {
               }
             }}
           >
-            {tab.running && <span className="qtab-dot" aria-hidden />}
+            <span className="qtab-status" aria-hidden>
+              {tab.running ? (
+                <LoaderCircle className="qtab-spinner animate-spin" />
+              ) : tab.runFailed ? (
+                <span className="qtab-error-dot" />
+              ) : null}
+            </span>
             <span className="qtab-label">{tabLabel(tab, i)}</span>
             <button
               className="qtab-close"

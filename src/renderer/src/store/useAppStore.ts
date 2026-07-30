@@ -40,6 +40,7 @@ import {
   appendResult,
   closeResult,
   createTab,
+  isRunFailure,
   patchResult,
   patchTab,
   pickActiveAfterClose,
@@ -865,26 +866,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     const limit = get().settings.queryLimit
     const execId = newExecId()
     set((s) => ({
-      tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
+      tabs: patchTab(s.tabs, tabId, { running: true, runFailed: false, runningExecId: execId }),
       lastError: null
     }))
     const query = { connectionId, database, code }
+    let runFailed = false
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
       // earlier results stay around for side-by-side comparison.
       const result = await window.api.shell.execute({ ...query, limit, skip: 0, execId })
+      runFailed = isRunFailure(result)
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
       // `use <db>` REPL command: switch the tab's active database (also warms
       // its collection names for completion via setActiveDatabase).
       if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
     } catch (e) {
+      runFailed = true
       set((s) =>
         patchTabResults(s, tabId, (t) =>
           appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
         )
       )
     } finally {
-      set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, { running: false, runFailed, runningExecId: null })
+      }))
     }
     void get().loadHistory()
   },
@@ -914,20 +920,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     const limit = get().settings.queryLimit
     const execId = newExecId()
     set((s) => ({
-      tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
+      tabs: patchTab(s.tabs, tabId, { running: true, runFailed: false, runningExecId: execId }),
       lastError: null
     }))
+    let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, limit, skip, execId })
+      runFailed = isRunFailure(result)
       set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, skip })))
     } catch (e) {
+      runFailed = true
       set((s) =>
         patchTabResults(s, tabId, (t) =>
           patchResult(t, resultId, { result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
         )
       )
     } finally {
-      set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, { running: false, runFailed, runningExecId: null })
+      }))
     }
   },
 
@@ -951,21 +962,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     const database = tab.activeDatabase || 'test'
     const execId = newExecId()
     set((s) => ({
-      tabs: patchTab(s.tabs, tabId, { running: true, runningExecId: execId }),
+      tabs: patchTab(s.tabs, tabId, { running: true, runFailed: false, runningExecId: execId }),
       lastError: null
     }))
     const query = { connectionId, database, code }
+    let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, explain: true, execId })
+      runFailed = isRunFailure(result)
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
     } catch (e) {
+      runFailed = true
       set((s) =>
         patchTabResults(s, tabId, (t) =>
           appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
         )
       )
     } finally {
-      set((s) => ({ tabs: patchTab(s.tabs, tabId, { running: false, runningExecId: null }) }))
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, { running: false, runFailed, runningExecId: null })
+      }))
     }
     void get().loadHistory()
   },
@@ -976,16 +992,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rt = activeResult(tab)
     if (!rt?.query) return
     const resultId = rt.id
+    const execId = newExecId()
+    set((s) => ({
+      tabs: patchTab(s.tabs, tabId, { running: true, runFailed: false, runningExecId: execId }),
+      lastError: null
+    }))
+    let runFailed = false
     try {
       // Refresh the focused result tab in place — keep its page offset and size.
       const result = await window.api.shell.execute({
         ...rt.query,
         limit: get().settings.queryLimit,
-        skip: rt.skip
+        skip: rt.skip,
+        execId
       })
+      runFailed = isRunFailure(result)
       set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
     } catch (e) {
+      runFailed = true
       set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
+    } finally {
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, { running: false, runFailed, runningExecId: null })
+      }))
     }
   },
 

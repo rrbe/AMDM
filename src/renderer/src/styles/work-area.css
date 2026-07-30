@@ -89,11 +89,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.qtab-dot {
+.qtab-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+}
+.qtab-spinner {
+  width: 10px;
+  height: 10px;
+  color: var(--accent);
+}
+.qtab-error-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--err);
   flex: 0 0 auto;
 }
 .qtab-close {

@@ -9,6 +9,7 @@ import {
   appendResult,
   closeResult,
   createTab,
+  isRunFailure,
   patchResult,
   patchTab,
   pickActiveAfterClose,
@@ -38,11 +39,20 @@ describe('createTab', () => {
       activeResultId: null,
       resultSeq: 0,
       running: false,
+      runFailed: false,
       runningExecId: null
     })
   })
   it('applies overrides', () => {
     expect(createTab('a', { code: 'db.x.find()' }).code).toBe('db.x.find()')
+  })
+})
+
+describe('isRunFailure', () => {
+  it('keeps only real errors red', () => {
+    expect(isRunFailure(docsResult())).toBe(false)
+    expect(isRunFailure({ kind: 'error', errorName: 'MongoServerError' })).toBe(true)
+    expect(isRunFailure({ kind: 'error', errorName: 'Aborted' })).toBe(false)
   })
 })
 
