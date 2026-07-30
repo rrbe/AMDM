@@ -110,6 +110,7 @@ export function pickFillTarget(
   const active = tabs.find((t) => t.id === activeTabId)
   if (
     active?.pristine &&
+    !active.running &&
     active.results.length === 0 &&
     (!match || active.connectionId === match.connectionId)
   )

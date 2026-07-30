@@ -53,6 +53,7 @@ import {
   buildAggregateCode,
   buildPreviewCode,
   createStage,
+  dbCollRef,
   moveStage,
   removeStage,
   setStageBody,
@@ -206,10 +207,8 @@ interface AppState {
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
-  /** Browse a collection from the explorer: seed `db.<coll>.find({})` into a
-      tab of its own — focus an identical browse tab if one is open, refill the
-      active tab only while it's pristine, else open a new tab. Never clobbers
-      code the user wrote, never auto-runs (ADR-0004 rule 5). */
+  /** Browse a collection from the explorer: run a bounded newest-first query
+      on first fill; focus an identical browse tab without re-running it. */
   browseCollection(db: string, coll: string): void
   /** Run the editor's script, or `codeOverride` when given (e.g. the current
       statement / selection from the right-click menu). */
@@ -834,9 +833,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   browseCollection(db, coll) {
-    // ADR-0004 rule 5: never auto-run. We only seed the editor — and only into
-    // a pristine tab, so browsing the catalog can't overwrite user code.
-    const seed = `db.${coll}.find({})`
+    const seed = `${dbCollRef(coll)}.find({}).sort({ _id: -1 }).limit(100)`
+    let shouldRun = false
     set((s) => {
       const connectionId = getActiveTab(s).connectionId
       if (!connectionId) return {}
@@ -846,10 +844,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         code: seed
       })
       if (focusId) return { activeTabId: focusId }
+      shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
       const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
+    if (shouldRun) void get().runShell()
   },
 
   async runShell(codeOverride) {

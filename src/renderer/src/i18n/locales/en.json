@@ -6,7 +6,7 @@
   },
   "app": {
     "emptyNoConn": "No connections yet. Use the + button in the sidebar to create your first MongoDB connection.",
-    "emptyHasConn": "Select a connection and double-click (or press Connect) to open a shell. Browsing a collection inserts a starter query — it never auto-runs.",
+    "emptyHasConn": "Select a connection and double-click (or press Connect) to open a shell. First opening a collection automatically queries its newest 100 documents.",
     "resizeSidebar": "Resize sidebar"
   },
   "settings": {

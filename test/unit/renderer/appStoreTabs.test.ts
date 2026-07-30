@@ -31,6 +31,37 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().activeTabId).toBe(c2Tab?.id)
   })
 
+  it('runs the bounded default query only on first collection open', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      kind: 'documents',
+      data: [],
+      count: 0,
+      truncated: false,
+      collection: 'orders'
+    })
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+
+    useAppStore.getState().browseCollection('shop', 'orders')
+
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        connectionId: 'c1',
+        database: 'shop',
+        code: 'db.orders.find({}).sort({ _id: -1 }).limit(100)',
+        skip: 0
+      })
+    )
+
+    useAppStore.getState().browseCollection('shop', 'orders')
+    expect(execute).toHaveBeenCalledOnce()
+  })
+
   it('shows running, keeps real failures red, and clears a stopped run', async () => {
     let finish!: (result: ShellResult) => void
     const execute = vi.fn(

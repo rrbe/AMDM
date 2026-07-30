@@ -109,6 +109,10 @@ describe('pickFillTarget', () => {
     const ran = { ...blank, ...appendResult(blank, 'r1', docsResult(), null) }
     expect(pickFillTarget([ran], 'a', SEED)).toEqual({})
   })
+  it('never reuses a tab while its first query is running', () => {
+    const running = createTab('a', { connectionId: 'c1', running: true })
+    expect(pickFillTarget([running], 'a', SEED)).toEqual({})
+  })
   it('only ever reuses the ACTIVE tab', () => {
     const blank = createTab('a', { connectionId: 'c1' })
     const edited = createTab('e', { code: 'let x = 1', pristine: false })

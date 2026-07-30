@@ -136,7 +136,7 @@ const DB_MEMBERS = new Set([
 
 /** `db.orders` for a plain name, else `db.getCollection("…")` for odd names or
     names that collide with a Db member/method. */
-function dbCollRef(coll: string): string {
+export function dbCollRef(coll: string): string {
   return IDENTIFIER.test(coll) && !DB_MEMBERS.has(coll)
     ? `db.${coll}`
     : `db.getCollection(${JSON.stringify(coll)})`

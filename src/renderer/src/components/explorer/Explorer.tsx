@@ -78,8 +78,8 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
  * expands to reveal its database subtree, lazily loaded via catalog.* and cached
  * per-connection in the store.
  *
- * ADR-0004 rule 5: clicking a collection never auto-runs a query; it sets the
- * active connection + database and seeds the editor with `db.<coll>.find({})`.
+ * Clicking a collection runs one bounded newest-first query on first open;
+ * clicking it again focuses the existing Shell tab without re-running it.
  */
 
 interface TreeRow {

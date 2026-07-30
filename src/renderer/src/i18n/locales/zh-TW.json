@@ -6,7 +6,7 @@
   },
   "app": {
     "emptyNoConn": "尚無連線。點選側邊欄的 + 按鈕，建立你的第一個 MongoDB 連線。",
-    "emptyHasConn": "選擇一個連線並雙擊（或點選連線）以開啟 Shell。瀏覽集合只會插入起始查詢——絕不會自動執行。",
+    "emptyHasConn": "選擇一個連線並雙擊（或點選連線）以開啟 Shell。首次瀏覽集合會自動查詢最新 100 筆文件。",
     "resizeSidebar": "調整側邊欄寬度"
   },
   "settings": {

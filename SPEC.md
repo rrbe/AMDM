@@ -33,7 +33,7 @@
 
 ### #2 浏览
 - 侧边栏:databases → collections → indexes / users,**懒加载**。
-- **点击集合不自动执行查询**(ADR-0004 第 5 条),先显示元信息。
+- 首次点击集合自动执行有界默认查询：`find({}).sort({ _id: -1 }).limit(100)`；再次点击只聚焦已有 Shell。
 
 ### #3 Shell 执行
 - 用户输入 JS(如 `db.lives.find({...})`),在 `vm` 沙箱中执行,`db` 是驱动 shim,返回 **typed BSON**。
@@ -75,7 +75,7 @@
 2. 游标流式分页拉取,默认页 50–100,绝不把整库塞进渲染进程。
 3. 重 CPU(BSON↔EJSON、格式化、schema 采样)丢 Worker,绝不堵主线程。
 4. schema 采样:懒、有界(20–100 文档)、异步、缓存。
-5. 打开集合不自动查询。
+5. 首次打开集合只执行有界默认查询（按 `_id` 倒序，最多 100 条）；再次打开不重复执行。
 6. 关闭 tab/连接立即销毁编辑器 model 和结果缓存;退出时清理所有子进程。
 7. 用当前版 Electron,各目标架构都出**原生**包(arm64 给 Apple Silicon、x64 给 Intel,都不走 Rosetta);懒加载重功能,tree-shake。
 

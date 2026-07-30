@@ -6,7 +6,7 @@
   },
   "app": {
     "emptyNoConn": "还没有连接。点击侧边栏的 + 按钮，创建你的第一个 MongoDB 连接。",
-    "emptyHasConn": "选择一个连接并双击（或点击连接）以打开 Shell。浏览集合只会插入起始查询——绝不会自动执行。",
+    "emptyHasConn": "选择一个连接并双击（或点击连接）以打开 Shell。首次浏览集合会自动查询最新 100 条文档。",
     "resizeSidebar": "调整侧边栏宽度"
   },
   "settings": {
