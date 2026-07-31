@@ -9,6 +9,23 @@
     "emptyHasConn": "選擇一個連線並雙擊（或點選連線）以開啟 Shell。首次瀏覽集合會自動查詢最新 100 筆文件。",
     "resizeSidebar": "調整側邊欄寬度"
   },
+  "navigation": {
+    "title": "應用程式功能導覽",
+    "data": "連線",
+    "saved": "已存",
+    "history": "歷史"
+  },
+  "queryNavigation": {
+    "connectTitle": "連線後開啟查詢",
+    "unavailableTitle": "需要 Connection",
+    "connectMessage": "「{{name}}」尚未連線。是否先連線，再開啟這筆查詢？",
+    "connectionMissing": "這筆查詢儲存的 Connection「{{name}}」已不存在。",
+    "noConnection": "請先連線一個 Connection，再開啟這筆查詢。",
+    "connectFailed": "連線失敗。",
+    "connect": "連線",
+    "cancel": "取消",
+    "goToConnections": "前往 Connections"
+  },
   "settings": {
     "title": "設定",
     "done": "完成",
@@ -163,6 +180,8 @@
     "clearSearch": "清除搜尋",
     "noSearchResults": "沒有相符的已載入項目。",
     "newConnection": "新增連線",
+    "collapse": "收起 Connections",
+    "expand": "展開 Connections",
     "theme": {
       "system": "佈景：系統 — 點擊切換為亮色",
       "light": "佈景：亮色 — 點擊切換為暗色",
@@ -367,7 +386,7 @@
   },
   "savedQueries": {
     "title": "已儲存的查詢",
-    "tabHistory": "歷史紀錄",
+    "tabHistory": "查詢歷史",
     "ungrouped": "未分組",
     "emptySaved": "尚無已儲存的查詢。請在工具列使用「儲存」。",
     "emptyHistory": "尚無歷史紀錄。",

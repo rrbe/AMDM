@@ -21,6 +21,10 @@
   transform: translate(-50%, -50%);
   z-index: 1001;
 }
+.ui-dialog-backdrop,
+.ui-dialog {
+  -webkit-app-region: no-drag;
+}
 
 /* Children of a 2-col .form-grid (ui/Field carries its own bottom margin) would
    add a stray gap, so neutralise it — the grid gap handles spacing. */

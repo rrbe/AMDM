@@ -250,8 +250,8 @@ interface AppState {
   deleteQuery(id: string): Promise<void>
   loadHistory(): Promise<void>
   clearHistory(): Promise<void>
-  /** Load a query/history snippet into the editor (never auto-runs). */
-  applyQuery(code: string, database?: string): void
+  /** Load a query/history snippet into its connection-bound editor (never auto-runs). */
+  applyQuery(code: string, database?: string, connectionId?: string): void
 
   // ---- actions: autocomplete (Phase 2) ----
   /** Fetch (and cache) sampled field names for a collection. */
@@ -389,6 +389,10 @@ function patchTabResults(
 
 /** The tab present at first render (so init can point activeTabId at it). */
 const INITIAL_TAB = createTab(newTabId())
+
+/** Concurrent callers share one session attempt instead of opening duplicate
+    clients/tunnels for the same Connection. */
+const connectionAttempts = new Map<string, { promise: Promise<void>; token: object }>()
 
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
@@ -538,49 +542,70 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ------------------------------------------------------------------- session
   async connect(id) {
-    set((s) => ({
-      statuses: { ...s.statuses, [id]: { id, state: 'connecting' } }
-    }))
-    try {
-      const status = await window.api.session.connect(id)
-      // A disconnect may have won while the IPC connect call was still pending.
-      if (get().statuses[id]?.state !== 'connecting') return
-      set((s) => {
-        // Auto-expand the connection in the explorer so its databases appear.
-        const expandedConnections = new Set(s.expandedConnections)
-        if (status.state === 'connected') expandedConnections.add(id)
-        return {
-          statuses: { ...s.statuses, [id]: status },
-          catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() },
-          expandedConnections
-        }
-      })
-      if (status.state === 'connected') {
-        get().setActiveConnection(id)
-        // Default the active tab's database to the connection's preferred db,
-        // unless that tab already has one chosen (don't clobber an explicit pick).
-        const conn = get().connections.find((c) => c.id === id)
-        const db = conn?.defaultDatabase
-        if (db && get().activeConnectionId === id) {
-          set((s) =>
-            getActiveTab(s).activeDatabase
-              ? {}
-              : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
-          )
-        }
-        await get().loadDatabases(id)
-        // Prefetch the active db's collection names so `db.` completion works
-        // without expanding the tree (only that db; skip if already cached).
-        const activeDb = getActiveTab(get()).activeDatabase
-        if (activeDb && get().catalogs[id]?.collections[activeDb] === undefined) {
-          void get().loadCollections(id, activeDb)
-        }
-      }
-    } catch (e) {
-      if (get().statuses[id]?.state !== 'connecting') return
+    const pending = connectionAttempts.get(id)
+    if (pending && get().statuses[id]?.state === 'connecting') return pending.promise
+
+    const token = {}
+    const attempt = (async (): Promise<void> => {
       set((s) => ({
-        statuses: { ...s.statuses, [id]: { id, state: 'error', error: errMessage(e) } }
+        statuses: { ...s.statuses, [id]: { id, state: 'connecting' } }
       }))
+      try {
+        const status = await window.api.session.connect(id)
+        // A disconnect or newer retry may have won while this call was pending.
+        if (
+          connectionAttempts.get(id)?.token !== token ||
+          get().statuses[id]?.state !== 'connecting'
+        )
+          return
+        set((s) => {
+          // Auto-expand the connection in the explorer so its databases appear.
+          const expandedConnections = new Set(s.expandedConnections)
+          if (status.state === 'connected') expandedConnections.add(id)
+          return {
+            statuses: { ...s.statuses, [id]: status },
+            catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() },
+            expandedConnections
+          }
+        })
+        if (status.state === 'connected') {
+          get().setActiveConnection(id)
+          // Default the active tab's database to the connection's preferred db,
+          // unless that tab already has one chosen (don't clobber an explicit pick).
+          const conn = get().connections.find((c) => c.id === id)
+          const db = conn?.defaultDatabase
+          if (db && get().activeConnectionId === id) {
+            set((s) =>
+              getActiveTab(s).activeDatabase
+                ? {}
+                : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
+            )
+          }
+          await get().loadDatabases(id)
+          // Prefetch the active db's collection names so `db.` completion works
+          // without expanding the tree (only that db; skip if already cached).
+          const activeDb = getActiveTab(get()).activeDatabase
+          if (activeDb && get().catalogs[id]?.collections[activeDb] === undefined) {
+            void get().loadCollections(id, activeDb)
+          }
+        }
+      } catch (e) {
+        if (
+          connectionAttempts.get(id)?.token !== token ||
+          get().statuses[id]?.state !== 'connecting'
+        )
+          return
+        set((s) => ({
+          statuses: { ...s.statuses, [id]: { id, state: 'error', error: errMessage(e) } }
+        }))
+      }
+    })()
+
+    connectionAttempts.set(id, { promise: attempt, token })
+    try {
+      await attempt
+    } finally {
+      if (connectionAttempts.get(id)?.token === token) connectionAttempts.delete(id)
     }
   },
 
@@ -1077,21 +1102,49 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyQuery(code, database) {
+  applyQuery(code, database, connectionId) {
     // Never auto-run (ADR-0004 rule 5). Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
     set((s) => {
+      const targetConnectionId = connectionId ?? s.activeConnectionId
+      if (!targetConnectionId) return { lastError: tr('notify.noActiveConnection') }
       const active = getActiveTab(s)
-      const activeDatabase = database || active.activeDatabase
-      const { reuseId } = pickFillTarget(s.tabs, s.activeTabId)
-      if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { code, activeDatabase }) }
+      const targetTab =
+        active.connectionId === targetConnectionId
+          ? active
+          : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
+      const activeDatabase = database || targetTab?.activeDatabase || ''
+      const match = { connectionId: targetConnectionId, database: activeDatabase, code }
+      const { focusId, reuseId } = pickFillTarget(
+        s.tabs,
+        targetTab?.id ?? s.activeTabId,
+        match
+      )
+      if (focusId) {
+        return { activeConnectionId: targetConnectionId, activeTabId: focusId }
+      }
+      if (reuseId) {
+        return {
+          activeConnectionId: targetConnectionId,
+          activeTabId: reuseId,
+          tabs: patchTab(s.tabs, reuseId, {
+            connectionId: targetConnectionId,
+            code,
+            activeDatabase
+          })
+        }
+      }
       const tab = createTab(newTabId(), {
-        connectionId: active.connectionId,
+        connectionId: targetConnectionId,
         code,
         activeDatabase
       })
-      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+      return {
+        activeConnectionId: targetConnectionId,
+        tabs: [...s.tabs, tab],
+        activeTabId: tab.id
+      }
     })
   },
 

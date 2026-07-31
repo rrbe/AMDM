@@ -9,6 +9,23 @@
     "emptyHasConn": "Select a connection and double-click (or press Connect) to open a shell. First opening a collection automatically queries its newest 100 documents.",
     "resizeSidebar": "Resize sidebar"
   },
+  "navigation": {
+    "title": "App navigation",
+    "data": "Data",
+    "saved": "Saved",
+    "history": "History"
+  },
+  "queryNavigation": {
+    "connectTitle": "Connect to open query",
+    "unavailableTitle": "Connection required",
+    "connectMessage": "“{{name}}” is not connected. Connect before opening this query?",
+    "connectionMissing": "The saved Connection “{{name}}” no longer exists.",
+    "noConnection": "Connect to a Connection before opening this query.",
+    "connectFailed": "Connection failed.",
+    "connect": "Connect",
+    "cancel": "Cancel",
+    "goToConnections": "Go to Connections"
+  },
   "settings": {
     "title": "Settings",
     "done": "Done",
@@ -163,6 +180,8 @@
     "clearSearch": "Clear search",
     "noSearchResults": "No matching loaded items.",
     "newConnection": "New Connection",
+    "collapse": "Collapse Connections",
+    "expand": "Expand Connections",
     "theme": {
       "system": "Theme: System — click for Light",
       "light": "Theme: Light — click for Dark",
@@ -367,7 +386,7 @@
   },
   "savedQueries": {
     "title": "Saved Queries",
-    "tabHistory": "History",
+    "tabHistory": "Query History",
     "ungrouped": "Ungrouped",
     "emptySaved": "No saved queries yet. Use \"Save\" in the toolbar.",
     "emptyHistory": "No history yet.",

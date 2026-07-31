@@ -1,5 +1,6 @@
 /* ---------------------------------------------------------------- app shell */
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -7,6 +8,7 @@
 }
 /* The explorer | work split fills the window. */
 .app-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -20,6 +22,41 @@
   width: 1px;
   background: var(--border);
   flex: 0 0 auto;
+}
+
+.sidebar-toggle-slot {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+}
+.sidebar-toggle-slot * {
+  -webkit-app-region: no-drag;
+}
+.sidebar-toggle-open {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+}
+.sidebar-toggle-open:hover {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.explorer-collapsed .tab-bar {
+  padding-left: 44px;
 }
 
 /* ---- Drag-to-resize dividers ----
@@ -80,6 +117,12 @@
    occupy the leading edge of the sidebar; query tabs remain clickable. */
 .is-mac .explorer-head.app-drag {
   padding-left: 78px;
+}
+.is-mac .sidebar-toggle-slot {
+  left: 72px;
+}
+.is-mac .explorer-collapsed .tab-bar {
+  padding-left: 116px;
 }
 .is-mac .app-drag .qtab {
   -webkit-app-region: no-drag;

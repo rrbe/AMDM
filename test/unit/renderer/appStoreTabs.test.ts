@@ -31,6 +31,92 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().activeTabId).toBe(c2Tab?.id)
   })
 
+  it('loads a saved query into its bound connection without running it', () => {
+    const execute = vi.fn()
+    vi.stubGlobal('window', { api: { shell: { execute } } })
+    useAppStore.setState({
+      tabs: [
+        createTab('c1-tab', {
+          connectionId: 'c1',
+          code: 'db.current.find({})',
+          pristine: false
+        }),
+        createTab('c2-tab', { connectionId: 'c2' })
+      ],
+      activeTabId: 'c1-tab',
+      activeConnectionId: 'c1'
+    })
+
+    useAppStore.getState().applyQuery('db.saved.find({})', 'saved', 'c2')
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeTabId: 'c2-tab',
+      activeConnectionId: 'c2'
+    })
+    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')).toMatchObject({
+      code: 'db.saved.find({})',
+      activeDatabase: 'saved',
+      connectionId: 'c2'
+    })
+    expect(execute).not.toHaveBeenCalled()
+
+    useAppStore.getState().applyQuery('db.saved.find({})', 'saved', 'c2')
+    expect(useAppStore.getState().tabs).toHaveLength(2)
+  })
+
+  it('shares concurrent connection attempts', async () => {
+    let finish!: (status: { id: string; state: 'connected' }) => void
+    const connect = vi.fn(
+      () =>
+        new Promise<{ id: string; state: 'connected' }>((resolve) => {
+          finish = resolve
+        })
+    )
+    vi.stubGlobal('window', {
+      api: {
+        session: { connect },
+        catalog: { databases: vi.fn().mockResolvedValue([]) }
+      }
+    })
+
+    const first = useAppStore.getState().connect('c2')
+    const second = useAppStore.getState().connect('c2')
+    expect(connect).toHaveBeenCalledOnce()
+
+    finish({ id: 'c2', state: 'connected' })
+    await Promise.all([first, second])
+    expect(useAppStore.getState().statuses.c2?.state).toBe('connected')
+  })
+
+  it('starts a fresh connection attempt after cancelling the previous one', async () => {
+    const finishes: ((status: { id: string; state: 'connected' }) => void)[] = []
+    const connect = vi.fn(
+      () =>
+        new Promise<{ id: string; state: 'connected' }>((resolve) => {
+          finishes.push(resolve)
+        })
+    )
+    vi.stubGlobal('window', {
+      api: {
+        session: { connect, disconnect: vi.fn().mockResolvedValue(undefined) },
+        catalog: { databases: vi.fn().mockResolvedValue([]) }
+      }
+    })
+
+    const first = useAppStore.getState().connect('c2')
+    const disconnecting = useAppStore.getState().disconnect('c2')
+    const retry = useAppStore.getState().connect('c2')
+    expect(connect).toHaveBeenCalledTimes(2)
+
+    finishes[0]({ id: 'c2', state: 'connected' })
+    await first
+    expect(useAppStore.getState().statuses.c2?.state).toBe('connecting')
+
+    finishes[1]({ id: 'c2', state: 'connected' })
+    await Promise.all([disconnecting, retry])
+    expect(useAppStore.getState().statuses.c2?.state).toBe('connected')
+  })
+
   it('runs the bounded default query only on first collection open', async () => {
     const execute = vi.fn().mockResolvedValue({
       kind: 'documents',

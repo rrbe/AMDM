@@ -48,7 +48,7 @@ export function Dialog({
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
-        <BaseDialog.Backdrop className={backdropClassName} />
+        <BaseDialog.Backdrop className={`ui-dialog-backdrop ${backdropClassName}`} />
         <BaseDialog.Popup
           className={['ui-dialog', className].filter(Boolean).join(' ')}
           aria-labelledby={ariaLabelledBy}

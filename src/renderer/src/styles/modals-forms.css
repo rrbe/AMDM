@@ -53,6 +53,7 @@
   bottom: 16px;
   right: 16px;
   z-index: 2000;
+  -webkit-app-region: no-drag;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -148,4 +149,3 @@
 
 /* (The From URL / To URL popups are now Tailwind in ConnectionForm; their box +
    .url-popup* rules were removed.) */
-

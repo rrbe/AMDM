@@ -1,16 +1,5 @@
-/**
- * Two independent sidebar drawers, each its own collapsible section:
- *
- *  - SavedQueriesPanel — persisted SavedQuery items, grouped by folder. Clicking
- *    a row loads it into the editor (applyQuery, never auto-runs); a hover trash
- *    button deletes it.
- *  - HistoryPanel — execution history newest-first. Clicking loads; the list can
- *    be cleared. The head shows the live entry count.
- *
- * Both only seed the editor; running stays an explicit user action (ADR-0004
- * rule 5). They read the same store slices the old combined panel used; the
- * code-preview / time helpers below are shared.
- */
+/** Saved Queries and History views embedded in the left panel. Both only seed
+ * the Shell; running remains an explicit user action. */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, Trash2 } from 'lucide-react'
@@ -36,11 +25,11 @@ function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQue
   return keys.map((folder) => ({ folder, items: map.get(folder) ?? [] }))
 }
 
-interface DrawerProps {
-  /** Whether the drawer is expanded. */
-  open: boolean
-  /** Toggle the drawer open/closed. */
-  onToggle: () => void
+export interface StoredQuerySelection {
+  code: string
+  connectionId?: string
+  connectionName?: string
+  database?: string
 }
 
 /** One-line preview of a (possibly multi-line) code snippet. */
@@ -62,15 +51,17 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-/** Saved Queries drawer: a collapsible head over the folder-grouped list. */
-export function SavedQueriesPanel({ open, onToggle }: DrawerProps): JSX.Element {
+export function SavedQueriesView({
+  onLoad
+}: {
+  onLoad: (query: StoredQuerySelection) => void
+}): JSX.Element {
   const { t } = useTranslation()
   const savedQueries = useAppStore((s) => s.savedQueries)
+  const connections = useAppStore((s) => s.connections)
   const deleteQuery = useAppStore((s) => s.deleteQuery)
   const saveQuery = useAppStore((s) => s.saveQuery)
-  const applyQuery = useAppStore((s) => s.applyQuery)
 
-  // Re-folder an existing query in place (saveQuery with its id updates it).
   const moveToFolder = (q: SavedQuery, folder: string | undefined): void => {
     void saveQuery({
       id: q.id,
@@ -83,58 +74,67 @@ export function SavedQueriesPanel({ open, onToggle }: DrawerProps): JSX.Element 
   }
 
   return (
-    <div className="sq-panel">
-      <div className="side-section-head sq-head" onClick={onToggle}>
-        <span className="sq-twisty">
-          <ChevronRight size={14} className={open ? 'twisty-icon open' : 'twisty-icon'} />
-        </span>
-        <span className="side-section-title">{t('savedQueries.title')}</span>
+    <section className="library-view">
+      <div className="library-head">
+        <h1>{t('savedQueries.title')}</h1>
+        <span className="library-count">{savedQueries.length}</span>
       </div>
-
-      {open && (
-        <div className="sq-body">
-          <SavedTab
-            queries={savedQueries}
-            onLoad={applyQuery}
-            onDelete={(id) => void deleteQuery(id)}
-            onMove={moveToFolder}
-          />
-        </div>
-      )}
-    </div>
+      <div className="library-body">
+        <SavedTab
+          queries={savedQueries}
+          onLoad={(query) =>
+            onLoad({
+              code: query.code,
+              connectionId: query.connectionId,
+              connectionName:
+                connections.find((item) => item.id === query.connectionId)?.name ??
+                query.connectionId,
+              database: query.database
+            })
+          }
+          onDelete={(id) => void deleteQuery(id)}
+          onMove={moveToFolder}
+        />
+      </div>
+    </section>
   )
 }
 
-/** History drawer: a collapsible head (with live count) over the run list. */
-export function HistoryPanel({ open, onToggle }: DrawerProps): JSX.Element {
+export function HistoryView({
+  onLoad
+}: {
+  onLoad: (query: StoredQuerySelection) => void
+}): JSX.Element {
   const { t } = useTranslation()
   const history = useAppStore((s) => s.history)
+  const connections = useAppStore((s) => s.connections)
   const clearHistory = useAppStore((s) => s.clearHistory)
-  const applyQuery = useAppStore((s) => s.applyQuery)
 
-  // History is newest-first by ranAt.
   const sortedHistory = useMemo(() => [...history].sort((a, b) => b.ranAt - a.ranAt), [history])
 
   return (
-    <div className="sq-panel">
-      <div className="side-section-head sq-head" onClick={onToggle}>
-        <span className="sq-twisty">
-          <ChevronRight size={14} className={open ? 'twisty-icon open' : 'twisty-icon'} />
-        </span>
-        <span className="side-section-title">{t('savedQueries.tabHistory')}</span>
-        {history.length > 0 && <span className="sq-head-count muted">{history.length}</span>}
+    <section className="library-view">
+      <div className="library-head">
+        <h1>{t('savedQueries.tabHistory')}</h1>
+        <span className="library-count">{history.length}</span>
       </div>
-
-      {open && (
-        <div className="sq-body">
-          <HistoryTab
-            entries={sortedHistory}
-            onLoad={applyQuery}
-            onClear={() => void clearHistory()}
-          />
-        </div>
-      )}
-    </div>
+      <div className="library-body">
+        <HistoryTab
+          entries={sortedHistory}
+          onLoad={(entry) =>
+            onLoad({
+              code: entry.code,
+              connectionId: entry.connectionId,
+              connectionName:
+                connections.find((item) => item.id === entry.connectionId)?.name ??
+                entry.connectionId,
+              database: entry.database
+            })
+          }
+          onClear={() => void clearHistory()}
+        />
+      </div>
+    </section>
   )
 }
 
@@ -145,7 +145,7 @@ function SavedTab({
   onMove
 }: {
   queries: SavedQuery[]
-  onLoad: (code: string, database?: string) => void
+  onLoad: (query: SavedQuery) => void
   onDelete: (id: string) => void
   onMove: (q: SavedQuery, folder: string | undefined) => void
 }): JSX.Element {
@@ -153,15 +153,16 @@ function SavedTab({
   // Collapsed folder names (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   // Right-click action menu, anchored to a specific query.
-  const [menu, setMenu] = useState<{ x: number; y: number; q: SavedQuery } | null>(null)
+  const [menu, setMenu] = useState<{
+    x: number
+    y: number
+    q: SavedQuery
+  } | null>(null)
 
   const groups = useMemo(() => groupByFolder(queries), [queries])
   // All real (non-empty) folder names — drives both "group or flat" and the
   // move-to targets in the context menu.
-  const folderNames = useMemo(
-    () => groups.map((g) => g.folder).filter((f) => f !== ''),
-    [groups]
-  )
+  const folderNames = useMemo(() => groups.map((g) => g.folder).filter((f) => f !== ''), [groups])
 
   if (queries.length === 0) {
     return <div className="sq-empty muted">{t('savedQueries.emptySaved')}</div>
@@ -178,11 +179,19 @@ function SavedTab({
   const buildMenu = (q: SavedQuery): ContextMenuEntry[] => {
     const targets = folderNames.filter((f) => f !== (q.folder ?? ''))
     const items: ContextMenuEntry[] = [
-      { label: t('savedQueries.menuLoad'), onClick: () => onLoad(q.code, q.database) }
+      { label: t('savedQueries.menuLoad'), onClick: () => onLoad(q) }
     ]
     if (targets.length > 0 || q.folder) items.push('separator')
-    for (const f of targets) items.push({ label: t('savedQueries.menuMoveTo', { folder: f }), onClick: () => onMove(q, f) })
-    if (q.folder) items.push({ label: t('savedQueries.menuMoveOut'), onClick: () => onMove(q, undefined) })
+    for (const f of targets)
+      items.push({
+        label: t('savedQueries.menuMoveTo', { folder: f }),
+        onClick: () => onMove(q, f)
+      })
+    if (q.folder)
+      items.push({
+        label: t('savedQueries.menuMoveOut'),
+        onClick: () => onMove(q, undefined)
+      })
     items.push('separator', {
       label: t('savedQueries.menuDelete'),
       danger: true,
@@ -195,7 +204,7 @@ function SavedTab({
     <div
       key={q.id}
       className="sq-row"
-      onClick={() => onLoad(q.code, q.database)}
+      onClick={() => onLoad(q)}
       onContextMenu={(e) => {
         e.preventDefault()
         setMenu({ x: e.clientX, y: e.clientY, q })
@@ -204,7 +213,9 @@ function SavedTab({
     >
       <div className="sq-name">{q.name}</div>
       <code className="sq-code">{codePreview(q.code)}</code>
-      <div className="sq-sub muted">{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</div>
+      <div className="sq-sub muted">
+        {q.database ? `db: ${q.database}` : t('savedQueries.noDb')}
+      </div>
       <button
         className="ghost sq-del"
         data-tip={t('savedQueries.menuDelete')}
@@ -262,7 +273,7 @@ function HistoryTab({
   onClear
 }: {
   entries: HistoryEntry[]
-  onLoad: (code: string, database?: string) => void
+  onLoad: (entry: HistoryEntry) => void
   onClear: () => void
 }): JSX.Element {
   const { t } = useTranslation()
@@ -279,19 +290,16 @@ function HistoryTab({
       </div>
       <div className="sq-list">
         {entries.map((h) => (
-          <div
-            key={h.id}
-            className="sq-row"
-            onClick={() => onLoad(h.code, h.database)}
-            data-tip={h.code}
-          >
+          <div key={h.id} className="sq-row" onClick={() => onLoad(h)} data-tip={h.code}>
             <code className="sq-code">{codePreview(h.code)}</code>
             <div className="sq-sub muted">
               <span>db: {h.database}</span>
               <span>·</span>
               <span>{formatTime(h.ranAt)}</span>
               <span>·</span>
-              <span className={h.ok ? 'lib-ok' : 'lib-err'}>{h.summary ?? (h.ok ? 'ok' : 'error')}</span>
+              <span className={h.ok ? 'lib-ok' : 'lib-err'}>
+                {h.summary ?? (h.ok ? 'ok' : 'error')}
+              </span>
             </div>
           </div>
         ))}

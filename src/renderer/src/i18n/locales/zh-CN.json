@@ -9,6 +9,23 @@
     "emptyHasConn": "选择一个连接并双击（或点击连接）以打开 Shell。首次浏览集合会自动查询最新 100 条文档。",
     "resizeSidebar": "调整侧边栏宽度"
   },
+  "navigation": {
+    "title": "应用功能导航",
+    "data": "连接",
+    "saved": "已存",
+    "history": "历史"
+  },
+  "queryNavigation": {
+    "connectTitle": "连接后打开查询",
+    "unavailableTitle": "需要 Connection",
+    "connectMessage": "“{{name}}”尚未连接。是否先连接，再打开这条查询？",
+    "connectionMissing": "这条查询保存的 Connection“{{name}}”已不存在。",
+    "noConnection": "请先连接一个 Connection，再打开这条查询。",
+    "connectFailed": "连接失败。",
+    "connect": "连接",
+    "cancel": "取消",
+    "goToConnections": "前往 Connections"
+  },
   "settings": {
     "title": "设置",
     "done": "完成",
@@ -163,6 +180,8 @@
     "clearSearch": "清除搜索",
     "noSearchResults": "没有匹配的已加载项目。",
     "newConnection": "新建连接",
+    "collapse": "收起 Connections",
+    "expand": "展开 Connections",
     "theme": {
       "system": "主题：系统 — 点击切换为浅色",
       "light": "主题：浅色 — 点击切换为深色",
@@ -367,7 +386,7 @@
   },
   "savedQueries": {
     "title": "已保存的查询",
-    "tabHistory": "历史记录",
+    "tabHistory": "查询历史",
     "ungrouped": "未分组",
     "emptySaved": "暂无已保存的查询。请在工具栏使用“保存”。",
     "emptyHistory": "暂无历史记录。",

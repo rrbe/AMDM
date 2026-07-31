@@ -26,26 +26,10 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
   color: var(--fg-0);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: var(--ls-tight);
-}
-.app-mark {
-  width: 25px;
-  height: 25px;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 36% 22%, rgba(255, 255, 255, 0.85), transparent 22%),
-    linear-gradient(180deg, #a5a69f 0 45%, #252623 52% 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(32, 33, 31, 0.16),
-    0 1px 2px rgba(32, 33, 31, 0.14);
 }
 .side-head-action {
   width: 28px;
@@ -64,6 +48,40 @@
 .side-head-action.is-active {
   background: var(--bg-3);
   color: var(--fg-0);
+}
+.explorer-nav {
+  min-height: 44px;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.explorer-nav-item {
+  height: 34px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--fg-2);
+}
+.explorer-nav-item:hover,
+.explorer-nav-item.is-active {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+.explorer-nav-item.is-active {
+  padding: 0 11px;
+  font-weight: 600;
+}
+.explorer-nav-item svg {
+  flex: 0 0 auto;
 }
 .explorer-search {
   height: 38px;
@@ -109,6 +127,40 @@
 .explorer-search button:hover {
   background: var(--bg-3);
   color: var(--fg-0);
+}
+
+/* ---- Saved Queries / History content inside the explorer ---- */
+.library-view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+}
+.library-head {
+  min-height: 34px;
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 4px;
+}
+.library-head h1 {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.library-count {
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.library-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .explorer-body {
   flex: 1;
@@ -166,19 +218,12 @@
   display: block;
 }
 
-/* Two stacked side-panel sections: Connections (top, fills space) and a
-   collapsible Saved Queries drawer (bottom), split by a light horizontal rule. */
 .side-section--conns {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-.side-section--saved,
-.side-section--history {
-  flex: 0 0 auto;
-  border-top: 1px solid var(--border);
 }
 .side-section-head {
   display: flex;
@@ -199,41 +244,6 @@
   white-space: nowrap;
 }
 
-/* ---- Saved Queries drawer (sidebar): clickable head + bounded body ---- */
-.sq-panel {
-  display: block;
-}
-/* The head is the collapse toggle: click anywhere (but the switch) to fold. */
-.sq-head {
-  padding-left: 6px;
-  cursor: pointer;
-  user-select: none;
-}
-.sq-head:hover {
-  background: var(--bg-2);
-}
-.sq-twisty {
-  width: 16px;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.sq-twisty svg {
-  display: block;
-}
-/* Expanded list is capped so the drawer never crowds out Connections. */
-.sq-body {
-  max-height: 300px;
-  overflow-y: auto;
-  padding-bottom: 4px;
-}
-/* Live entry count beside the History drawer title. */
-.sq-head-count {
-  flex: 0 0 auto;
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-}
 .sq-toolbar {
   display: flex;
   align-items: center;

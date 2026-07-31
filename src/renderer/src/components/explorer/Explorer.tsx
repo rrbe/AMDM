@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  Bookmark,
   ChevronRight,
   Clock,
+  Clock3,
   Database,
   Download,
   Eye,
@@ -13,6 +15,7 @@ import {
   Moon,
   MoreVertical,
   Pencil,
+  PanelLeftClose,
   Plug,
   Plus,
   Search,
@@ -40,8 +43,13 @@ import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
-import { HistoryPanel, SavedQueriesPanel } from '@renderer/components/explorer/SavedQueriesPanel'
-import { SettingsModal } from '@renderer/components/settings/SettingsModal'
+import {
+  HistoryView,
+  SavedQueriesView,
+  type StoredQuerySelection
+} from '@renderer/components/explorer/SavedQueriesPanel'
+
+export type ExplorerView = 'connections' | 'savedQueries' | 'history'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
 function TreeIcon({ name }: { name: string }): JSX.Element | null {
@@ -118,16 +126,38 @@ type Row = ConnRow | TreeRow
 
 /** The store actions the catalog rows wire their click handlers to. */
 interface RowActions {
-  toggleNode: (connId: string, nodeId: string, kind: NodeKind, payload: NodePayload) => Promise<void>
+  toggleNode: (
+    connId: string,
+    nodeId: string,
+    kind: NodeKind,
+    payload: NodePayload
+  ) => Promise<void>
   setActiveConnection: (id: string | null) => void
   setActiveDatabase: (db: string) => void
   browseCollection: (db: string, coll: string) => void
 }
 
 /** Which import/export modal (if any) is open, and for which collection. */
-type IoModal = { mode: 'export' | 'import'; connId: string; db: string; collection: string } | null
+type IoModal = {
+  mode: 'export' | 'import'
+  connId: string
+  db: string
+  collection: string
+} | null
 
-export function Explorer(): JSX.Element {
+export function Explorer({
+  view,
+  onViewChange,
+  onQueryLoad,
+  onCollapse,
+  onSettings
+}: {
+  view: ExplorerView
+  onViewChange: (view: ExplorerView) => void
+  onQueryLoad: (query: StoredQuerySelection) => void
+  onCollapse: () => void
+  onSettings: () => void
+}): JSX.Element {
   const { t } = useTranslation()
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
@@ -150,32 +180,20 @@ export function Explorer(): JSX.Element {
   const browseCollection = useAppStore((s) => s.browseCollection)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
-  // Saved Queries + History each live in their own bottom drawer, collapsed by
-  // default and independently toggled.
-  const [savedOpen, setSavedOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [connForm, setConnForm] = useState<{ open: boolean; editing?: ConnectionConfig }>({
+  const [connForm, setConnForm] = useState<{
+    open: boolean
+    editing?: ConnectionConfig
+  }>({
     open: false
   })
   const [ioModal, setIoModal] = useState<IoModal>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(
-    null
-  )
-
-  // ⌘, / Ctrl+, opens Settings — the platform convention for preferences.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ',') {
-        e.preventDefault()
-        setSettingsOpen(true)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number
+    y: number
+    items: ContextMenuEntry[]
+  } | null>(null)
 
   // Right-click a connection → every action (connect, edit, delete) lives here.
   // The row itself carries nothing but the live status signal — no hover buttons.
@@ -208,8 +226,7 @@ export function Explorer(): JSX.Element {
           icon: <Trash2 size={14} />,
           danger: true,
           onClick: () => {
-            if (confirm(`Delete connection "${row.conn.name}"?`))
-              void deleteConnection(row.id)
+            if (confirm(`Delete connection "${row.conn.name}"?`)) void deleteConnection(row.id)
           }
         }
       ]
@@ -231,13 +248,23 @@ export function Explorer(): JSX.Element {
           label: 'Export collection…',
           icon: <Download size={14} />,
           onClick: () =>
-            setIoModal({ mode: 'export', connId, db: coll.db, collection: coll.name })
+            setIoModal({
+              mode: 'export',
+              connId,
+              db: coll.db,
+              collection: coll.name
+            })
         },
         {
           label: 'Import into collection…',
           icon: <Upload size={14} />,
           onClick: () =>
-            setIoModal({ mode: 'import', connId, db: coll.db, collection: coll.name })
+            setIoModal({
+              mode: 'import',
+              connId,
+              db: coll.db,
+              collection: coll.name
+            })
         }
       ]
     })
@@ -247,7 +274,12 @@ export function Explorer(): JSX.Element {
   // + expanded connection contributes its database subtree starting at depth 1.
   // zustand action refs are stable, so listing them as deps is free.
   const rows = useMemo<Row[]>(() => {
-    const actions: RowActions = { toggleNode, setActiveConnection, setActiveDatabase, browseCollection }
+    const actions: RowActions = {
+      toggleNode,
+      setActiveConnection,
+      setActiveDatabase,
+      browseCollection
+    }
     const out: Row[] = []
     for (const conn of connections) {
       const state = statuses[conn.id]?.state ?? 'disconnected'
@@ -295,23 +327,66 @@ export function Explorer(): JSX.Element {
     <div className="explorer">
       <div className="explorer-head app-drag">
         <div className="app-brand">
-          <span className="app-mark" aria-hidden />
           <span>AMDM</span>
         </div>
+        {view === 'connections' && (
+          <button
+            className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
+            data-tip={t('explorer.search')}
+            aria-label={t('explorer.search')}
+            aria-pressed={searchOpen}
+            onClick={() => {
+              if (searchOpen) setSearch('')
+              setSearchOpen((open) => !open)
+            }}
+          >
+            <Search size={16} />
+          </button>
+        )}
         <button
-          className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
-          data-tip={t('explorer.search')}
-          aria-label={t('explorer.search')}
-          aria-pressed={searchOpen}
-          onClick={() => {
-            if (searchOpen) setSearch('')
-            setSearchOpen((open) => !open)
-          }}
+          className="side-head-action"
+          data-tip={t('explorer.collapse')}
+          aria-label={t('explorer.collapse')}
+          onClick={onCollapse}
         >
-          <Search size={16} />
+          <PanelLeftClose size={16} />
         </button>
       </div>
-      {searchOpen && (
+
+      <nav className="explorer-nav" aria-label={t('navigation.title')}>
+        <button
+          className={view === 'connections' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+          data-tip={view === 'connections' ? undefined : t('navigation.data')}
+          aria-label={t('navigation.data')}
+          aria-current={view === 'connections' ? 'page' : undefined}
+          onClick={() => onViewChange('connections')}
+        >
+          <Database size={17} />
+          {view === 'connections' && <span>{t('navigation.data')}</span>}
+        </button>
+        <button
+          className={view === 'savedQueries' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+          data-tip={view === 'savedQueries' ? undefined : t('navigation.saved')}
+          aria-label={t('navigation.saved')}
+          aria-current={view === 'savedQueries' ? 'page' : undefined}
+          onClick={() => onViewChange('savedQueries')}
+        >
+          <Bookmark size={17} />
+          {view === 'savedQueries' && <span>{t('navigation.saved')}</span>}
+        </button>
+        <button
+          className={view === 'history' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+          data-tip={view === 'history' ? undefined : t('navigation.history')}
+          aria-label={t('navigation.history')}
+          aria-current={view === 'history' ? 'page' : undefined}
+          onClick={() => onViewChange('history')}
+        >
+          <Clock3 size={17} />
+          {view === 'history' && <span>{t('navigation.history')}</span>}
+        </button>
+      </nav>
+
+      {view === 'connections' && searchOpen && (
         <div className="explorer-search">
           <Search size={14} aria-hidden />
           <input
@@ -333,93 +408,88 @@ export function Explorer(): JSX.Element {
         </div>
       )}
 
-      <div className="side-section side-section--conns">
-        <div className="side-section-head">
-          <span className="side-section-title">Connections</span>
-          <button
-            className="ghost side-section-more"
-            data-tip="Back up / restore connections"
-            aria-label="Back up / restore connections"
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect()
-              setCtxMenu({
-                x: r.left,
-                y: r.bottom + 4,
-                items: [
-                  {
-                    label: 'Export connections…',
-                    icon: <Download size={14} />,
-                    onClick: () => void exportConnections()
-                  },
-                  {
-                    label: 'Import connections…',
-                    icon: <Upload size={14} />,
-                    onClick: () => void importConnections()
-                  }
-                ]
-              })
-            }}
-          >
-            <MoreVertical size={15} />
-          </button>
-        </div>
-        <div className="explorer-body">
-          {connections.length === 0 && (
-            <div className="explorer-empty">No connections. Click "New" to add one.</div>
-          )}
+      {view === 'connections' ? (
+        <>
+          <div className="side-section side-section--conns">
+            <div className="side-section-head">
+              <span className="side-section-title">Connections</span>
+              <button
+                className="ghost side-section-more"
+                data-tip="Back up / restore connections"
+                aria-label="Back up / restore connections"
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setCtxMenu({
+                    x: r.left,
+                    y: r.bottom + 4,
+                    items: [
+                      {
+                        label: 'Export connections…',
+                        icon: <Download size={14} />,
+                        onClick: () => void exportConnections()
+                      },
+                      {
+                        label: 'Import connections…',
+                        icon: <Upload size={14} />,
+                        onClick: () => void importConnections()
+                      }
+                    ]
+                  })
+                }}
+              >
+                <MoreVertical size={15} />
+              </button>
+            </div>
+            <div className="explorer-body">
+              {connections.length === 0 && (
+                <div className="explorer-empty">No connections. Click "New" to add one.</div>
+              )}
 
-          {search.trim() && visibleRows.length === 0 && (
-            <div className="explorer-empty">{t('explorer.noSearchResults')}</div>
-          )}
+              {search.trim() && visibleRows.length === 0 && (
+                <div className="explorer-empty">{t('explorer.noSearchResults')}</div>
+              )}
 
-          {visibleRows.map((row) =>
-            row.type === 'connection' ? (
-              <ConnectionRow
-                key={row.id}
-                row={row}
-                isActive={activeConnectionId === row.id}
-                onSelect={() => setActiveConnection(row.id)}
-                onToggle={() => toggleConnectionExpanded(row.id)}
-                onConnect={() => void connect(row.id)}
-                onContextMenu={(e) => openConnMenu(e, row)}
-              />
-            ) : (
-              <CatalogRow
-                key={row.id}
-                row={row}
-                isActive={
-                  row.connId === activeConnectionId &&
-                  (row.collection
-                    ? row.collection.db === activeTab.activeDatabase &&
-                      row.collection.name === activeCollection
-                    : row.kind === 'database' && row.label === activeTab.activeDatabase)
-                }
-                onContextMenu={openCollMenu}
-              />
-            )
-          )}
-        </div>
-      </div>
+              {visibleRows.map((row) =>
+                row.type === 'connection' ? (
+                  <ConnectionRow
+                    key={row.id}
+                    row={row}
+                    isActive={activeConnectionId === row.id}
+                    onSelect={() => setActiveConnection(row.id)}
+                    onToggle={() => toggleConnectionExpanded(row.id)}
+                    onConnect={() => void connect(row.id)}
+                    onContextMenu={(e) => openConnMenu(e, row)}
+                  />
+                ) : (
+                  <CatalogRow
+                    key={row.id}
+                    row={row}
+                    isActive={
+                      row.connId === activeConnectionId &&
+                      (row.collection
+                        ? row.collection.db === activeTab.activeDatabase &&
+                          row.collection.name === activeCollection
+                        : row.kind === 'database' && row.label === activeTab.activeDatabase)
+                    }
+                    onContextMenu={openCollMenu}
+                  />
+                )
+              )}
+            </div>
+          </div>
 
-      {/* Saved Queries + History: two sibling collapsible drawers pinned to the
-          bottom (each collapsed by default). The light rules above them separate
-          them from Connections and from each other. */}
-      <div className="side-section side-section--saved">
-        <SavedQueriesPanel open={savedOpen} onToggle={() => setSavedOpen((v) => !v)} />
-      </div>
-      <div className="side-section side-section--history">
-        <HistoryPanel open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
-      </div>
-
-      <div className="explorer-create">
-        <button
-          className="primary btn-new-conn"
-          onClick={() => setConnForm({ open: true })}
-        >
-          <Plus size={15} />
-          <span>{t('explorer.newConnection')}</span>
-        </button>
-      </div>
+          <div className="explorer-create">
+            <button className="primary btn-new-conn" onClick={() => setConnForm({ open: true })}>
+              <Plus size={15} />
+              <span>{t('explorer.newConnection')}</span>
+            </button>
+          </div>
+        </>
+      ) : view === 'savedQueries' ? (
+        <SavedQueriesView onLoad={onQueryLoad} />
+      ) : (
+        <HistoryView onLoad={onQueryLoad} />
+      )}
 
       {/* App-level controls stay in the quiet footer. */}
       <div className="side-foot">
@@ -454,7 +524,7 @@ export function Explorer(): JSX.Element {
           className="theme-cycle"
           data-tip={t('common.settings')}
           aria-label={t('common.settings')}
-          onClick={() => setSettingsOpen(true)}
+          onClick={onSettings}
         >
           <Settings size={16} />
         </button>
@@ -488,7 +558,6 @@ export function Explorer(): JSX.Element {
           onClose={() => setCtxMenu(null)}
         />
       )}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   )
 }
@@ -613,7 +682,9 @@ function CatalogRow({
       )}
       <span
         className="tree-label"
-        data-tip={isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label}
+        data-tip={
+          isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label
+        }
         data-tip-overflow={isNote || row.empty ? undefined : ''}
       >
         {row.label}
@@ -739,7 +810,10 @@ function flattenCatalog(
         collection: { db: db.name, name: coll.name },
         // Toggle expands sub-folders; clicking the row seeds the editor.
         onToggle: () =>
-          void a.toggleNode(connId, collNodeId, 'collection', { db: db.name, coll: coll.name }),
+          void a.toggleNode(connId, collNodeId, 'collection', {
+            db: db.name,
+            coll: coll.name
+          }),
         onClick: () => browseCollection(a, connId, db.name, coll.name)
       })
 
@@ -763,9 +837,15 @@ function flattenCatalog(
         loading: cat.loading.has(idxNodeId),
         count: idxList?.length,
         onToggle: () =>
-          void a.toggleNode(connId, idxNodeId, 'indexes', { db: db.name, coll: coll.name }),
+          void a.toggleNode(connId, idxNodeId, 'indexes', {
+            db: db.name,
+            coll: coll.name
+          }),
         onClick: () =>
-          void a.toggleNode(connId, idxNodeId, 'indexes', { db: db.name, coll: coll.name })
+          void a.toggleNode(connId, idxNodeId, 'indexes', {
+            db: db.name,
+            coll: coll.name
+          })
       })
       if (idxExpanded && idxList) {
         for (const ix of idxList) {
