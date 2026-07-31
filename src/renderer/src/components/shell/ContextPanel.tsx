@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
-import { Clock, Database, KeyRound, Plug, Table2, X } from 'lucide-react'
+import { Clock, Database, KeyRound, Plug, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { tabCollection } from '@renderer/lib/tabs'
 
-export function ContextPanel({ onClose }: { onClose: () => void }): JSX.Element {
+export function ContextPanel(): JSX.Element {
   const { t } = useTranslation()
   const tab = useAppStore(getActiveTab)
   const activeResult = useAppStore(getActiveResult)
@@ -39,15 +39,6 @@ export function ContextPanel({ onClose }: { onClose: () => void }): JSX.Element 
     <div className="flex h-full min-h-0 w-full flex-col bg-[var(--bg-1)]">
       <div className="flex h-11 shrink-0 items-center border-b border-border px-3">
         <span className="text-[13px] font-semibold text-foreground">{t('context.title')}</span>
-        <span className="flex-1" />
-        <button
-          className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={onClose}
-          aria-label={t('context.close')}
-          data-tip={t('context.close')}
-        >
-          <X size={15} />
-        </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-3">

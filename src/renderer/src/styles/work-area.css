@@ -228,6 +228,10 @@
   max-height: calc(100vh - 300px);
   border-bottom: 1px solid var(--border);
 }
+.shell-main.results-expanded .editor-row,
+.shell-main.results-expanded > .resize-handle--row {
+  display: none;
+}
 .editor-wrap {
   flex: 1;
   min-width: 0;

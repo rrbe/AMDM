@@ -829,7 +829,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async setQueryLimit(n) {
-    const limit = Math.min(1000, Math.max(1, Math.floor(n) || 1))
+    const limit = Math.min(2000, Math.max(1, Math.floor(n) || 1))
     await get().updateSettings({ queryLimit: limit })
     // Re-run the focused result's query from the first page with the new size.
     if (getActiveResult(get())?.query) await get().loadPage(0)

@@ -43,6 +43,7 @@ export function ShellWorkspace(): JSX.Element {
 
   const [showSave, setShowSave] = useState(false)
   const [contextOpen, setContextOpen] = useState(true)
+  const [resultsExpanded, setResultsExpanded] = useState(false)
   const selectedCode = useRef<string>()
 
   const conn = connections.find((c) => c.id === activeConnectionId)
@@ -60,7 +61,7 @@ export function ShellWorkspace(): JSX.Element {
     <div className="work">
       <TabBar />
       <div className="shell-body">
-        <main className="shell-main">
+        <main className={resultsExpanded ? 'shell-main results-expanded' : 'shell-main'}>
           <div className="work-header">
             <div className="work-breadcrumb">
               <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
@@ -150,12 +151,12 @@ export function ShellWorkspace(): JSX.Element {
             ariaLabel={t('shell.resizeEditor')}
           />
 
-          <ResultPanel />
+          <ResultPanel expanded={resultsExpanded} onExpandedChange={setResultsExpanded} />
         </main>
 
         {contextOpen && (
           <aside className="context-rail">
-            <ContextPanel onClose={() => setContextOpen(false)} />
+            <ContextPanel />
           </aside>
         )}
       </div>

@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ShellResult } from '@shared/types'
+import { QUERY_LIMITS, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { ContextMenu } from '@renderer/components/ContextMenu'
+import { Select } from '@renderer/components/ui/Select'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
+
+const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
+  label: String(value),
+  value
+}))
 
 /**
  * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
@@ -22,7 +28,13 @@ import { ConsoleView } from './ConsoleView'
  * lands on Console automatically; a run with a real result keeps the data view
  * and offers Console alongside.
  */
-export function ResultPanel(): JSX.Element {
+export function ResultPanel({
+  expanded,
+  onExpandedChange
+}: {
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
+}): JSX.Element {
   const { t } = useTranslation()
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
@@ -101,6 +113,10 @@ export function ResultPanel(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [switchable, hasOutput, active?.id, setView])
 
+  useEffect(() => {
+    if (!result && expanded) onExpandedChange(false)
+  }, [result, expanded, onExpandedChange])
+
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
   const strip =
@@ -123,7 +139,14 @@ export function ResultPanel(): JSX.Element {
     return (
       <div className="result-panel">
         {strip}
-        <ErrorView result={result} compact={hasOutput} copied={copied} onCopy={copyWithFeedback} />
+        <ErrorView
+          result={result}
+          compact={hasOutput}
+          copied={copied}
+          onCopy={copyWithFeedback}
+          expanded={expanded}
+          onExpandedChange={onExpandedChange}
+        />
         {hasOutput && (
           <div className="result-body">
             <ConsoleView output={result.output!} truncated={result.outputTruncated} />
@@ -142,6 +165,8 @@ export function ResultPanel(): JSX.Element {
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
           <ResultMeta result={result} docCount={0} />
+          <span className="result-bar-spacer" />
+          <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
           <ExplainView plan={result.data} />
@@ -165,13 +190,13 @@ export function ResultPanel(): JSX.Element {
               <button
                 key={v}
                 className={!showConsole && view === v ? 'active' : ''}
-                data-tip={`${label} (⌘${i + 1})`}
                 onClick={() => {
                   chooseConsole(false)
                   setView(v)
                 }}
               >
                 {label}
+                <span className="text-[0.8em] leading-none font-normal text-muted-foreground">(⌘{i + 1})</span>
               </button>
             )
           })}
@@ -190,7 +215,7 @@ export function ResultPanel(): JSX.Element {
         {result.kind === 'documents' && <PageSizeControl />}
         {result.kind === 'documents' && <ResultPager result={result} />}
         <button
-          className="ghost result-copy"
+          className="ghost result-action"
           data-tip={copied ? t('notify.copied') : t('result.copyAllTip')}
           aria-label={copied ? t('notify.copied') : t('result.copyAllTip')}
           onClick={(e) => {
@@ -204,6 +229,7 @@ export function ResultPanel(): JSX.Element {
         >
           {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
         </button>
+        <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
       </div>
 
       <div className="result-body">
@@ -233,6 +259,28 @@ export function ResultPanel(): JSX.Element {
         />
       )}
     </div>
+  )
+}
+
+function ResultExpandButton({
+  expanded,
+  onExpandedChange
+}: {
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
+}): JSX.Element {
+  const { t } = useTranslation()
+  const label = t(expanded ? 'result.restoreEditor' : 'result.expandResults')
+  return (
+    <button
+      className={`ghost result-action${expanded ? ' is-active' : ''}`}
+      data-tip={label}
+      aria-label={label}
+      aria-pressed={expanded}
+      onClick={() => onExpandedChange(!expanded)}
+    >
+      {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+    </button>
   )
 }
 
@@ -382,36 +430,25 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
   )
 }
 
-/** Page-size (per-page doc count) control; commits on blur / Enter, then re-runs. */
+/** Query limit control; changing it re-runs the focused result from page one. */
 function PageSizeControl(): JSX.Element {
   const { t } = useTranslation()
   const limit = useAppStore((s) => s.settings.queryLimit)
   const setQueryLimit = useAppStore((s) => s.setQueryLimit)
   const running = useAppStore((s) => getActiveTab(s).running)
-  const [val, setVal] = useState(String(limit))
-  useEffect(() => setVal(String(limit)), [limit])
 
-  const commit = (): void => {
-    const n = Math.min(1000, Math.max(1, parseInt(val, 10) || limit))
-    setVal(String(n))
-    if (n !== limit) void setQueryLimit(n)
-  }
   return (
-    <label className="page-size">
+    <div className="page-size">
       <span>{t('result.pageSizeLabel')}</span>
-      <input
-        type="number"
-        min={1}
-        max={1000}
-        value={val}
+      <Select<number>
+        value={limit}
+        options={QUERY_LIMIT_OPTIONS}
         disabled={running}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        }}
+        onChange={(n) => void setQueryLimit(n)}
+        className="h-6 w-[72px] px-2 text-xs"
+        aria-label={t('result.pageSizeLabel')}
       />
-    </label>
+    </div>
   )
 }
 
@@ -419,12 +456,16 @@ function ErrorView({
   result,
   compact,
   copied,
-  onCopy
+  onCopy,
+  expanded,
+  onExpandedChange
 }: {
   result: ShellResult
   compact?: boolean
   copied: boolean
   onCopy: (text: string) => void
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
 }): JSX.Element {
   const { t } = useTranslation()
   const name = result.errorName ?? t('result.errorName')
@@ -440,13 +481,14 @@ function ErrorView({
             <div className="error-msg">{message}</div>
           </div>
           <button
-            className="ghost result-copy shrink-0"
+            className="ghost result-action shrink-0"
             data-tip={copied ? t('notify.copied') : t('result.copyErrorTip')}
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}
             onClick={() => onCopy(`${name}: ${message}`)}
           >
             {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
           </button>
+          <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
       </div>
     </div>

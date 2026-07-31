@@ -253,6 +253,8 @@
     "view": { "tree": "樹狀", "table": "表格", "console": "Console" },
     "copyAllTip": "複製全部結果",
     "copyErrorTip": "複製錯誤資訊",
+    "expandResults": "展開結果區",
+    "restoreEditor": "恢復編輯區",
     "copy": {
       "pureJson": "複製為 JSON",
       "mongoShell": "複製為 MongoDB 文件",
@@ -271,7 +273,7 @@
     "elapsed": "{{ms}} ms",
     "prevPage": "上一頁",
     "nextPage": "下一頁",
-    "pageSizeLabel": "每頁",
+    "pageSizeLabel": "上限",
     "errorName": "錯誤",
     "errorUnknown": "發生了未知錯誤。"
   },

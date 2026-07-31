@@ -253,6 +253,8 @@
     "view": { "tree": "Tree", "table": "Table", "console": "Console" },
     "copyAllTip": "Copy all results",
     "copyErrorTip": "Copy error details",
+    "expandResults": "Expand results",
+    "restoreEditor": "Restore editor",
     "copy": {
       "pureJson": "Copy as JSON",
       "mongoShell": "Copy as MongoDB Document",
@@ -271,7 +273,7 @@
     "elapsed": "{{ms}} ms",
     "prevPage": "Previous page",
     "nextPage": "Next page",
-    "pageSizeLabel": "Per page",
+    "pageSizeLabel": "Limit",
     "errorName": "Error",
     "errorUnknown": "An unknown error occurred."
   },

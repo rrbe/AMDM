@@ -454,11 +454,11 @@
   background: var(--bg-2);
 }
 
-/* Copy-all button in the result bar. */
+/* Icon actions in the result bar. */
 .result-bar-spacer {
   flex: 1;
 }
-.result-copy {
+.result-action {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
@@ -467,7 +467,8 @@
   border-radius: var(--radius-sm);
   color: var(--fg-2);
 }
-.result-copy:hover {
+.result-action:hover,
+.result-action.is-active {
   background: var(--bg-3);
   color: var(--fg-0);
 }
@@ -496,17 +497,12 @@
   text-align: center;
   color: var(--fg-1);
 }
-/* Per-page doc count. */
+/* Query limit. */
 .page-size {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   white-space: nowrap;
-}
-.page-size input {
-  width: 56px;
-  padding: 2px 6px;
-  font-size: var(--fs-sm);
 }
 
 /* JSON view: a wrapper hosts the optional "all selected" hint above the

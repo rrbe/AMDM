@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { CollectionSort, Language, ThemeMode } from '@shared/types'
+import { QUERY_LIMITS, type CollectionSort, type Language, type ThemeMode } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
@@ -81,13 +81,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }): JSX.Element
       <div className="settings-section">
         <div className="settings-section-title">{t('settings.sectionQuery')}</div>
         <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
-          <NumberField
-            min={1}
-            max={1000}
+          <Select<number>
             value={settings.queryLimit}
-            onChange={(n) => {
-              if (n != null) void updateSettings({ queryLimit: n })
-            }}
+            onChange={(queryLimit) => void updateSettings({ queryLimit })}
+            options={QUERY_LIMITS.map((value) => ({ label: String(value), value }))}
             aria-label={t('settings.queryLimit')}
           />
         </Field>
