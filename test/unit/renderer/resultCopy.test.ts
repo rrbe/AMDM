@@ -81,4 +81,7 @@ describe('CSV / TSV (RFC-4180 quoting)', () => {
   it('renders an ObjectId cell as its hex and an array cell as compact JSON', () => {
     expect(toCsv([{ id: { $oid: OID }, tags: [1, 2] }])).toBe(`id,tags\n${OID},"[1,2]"`)
   })
+  it('preserves literal dotted fields and quotes carriage returns', () => {
+    expect(toCsv([{ 'a.b': 'x\ry' }])).toBe('a.b\n"x\ry"')
+  })
 })

@@ -34,6 +34,9 @@ describe('cellValue', () => {
   it('reads a top-level field', () => {
     expect(cellValue({ a: 1 }, 'a')).toEqual({ present: true, value: 1 })
   })
+  it('prefers a literal dotted field over nested-path lookup', () => {
+    expect(cellValue({ 'a.b': 1, a: { b: 2 } }, 'a.b')).toEqual({ present: true, value: 1 })
+  })
   it('treats a present null as present', () => {
     expect(cellValue({ a: null }, 'a')).toEqual({ present: true, value: null })
   })

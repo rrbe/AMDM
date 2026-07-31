@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Copy, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronLeft, ChevronRight, Copy, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
+import { consoleText } from '@renderer/lib/consoleOutput'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
@@ -31,6 +32,17 @@ export function ResultPanel(): JSX.Element {
   const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const copiedTimer = useRef<number | null>(null)
+  const copyAttempt = useRef(0)
+
+  useEffect(
+    () => () => {
+      copyAttempt.current += 1
+      if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
+    },
+    []
+  )
 
   const hasOutput = !!result?.output?.length
   // Scripts that only print (REPL completion value null/undefined) open on
@@ -40,6 +52,22 @@ export function ResultPanel(): JSX.Element {
   // result tabs restores each one's view). Pruned to live ids on update.
   const [consoleChoice, setConsoleChoice] = useState<Record<string, boolean>>({})
   const showConsole = hasOutput && !!active && (consoleChoice[active.id] ?? autoConsole)
+  const copyFeedbackKey = `${active?.id ?? ''}:${result?.kind === 'error' ? 'error' : showConsole ? 'console' : view}`
+  const copied = copiedKey === copyFeedbackKey
+  const copyWithFeedback = (text: string): void => {
+    const attempt = ++copyAttempt.current
+    if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
+    copiedTimer.current = null
+    setCopiedKey(null)
+    void copyText(text).then((ok) => {
+      if (!ok || attempt !== copyAttempt.current) return
+      setCopiedKey(copyFeedbackKey)
+      copiedTimer.current = window.setTimeout(() => {
+        setCopiedKey(null)
+        copiedTimer.current = null
+      }, 1500)
+    })
+  }
   const chooseConsole = (on: boolean): void => {
     if (!active) return
     setConsoleChoice((prev) => {
@@ -95,7 +123,7 @@ export function ResultPanel(): JSX.Element {
     return (
       <div className="result-panel">
         {strip}
-        <ErrorView result={result} compact={hasOutput} />
+        <ErrorView result={result} compact={hasOutput} copied={copied} onCopy={copyWithFeedback} />
         {hasOutput && (
           <div className="result-body">
             <ConsoleView output={result.output!} truncated={result.outputTruncated} />
@@ -163,14 +191,18 @@ export function ResultPanel(): JSX.Element {
         {result.kind === 'documents' && <ResultPager result={result} />}
         <button
           className="ghost result-copy"
-          data-tip={t('result.copyAllTip')}
-          aria-label={t('result.copyAllTip')}
+          data-tip={copied ? t('notify.copied') : t('result.copyAllTip')}
+          aria-label={copied ? t('notify.copied') : t('result.copyAllTip')}
           onClick={(e) => {
+            if (showConsole) {
+              copyWithFeedback(consoleText(result.output!))
+              return
+            }
             const r = e.currentTarget.getBoundingClientRect()
             setCopyMenu({ x: r.left, y: r.bottom + 4 })
           }}
         >
-          <Copy size={14} />
+          {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
         </button>
       </div>
 
@@ -192,11 +224,11 @@ export function ResultPanel(): JSX.Element {
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            { label: t('result.copy.pureJson'), onClick: () => void copyText(toPlainJson(docs)) },
-            { label: t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(docs)) },
-            { label: t('result.copy.extendedJson'), onClick: () => void copyText(toStrictEjson(docs)) },
-            { label: t('result.copy.csv'), onClick: () => void copyText(toCsv(docs)) },
-            { label: t('result.copy.tsv'), onClick: () => void copyText(toTsv(docs)) }
+            { label: t('result.copy.pureJson'), onClick: () => copyWithFeedback(toPlainJson(docs)) },
+            { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
+            { label: t('result.copy.extendedJson'), onClick: () => copyWithFeedback(toStrictEjson(docs)) },
+            { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs)) },
+            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs)) }
           ]}
         />
       )}
@@ -383,15 +415,39 @@ function PageSizeControl(): JSX.Element {
   )
 }
 
-function ErrorView({ result, compact }: { result: ShellResult; compact?: boolean }): JSX.Element {
+function ErrorView({
+  result,
+  compact,
+  copied,
+  onCopy
+}: {
+  result: ShellResult
+  compact?: boolean
+  copied: boolean
+  onCopy: (text: string) => void
+}): JSX.Element {
   const { t } = useTranslation()
+  const name = result.errorName ?? t('result.errorName')
+  const message = result.error ?? t('result.errorUnknown')
   return (
     // Compact mode: a banner above the run's console output instead of the
     // full-height body (the output printed before the failure stays visible).
     <div className={compact ? 'result-error-banner' : 'result-body'}>
       <div className="error-panel">
-        <div className="error-name">{result.errorName ?? t('result.errorName')}</div>
-        <div className="error-msg">{result.error ?? t('result.errorUnknown')}</div>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="error-name">{name}</div>
+            <div className="error-msg">{message}</div>
+          </div>
+          <button
+            className="ghost result-copy shrink-0"
+            data-tip={copied ? t('notify.copied') : t('result.copyErrorTip')}
+            aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}
+            onClick={() => onCopy(`${name}: ${message}`)}
+          >
+            {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+          </button>
+        </div>
       </div>
     </div>
   )

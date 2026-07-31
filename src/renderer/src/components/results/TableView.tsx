@@ -142,6 +142,9 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     if (!docCtx || col === '_id') return false
     const doc = docs[row]
     if (!docHasId(doc)) return false
+    // A literal dotted key is readable/copyable, but Mongo's ordinary update
+    // path syntax would target a nested field instead.
+    if (col.includes('.') && Object.prototype.hasOwnProperty.call(doc, col)) return false
     const { present, value } = cellValue(doc, col)
     return present && editableText(value) != null
   }

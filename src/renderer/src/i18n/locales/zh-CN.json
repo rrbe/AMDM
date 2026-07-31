@@ -259,6 +259,7 @@
     "explainTag": "Explain",
     "view": { "tree": "树形", "table": "表格", "console": "Console" },
     "copyAllTip": "复制全部结果",
+    "copyErrorTip": "复制错误信息",
     "copy": {
       "pureJson": "复制全部 (Pure JSON)",
       "mongoShell": "复制全部 (MongoShell JS)",

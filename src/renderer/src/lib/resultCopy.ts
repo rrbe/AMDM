@@ -129,9 +129,9 @@ export function plainScalarText(value: unknown): string {
 // ----------------------------------------------------------------- CSV / TSV
 
 /** Quote a field (doubling internal quotes) only when it contains the delimiter,
-    a quote, or a newline — standard RFC-4180-style escaping. */
+    a quote, or a line break — standard RFC-4180-style escaping. */
 function escapeField(text: string, delimiter: string): string {
-  if (text.includes(delimiter) || text.includes('"') || text.includes('\n')) {
+  if (text.includes(delimiter) || text.includes('"') || text.includes('\n') || text.includes('\r')) {
     return `"${text.replace(/"/g, '""')}"`
   }
   return text

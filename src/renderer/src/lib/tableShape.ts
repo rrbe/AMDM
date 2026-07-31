@@ -20,11 +20,9 @@ export function cellValue(doc: unknown, column: string): { present: boolean; val
   if (!isPlainObject(doc)) {
     return column === '(value)' ? { present: true, value: doc } : { present: false, value: undefined }
   }
+  if (Object.prototype.hasOwnProperty.call(doc, column)) return { present: true, value: doc[column] }
   const dot = column.indexOf('.')
-  if (dot === -1) {
-    if (!Object.prototype.hasOwnProperty.call(doc, column)) return { present: false, value: undefined }
-    return { present: true, value: doc[column] }
-  }
+  if (dot === -1) return { present: false, value: undefined }
   const parent = column.slice(0, dot)
   const child = column.slice(dot + 1)
   const parentVal = doc[parent]
