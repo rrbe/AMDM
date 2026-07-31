@@ -9,6 +9,7 @@ import {
   appendResult,
   closeResult,
   createTab,
+  dbCollRef,
   isRunFailure,
   patchResult,
   patchTab,
@@ -20,6 +21,16 @@ import {
   type ResultTab
 } from '../../../src/renderer/src/lib/tabs'
 import type { ShellResult } from '../../../src/shared/types'
+
+describe('dbCollRef', () => {
+  it('quotes unsafe or reserved collection names', () => {
+    expect(dbCollRef('orders')).toBe('db.orders')
+    expect(dbCollRef('weird-name.x')).toBe('db.getCollection("weird-name.x")')
+    for (const name of ['admin', 'collection', 'aggregate', 'getCollection', 'stats']) {
+      expect(dbCollRef(name)).toBe(`db.getCollection("${name}")`)
+    }
+  })
+})
 
 /** A minimal documents result for strip tests. */
 function docsResult(collection?: string): ShellResult {

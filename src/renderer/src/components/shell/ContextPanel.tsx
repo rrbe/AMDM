@@ -14,7 +14,7 @@ export function ContextPanel({ onClose }: { onClose: () => void }): JSX.Element 
   const connection = connections.find((item) => item.id === tab.connectionId)
   const database = tab.activeDatabase || activeResult?.query?.database || ''
   const result = activeResult?.result
-  const collection = tabCollection(tab) ?? result?.collection ?? tab.pipeline?.collection ?? ''
+  const collection = tabCollection(tab) ?? result?.collection ?? ''
   const catalog = tab.connectionId ? catalogs[tab.connectionId] : undefined
   const collectionInfo = catalog?.collections[database]?.find((item) => item.name === collection)
   const indexes = catalog?.indexes[`${database}/${collection}`]

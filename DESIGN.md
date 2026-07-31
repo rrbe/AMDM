@@ -11,7 +11,7 @@
 1. **暖 Stone 表面，单一 Ink 强调。** 内容面在亮色是暖灰白 `#edece8`、暗色是暖近黑 `#191a17`；chrome（窗口框、侧栏、表头、凸起控件）逐级降低明度。石墨强调是**结构性**的，只标主操作 / 当前选中 / 焦点环，绝不大面积铺。
 2. **结构化排版 + 现代细节。** 靠字重、颜色、细发丝线建立层级；克制圆角（6–10px）+ 圆角内嵌 hover（侧栏/菜单）+ 短过渡。
 3. **为数据工作而读。** 紧凑密度，所有数据/代码用 **JetBrains Mono**，语法着色为「扫读」调校——不是彩虹。
-4. **三栏只承载现有上下文。** 左栏浏览 Connection 与目录，中间是 Shell + Result View，右栏显示已加载的上下文或管道构建器；不为视觉完整性发起额外查询。
+4. **三栏只承载现有上下文。** 左栏浏览 Connection 与目录，中间是 Shell + Result View，右栏显示已加载的上下文；不为视觉完整性发起额外查询。
 
 ---
 
@@ -105,7 +105,7 @@
 
 - 圆角克制，不做夸张 pill UI。
 - **密度**：数据区紧凑优先（给想一屏看大量数据的人）；**弹窗/表单则舒展**——Modal 三档宽度 `sm 480 / md 660(默认) / lg 760`，内边距 `px-6 py-5`，字段 16px 节奏。这是一个宽应用，弹窗应显著宽。
-- **可拖拽尺寸**：`--sidebar-width`(280px) / `--editor-height`(120px) 由 JS 从持久化设置覆写。右侧 Details 固定 300px，窄窗口自动隐藏；Pipeline Builder 在窄窗口改为覆盖层。
+- **可拖拽尺寸**：`--sidebar-width`(280px) / `--editor-height`(120px) 由 JS 从持久化设置覆写。右侧 Details 固定 300px，窄窗口自动隐藏。
 
 ---
 
@@ -140,7 +140,6 @@
 ### 右侧上下文栏
 - 默认显示当前 Connection / Deployment / Database / Collection、已加载的集合元信息和最近 Result。
 - 只消费 store 中已经存在的目录与 Result 数据，不因展示栏发起额外 MongoDB 请求。
-- Pipeline Builder 打开时复用同一栏位，不再挤压 Shell 编辑器。
 
 ### 分段控件 / 结果（`.view-switch`、`results.css`）
 - 视图切换（Tree/JSON/Table）：轨道 `--bg-2`，激活段取 `--bg-elevated` + 细描边。

@@ -1,29 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
   ChevronRight,
   LoaderCircle,
-  PanelRight,
+  PanelRightClose,
+  PanelRightOpen,
   Play,
   Plus,
   Save,
-  X,
-  Workflow
+  X
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabCollection, tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
-import { PipelineBuilderPanel } from './pipeline/PipelineBuilderPanel'
 import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
-import { Select } from '@renderer/components/ui/Select'
 
 /**
- * The main work area: a tab strip, header (active connection + db selector +
+ * The main work area: a tab strip, header (active connection + database +
  * Run), the lazy CodeMirror editor, and the result panel below. Each tab owns
  * its own code/result/db/run state (see the store's `tabs`).
  */
@@ -31,19 +29,15 @@ export function ShellWorkspace(): JSX.Element {
   const { t } = useTranslation()
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connections = useAppStore((s) => s.connections)
-  const catalogs = useAppStore((s) => s.catalogs)
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
   const code = useAppStore((s) => getActiveTab(s).code)
   const running = useAppStore((s) => getActiveTab(s).running)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
   const formatCode = useAppStore((s) => s.formatCode)
-  const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const runShell = useAppStore((s) => s.runShell)
   const stopShell = useAppStore((s) => s.stopShell)
   const runExplain = useAppStore((s) => s.runExplain)
-  const togglePipeline = useAppStore((s) => s.togglePipeline)
-  const pipelineOpen = useAppStore((s) => getActiveTab(s).pipeline?.open ?? false)
   const editorHeight = useAppStore((s) => s.settings.editorHeight)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
@@ -54,7 +48,6 @@ export function ShellWorkspace(): JSX.Element {
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
   const busy = running || !code.trim()
-  const databases = activeConnectionId ? catalogs[activeConnectionId]?.databases ?? [] : []
   const runEditor = (): void => {
     void runShell(selectedCode.current)
   }
@@ -62,13 +55,6 @@ export function ShellWorkspace(): JSX.Element {
   useEffect(() => {
     selectedCode.current = undefined
   }, [activeTabId])
-
-  // Database options: loaded databases, ensuring the active one is always shown.
-  const dbOptions = useMemo(() => {
-    const names = databases.map((d) => d.name)
-    if (activeDatabase && !names.includes(activeDatabase)) names.unshift(activeDatabase)
-    return names
-  }, [databases, activeDatabase])
 
   return (
     <div className="work">
@@ -79,15 +65,7 @@ export function ShellWorkspace(): JSX.Element {
             <div className="work-breadcrumb">
               <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
               <ChevronRight size={13} aria-hidden />
-              <Select
-                className="db-select"
-                value={activeDatabase}
-                onChange={setActiveDatabase}
-                options={dbOptions.map((name) => ({ label: name, value: name }))}
-                placeholder={dbOptions.length === 0 ? t('shell.noDatabase') : t('shell.selectDatabase')}
-                disabled={dbOptions.length === 0}
-                aria-label={t('shell.activeDatabaseTip')}
-              />
+              <span className="database-title">{activeDatabase || t('shell.noDatabase')}</span>
               {targetCollection && (
                 <>
                   <ChevronRight size={13} aria-hidden />
@@ -129,23 +107,12 @@ export function ShellWorkspace(): JSX.Element {
                 <Save size={15} />
               </button>
               <button
-                className={pipelineOpen ? 'work-icon-btn pipeline-toggle is-active' : 'work-icon-btn pipeline-toggle'}
-                onClick={() => {
-                  if (!pipelineOpen) setContextOpen(true)
-                  togglePipeline()
-                }}
-                data-tip={t('builder.toggleTip')}
-                aria-label={t('builder.title')}
-              >
-                <Workflow size={15} />
-              </button>
-              <button
-                className={contextOpen ? 'work-icon-btn context-toggle is-active' : 'work-icon-btn context-toggle'}
+                className="work-icon-btn context-toggle"
                 onClick={() => setContextOpen((open) => !open)}
-                data-tip={t('context.toggle')}
-                aria-label={t('context.toggle')}
+                data-tip={t(contextOpen ? 'context.close' : 'context.open')}
+                aria-label={t(contextOpen ? 'context.close' : 'context.open')}
               >
-                <PanelRight size={15} />
+                {contextOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
               </button>
             </div>
           </div>
@@ -187,12 +154,8 @@ export function ShellWorkspace(): JSX.Element {
         </main>
 
         {contextOpen && (
-          <aside className={pipelineOpen ? 'context-rail is-pipeline' : 'context-rail'}>
-            {pipelineOpen ? (
-              <PipelineBuilderPanel />
-            ) : (
-              <ContextPanel onClose={() => setContextOpen(false)} />
-            )}
+          <aside className="context-rail">
+            <ContextPanel onClose={() => setContextOpen(false)} />
           </aside>
         )}
       </div>
@@ -263,10 +226,10 @@ function TabBar(): JSX.Element {
             </button>
           </div>
         ))}
+        <button className="qtab-new" data-tip={t('shell.newTabTip')} aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
+          <Plus size={14} />
+        </button>
       </div>
-      <button className="qtab-new" data-tip={t('shell.newTabTip')} aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
-        <Plus size={14} />
-      </button>
     </div>
   )
 }

@@ -13,7 +13,6 @@ import {
   Loader2,
   Monitor,
   Moon,
-  MoreVertical,
   Pencil,
   PanelLeftClose,
   Plug,
@@ -174,8 +173,6 @@ export function Explorer({
   const toggleConnectionExpanded = useAppStore((s) => s.toggleConnectionExpanded)
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const deleteConnection = useAppStore((s) => s.deleteConnection)
-  const exportConnections = useAppStore((s) => s.exportConnections)
-  const importConnections = useAppStore((s) => s.importConnections)
   const toggleNode = useAppStore((s) => s.toggleNode)
   const browseCollection = useAppStore((s) => s.browseCollection)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -413,32 +410,6 @@ export function Explorer({
           <div className="side-section side-section--conns">
             <div className="side-section-head">
               <span className="side-section-title">Connections</span>
-              <button
-                className="ghost side-section-more"
-                data-tip="Back up / restore connections"
-                aria-label="Back up / restore connections"
-                onClick={(e) => {
-                  const r = e.currentTarget.getBoundingClientRect()
-                  setCtxMenu({
-                    x: r.left,
-                    y: r.bottom + 4,
-                    items: [
-                      {
-                        label: 'Export connections…',
-                        icon: <Download size={14} />,
-                        onClick: () => void exportConnections()
-                      },
-                      {
-                        label: 'Import connections…',
-                        icon: <Upload size={14} />,
-                        onClick: () => void importConnections()
-                      }
-                    ]
-                  })
-                }}
-              >
-                <MoreVertical size={15} />
-              </button>
             </div>
             <div className="explorer-body">
               {connections.length === 0 && (

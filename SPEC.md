@@ -29,7 +29,7 @@
 - 保存/编辑连接;颜色直接挂在每个 Connection 上。
 - 认证/接入:**SCRAM(用户名密码)**、**SSH 隧道**(密码或私钥)、**TLS/SSL(含自签 CA / 客户端证书)**、**Replica Set / `mongodb+srv`(Atlas)**。
 - **不做** 企业认证(x.509 / LDAP / AWS IAM / Kerberos)。
-- 密码进 Keychain;其余配置本地 JSON,可导出/备份连接配置。
+- 密码进 Keychain;其余配置存本地 JSON。
 
 ### #2 浏览
 - 侧边栏:databases → collections → indexes / users,**懒加载**。

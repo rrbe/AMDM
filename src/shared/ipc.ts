@@ -37,8 +37,6 @@ export const IPC = {
   connectionsTest: 'connections:test',
   connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
-  connectionsExport: 'connections:export',
-  connectionsImport: 'connections:import',
 
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
@@ -88,12 +86,8 @@ export interface Api {
      * password is inlined (from the form if just typed, else — when editing a
      * saved connection not re-typed — decrypted from the store, which renderers
      * never hold); otherwise a readable `<password>` placeholder is used.
-     */
+    */
     buildUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string>
-    /** Back up all connections to a JSON file (secrets excluded). */
-    export(): Promise<DataOpResult>
-    /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
-    import(): Promise<DataOpResult>
   }
   session: {
     connect(connectionId: string): Promise<ConnectionStatus>

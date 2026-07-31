@@ -6,7 +6,6 @@
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
 import type { ShellResult } from '@shared/types'
-import type { PipelineBuilderState } from '@renderer/lib/pipelineBuilder'
 
 /** The query that produced a result (refresh / paging / doc-edit target). */
 export interface ResultQuery {
@@ -32,11 +31,28 @@ export interface ResultTab {
     lands (ADR-0004 rule 6 — results hold up to a full page of EJSON docs). */
 export const MAX_RESULT_TABS = 8
 
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
+const DB_MEMBERS = new Set([
+  'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'getName', 'version',
+  'runCommand', 'adminCommand', 'aggregate', 'admin', 'collection', 'collections', 'command',
+  'createCollection', 'createIndex', 'dropCollection', 'dropDatabase', 'indexInformation',
+  'listCollections', 'profilingLevel', 'removeUser', 'renameCollection', 'setProfilingLevel',
+  'stats', 'watch', 'namespace', 'databaseName', 'options', 'readConcern', 'writeConcern',
+  'readPreference', 's', 'client'
+])
+
+/** Shell-safe collection reference for generated browse queries. */
+export function dbCollRef(collection: string): string {
+  return IDENTIFIER.test(collection) && !DB_MEMBERS.has(collection)
+    ? `db.${collection}`
+    : `db.getCollection(${JSON.stringify(collection)})`
+}
+
 export interface QueryTab {
   id: string
   /** Connection this tab executes against. */
   connectionId: string | null
-  /** Per-tab active database (the db selector is scoped to the tab). */
+  /** Per-tab active database shown in the workspace breadcrumb. */
   activeDatabase: string
   code: string
   /** True while `code` is blank or a programmatic fill (browse seed, loaded
@@ -56,10 +72,6 @@ export interface QueryTab {
   runFailed: boolean
   /** execId of this tab's in-flight run, for Stop / cleanup on close. */
   runningExecId: string | null
-  /** Aggregation pipeline builder state for this tab (absent until opened). The
-      stage definitions are lightweight text and persist with the tab; preview
-      results are kept transiently in the store, not here. */
-  pipeline?: PipelineBuilderState
 }
 
 /** A fresh, empty tab. `id` is injected so callers control id generation. */

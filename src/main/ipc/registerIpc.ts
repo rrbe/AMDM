@@ -27,7 +27,6 @@ import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
-import { exportConnections, importConnections } from '../io/connectionBackup'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
   if (kind === 'documents') return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`
@@ -127,13 +126,6 @@ export function registerIpc(): void {
     (_e, input: ConnectionInput, opts: { includePassword: boolean }) =>
       buildConnectionUri(input, !!opts?.includePassword)
   )
-  ipcMain.handle(IPC.connectionsExport, () =>
-    exportConnections(BrowserWindow.getFocusedWindow())
-  )
-  ipcMain.handle(IPC.connectionsImport, () =>
-    importConnections(BrowserWindow.getFocusedWindow())
-  )
-
   // Native file picker (e.g. choosing an SSH private key). Returns the absolute
   // path, or null if cancelled. `~` in defaultPath is expanded here (the OS
   // dialog does not expand it).

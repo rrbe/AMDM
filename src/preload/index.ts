@@ -13,9 +13,7 @@ const api: Api = {
     delete: (id) => ipcRenderer.invoke(IPC.connectionsDelete, id),
     test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input),
     diagnose: (input, scope) => ipcRenderer.invoke(IPC.connectionsDiagnose, input, scope),
-    buildUri: (input, opts) => ipcRenderer.invoke(IPC.connectionsBuildUri, input, opts),
-    export: () => ipcRenderer.invoke(IPC.connectionsExport),
-    import: () => ipcRenderer.invoke(IPC.connectionsImport)
+    buildUri: (input, opts) => ipcRenderer.invoke(IPC.connectionsBuildUri, input, opts)
   },
   session: {
     connect: (connectionId) => ipcRenderer.invoke(IPC.sessionConnect, connectionId),

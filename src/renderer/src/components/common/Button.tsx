@@ -63,7 +63,7 @@ export function Button({
       disabled={disabled || busy}
       aria-busy={busy || undefined}
     >
-      <span className="busy-btn-label">{children}</span>
+      <span className="busy-btn-label inline-flex items-center gap-1.5">{children}</span>
       {busy && <span className="busy-btn-spinner" aria-hidden />}
     </button>
   )

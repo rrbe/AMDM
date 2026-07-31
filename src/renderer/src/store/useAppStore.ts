@@ -40,6 +40,7 @@ import {
   appendResult,
   closeResult,
   createTab,
+  dbCollRef,
   isRunFailure,
   patchResult,
   patchTab,
@@ -48,20 +49,6 @@ import {
   type QueryTab,
   type ResultTab
 } from '@renderer/lib/tabs'
-import {
-  addStage,
-  buildAggregateCode,
-  buildPreviewCode,
-  createStage,
-  dbCollRef,
-  moveStage,
-  removeStage,
-  setStageBody,
-  setStageOp,
-  toggleStage,
-  type AggregationStage,
-  type PipelineBuilderState
-} from '@renderer/lib/pipelineBuilder'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -70,16 +57,6 @@ const tr = i18n.t.bind(i18n)
 export type { QueryTab, ResultTab }
 
 export type ResultView = 'tree' | 'json' | 'table'
-
-/** Transient per-stage preview outcome (keyed by stage id, not persisted with
-    the tab — pipeline previews hold a bounded sample, ADR-0004 rule 6). */
-export interface StagePreview {
-  loading: boolean
-  result?: ShellResult
-}
-
-/** Documents pulled for a per-stage preview (small — it's a sample, not a run). */
-const PREVIEW_LIMIT = 10
 
 export type NoticeKind = 'success' | 'info' | 'warn'
 
@@ -138,8 +115,6 @@ interface AppState {
   activeTabId: string
   /** Result view (Tree/JSON/Table) — a global UI preference, not per-tab. */
   resultView: ResultView
-  /** Transient pipeline-builder previews, keyed by stage id (not persisted). */
-  pipelinePreviews: Record<string, StagePreview>
 
   // ---- saved queries + history + autocomplete (Phase 2) ----
   savedQueries: SavedQuery[]
@@ -169,10 +144,6 @@ interface AppState {
   pickFile(opts?: { title?: string; defaultPath?: string }): Promise<string | null>
   /** Run a single-hop SSH connectivity check (target or jump) for the form fields. */
   diagnoseConnection(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
-  /** Back up all connections to a JSON file (secrets excluded). */
-  exportConnections(): Promise<void>
-  /** Restore connections from a JSON backup (adds; secrets must be re-entered). */
-  importConnections(): Promise<void>
 
   // ---- actions: session ----
   connect(id: string): Promise<void>
@@ -227,22 +198,6 @@ interface AppState {
   /** Show a transient success/info/warning toast (errors use `lastError`). */
   notify(kind: NoticeKind, message: string): void
   dismissNotice(): void
-
-  // ---- actions: aggregation pipeline builder (active tab) ----
-  /** Open/close the builder panel for the active tab (initializing it on first
-      open with one empty stage + a guessed target collection). */
-  togglePipeline(): void
-  setPipelineCollection(collection: string): void
-  addPipelineStage(op?: string): void
-  removePipelineStage(stageId: string): void
-  movePipelineStage(from: number, to: number): void
-  togglePipelineStage(stageId: string): void
-  setPipelineStageOp(stageId: string, op: string): void
-  setPipelineStageBody(stageId: string, body: string): void
-  /** Generate `db.<coll>.aggregate([...])` and load it into the editor. */
-  applyPipeline(): void
-  /** Run the pipeline truncated through `index` and store a bounded sample. */
-  previewPipelineStage(index: number): Promise<void>
 
   // ---- actions: saved queries + history (Phase 2) ----
   loadQueries(): Promise<void>
@@ -315,66 +270,6 @@ export function getActiveResult(s: { tabs: QueryTab[]; activeTabId: string }): R
   return activeResult(getActiveTab(s))
 }
 
-/** Stable id for a new pipeline stage. */
-function newStageId(): string {
-  return crypto.randomUUID()
-}
-
-const RESERVED_DB_MEMBERS = new Set(['getCollection', 'getSiblingDB', 'runCommand', 'adminCommand'])
-
-/** Best-guess target collection when the builder first opens: the collection
-    referenced in the tab's code, else the active db's first collection. */
-function guessCollection(s: {
-  tabs: QueryTab[]
-  activeTabId: string
-  activeConnectionId: string | null
-  catalogs: Record<string, CatalogState>
-}): string {
-  const tab = getActiveTab(s)
-  const m = /\bdb\s*\.\s*([A-Za-z_$][\w$]*)\s*\./.exec(tab.code)
-  if (m && !RESERVED_DB_MEMBERS.has(m[1])) return m[1]
-  const colls = s.catalogs[s.activeConnectionId ?? '']?.collections[tab.activeDatabase] ?? []
-  return colls[0]?.name ?? ''
-}
-
-/** Apply a transform to the active tab's pipeline (no-op if none open). */
-function patchPipeline(
-  s: { tabs: QueryTab[]; activeTabId: string },
-  fn: (p: PipelineBuilderState) => PipelineBuilderState
-): { tabs: QueryTab[] } | Record<string, never> {
-  const tab = getActiveTab(s)
-  if (!tab.pipeline) return {}
-  return { tabs: patchTab(s.tabs, tab.id, { pipeline: fn(tab.pipeline) }) }
-}
-
-/** Drop the preview entries for `stages` (e.g. when a tab/stage is closed),
-    returning the same object when nothing matched (stable reference). */
-function dropPreviews(
-  previews: Record<string, StagePreview>,
-  stages: AggregationStage[] | undefined
-): Record<string, StagePreview> {
-  if (!stages || stages.length === 0) return previews
-  const ids = new Set(stages.map((st) => st.id))
-  let changed = false
-  const next: Record<string, StagePreview> = {}
-  for (const [k, v] of Object.entries(previews)) {
-    if (ids.has(k)) changed = true
-    else next[k] = v
-  }
-  return changed ? next : previews
-}
-
-/** Clear previews for `fromId` and every stage downstream of it — their sampled
-    output depends on the changed stage, so a stale preview must not linger. */
-function clearPreviewsFrom(
-  previews: Record<string, StagePreview>,
-  stages: AggregationStage[],
-  fromId: string
-): Record<string, StagePreview> {
-  const idx = stages.findIndex((s) => s.id === fromId)
-  return idx < 0 ? previews : dropPreviews(previews, stages.slice(idx))
-}
-
 /** Apply a result-strip patch (append/patch/close) to one tab by id, reading
     the tab's CURRENT state inside `set` so concurrent runs don't clobber. */
 function patchTabResults(
@@ -405,7 +300,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [INITIAL_TAB],
   activeTabId: INITIAL_TAB.id,
   resultView: 'tree',
-  pipelinePreviews: {},
 
   savedQueries: [],
   history: [],
@@ -506,37 +400,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       set({ lastError: tr('notify.diagnoseFailed', { error: errMessage(e) }) })
       return []
-    }
-  },
-
-  async exportConnections() {
-    try {
-      const res = await window.api.connections.export()
-      if (res.ok) get().notify('success', tr('notify.exportConnectionsSuccess', { count: res.count ?? 0 }))
-      else if (!res.cancelled)
-        set({ lastError: tr('notify.exportConnectionsFailed', { error: res.error ?? tr('notify.unknown') }) })
-    } catch (e) {
-      set({ lastError: tr('notify.exportConnectionsFailed', { error: errMessage(e) }) })
-    }
-  },
-
-  async importConnections() {
-    try {
-      const res = await window.api.connections.import()
-      if (res.ok) {
-        await get().loadConnections()
-        get().notify(
-          'success',
-          tr('notify.importConnectionsSuccess', {
-            count: res.count ?? 0,
-            warning: res.warning ?? tr('notify.reenterPasswords')
-          })
-        )
-      } else if (!res.cancelled) {
-        set({ lastError: tr('notify.importConnectionsFailed', { error: res.error ?? tr('notify.unknown') }) })
-      }
-    } catch (e) {
-      set({ lastError: tr('notify.importConnectionsFailed', { error: errMessage(e) }) })
     }
   },
 
@@ -797,16 +660,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (closing?.runningExecId) void window.api.shell.abort(closing.runningExecId).catch(() => {})
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id)
-      // Free any per-stage previews the closed tab's builder was holding.
-      const pipelinePreviews = dropPreviews(s.pipelinePreviews, closing?.pipeline?.stages)
       if (remaining.length === 0) {
         const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
-        return { tabs: [fresh], activeTabId: fresh.id, pipelinePreviews }
+        return { tabs: [fresh], activeTabId: fresh.id }
       }
       const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
       const activeConnectionId =
         remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
-      return { tabs: remaining, activeTabId: nextActive, activeConnectionId, pipelinePreviews }
+      return { tabs: remaining, activeTabId: nextActive, activeConnectionId }
     })
   },
 
@@ -1146,137 +1007,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeTabId: tab.id
       }
     })
-  },
-
-  // ------------------------------------------------------ pipeline builder
-  togglePipeline() {
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (tab.pipeline) {
-        return { tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, open: !tab.pipeline.open } }) }
-      }
-      const pipeline: PipelineBuilderState = {
-        open: true,
-        collection: guessCollection(s),
-        stages: [createStage(newStageId())]
-      }
-      return { tabs: patchTab(s.tabs, tab.id, { pipeline }) }
-    })
-  },
-
-  setPipelineCollection(collection) {
-    // Different source collection invalidates every preview.
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (!tab.pipeline) return {}
-      return {
-        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, collection } }),
-        pipelinePreviews: dropPreviews(s.pipelinePreviews, tab.pipeline.stages)
-      }
-    })
-  },
-
-  addPipelineStage(op) {
-    // Appended at the end → earlier previews stay valid; nothing to clear.
-    set((s) => patchPipeline(s, (p) => ({ ...p, stages: addStage(p.stages, createStage(newStageId(), op)) })))
-  },
-
-  removePipelineStage(stageId) {
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (!tab.pipeline) return {}
-      return {
-        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: removeStage(tab.pipeline.stages, stageId) } }),
-        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
-      }
-    })
-  },
-
-  movePipelineStage(from, to) {
-    // Reordering changes outputs from the first moved position on → clear all.
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (!tab.pipeline) return {}
-      return {
-        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: moveStage(tab.pipeline.stages, from, to) } }),
-        pipelinePreviews: dropPreviews(s.pipelinePreviews, tab.pipeline.stages)
-      }
-    })
-  },
-
-  togglePipelineStage(stageId) {
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (!tab.pipeline) return {}
-      return {
-        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: toggleStage(tab.pipeline.stages, stageId) } }),
-        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
-      }
-    })
-  },
-
-  setPipelineStageOp(stageId, op) {
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (!tab.pipeline) return {}
-      return {
-        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: setStageOp(tab.pipeline.stages, stageId, op) } }),
-        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
-      }
-    })
-  },
-
-  setPipelineStageBody(stageId, body) {
-    set((s) => {
-      const tab = getActiveTab(s)
-      if (!tab.pipeline) return {}
-      return {
-        tabs: patchTab(s.tabs, tab.id, { pipeline: { ...tab.pipeline, stages: setStageBody(tab.pipeline.stages, stageId, body) } }),
-        pipelinePreviews: clearPreviewsFrom(s.pipelinePreviews, tab.pipeline.stages, stageId)
-      }
-    })
-  },
-
-  applyPipeline() {
-    const s = get()
-    const tab = getActiveTab(s)
-    const p = tab.pipeline
-    if (!p || !p.collection) return
-    // Explicit user action → write into the builder's OWN tab. (applyQuery's
-    // no-clobber path would open a NEW tab when this one isn't pristine, hiding
-    // the builder and spawning tabs on repeated Apply.)
-    const code = buildAggregateCode(p.collection, p.stages)
-    set((st) => ({ tabs: patchTab(st.tabs, tab.id, { code, pristine: false }) }))
-  },
-
-  async previewPipelineStage(index) {
-    const s = get()
-    const tab = getActiveTab(s)
-    const p = tab.pipeline
-    const stage = p?.stages[index]
-    if (!p || !stage || !tab.connectionId || !p.collection) return
-    const stageId = stage.id
-    const code = buildPreviewCode(p.collection, p.stages, index)
-    const database = tab.activeDatabase || 'test'
-    set((st) => ({ pipelinePreviews: { ...st.pipelinePreviews, [stageId]: { loading: true } } }))
-    try {
-      const result = await window.api.shell.execute({
-        connectionId: tab.connectionId,
-        database,
-        code,
-        limit: PREVIEW_LIMIT,
-        skip: 0,
-        execId: newExecId()
-      })
-      set((st) => ({ pipelinePreviews: { ...st.pipelinePreviews, [stageId]: { loading: false, result } } }))
-    } catch (e) {
-      set((st) => ({
-        pipelinePreviews: {
-          ...st.pipelinePreviews,
-          [stageId]: { loading: false, result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } }
-        }
-      }))
-    }
   },
 
   // ---------------------------------------------------------------- autocomplete

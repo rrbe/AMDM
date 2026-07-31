@@ -178,20 +178,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.work-header .db-select {
-  width: auto;
-  min-width: 120px;
-  max-width: 180px;
-  height: 28px;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-.work-header .db-select:hover {
-  background: var(--bg-2);
-}
+.database-title,
 .collection-title {
   min-width: 0;
+  max-width: 180px;
   overflow: hidden;
   color: var(--fg-1);
   font-family: var(--font-mono);
@@ -228,8 +218,7 @@
   color: var(--fg-0);
 }
 
-/* The editor keeps its own resizable row; the Pipeline Builder now lives in
-   the right context rail instead of shrinking the editor. */
+/* The editor keeps its own resizable row. */
 .editor-row {
   display: flex;
   flex: 0 0 auto;
@@ -323,20 +312,10 @@
   content: '';
 }
 
-/* Keep the data workspace usable at compact window widths. Details disappear;
-   an explicitly-open Pipeline Builder becomes a temporary right overlay. */
+/* Keep the data workspace usable at compact window widths. */
 @media (max-width: 1199px) {
-  .context-rail:not(.is-pipeline) {
+  .context-rail {
     display: none;
-  }
-  .context-rail.is-pipeline {
-    position: absolute;
-    z-index: 20;
-    inset: 0 0 0 auto;
-    width: min(360px, 100%);
-    max-width: 100%;
-    flex-basis: auto;
-    box-shadow: var(--shadow-lg);
   }
   .context-toggle {
     display: none;

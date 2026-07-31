@@ -91,7 +91,7 @@ pnpm test         # 跑 Vitest（真实 MongoDB 集成测试，见下）
 - **何时 Tailwind vs 全局 vs CSS Module:**
   - **新组件 / 重做组件 → Tailwind 工具类 + `cva`**(首选,见 `components/ui/*`)。
   - **永远全局**:`tokens.css` 令牌、第三方选择器(CodeMirror `.cm-*`、Base UI `[data-*]`)、跨组件复用的共享数据词汇(`.v-*` 类型色、`.kv-row`、`.vrow`)。
-  - **CSS Module**(`Foo.module.css`,作用域隔离):自包含组件,范本 `components/shell/pipeline/pipeline.module.css`。
+  - **CSS Module**(`Foo.module.css`,作用域隔离):自包含组件。
   - 复用既有 result/tree/table/explorer 词汇的老组件 → 暂留全局,随迁移再说;不强制回迁。
 
 ## 性能铁律（ADR-0004 —— 不可妥协,每个功能都必须遵守）
