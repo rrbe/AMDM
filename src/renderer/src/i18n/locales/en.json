@@ -261,11 +261,11 @@
     "copyAllTip": "Copy all results",
     "copyErrorTip": "Copy error details",
     "copy": {
-      "pureJson": "Copy all (Pure JSON)",
-      "mongoShell": "Copy all (MongoShell JS)",
-      "extendedJson": "Copy all (Extended JSON)",
-      "csv": "Copy all as CSV",
-      "tsv": "Copy all as TSV"
+      "pureJson": "Copy as JSON",
+      "mongoShell": "Copy as MongoDB Document",
+      "extendedJson": "Copy as Extended JSON",
+      "csv": "Copy as CSV",
+      "tsv": "Copy as TSV"
     },
     "docCount_one": "{{count}} doc",
     "docCount_other": "{{count}} docs",

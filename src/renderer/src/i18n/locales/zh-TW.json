@@ -261,11 +261,11 @@
     "copyAllTip": "複製全部結果",
     "copyErrorTip": "複製錯誤資訊",
     "copy": {
-      "pureJson": "複製全部 (Pure JSON)",
-      "mongoShell": "複製全部 (MongoShell JS)",
-      "extendedJson": "複製全部 (Extended JSON)",
-      "csv": "複製全部為 CSV",
-      "tsv": "複製全部為 TSV"
+      "pureJson": "複製為 JSON",
+      "mongoShell": "複製為 MongoDB 文件",
+      "extendedJson": "複製為擴展 JSON",
+      "csv": "複製為 CSV",
+      "tsv": "複製為 TSV"
     },
     "docCount_one": "{{count}} 筆文件",
     "docCount_other": "{{count}} 筆文件",
