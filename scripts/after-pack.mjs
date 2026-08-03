@@ -2,15 +2,8 @@ import { execFileSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-export default function writeSparklePublicKey(context) {
+export default function configureSparkleFeed(context) {
   if (context.electronPlatformName !== "darwin") return;
-
-  const publicKey = process.env.SPARKLE_PUBLIC_ED_KEY?.trim();
-  if (!/^[A-Za-z0-9+/]{43}=$/.test(publicKey ?? "")) {
-    throw new Error(
-      "SPARKLE_PUBLIC_ED_KEY must be a 32-byte base64 EdDSA public key",
-    );
-  }
 
   const appName = readdirSync(context.appOutDir).find((name) =>
     name.endsWith(".app"),
@@ -18,14 +11,23 @@ export default function writeSparklePublicKey(context) {
   if (!appName)
     throw new Error(`macOS app bundle not found in ${context.appOutDir}`);
 
+  const arch = { 1: "x64", 3: "arm64" }[context.arch];
+  if (!arch) throw new Error(`Unsupported macOS architecture: ${context.arch}`);
+  const infoPlist = join(
+    context.appOutDir,
+    appName,
+    "Contents",
+    "Info.plist",
+  );
+
   execFileSync(
     "plutil",
     [
       "-replace",
-      "SUPublicEDKey",
+      "SUFeedURL",
       "-string",
-      publicKey,
-      join(context.appOutDir, appName, "Contents", "Info.plist"),
+      `https://github.com/rrbe/AMDM/releases/latest/download/appcast-${arch}.xml`,
+      infoPlist,
     ],
     { stdio: "inherit" },
   );

@@ -30,13 +30,11 @@ pnpm clean           # 清理构建产物
 
 macOS 安装包内置 Sparkle 2，会按天检查并在后台下载新版本。发布前需要配置：
 
-- `SPARKLE_PUBLIC_ED_KEY`：Sparkle 公钥，作为 GitHub Actions Secret，同时传给打包步骤。
-- `SPARKLE_PRIVATE_ED_KEY`：由 Sparkle `generate_keys -x` 导出的私钥，只配置为 GitHub Actions Secret。
-- `MAC_CSC_LINK` / `MAC_CSC_KEY_PASSWORD`：Developer ID Application 证书及其密码，供 GitHub Actions 签名 macOS 包。
+- `SPARKLE_ED_PRIVATE_KEY`：由 Sparkle `generate_keys -x` 导出的私钥，只配置为 GitHub Actions Secret。AMDM 与 LocalShare 使用相同公钥，可以复用已有私钥。
 
-发布工作流会生成并上传 `appcast.xml`。本地打包 macOS 产物时也需要提供 `SPARKLE_PUBLIC_ED_KEY`。
+发布工作流会生成并上传 `appcast-arm64.xml` 与 `appcast-x64.xml`。
 
-正式分发还需要 Apple Developer ID 签名（electron-builder 的 `CSC_LINK` / `CSC_KEY_PASSWORD`）和公证凭据；本地 ad-hoc 包只用于验证打包结构，不代表更新链路可用。
+macOS 产物使用 ad-hoc 签名且未经 Apple 公证。首次打开时可能需要在“隐私与安全性”中点击“仍要打开”，或执行 `xattr -dr com.apple.quarantine /Applications/AMDM.app` 清除隔离标记。
 
 ## 许可证
 

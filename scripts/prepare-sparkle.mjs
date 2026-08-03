@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -12,15 +13,10 @@ import { fileURLToPath } from "node:url";
 
 if (process.platform !== "darwin") process.exit(0);
 
-const publicKey = process.env.SPARKLE_PUBLIC_ED_KEY?.trim();
-if (!/^[A-Za-z0-9+/]{43}=$/.test(publicKey ?? "")) {
-  throw new Error(
-    "SPARKLE_PUBLIC_ED_KEY must be a 32-byte base64 EdDSA public key",
-  );
-}
-
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const version = process.env.SPARKLE_VERSION ?? "2.9.2";
+const version = "2.9.2";
+const archiveSha256 =
+  "1cb340cbbef04c6c0d162078610c25e2221031d794a3449d89f2f56f4df77c95";
 const sparkleDir = join(root, "build", "sparkle");
 const frameworkPath = join(sparkleDir, "Sparkle.framework");
 const appcastTool = join(sparkleDir, "bin", "generate_appcast");
@@ -39,14 +35,23 @@ if (
   !existsSync(frameworkPath) ||
   !existsSync(appcastTool)
 ) {
-  rmSync(sparkleDir, { recursive: true, force: true });
-  mkdirSync(sparkleDir, { recursive: true });
-
   const archivePath = join(tmpdir(), `amdm-sparkle-${version}.tar.xz`);
   const archiveUrl = `https://github.com/sparkle-project/Sparkle/releases/download/${version}/Sparkle-${version}.tar.xz`;
   execFileSync("curl", ["-fL", "--retry", "3", "-o", archivePath, archiveUrl], {
     stdio: "inherit",
   });
+  const actualSha256 = createHash("sha256")
+    .update(readFileSync(archivePath))
+    .digest("hex");
+  if (actualSha256 !== archiveSha256) {
+    rmSync(archivePath, { force: true });
+    throw new Error(
+      `Sparkle ${version} archive SHA-256 mismatch: expected ${archiveSha256}, got ${actualSha256}`,
+    );
+  }
+
+  rmSync(sparkleDir, { recursive: true, force: true });
+  mkdirSync(sparkleDir, { recursive: true });
   execFileSync("tar", ["-xJf", archivePath, "-C", sparkleDir], {
     stdio: "inherit",
   });

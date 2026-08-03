@@ -30,13 +30,11 @@ pnpm clean           # remove generated build files
 
 macOS packages include Sparkle 2, which checks daily and downloads new releases in the background. Configure these GitHub Actions secrets before publishing:
 
-- `SPARKLE_PUBLIC_ED_KEY`: the public Sparkle key, also embedded into the app bundle.
-- `SPARKLE_PRIVATE_ED_KEY`: the private key exported by Sparkle `generate_keys -x`; keep it only in GitHub Actions.
-- `MAC_CSC_LINK` / `MAC_CSC_KEY_PASSWORD`: the Developer ID Application certificate and password used to sign macOS packages in GitHub Actions.
+- `SPARKLE_ED_PRIVATE_KEY`: the private key exported by Sparkle `generate_keys -x`; keep it only in GitHub Actions. AMDM uses the same public key as LocalShare, so the existing private key can be reused.
 
-The release workflow generates and uploads `appcast.xml`. Local macOS packaging also requires `SPARKLE_PUBLIC_ED_KEY`.
+The release workflow generates and uploads `appcast-arm64.xml` and `appcast-x64.xml`.
 
-Production distribution also requires an Apple Developer ID signature (`CSC_LINK` / `CSC_KEY_PASSWORD`) and notarization credentials; local ad-hoc packages only validate the bundle wiring and are not valid updater tests.
+macOS packages use ad-hoc signing and are not notarized. On first launch, Gatekeeper may require users to select Open Anyway in Privacy & Security or remove quarantine with `xattr -dr com.apple.quarantine /Applications/AMDM.app`.
 
 ## License
 

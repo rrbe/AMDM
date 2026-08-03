@@ -27,7 +27,7 @@ import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
-import { checkSparkleForUpdates } from '../sparkle'
+import { registerUpdatesIpc } from './registerUpdatesIpc'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
   if (kind === 'documents') return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`
@@ -201,6 +201,5 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.settingsGet, () => settingsStore.get())
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: Partial<AppSettings>) => settingsStore.update(patch))
 
-  // updates
-  ipcMain.handle(IPC.updatesCheck, () => checkSparkleForUpdates())
+  registerUpdatesIpc()
 }
