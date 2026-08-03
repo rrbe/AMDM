@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTab } from '../../../src/renderer/src/lib/tabs'
 import { useAppStore } from '../../../src/renderer/src/store/useAppStore'
-import type { ShellResult } from '../../../src/shared/types'
+import { DEFAULT_SETTINGS, type ShellResult } from '../../../src/shared/types'
 
 describe('connection-bound tabs', () => {
   beforeEach(() => {
@@ -115,6 +115,126 @@ describe('connection-bound tabs', () => {
     finishes[1]({ id: 'c2', state: 'connected' })
     await Promise.all([disconnecting, retry])
     expect(useAppStore.getState().statuses.c2?.state).toBe('connected')
+  })
+
+  it('surfaces a failed connection and clears it on retry', async () => {
+    const connect = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 'c2', state: 'error', error: 'getaddrinfo ENOTFOUND db2' })
+      .mockResolvedValueOnce({ id: 'c2', state: 'connected' })
+    vi.stubGlobal('window', {
+      api: {
+        session: { connect },
+        catalog: { databases: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    useAppStore.setState({ statuses: {}, catalogs: {}, lastError: null })
+
+    await useAppStore.getState().connect('c2')
+    expect(useAppStore.getState().statuses.c2).toMatchObject({ state: 'error' })
+    expect(useAppStore.getState().lastError).toContain('getaddrinfo ENOTFOUND db2')
+
+    await useAppStore.getState().connect('c2')
+    expect(useAppStore.getState().statuses.c2).toMatchObject({ state: 'connected' })
+    expect(useAppStore.getState().lastError).toBeNull()
+  })
+
+  it('syncs persisted settings to the other renderer window', async () => {
+    let receive!: (event: MessageEvent) => void
+    const channel = {
+      addEventListener: vi.fn((_type: string, listener: (event: MessageEvent) => void) => {
+        receive = listener
+      }),
+      postMessage: vi.fn()
+    }
+    class FakeBroadcastChannel {
+      addEventListener = channel.addEventListener
+      postMessage = channel.postMessage
+    }
+    vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel)
+    vi.stubGlobal('window', {
+      api: {
+        settings: {
+          get: vi.fn().mockResolvedValue(DEFAULT_SETTINGS),
+          update: vi.fn().mockImplementation((patch) =>
+            Promise.resolve({ ...DEFAULT_SETTINGS, ...patch })
+          )
+        }
+      }
+    })
+
+    await useAppStore.getState().loadSettings()
+    await useAppStore.getState().updateSettings({ collectionSort: 'alpha' })
+    expect(channel.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ collectionSort: 'alpha' })
+    )
+
+    receive({ data: { ...DEFAULT_SETTINGS, collectionSort: 'natural' } } as MessageEvent)
+    expect(useAppStore.getState().settings.collectionSort).toBe('natural')
+  })
+
+  it('refreshes only the requested database collections', async () => {
+    const collections = vi.fn().mockResolvedValue([
+      { name: 'fresh', type: 'collection' }
+    ])
+    vi.stubGlobal('window', { api: { catalog: { collections } } })
+    const c1 = {
+      databases: [{ name: 'db1' }],
+      collections: { db1: [{ name: 'stale', type: 'collection' as const }] },
+      indexes: {},
+      users: {},
+      expanded: new Set<string>(),
+      loading: new Set<string>()
+    }
+    const c2 = {
+      databases: [{ name: 'other' }],
+      collections: { other: [{ name: 'untouched', type: 'collection' as const }] },
+      indexes: {},
+      users: {},
+      expanded: new Set<string>(),
+      loading: new Set<string>()
+    }
+    const tabs = useAppStore.getState().tabs
+    useAppStore.setState({ catalogs: { c1, c2 } })
+
+    await useAppStore.getState().loadCollections('c1', 'db1')
+
+    expect(collections).toHaveBeenCalledWith('c1', 'db1')
+    expect(useAppStore.getState().catalogs.c1.collections.db1?.[0]?.name).toBe('fresh')
+    expect(useAppStore.getState().catalogs.c2).toBe(c2)
+    expect(useAppStore.getState().tabs).toBe(tabs)
+  })
+
+  it('refreshes only the requested connection database list', async () => {
+    const databases = vi.fn().mockResolvedValue([{ name: 'fresh' }])
+    vi.stubGlobal('window', { api: { catalog: { databases } } })
+    const collections = { old: [{ name: 'kept', type: 'collection' as const }] }
+    const c1 = {
+      databases: [{ name: 'old' }],
+      collections,
+      indexes: {},
+      users: {},
+      expanded: new Set<string>(),
+      loading: new Set<string>()
+    }
+    const c2 = {
+      databases: [{ name: 'untouched' }],
+      collections: {},
+      indexes: {},
+      users: {},
+      expanded: new Set<string>(),
+      loading: new Set<string>()
+    }
+    const tabs = useAppStore.getState().tabs
+    useAppStore.setState({ catalogs: { c1, c2 } })
+
+    await useAppStore.getState().loadDatabases('c1')
+
+    expect(databases).toHaveBeenCalledWith('c1')
+    expect(useAppStore.getState().catalogs.c1.databases?.[0]?.name).toBe('fresh')
+    expect(useAppStore.getState().catalogs.c1.collections).toBe(collections)
+    expect(useAppStore.getState().catalogs.c2).toBe(c2)
+    expect(useAppStore.getState().tabs).toBe(tabs)
   })
 
   it('runs the bounded default query only on first collection open', async () => {

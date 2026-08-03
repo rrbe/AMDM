@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   Plug,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Sun,
@@ -38,6 +39,7 @@ import {
 } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
 import { tabCollection } from '@renderer/lib/tabs'
+import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -80,10 +82,9 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
  *   Connection → Databases → (Users) + Collections → (Indexes) → leaves
  *
  * Top-level rows are connections — each shows only a live status signal, name,
- * and host/port; connect / edit / delete all live in the right-click menu
- * (`openConnMenu`), so the row carries no hover buttons. A connected connection
- * expands to reveal its database subtree, lazily loaded via catalog.* and cached
- * per-connection in the store.
+ * and hosts; management and refresh actions live in right-click menus. A
+ * connected connection expands to reveal its database subtree, lazily loaded
+ * via catalog.* and cached per-connection in the store.
  *
  * Clicking a collection runs one bounded newest-first query on first open;
  * clicking it again focuses the existing Shell tab without re-running it.
@@ -116,6 +117,7 @@ interface ConnRow {
   id: string
   conn: ConnectionConfig
   state: ConnectionState
+  error?: string
   expandable: boolean
   expanded: boolean
   loading: boolean
@@ -174,6 +176,8 @@ export function Explorer({
   const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const deleteConnection = useAppStore((s) => s.deleteConnection)
   const toggleNode = useAppStore((s) => s.toggleNode)
+  const loadDatabases = useAppStore((s) => s.loadDatabases)
+  const loadCollections = useAppStore((s) => s.loadCollections)
   const browseCollection = useAppStore((s) => s.browseCollection)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
@@ -192,8 +196,7 @@ export function Explorer({
     items: ContextMenuEntry[]
   } | null>(null)
 
-  // Right-click a connection → every action (connect, edit, delete) lives here.
-  // The row itself carries nothing but the live status signal — no hover buttons.
+  // Right-click a connection → manage it or refresh only its database list.
   const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
     e.preventDefault()
     const disconnectable = row.state === 'connected' || row.state === 'connecting'
@@ -212,6 +215,12 @@ export function Explorer({
               icon: <Plug size={14} />,
               onClick: () => void connect(row.id)
             },
+        {
+          label: 'Refresh',
+          icon: <RefreshCw size={14} />,
+          disabled: row.state !== 'connected',
+          onClick: () => void loadDatabases(row.id)
+        },
         'separator',
         {
           label: 'Edit',
@@ -230,13 +239,27 @@ export function Explorer({
     })
   }
 
-  // Right-click a collection → Export / Import live here (not as hover buttons).
-  const openCollMenu = (
-    e: MouseEvent,
-    coll: { db: string; name: string },
-    connId: string
-  ): void => {
+  // Right-click a database refreshes only its Collections; collection actions
+  // remain scoped to that collection.
+  const openCatalogMenu = (e: MouseEvent, row: TreeRow): void => {
     e.preventDefault()
+    if (row.kind === 'database') {
+      setCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            label: 'Refresh',
+            icon: <RefreshCw size={14} />,
+            onClick: () => void loadCollections(row.connId, row.label)
+          }
+        ]
+      })
+      return
+    }
+
+    const coll = row.collection
+    if (!coll) return
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
@@ -247,7 +270,7 @@ export function Explorer({
           onClick: () =>
             setIoModal({
               mode: 'export',
-              connId,
+              connId: row.connId,
               db: coll.db,
               collection: coll.name
             })
@@ -258,7 +281,7 @@ export function Explorer({
           onClick: () =>
             setIoModal({
               mode: 'import',
-              connId,
+              connId: row.connId,
               db: coll.db,
               collection: coll.name
             })
@@ -289,6 +312,7 @@ export function Explorer({
         id: conn.id,
         conn,
         state,
+        error: statuses[conn.id]?.error,
         expandable: connected,
         expanded,
         loading: connected && (dbsLoading || catalog?.databases === undefined)
@@ -442,7 +466,7 @@ export function Explorer({
                           row.collection.name === activeCollection
                         : row.kind === 'database' && row.label === activeTab.activeDatabase)
                     }
-                    onContextMenu={openCollMenu}
+                    onContextMenu={openCatalogMenu}
                   />
                 )
               )}
@@ -548,13 +572,13 @@ function ConnectionRow({
   onConnect: () => void
   onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
-  const { conn, state, expandable, expanded } = row
+  const { conn, state, error, expandable, expanded } = row
   const isConnected = state === 'connected'
-  const sub = conn.useSrv ? `srv · ${conn.host}` : `${conn.host}:${conn.port ?? 27017}`
+  const sub =
+    conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
 
   // The lone surviving piece of chrome: a single status signal whose color +
-  // glow carry the live state (online / connecting / error / offline). No
-  // check/x/spinner glyphs — every action moved into the right-click menu.
+  // glow carry the live state. Actions stay in the right-click menu.
   const signalClass = `conn-signal conn-signal--${
     state === 'connected'
       ? 'on'
@@ -600,7 +624,7 @@ function ConnectionRow({
             : state === 'connecting'
               ? 'Connecting…'
               : state === 'error'
-                ? 'Connection error'
+                ? error || 'Connection error'
                 : 'Disconnected'
         }
       >
@@ -617,7 +641,7 @@ function CatalogRow({
 }: {
   row: TreeRow
   isActive: boolean
-  onContextMenu: (e: MouseEvent, coll: { db: string; name: string }, connId: string) => void
+  onContextMenu: (e: MouseEvent, row: TreeRow) => void
 }): JSX.Element {
   const coll = row.collection
   const isNote = row.kind === 'leaf'
@@ -631,7 +655,7 @@ function CatalogRow({
       className={className}
       style={{ paddingLeft: 8 + row.depth * 14 }}
       onClick={row.onClick}
-      onContextMenu={coll ? (e) => onContextMenu(e, coll, row.connId) : undefined}
+      onContextMenu={row.kind === 'database' || coll ? (e) => onContextMenu(e, row) : undefined}
     >
       <span
         className="tree-twisty"

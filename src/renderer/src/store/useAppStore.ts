@@ -290,6 +290,29 @@ const INITIAL_TAB = createTab(newTabId())
     clients/tunnels for the same Connection. */
 const connectionAttempts = new Map<string, { promise: Promise<void>; token: object }>()
 
+// Settings live in a separate BrowserWindow, hence a separate Zustand store.
+// BroadcastChannel is the native, dependency-free bridge between same-origin
+// renderer windows; the main process remains the persistence authority.
+let settingsChannel: BroadcastChannel | null | undefined
+let settingsSubscribed = false
+
+function getSettingsChannel(): BroadcastChannel | null {
+  if (settingsChannel !== undefined) return settingsChannel
+  settingsChannel =
+    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('amdm-settings')
+  return settingsChannel
+}
+
+function subscribeToSettings(): void {
+  if (settingsSubscribed) return
+  const channel = getSettingsChannel()
+  if (!channel) return
+  settingsSubscribed = true
+  channel.addEventListener('message', (event: MessageEvent<AppSettings>) => {
+    useAppStore.setState({ settings: event.data })
+  })
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -411,9 +434,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const token = {}
     const attempt = (async (): Promise<void> => {
-      set((s) => ({
-        statuses: { ...s.statuses, [id]: { id, state: 'connecting' } }
-      }))
+      set((s) => {
+        const { [id]: _removed, ...catalogs } = s.catalogs
+        const expandedConnections = new Set(s.expandedConnections)
+        expandedConnections.delete(id)
+        return {
+          statuses: { ...s.statuses, [id]: { id, state: 'connecting' } },
+          catalogs,
+          expandedConnections,
+          lastError: null
+        }
+      })
       try {
         const status = await window.api.session.connect(id)
         // A disconnect or newer retry may have won while this call was pending.
@@ -428,8 +459,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           if (status.state === 'connected') expandedConnections.add(id)
           return {
             statuses: { ...s.statuses, [id]: status },
-            catalogs: { ...s.catalogs, [id]: s.catalogs[id] ?? emptyCatalog() },
-            expandedConnections
+            catalogs:
+              status.state === 'connected'
+                ? { ...s.catalogs, [id]: emptyCatalog() }
+                : s.catalogs,
+            expandedConnections,
+            lastError:
+              status.state === 'error'
+                ? tr('notify.connectFailed', { error: status.error ?? tr('notify.unknown') })
+                : s.lastError
           }
         })
         if (status.state === 'connected') {
@@ -459,8 +497,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           get().statuses[id]?.state !== 'connecting'
         )
           return
+        const error = errMessage(e)
         set((s) => ({
-          statuses: { ...s.statuses, [id]: { id, state: 'error', error: errMessage(e) } }
+          statuses: { ...s.statuses, [id]: { id, state: 'error', error } },
+          lastError: tr('notify.connectFailed', { error })
         }))
       }
     })()
@@ -1106,6 +1146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async loadSettings() {
+    subscribeToSettings()
     try {
       set({ settings: await window.api.settings.get() })
     } catch {
@@ -1119,6 +1160,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const saved = await window.api.settings.update(patch)
       set({ settings: saved })
+      getSettingsChannel()?.postMessage(saved)
     } catch (e) {
       set({ lastError: tr('notify.saveSettingsFailed', { error: errMessage(e) }) })
     }
