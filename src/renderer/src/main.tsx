@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from '@renderer/App'
+import { SettingsWindow } from '@renderer/components/settings/SettingsWindow'
 import { ErrorBoundary } from '@renderer/components/common/ErrorBoundary'
 // Fonts.
 // UI chrome uses the platform system font.
@@ -41,10 +42,12 @@ if (!container) {
   throw new Error('Root element #root not found')
 }
 
+const Root = window.location.hash === '#settings' ? SettingsWindow : App
+
 createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <Root />
     </ErrorBoundary>
   </React.StrictMode>
 )

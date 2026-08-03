@@ -28,7 +28,8 @@
   },
   "settings": {
     "title": "设置",
-    "done": "完成",
+    "searchPlaceholder": "搜索设置",
+    "searchNoResults": "没有匹配的设置",
     "sectionAppearance": "外观",
     "sectionCatalog": "目录",
     "sectionQuery": "查询",

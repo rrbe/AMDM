@@ -5,14 +5,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { version } from './package.json'
 
-const buildDate = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: 'Asia/Shanghai',
-  dateStyle: 'short'
-})
-  .format(new Date())
-  .replace(/-/g, '')
-  .slice(2)
-const buildId = `${version}+${buildDate}-${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
+const buildId = `${version} - ${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
 
 export default defineConfig({
   main: {

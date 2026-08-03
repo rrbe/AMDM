@@ -6,7 +6,6 @@ import { setLanguage } from '@renderer/i18n'
 import { Explorer, type ExplorerView } from '@renderer/components/explorer/Explorer'
 import type { StoredQuerySelection } from '@renderer/components/explorer/SavedQueriesPanel'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
-import { SettingsModal } from '@renderer/components/settings/SettingsModal'
 import { Toaster } from '@renderer/components/common/Toaster'
 import { TooltipLayer } from '@renderer/components/common/TooltipLayer'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
@@ -24,6 +23,10 @@ type QueryPrompt =
     }
   | { kind: 'missing'; query: StoredQuerySelection; connectionName?: string }
 
+function openSettingsWindow(): void {
+  window.open('#settings', 'amdm-settings')?.focus()
+}
+
 export default function App(): JSX.Element {
   const bootstrap = useAppStore((s) => s.bootstrap)
   const connections = useAppStore((s) => s.connections)
@@ -39,7 +42,6 @@ export default function App(): JSX.Element {
 
   const [view, setView] = useState<ExplorerView>('connections')
   const [explorerOpen, setExplorerOpen] = useState(true)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [queryPrompt, setQueryPrompt] = useState<QueryPrompt | null>(null)
   const queryAttempt = useRef(0)
 
@@ -57,7 +59,7 @@ export default function App(): JSX.Element {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ',') {
         e.preventDefault()
-        setSettingsOpen(true)
+        openSettingsWindow()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -144,7 +146,7 @@ export default function App(): JSX.Element {
             onViewChange={setView}
             onQueryLoad={requestQueryLoad}
             onCollapse={() => setExplorerOpen(false)}
-            onSettings={() => setSettingsOpen(true)}
+            onSettings={openSettingsWindow}
           />
         )}
         {explorerOpen && (
@@ -174,7 +176,6 @@ export default function App(): JSX.Element {
           </div>
         )}
       </div>
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {queryPrompt && (
         <Modal
           small

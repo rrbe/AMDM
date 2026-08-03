@@ -10,6 +10,7 @@ import { sessionManager } from './mongo/sessionManager'
 import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
 import { startSparkle } from './sparkle'
+import { isSettingsWindowUrl } from './windowOpenCore'
 
 // Default geometry, also the floor on size. Saved bounds are reconciled against
 // these + the connected displays in windowStateCore (off-screen safety).
@@ -103,6 +104,28 @@ function createWindow(): void {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSettingsWindowUrl(url, win.webContents.getURL())) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 900,
+          height: 620,
+          minWidth: 720,
+          minHeight: 500,
+          title: 'Settings',
+          titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+          trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 13 } : undefined,
+          backgroundColor: '#edece8',
+          icon: appIcon,
+          webPreferences: {
+            preload: join(__dirname, '../preload/index.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: false
+          }
+        }
+      }
+    }
     shell.openExternal(url)
     return { action: 'deny' }
   })

@@ -28,7 +28,8 @@
   },
   "settings": {
     "title": "設定",
-    "done": "完成",
+    "searchPlaceholder": "搜尋設定",
+    "searchNoResults": "沒有符合的設定",
     "sectionAppearance": "外觀",
     "sectionCatalog": "目錄",
     "sectionQuery": "查詢",

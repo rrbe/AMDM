@@ -28,7 +28,8 @@
   },
   "settings": {
     "title": "Settings",
-    "done": "Done",
+    "searchPlaceholder": "Search settings",
+    "searchNoResults": "No matching settings",
     "sectionAppearance": "Appearance",
     "sectionCatalog": "Catalog",
     "sectionQuery": "Query",
