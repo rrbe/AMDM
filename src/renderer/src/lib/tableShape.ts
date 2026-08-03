@@ -5,7 +5,7 @@
  * Columns are the union of top-level field names across all docs (first-seen
  * order), with ONE level of dot-flattening for nested plain objects
  * (`address.city`); EJSON wrappers ({$oid} etc.) stay scalar leaves. Deeper
- * recursion is intentionally out of scope (mirrors ADR-0004 / Phase 2).
+ * recursion is intentionally out of scope to keep table shaping bounded.
  */
 import { isExtended } from './ejson'
 

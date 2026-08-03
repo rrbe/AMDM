@@ -4,7 +4,7 @@ import { runShellOnDb } from './shellCore'
 
 /**
  * In-flight runs keyed by `execId`, so a slow find/aggregate can be cancelled
- * from the UI (ADR-0003 leaves the shell deliberately minimal; this is the one
+ * from the UI (the shell stays deliberately minimal; this is the one
  * piece of run lifecycle the session layer owns). The map only holds runs that
  * carried an `execId`; entries are removed in `finally` regardless of outcome.
  */

@@ -1,5 +1,5 @@
 /**
- * Shell-on-driver core (ADR-0003) — the part that turns a user's JavaScript
+ * Shell-on-driver core — the part that turns a user's JavaScript
  * snippet into a typed-BSON {@link ShellResult}, with NO Electron/session
  * dependencies so it can be exercised in isolation against a real `Db`.
  *
@@ -9,7 +9,7 @@
  *
  * We intentionally implement only the focused subset of the mongosh /
  * NoSQLBooster surface the user actually needs; gaps should surface as clear
- * errors, never silent wrong behavior (ADR-0003).
+ * errors, never silent wrong behavior.
  *
  * Shim catalog (the authoritative list CLAUDE.md points here for):
  *   db layer:      getCollection, getSiblingDB, getCollectionNames,
@@ -43,8 +43,8 @@ import { serializerPool } from '../workers/serializerPool'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
-/** Upper bound on captured print/printjson lines per run (ADR-0004 rule 2 in
-    spirit: a `forEach(printjson)` over a huge cursor must not flood the IPC). */
+/** Upper bound on captured print/printjson lines per run: a `forEach(printjson)`
+    over a huge cursor must not flood the IPC. */
 export const MAX_OUTPUT_LINES = 1000
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ export function markSyntheticPromise<T>(value: T): T {
 // - Covered: forEach / map / flatMap / filter / find / findIndex / some /
 //   every / reduce / reduceRight. `sort`/`toSorted` cannot be made async-aware
 //   (a comparator has no sequential-await order), so a comparator returning a
-//   thenable THROWS instead of silently misordering (ADR-0003: loud, never
+//   thenable THROWS instead of silently misordering (loud failure, never
 //   silent). Anything else with a callback (e.g. `findLast`) falls through to
 //   the native, async-unaware method.
 // - Plain array literals are NOT patched — same limitation as mongosh itself.
@@ -327,7 +327,7 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
   )
   // A db-touching comparator (rewritten to return a promise) would make the
   // NATIVE sort coerce promises to NaN and "succeed" with garbage order —
-  // exactly the silent-wrong ADR-0003 forbids. Throw with a way out instead.
+  // exactly the silent-wrong behavior the shell contract forbids. Throw instead.
   const guardComparator =
     (cmp: (x: unknown, y: unknown) => unknown) =>
     (x: unknown, y: unknown): number => {
@@ -605,7 +605,7 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal): Collection {
 }
 
 // ---------------------------------------------------------------------------
-// db proxy (ADR-0003)
+// db proxy
 // ---------------------------------------------------------------------------
 
 /**
@@ -985,7 +985,7 @@ async function runReplCommand(
 }
 
 export interface RunShellOptions {
-  /** Default page size applied to bare cursors (ADR-0004 rule 2). */
+  /** Default page size applied to bare cursors to keep results bounded. */
   limit?: number
   /** Page offset injected into a FindCursor (prev/next paging). Ignored for
       non-find cursors — they can't skip without a pipeline stage. */

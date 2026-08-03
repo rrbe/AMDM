@@ -1,5 +1,5 @@
 /**
- * Document mutation core (ADR-0003 pattern: pure-ish core + thin session
+ * Document mutation core (pure-ish core + thin session
  * wrapper). These operate on a driver `Db` directly — no `sessionManager` — so
  * they can be integration-tested against a real MongoDB. `docOps.ts` is the
  * thin wrapper that resolves the active client and delegates here.

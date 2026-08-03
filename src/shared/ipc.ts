@@ -101,7 +101,7 @@ export interface Api {
     collections(connectionId: string, database: string): Promise<CollectionInfo[]>
     indexes(connectionId: string, database: string, collection: string): Promise<IndexInfo[]>
     users(connectionId: string, database: string): Promise<UserInfo[]>
-    /** Bounded, cached field-name sampling for autocomplete (ADR-0004 rule 4). */
+    /** Bounded, cached field-name sampling for autocomplete. */
     sampleFields(connectionId: string, database: string, collection: string): Promise<string[]>
   }
   shell: {

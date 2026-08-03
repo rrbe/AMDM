@@ -36,7 +36,7 @@ import { DocEditor } from './DocEditor'
  * twisty) to expand/collapse. A draggable divider sets the key-column width so
  * keys and values line up in two clean columns.
  *
- * VIRTUALIZATION APPROACH (ADR-0004 rule 1):
+ * VIRTUALIZATION APPROACH:
  *  - We never render the whole nested tree as DOM. Instead we FLATTEN only the
  *    currently-visible nodes into a single `FlatNode[]` array. A node's children
  *    are appended ONLY when that node is in the `expanded` set, so collapsed

@@ -1,5 +1,5 @@
 /**
- * Main-thread client for the serializer worker (ADR-0004 rules 3 & 4).
+ * Main-thread client for the serializer worker.
  *
  * A single long-lived worker is plenty for a single-user GUI — jobs queue and
  * resolve by id. The main thread only does the cheap binary `BSON.serialize`
@@ -14,7 +14,7 @@
  * NOTE: we intentionally do NOT use a transferList for the BSON buffers.
  * `BSON.serialize` may return a Buffer backed by Node's shared allocation pool;
  * transferring its ArrayBuffer would detach unrelated Buffers. Structured-clone
- * copies the (small, bounded — ADR-0004 rule 2) bytes safely instead.
+ * safely copies the small, bounded payload instead.
  */
 import { Worker } from 'node:worker_threads'
 import { join } from 'node:path'

@@ -28,7 +28,7 @@ export interface ResultTab {
 }
 
 /** Upper bound on kept results per tab; the oldest is evicted when a new run
-    lands (ADR-0004 rule 6 — results hold up to a full page of EJSON docs). */
+    lands because each result can hold a full page of EJSON docs. */
 export const MAX_RESULT_TABS = 8
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/

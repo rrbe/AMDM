@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 
-// Test layers (see test/README.md):
+// Test layers:
 //   test/unit/**      pure logic, node env, no mongo — CI gate
 //   test/contract/**  cross-layer BSON↔EJSON round-trip — CI gate
 //   test/integration/** real MongoDB via mongodb-memory-server — local

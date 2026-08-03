@@ -1,5 +1,5 @@
 /**
- * Serializer worker (ADR-0004 rules 3 & 4).
+ * Serializer worker for CPU-heavy EJSON encoding and field extraction.
  *
  * Runs the heavy CPU off the main process event loop: the BSON→EJSON encoding
  * of query results and the schema-sampling field extraction. If this ran on the

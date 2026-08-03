@@ -1,5 +1,5 @@
 /**
- * Shell-on-driver coverage (ADR-0003). Runs the real `runShellOnDb` against a
+ * Shell-on-driver coverage. Runs the real `runShellOnDb` against a
  * real MongoDB (mongodb-memory-server) and asserts on the EJSON-canonical wire
  * shape the renderer actually receives.
  *
@@ -829,7 +829,7 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
   })
 
   // A comparator has no sequential-await order — a db-touching one must fail
-  // loudly (ADR-0003), not "succeed" with garbage order via Promise→NaN.
+  // loudly, not "succeed" with garbage order via Promise→NaN.
   it('sort with a db-touching comparator fails loudly instead of silently misordering', async () => {
     const r = await run(`
       const gs = db.nums.distinct('g');

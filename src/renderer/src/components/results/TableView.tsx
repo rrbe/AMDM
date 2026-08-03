@@ -25,7 +25,7 @@ import { DocEditor } from './DocEditor'
 /**
  * Virtualized table.
  *
- * VIRTUALIZATION APPROACH (ADR-0004 rule 1):
+ * VIRTUALIZATION APPROACH:
  *  - ROWS are virtualized with `useVirtualizer`; only visible rows (+ overscan)
  *    exist in the DOM, so a 100k-doc result renders the same handful of rows.
  *  - Columns are derived ONCE (memoized on docs identity) by scanning every
@@ -38,7 +38,7 @@ import { DocEditor } from './DocEditor'
  *    header cell's right edge; header and body share the per-column width.
  *
  * NOTE: column derivation scans all docs, but the result set is already bounded
- * at the data layer (ADR-0004 rule 2), so this is cheap.
+ * at the data layer, so this is cheap.
  */
 
 interface TableViewProps {

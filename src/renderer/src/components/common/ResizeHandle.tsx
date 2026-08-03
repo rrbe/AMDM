@@ -21,7 +21,7 @@ interface ResizeHandleProps {
 /**
  * A draggable divider that resizes a sibling panel by writing a px value into a
  * :root CSS variable. The drag mutates the variable IMPERATIVELY (no React
- * re-render per frame — perf rule ADR-0004), and only commits to settings on
+ * re-render per frame), and only commits to settings on
  * pointer-up, so we never thrash settings.json mid-drag. At rest the variable
  * is kept in sync with the persisted `value` prop.
  */

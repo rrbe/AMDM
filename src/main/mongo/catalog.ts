@@ -116,7 +116,7 @@ export async function listIndexes(
   )
 }
 
-// --- field sampling for autocomplete (ADR-0004 rule 4: bounded + cached) ---
+// --- field sampling for autocomplete (bounded + cached) ---
 
 const SAMPLE_LIMIT = 50
 const fieldCache = new Map<string, string[]>()
@@ -124,8 +124,7 @@ const fieldCache = new Map<string, string[]>()
 /**
  * Sample a bounded number of documents and return their (dot-pathed) field
  * names for autocomplete. Cached per connection+namespace for the session.
- * The field extraction runs off the main thread via the serializer worker
- * (ADR-0004 rules 3 & 4).
+ * Field extraction runs in the serializer worker to avoid blocking the main thread.
  */
 export async function sampleFields(
   connectionId: string,

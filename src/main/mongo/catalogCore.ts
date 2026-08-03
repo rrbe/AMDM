@@ -1,5 +1,5 @@
 /**
- * Catalog read core (ADR-0003 pattern: driver-only core + thin session
+ * Catalog read core (driver-only core + thin session
  * wrapper). These take a `Db` directly — no `sessionManager` — so they can be
  * integration-tested against a real MongoDB. `catalog.ts` wraps them with
  * session resolution, the disconnect-race guard, and field-sample caching.
@@ -16,7 +16,7 @@ export function toPlain(value: unknown): Record<string, unknown> {
 
 export async function listCollectionsOnDb(db: Db): Promise<CollectionInfo[]> {
   // nameOnly:false to read `type` (collection/view/timeseries); we deliberately
-  // do NOT fetch per-collection counts here (ADR-0004).
+  // Do not fetch per-collection counts here; catalog reads must stay bounded.
   const cols = await db.listCollections({}, { nameOnly: false }).toArray()
   return cols.map((c) => ({
     name: c.name,
@@ -45,6 +45,6 @@ export async function sampleFieldsOnDb(
 ): Promise<string[]> {
   const docs = await db.collection(collection).find({}, { limit }).toArray()
   // Field extraction runs off the main thread via the serializer worker, with
-  // an inline fallback (ADR-0004 rules 3 & 4).
+  // an inline fallback so worker failure does not break catalog reads.
   return serializerPool.extractFields(docs)
 }

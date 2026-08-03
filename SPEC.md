@@ -1,101 +1,23 @@
-# AMDM — 规格书 (SPEC)
+# AMDM — SPEC
 
-一个精简、性能优先的 MongoDB 桌面 GUI,作为 NoSQLBooster 的个人替代品:保留它最好的 UX(三种结果视图),砍掉让它卡顿的臃肿。**性能是第一优先级。** 所有代码由 AI agent 编写,用户不审阅代码,因此技术选型偏向"agent 最不容易写错、生态最成熟"的方案。
+一个精简、性能优先的 MongoDB 桌面 GUI。
 
-> 术语见 [CONTEXT.md](./CONTEXT.md);关键决策见 [docs/adr/](./docs/adr/)。
+## 范围边界
 
----
+- 支持 SCRAM、SSH 隧道、TLS、自签 CA、客户端证书、副本集和 `mongodb+srv`;不做 x.509、LDAP、AWS IAM、Kerberos。
+- 密码和 SSH 口令只存 Keychain;其他配置存本地 JSON。
+- Shell 在 Node `vm` 中执行常用 mongosh API 子集并返回 typed BSON;未支持的 helper 必须明确报错。
+- 首次打开集合自动执行 `find({}).sort({ _id: -1 }).limit(100)`;再次打开只聚焦已有 Shell。
+- 保存查询分连接级和全局级;历史独立保存,加载后不自动执行。
+- 原生支持 JSON/EJSON、CSV、XLSX、BSON 导入导出,不依赖外部 MongoDB 工具。
+- 结果提供 Tree、JSON、Table 视图;打印输出单独显示在 Console。
+- 支持文档编辑、删除和表格内联单元格编辑。
 
-## 1. 技术栈(已锁定)
+## 性能约束
 
-| 层 | 选择 | ADR |
-|---|---|---|
-| 平台 | macOS 优先,Web UI 技术栈(跨平台留后路) | — |
-| 应用框架 | **Electron(精简版)** | [0001](./docs/adr/0001-build-on-electron.md) |
-| 前端 | **React + TypeScript + Vite** | [0002](./docs/adr/0002-react-because-code-is-agent-written.md) |
-| 数据访问 | 官方 **MongoDB Node.js 驱动** | [0003](./docs/adr/0003-shell-reimplemented-on-node-driver.md) |
-| Shell 执行 | 在驱动之上重写 shell API,Node `vm` 沙箱,返回 typed BSON | [0003](./docs/adr/0003-shell-reimplemented-on-node-driver.md) |
-| 代码编辑器 | **CodeMirror 6**(懒加载) | [0004](./docs/adr/0004-performance-first-architecture.md) |
-| 结果渲染 | 全部 **虚拟化**(`@tanstack/virtual`) | [0004](./docs/adr/0004-performance-first-architecture.md) |
-| 重活(序列化/采样) | **Worker 线程** | [0004](./docs/adr/0004-performance-first-architecture.md) |
-| 导入导出 | JSON/CSV/XLSX 原生;BSON 包裹官方工具(按需下载,不内置) | [0005](./docs/adr/0005-import-export-strategy.md) |
-| 秘钥存储 | **macOS Keychain**;非敏感配置存本地 JSON | — |
-
----
-
-## 2. 功能范围(逐条对应你的需求)
-
-### #1 连接管理
-- 保存/编辑连接;颜色直接挂在每个 Connection 上。
-- 认证/接入:**SCRAM(用户名密码)**、**SSH 隧道**(密码或私钥)、**TLS/SSL(含自签 CA / 客户端证书)**、**Replica Set / `mongodb+srv`(Atlas)**。
-- **不做** 企业认证(x.509 / LDAP / AWS IAM / Kerberos)。
-- 密码进 Keychain;其余配置存本地 JSON。
-
-### #2 浏览
-- 侧边栏:databases → collections → indexes / users,**懒加载**。
-- 首次点击集合自动执行有界默认查询：`find({}).sort({ _id: -1 }).limit(100)`；再次点击只聚焦已有 Shell。
-
-### #3 Shell 执行
-- 用户输入 JS(如 `db.lives.find({...})`),在 `vm` 沙箱中执行,`db` 是驱动 shim,返回 **typed BSON**。
-- 实现常用 shell API 子集(find/aggregate/count/distinct/index 操作等),按需增量补充;未支持的提示"unsupported helper"而非静默错。
-- 批量/循环操作引导走服务端 aggregation / `bulkWrite`,避免客户端逐条往返。
-
-### #4 代码补全
-- CodeMirror 6 补全源:JS/shell API 关键字 + 驱动方法 + 当前库集合名 + **懒采样**得到的字段名(有界、缓存、Worker 中采样)。
-- TypeScript 语言服务在 Web Worker 中按需运行，避免阻塞 UI。
-
-### #5 保存查询
-- 两级:按连接 + 全局;文件夹组织。
-- 另有**自动执行历史**(最近查询),与显式保存的查询分开。
-- 本地 JSON 存储。
-
-### #6 导入 / 导出(双向)
-- **JSON/EJSON、CSV、XLSX**:原生 JS 进程内流式读写,复用现有连接(含 SSH 隧道),无外部二进制。
-- **BSON**:使用现有 `bson` 包在进程内读写 plain `.bson` 文档流，不依赖外部工具。
-
-### #7 结果视图(照抄 NoSQLBooster)
-- **Tree**:虚拟化,嵌套懒展开。
-- **JSON**:EJSON,折叠/展开。
-- **Table**:嵌套字段拍平成列,虚拟化,列显隐。
-- 三视图可切换,布局 1:1 对齐 NoSQLBooster。
-
-### #8 Explain / 高级分析
-- **可视化摘要 + 原始 JSON 双视图**:解析 `executionStats` → winning plan 阶段树、`nReturned`/`totalDocsExamined`/`totalKeysExamined`、用了哪个索引、执行耗时、**COLLSCAN 红色告警**;原始 JSON 可展开。
-
-### 数据编辑(范围决策)
-- **文档级编辑**:双击文档打开 JSON 编辑器,改完保存。
-- **删除文档**。
-- **表格内联单元格编辑**。
-
----
-
-## 3. 性能铁律(不可妥协 — 详见 [ADR-0004](./docs/adr/0004-performance-first-architecture.md))
-
-1. 所有大列表/树/表格一律虚拟化,DOM 只持有可见行。
-2. 游标流式分页拉取,默认页 50–100,绝不把整库塞进渲染进程。
-3. 重 CPU(BSON↔EJSON、格式化、schema 采样)丢 Worker,绝不堵主线程。
-4. schema 采样:懒、有界(20–100 文档)、异步、缓存。
-5. 首次打开集合只执行有界默认查询（按 `_id` 倒序，最多 100 条）；再次打开不重复执行。
-6. 关闭 tab/连接立即销毁编辑器 model 和结果缓存;退出时清理所有子进程。
-7. 用当前版 Electron,各目标架构都出**原生**包(arm64 给 Apple Silicon、x64 给 Intel,都不走 Rosetta);懒加载重功能,tree-shake。
-
----
-
-## 4. 分期计划
-
-- **Phase 1(核心闭环,能日常用)** ✅ 已确认优先
-  连接管理(SCRAM/SSH/TLS/replica)+ 浏览 db/coll/index/user + Shell 跑 find/aggregate + 三视图(虚拟化)。
-- **Phase 2** ✅ 已完成
-  代码补全 + 保存查询/历史 + explain 可视化 + 文档编辑/删除。
-- **Phase 3** ✅ 已完成
-  导入导出(JSON/CSV/XLSX/BSON 均为进程内原生实现,见 ADR-0005)。
-  入口:目录树集合节点 hover 的 Export/Import 按钮 → 弹窗选格式/过滤/limit。
-  (连接颜色已改为每连接直选,Group 概念移除,见 CONTEXT.md。)
-
-- **性能加固** ✅ 已完成
-  序列化(BSON→EJSON 编码)与 schema 字段采样提取已挪到主进程的 **worker_thread 序列化池**(`src/main/workers/`),不再堵主进程事件循环(ADR-0004 第 3、4 条)。主线程只做很快的二进制 `BSON.serialize`,重活在 worker 里;worker 起不来或崩溃时自动**内联降级**,保证不影响功能。退出时随会话清理。
-  (此处旧列的「遗留待办」均已交付或失效;当前 backlog 见 `TODO.md`。)
-  - **侧边栏目录树虚拟化 vs sticky 段头(待解张力)**:目录树当前为 `rows.map()` 直渲、未虚拟化,与铁律 #1(所有大列表/树一律虚拟化)有差距。连接行的 sticky-scroll 段头(`position: sticky; top: 0`,见 `styles/explorer.css` 的 `.conn-item`)**结构上依赖真实 DOM 流**,虚拟化常用的绝对定位容器会令其失效。将来若要虚拟化目录树,需同步设计 sticky 段头的替代实现(如 `@tanstack/react-virtual` 的 sticky-index 方案),二者不可简单叠加。
-
-- **多语言 + 集中式设置** ✅ 已完成
-  UI 文案经 `react-i18next` 全量国际化,内置 **简体中文 / English / 繁體中文** 三语,默认跟随系统 locale(`navigator.language`,回退 en)。语言偏好存进 `AppSettings.language`(settings.json,沿用现有 settings IPC,无新增通道)。资源在 `src/renderer/src/i18n/locales/*.json`,纯函数解析器 `lib/language.ts` + 键齐全性单测 `test/unit/renderer/i18n.test.ts`(三语键集合 + 插值占位符一致性)。新增**集中式设置窗口**(`components/settings/SettingsWindow.tsx`,齿轮按钮或 ⌘, 打开)统一承载语言/主题/集合排序/每页条数/编辑器字号·换行·缩进,并支持按当前语言搜索分组与设置项。同时清除了 UI 文案的强制大写(CSS `text-transform` + 硬编码全大写),遵循 CLAUDE.md 的大驼峰规则。
+1. 大列表、树、表格必须虚拟化。
+2. 游标在数据层分页限界;显式 `toArray()` 等用户操作除外。
+3. BSON/EJSON 序列化和字段采样等重 CPU 工作放入 worker,失败时可内联降级。
+4. schema 采样必须懒加载、有界、异步并缓存。
+5. 关闭 tab/连接和应用退出时清理结果缓存、MongoClient、SSH 隧道及 worker。
+6. macOS arm64/x64 均构建原生产物;CodeMirror 等重功能懒加载。

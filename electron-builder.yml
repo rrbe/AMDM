@@ -37,7 +37,7 @@ mac:
       to: Frameworks/Sparkle.framework
   target:
     # Both architectures are NATIVE builds — arm64 for Apple Silicon, x64 for
-    # Intel. ADR-0004 rule #7 says "no Rosetta" (don't emulate), which these two
+    # Intel. "No Rosetta" means no emulation, which these two
     # native targets satisfy; it does NOT mean arm64-only.
     - target: dmg
       arch: [arm64, x64]

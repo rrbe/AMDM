@@ -6,7 +6,7 @@
  */
 import { EJSON } from 'bson'
 
-/** Cap on sampled field paths (ADR-0004 rule 4: bounded). */
+/** Cap on sampled field paths so schema discovery stays bounded. */
 const MAX_FIELDS = 500
 
 /** BSON value → plain JSON-cloneable EJSON-canonical value (safe over IPC). */

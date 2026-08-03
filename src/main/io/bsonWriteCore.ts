@@ -35,8 +35,8 @@ export function writeChunk(
 
 /**
  * Stream documents to a plain `.bson` file (optionally gzipped), one serialized
- * document at a time so memory stays bounded regardless of collection size
- * (ADR-0004 #2). Returns the number of documents written. On any failure the
+ * document at a time so memory stays bounded regardless of collection size.
+ * Returns the number of documents written. On any failure the
  * half-written file is removed, so a crashed export never leaves a truncated
  * `.bson` at the user's chosen path.
  */

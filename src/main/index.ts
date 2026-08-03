@@ -164,7 +164,7 @@ app.on('window-all-closed', () => {
 })
 
 // Clean up all clients + SSH tunnels + the serializer worker on quit
-// (ADR-0004: no zombie processes / threads).
+// so no processes or threads survive application shutdown.
 app.on('will-quit', () => {
   void sessionManager.closeAll()
   serializerPool.dispose()

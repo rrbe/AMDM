@@ -26,18 +26,12 @@ pnpm clean           # 清理构建产物
 - Tree / JSON / Table 结果视图
 - 可视化 explain
 
-## macOS 自动更新
+## macOS 安装
 
-macOS 安装包内置 Sparkle 2，会按天检查并在后台下载新版本。发布前需要配置：
-
-- `SPARKLE_ED_PRIVATE_KEY`：由 Sparkle `generate_keys -x` 导出的私钥，只配置为 GitHub Actions Secret。AMDM 与 LocalShare 使用相同公钥，可以复用已有私钥。
-
-发布工作流会生成并上传 `appcast-arm64.xml` 与 `appcast-x64.xml`。
-
-macOS 产物使用 ad-hoc 签名且未经 Apple 公证。首次打开时可能需要在“隐私与安全性”中点击“仍要打开”，或执行 `xattr -dr com.apple.quarantine /Applications/AMDM.app` 清除隔离标记。
+macOS 版本通过 Sparkle 更新,使用 ad-hoc 签名且未经 Apple 公证。首次打开时请在“隐私与安全性”中点击“仍要打开”,或执行 `xattr -dr com.apple.quarantine /Applications/AMDM.app`。
 
 ## 许可证
 
 [MIT](./LICENSE)
 
-> AMDM 是非官方 MongoDB 客户端，和 MongoDB, Inc. 没有任何关系。
+> AMDM 是非官方 MongoDB 客户端,与 MongoDB, Inc. 无关。

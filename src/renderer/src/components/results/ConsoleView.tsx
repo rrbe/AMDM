@@ -8,7 +8,7 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 
 /**
  * Console output of a run: every print/printjson/console.* line, in call
- * order, virtualized BY LINE like the JSON view (ADR-0004 rule 1 — a
+ * order, virtualized BY LINE like the JSON view (a
  * forEach(printjson) easily produces thousands of lines). printjson payloads
  * reuse the JSON view's shell-style tokens; warn/error lines are tinted.
  * Text is natively selectable; ⌘C with no selection copies the whole console.

@@ -14,8 +14,8 @@ interface WindowStateFile {
 }
 
 /**
- * Persists the main window's geometry to window-state.json in userData (see
- * ADR-0006: plain JSON, no SQLite). Kept out of settings.json on purpose:
+ * Persists the main window's geometry to window-state.json in userData using
+ * plain JSON, not SQLite. Kept out of settings.json on purpose:
  * window bounds are main-process-only, change on every drag, and never cross
  * IPC — folding them into the renderer-facing settings would churn that file.
  */

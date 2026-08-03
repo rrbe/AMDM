@@ -1005,7 +1005,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   applyQuery(code, database, connectionId) {
-    // Never auto-run (ADR-0004 rule 5). Loads land like browse seeds: refill
+    // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
     set((s) => {

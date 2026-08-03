@@ -26,15 +26,9 @@ pnpm clean           # remove generated build files
 - Tree / JSON / Table result views
 - Visual explain
 
-## macOS auto-updates
+## macOS installation
 
-macOS packages include Sparkle 2, which checks daily and downloads new releases in the background. Configure these GitHub Actions secrets before publishing:
-
-- `SPARKLE_ED_PRIVATE_KEY`: the private key exported by Sparkle `generate_keys -x`; keep it only in GitHub Actions. AMDM uses the same public key as LocalShare, so the existing private key can be reused.
-
-The release workflow generates and uploads `appcast-arm64.xml` and `appcast-x64.xml`.
-
-macOS packages use ad-hoc signing and are not notarized. On first launch, Gatekeeper may require users to select Open Anyway in Privacy & Security or remove quarantine with `xattr -dr com.apple.quarantine /Applications/AMDM.app`.
+macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. On first launch, select Open Anyway in Privacy & Security or run `xattr -dr com.apple.quarantine /Applications/AMDM.app`.
 
 ## License
 

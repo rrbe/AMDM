@@ -23,7 +23,7 @@ import { selectionCode } from '@renderer/lib/shellSelection'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 
 /**
- * CodeMirror is heavy, so we lazy-load it (ADR-0004 rule 7) — it stays out of
+ * CodeMirror is heavy, so we lazy-load it — it stays out of
  * the initial bundle and only loads when the shell workspace first renders.
  *
  * Shortcuts live INSIDE CodeMirror as a high-precedence keymap (not on a React
@@ -144,7 +144,7 @@ export function ShellEditor({
 
   // Hold the latest callbacks in a ref so the keymap extension can stay a stable
   // reference — recreating `extensions` would reconfigure CodeMirror on every
-  // keystroke (ADR-0004). The bindings read fresh props through this ref.
+  // keystroke. The bindings read fresh props through this ref.
   const handlers = useRef({ onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy })
   handlers.current = { onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy }
 

@@ -204,7 +204,7 @@ export interface ShellRequest {
   connectionId: string
   database: string
   code: string
-  /** Default page size applied to bare cursors (ADR-0004 rule 2). */
+  /** Default page size applied to bare cursors so results remain bounded. */
   limit?: number
   /** Page offset injected into a `find()` cursor for prev/next paging. Only
       honored when the script's result is a FindCursor (see `pageable`). */
@@ -382,7 +382,7 @@ export interface DataOpResult {
 }
 
 // ---------------------------------------------------------------------------
-// App settings / preferences (persisted to settings.json — see ADR-0006)
+// App settings / preferences (persisted to settings.json)
 // ---------------------------------------------------------------------------
 
 /** How databases/collections are ordered in the catalog tree. */
@@ -412,7 +412,7 @@ export interface AppSettings {
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
   editorHeight: number
   /** Page size for query results — how many docs a cursor fetches per page
-      (ADR-0004 rule 2: bounded; never the whole collection). */
+      (bounded; never the whole collection). */
   queryLimit: number
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number

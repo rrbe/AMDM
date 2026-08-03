@@ -8,7 +8,7 @@ interface SettingsFile {
   settings: AppSettings
 }
 
-/** Persists UI preferences to settings.json in userData (see ADR-0006). */
+/** Persists UI preferences to settings.json in userData. */
 class SettingsStore {
   private filePath = ''
   private data: SettingsFile = { version: 1, settings: { ...DEFAULT_SETTINGS } }

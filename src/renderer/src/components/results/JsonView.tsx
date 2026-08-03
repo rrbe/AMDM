@@ -10,7 +10,7 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 /**
  * Pretty-printed EJSON, virtualized BY LINE.
  *
- * VIRTUALIZATION APPROACH (ADR-0004 rule 1):
+ * VIRTUALIZATION APPROACH:
  *  - We flatten the whole result into a flat `JsonLine[]` once (memoized on the
  *    docs identity) instead of building one giant string and dumping it into
  *    the DOM. Each line carries its indent depth.

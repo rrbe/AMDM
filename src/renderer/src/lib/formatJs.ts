@@ -1,6 +1,6 @@
 /**
  * Lazy shell-script formatter (Prettier standalone). Prettier + its babel/estree
- * plugins are heavy, so — exactly like CodeMirror (ADR-0004 rule 7) — we only
+ * plugins are heavy, so — exactly like CodeMirror — we only
  * pull them in the first time the user hits the format shortcut. Runs entirely
  * in the renderer (no main process); the `browser`/standalone build needs no
  * filesystem or Node config resolution.
