@@ -224,6 +224,7 @@ interface AppState {
   importCollection(req: ImportRequest): Promise<DataOpResult>
 
   // ---- actions: preferences ----
+  checkForUpdates(): Promise<boolean>
   loadSettings(): Promise<void>
   updateSettings(patch: Partial<AppSettings>): Promise<void>
 }
@@ -1093,6 +1094,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // -------------------------------------------------------------- preferences
+  async checkForUpdates() {
+    try {
+      const started = await window.api.updates.checkForUpdates()
+      if (!started) set({ lastError: tr('notify.updateCheckUnavailable') })
+      return started
+    } catch (e) {
+      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+      return false
+    }
+  },
+
   async loadSettings() {
     try {
       set({ settings: await window.api.settings.get() })

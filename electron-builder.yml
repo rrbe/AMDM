@@ -3,7 +3,7 @@ productName: AMDM
 copyright: Copyright © 2026 shawn
 
 directories:
-  buildResources: build   # icon.icns / icon.ico / icon.png live here
+  buildResources: build # icon.icns / icon.ico / icon.png live here
   output: dist
 
 # electron-builder adds production dependencies separately.
@@ -11,13 +11,26 @@ files:
   - out/**/*
   - package.json
 
-# This project deliberately avoids native modules (see ADR-0006), so there is
-# nothing to rebuild against Electron's ABI.
+# The Sparkle addon is built as a stable N-API module; JS dependencies still do
+# not need an Electron ABI rebuild.
 npmRebuild: false
+afterPack: scripts/after-pack.mjs
 
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.icns
+  extendInfo:
+    SUFeedURL: https://github.com/rrbe/AMDM/releases/latest/download/appcast.xml
+    SUPublicEDKey: ""
+    SUEnableAutomaticChecks: true
+    SUAutomaticallyUpdate: true
+    SUScheduledCheckInterval: 86400
+  extraResources:
+    - from: build/sparkle/native/sparkle.node
+      to: native/sparkle.node
+  extraFiles:
+    - from: build/sparkle/Sparkle.framework
+      to: Frameworks/Sparkle.framework
   target:
     # Both architectures are NATIVE builds — arm64 for Apple Silicon, x64 for
     # Intel. ADR-0004 rule #7 says "no Rosetta" (don't emulate), which these two

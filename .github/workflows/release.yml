@@ -75,14 +75,35 @@ jobs:
       # electron-builder,导致其后的 --publish never 被当成位置参数而失效。
       # --publish never:这里只产包,统一在 release job 里发布(否则 electron-builder
       # 在 CI+tag 环境下会默认尝试自动发布,进而索要 GH_TOKEN 而失败)。
+      - name: Verify macOS signing secrets
+        if: matrix.platform == 'mac'
+        shell: bash
+        env:
+          AMDM_MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          AMDM_MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          test -n "$AMDM_MAC_CSC_LINK" || { echo "::error::Missing MAC_CSC_LINK"; exit 1; }
+          test -n "$AMDM_MAC_CSC_KEY_PASSWORD" || { echo "::error::Missing MAC_CSC_KEY_PASSWORD"; exit 1; }
+
       - name: Build & package
         shell: bash
         env:
-          # CI 上没有 Apple 签名证书——跳过签名而不是报错失败。
+          SPARKLE_PUBLIC_ED_KEY: ${{ matrix.platform == 'mac' && secrets.SPARKLE_PUBLIC_ED_KEY || '' }}
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
+          if [ "${{ matrix.platform }}" = "mac" ]; then pnpm prepare:sparkle; fi
           pnpm run build
           pnpm exec electron-builder --${{ matrix.platform }} --publish never
+
+      - name: Generate Sparkle appcast
+        if: matrix.platform == 'mac'
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+          SPARKLE_DOWNLOAD_URL_PREFIX: https://github.com/rrbe/AMDM/releases/download/${{ github.ref_name }}/
+          SPARKLE_APPCAST_URL: https://github.com/rrbe/AMDM/releases/latest/download/appcast.xml
+        run: pnpm generate:sparkle-appcast dist
 
       # 只上传面向用户的安装包,不传体积巨大的 unpacked 目录。
       # 每个平台只命中自己那几个 glob,未命中的 glob 自动忽略。
@@ -96,6 +117,8 @@ jobs:
             dist/*.zip
             dist/*.exe
             dist/*.AppImage
+            dist/appcast.xml
+            dist/*.delta
 
   release:
     needs: build

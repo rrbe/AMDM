@@ -68,6 +68,8 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
 
+  updatesCheck: 'updates:check',
+
   dialogOpenFile: 'dialog:openFile'
 } as const
 
@@ -132,6 +134,10 @@ export interface Api {
     get(): Promise<AppSettings>
     /** Merge a partial patch and return the full updated settings. */
     update(patch: Partial<AppSettings>): Promise<AppSettings>
+  }
+  updates: {
+    /** Returns false when Sparkle is unavailable in this build. */
+    checkForUpdates(): Promise<boolean>
   }
   dialog: {
     /** Native open-file picker; resolves the chosen absolute path, or null if cancelled. */

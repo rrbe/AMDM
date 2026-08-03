@@ -56,6 +56,9 @@ const api: Api = {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch)
   },
+  updates: {
+    checkForUpdates: () => ipcRenderer.invoke(IPC.updatesCheck)
+  },
   dialog: {
     openFile: (opts) => ipcRenderer.invoke(IPC.dialogOpenFile, opts)
   }

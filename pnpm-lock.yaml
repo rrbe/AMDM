@@ -114,6 +114,9 @@ importers:
       mongodb-memory-server:
         specifier: ^11.2.0
         version: 11.2.0
+      node-addon-api:
+        specifier: ^1.7.2
+        version: 1.7.2
       prettier:
         specifier: ^3.8.3
         version: 3.8.3
@@ -5639,8 +5642,7 @@ snapshots:
     dependencies:
       semver: 7.8.1
 
-  node-addon-api@1.7.2:
-    optional: true
+  node-addon-api@1.7.2: {}
 
   node-api-version@0.2.1:
     dependencies:

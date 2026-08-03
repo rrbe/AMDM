@@ -9,6 +9,7 @@ import { resolveWindowBounds } from './store/windowStateCore'
 import { sessionManager } from './mongo/sessionManager'
 import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
+import { startSparkle } from './sparkle'
 
 // Default geometry, also the floor on size. Saved bounds are reconciled against
 // these + the connected displays in windowStateCore (off-screen safety).
@@ -128,6 +129,7 @@ app.whenReady().then(() => {
   windowStateStore.init()
   registerIpc()
   createWindow()
+  startSparkle()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

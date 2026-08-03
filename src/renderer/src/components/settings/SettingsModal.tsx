@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type CollectionSort, type Language, type ThemeMode } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -20,7 +21,18 @@ import { Checkbox } from '@renderer/components/ui/Checkbox'
 export function SettingsModal({ onClose }: { onClose: () => void }): JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
+  const checkForUpdates = useAppStore((s) => s.checkForUpdates)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const [checking, setChecking] = useState(false)
+
+  const runUpdateCheck = async (): Promise<void> => {
+    setChecking(true)
+    try {
+      await checkForUpdates()
+    } finally {
+      setChecking(false)
+    }
+  }
 
   return (
     <Modal
@@ -61,6 +73,15 @@ export function SettingsModal({ onClose }: { onClose: () => void }): JSX.Element
               { label: t('settings.themeDark'), value: 'dark' }
             ]}
           />
+        </Field>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">{t('settings.sectionUpdates')}</div>
+        <Field label={t('settings.checkForUpdates')} hint={t('settings.checkForUpdatesHint')}>
+          <Button type="button" busy={checking} onClick={() => void runUpdateCheck()}>
+            {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
+          </Button>
         </Field>
       </div>
 
