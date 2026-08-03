@@ -8,7 +8,7 @@ import { cn } from '@renderer/lib/utils'
  * keep conditionally rendering content from the controlled `value`, so this only
  * replaces the tab button row.
  *
- * shadcn-style underline tabs: the active tab is matched by `[data-selected]`
+ * shadcn-style underline tabs: the active tab is matched by `[data-active]`
  * (blue accent underline + text).
  */
 export interface TabItem<T> {
@@ -32,13 +32,13 @@ export function Tabs<T extends string | number = string>({
 }: TabsProps<T>): JSX.Element {
   return (
     <BaseTabs.Root value={value} onValueChange={(v) => onChange(v as T)}>
-      <BaseTabs.List className={cn('flex gap-0.5 border-b border-border', className)}>
+      <BaseTabs.List className={cn('flex gap-3 border-b border-border', className)}>
         {items.map((it) => (
           <BaseTabs.Tab
             key={String(it.value)}
             value={it.value}
             disabled={it.disabled}
-            className="relative -mb-px rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-1.5 text-[13px] font-medium text-muted-foreground outline-none transition-colors hover:bg-transparent hover:text-foreground data-[selected]:border-[var(--accent)] data-[selected]:text-[var(--accent)] disabled:cursor-default disabled:opacity-50"
+            className="relative -mb-px rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-1.5 text-[13px] font-medium text-muted-foreground outline-none transition-colors hover:bg-transparent hover:text-foreground data-[active]:border-[var(--accent)] data-[active]:text-[var(--accent)] disabled:cursor-default disabled:opacity-50"
           >
             {it.label}
           </BaseTabs.Tab>

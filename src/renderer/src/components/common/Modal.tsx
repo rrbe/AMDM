@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogClose, DialogTitle } from '@renderer/components/ui/Dialog'
 import { cn } from '@renderer/lib/utils'
@@ -16,6 +16,8 @@ interface ModalProps {
   /** Width preset. `small` is kept for back-compat (= 'sm'). Default 'md'. */
   small?: boolean
   size?: 'sm' | 'md' | 'lg'
+  /** Keep the opening top edge fixed while body content changes height. */
+  lockTop?: boolean
 }
 
 /**
@@ -25,10 +27,28 @@ interface ModalProps {
  * roomy elevated card on a dimmed backdrop. Positioning + backdrop come from
  * ui/Dialog. Three width presets keep dense dialogs tight and forms spacious.
  */
-export function Modal({ title, onClose, children, footer, small, size }: ModalProps): JSX.Element {
+export function Modal({
+  title,
+  onClose,
+  children,
+  footer,
+  small,
+  size,
+  lockTop = false
+}: ModalProps): JSX.Element {
   const { t } = useTranslation()
   const bodyRef = useRef<HTMLDivElement>(null)
+  const [openingHalfHeight, setOpeningHalfHeight] = useState<number | null>(null)
   const width = small ? 'sm' : (size ?? 'md')
+  const popupRef = useCallback(
+    (popup: HTMLDivElement | null) => {
+      if (lockTop && popup) {
+        setOpeningHalfHeight((current) => current ?? popup.getBoundingClientRect().height / 2)
+      }
+    },
+    [lockTop]
+  )
+
   return (
     <Dialog
       open
@@ -41,11 +61,17 @@ export function Modal({ title, onClose, children, footer, small, size }: ModalPr
         width === 'md' && 'w-[660px]',
         width === 'lg' && 'w-[760px]'
       )}
+      popupRef={popupRef}
+      style={
+        openingHalfHeight === null
+          ? undefined
+          : { transform: `translate(-50%, -${openingHalfHeight}px)` }
+      }
       // Focus the first field in the body on open (preserving the old per-input
       // autoFocus); fall back to Base UI's default if the body has no control.
       initialFocus={() => bodyRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? true}
     >
-      <div className="flex items-center justify-between border-b border-border px-6 py-4 text-[15px] font-semibold">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4 text-[15px] font-semibold">
         <DialogTitle render={<span />}>{title}</DialogTitle>
         <DialogClose
           className="-mr-1.5 inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
@@ -54,11 +80,13 @@ export function Modal({ title, onClose, children, footer, small, size }: ModalPr
           ✕
         </DialogClose>
       </div>
-      <div className="overflow-y-auto px-6 py-5" ref={bodyRef}>
+      <div className="min-h-0 overflow-y-auto px-6 py-5" ref={bodyRef}>
         {children}
       </div>
       {footer && (
-        <div className="flex items-center gap-2 border-t border-border px-6 py-4 [&_.spacer]:flex-1">{footer}</div>
+        <div className="flex shrink-0 items-center gap-2 border-t border-border px-6 py-4 [&_.spacer]:flex-1">
+          {footer}
+        </div>
       )}
     </Dialog>
   )

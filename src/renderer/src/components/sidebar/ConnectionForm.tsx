@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardPaste, Link, MessageSquareText } from 'lucide-react'
+import { ClipboardPaste, Link, MessageSquareText, Plus, Trash2 } from 'lucide-react'
 import type {
   ConnectionConfig,
   ConnectionInput,
@@ -19,12 +19,25 @@ import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { cn } from '@renderer/lib/utils'
-import { formatMongoHosts, parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
+import {
+  connectionMembersAreValid,
+  formatConnectionMembers,
+  inferAuthType,
+  parseConnectionMembers,
+  parseMongoUri,
+  PRESET_COLORS,
+  type ConnectionMember
+} from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
+type MemberRow = ConnectionMember & { id: string }
 
 function genId(): string {
   return `conn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function memberRows(members: ConnectionMember[]): MemberRow[] {
+  return members.map((member) => ({ ...member, id: genId() }))
 }
 
 interface ConnectionFormProps {
@@ -151,19 +164,21 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [name, setName] = useState(editing?.name ?? '')
   const [color, setColor] = useState(editing?.color ?? '')
   const [useSrv, setUseSrv] = useState(editing?.useSrv ?? false)
-  const [host, setHost] = useState(
-    editing
-      ? editing.useSrv
-        ? editing.host
-        : formatMongoHosts(editing.host, editing.port)
-      : 'localhost:27017'
+  const [srvHost, setSrvHost] = useState(editing?.useSrv ? editing.host : '')
+  const [members, setMembers] = useState<MemberRow[]>(() =>
+    memberRows(
+      editing && !editing.useSrv
+        ? parseConnectionMembers(editing.host, editing.port)
+        : editing
+          ? [{ host: '', port: '27017' }]
+          : parseConnectionMembers('localhost:27017')
+    )
   )
   const [replicaSet, setReplicaSet] = useState(editing?.replicaSet ?? '')
   const [defaultDatabase, setDefaultDatabase] = useState(editing?.defaultDatabase ?? '')
   const [options, setOptions] = useState<Record<string, string>>(editing?.options ?? {})
 
   // ---- Auth ----
-  const [authType, setAuthType] = useState<'none' | 'scram'>(editing?.auth.type ?? 'none')
   const [username, setUsername] = useState(editing?.auth.username ?? '')
   const [authSource, setAuthSource] = useState(editing?.auth.authSource ?? '')
   const [mechanism, setMechanism] = useState<ScramMechanism>(editing?.auth.mechanism ?? 'DEFAULT')
@@ -250,11 +265,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     try {
       const p = parseMongoUri(fromText)
       setUseSrv(p.useSrv)
-      setHost(p.hosts.join(','))
+      if (p.useSrv) setSrvHost(p.hosts[0] ?? '')
+      else setMembers(memberRows(parseConnectionMembers(p.hosts.join(','))))
       setReplicaSet(p.replicaSet)
       setDefaultDatabase(p.defaultDatabase)
       if (p.hasAuth) {
-        setAuthType('scram')
         setUsername(p.username)
         if (p.password != null) {
           setPassword(p.password)
@@ -262,7 +277,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         }
         setAuthSource(p.authSource)
       } else {
-        setAuthType('none')
+        setUsername('')
+        setPassword('')
+        setPasswordTouched(true)
+        setAuthSource('')
+        setMechanism('DEFAULT')
       }
       setTlsEnabled(p.tlsEnabled)
       setAllowInvalid(p.tlsAllowInvalid)
@@ -280,7 +299,15 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   // ---- To URL: serialize the CURRENT form fields to a string (one-way) ----
   // Works while creating or editing. The "include real password" choice only
   // matters when the connection uses username/password auth.
+  const authType = inferAuthType({ username, password, authSource })
+  const authError =
+    authType === 'scram' && !username.trim() ? tFn('connection.auth.usernameRequired') : undefined
   const hasPasswordAuth = authType === 'scram' && !!username.trim()
+  const host = useMemo(
+    () => (useSrv ? srvHost.trim() : formatConnectionMembers(members)),
+    [useSrv, srvHost, members]
+  )
+  const membersValid = useMemo(() => connectionMembersAreValid(members), [members])
 
   const refreshToUri = async (includePassword: boolean): Promise<void> => {
     setToBuilding(true)
@@ -368,7 +395,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           }
         }
         // Secrets: only include if the user typed (else keep stored value).
-        if (passwordTouched) input.password = password
+        if (authType === 'none') input.password = ''
+        else if (passwordTouched) input.password = password
         if (sshPasswordTouched) input.sshPassword = sshPassword
         if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
         if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
@@ -450,9 +478,15 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
       onClose={handleModalClose}
       size="lg"
+      lockTop
       footer={
         <>
-          <Button variant="ghost" busy={testing} onClick={() => void runTest()}>
+          <Button
+            variant="ghost"
+            busy={testing}
+            disabled={!host.trim() || (!useSrv && !membersValid) || !!sshError || !!authError}
+            onClick={() => void runTest()}
+          >
             {tFn('connection.action.test')}
           </Button>
           {test && (
@@ -478,6 +512,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               {sshError}
             </span>
           )}
+          {authError && (
+            <span className="rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1 font-mono text-[12px] text-destructive">
+              {authError}
+            </span>
+          )}
           <span className="flex-1" />
           <Button variant="ghost" onClick={onClose}>
             {tFn('connection.action.cancel')}
@@ -485,7 +524,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           <Button
             variant="primary"
             busy={saving}
-            disabled={!host.trim() || !!sshError}
+            disabled={!host.trim() || (!useSrv && !membersValid) || !!sshError || !!authError}
             onClick={() => void submit()}
           >
             {tFn('connection.action.save')}
@@ -499,18 +538,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       <div className="mb-5 flex items-center gap-2">
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-3 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
+          className="inline-flex w-32 items-center justify-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-5 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
           onClick={() => {
             setFromError(null)
             setUrlPanel('from')
           }}
         >
-          <ClipboardPaste size={15} />
+          <Plus size={15} />
           <span>{tFn('connection.uri.fromUrl')}</span>
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-3 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
+          className="inline-flex w-32 items-center justify-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-5 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
           onClick={openToUrl}
         >
           <Link size={15} />
@@ -582,20 +621,112 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             />
           </div>
 
-          <Field
-            label={useSrv ? tFn('connection.general.srvHost') : tFn('connection.general.hosts')}
-            hint={useSrv ? undefined : tFn('connection.general.hostsHint')}
-          >
-            <Input
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              placeholder={
-                useSrv
-                  ? 'cluster.mongodb.net'
-                  : 'db1.example.com:27017,db2.example.com:27017'
-              }
-            />
-          </Field>
+          {useSrv ? (
+            <Field
+              label={tFn('connection.general.srvHost')}
+              hint={tFn('connection.general.srvHostHint')}
+            >
+              <Input
+                value={srvHost}
+                onChange={(e) => setSrvHost(e.target.value)}
+                placeholder="cluster.mongodb.net"
+              />
+            </Field>
+          ) : (
+            <div className="mb-3">
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <div className="text-[11px] font-medium text-muted-foreground">
+                  {tFn('connection.general.hosts')}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setMembers((current) => [
+                      ...current,
+                      { id: genId(), host: '', port: '27017' }
+                    ])
+                  }
+                >
+                  <Plus size={14} />
+                  {tFn('connection.general.addMember')}
+                </Button>
+              </div>
+
+              <div className="overflow-hidden rounded-md border border-border">
+                <div className="grid grid-cols-[minmax(0,1fr)_112px_44px] bg-[var(--bg-2)] text-[11px] font-medium text-muted-foreground">
+                  <span className="px-3 py-1.5">{tFn('connection.general.memberHost')}</span>
+                  <span className="border-l border-border px-3 py-1.5">
+                    {tFn('connection.general.memberPort')}
+                  </span>
+                  <span className="border-l border-border" />
+                </div>
+                {members.length === 0 ? (
+                  <div className="border-t border-border px-3 py-3 text-[12px] text-[var(--fg-3)]">
+                    {tFn('connection.general.noMembers')}
+                  </div>
+                ) : (
+                  members.map((member, index) => (
+                    <div
+                      key={member.id}
+                      className="grid grid-cols-[minmax(0,1fr)_112px_44px] items-stretch border-t border-border"
+                    >
+                      <Input
+                        className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
+                        value={member.host}
+                        aria-label={`${tFn('connection.general.memberHost')} ${index + 1}`}
+                        placeholder="db1.example.com"
+                        onChange={(event) =>
+                          setMembers((current) =>
+                            current.map((row) =>
+                              row.id === member.id ? { ...row, host: event.target.value } : row
+                            )
+                          )
+                        }
+                      />
+                      <div className="border-l border-border">
+                        <Input
+                          className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
+                          value={member.port}
+                          inputMode="numeric"
+                          aria-label={`${tFn('connection.general.memberPort')} ${index + 1}`}
+                          placeholder="27017"
+                          onChange={(event) =>
+                            setMembers((current) =>
+                              current.map((row) =>
+                                row.id === member.id ? { ...row, port: event.target.value } : row
+                              )
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center justify-center border-l border-border">
+                        <button
+                          type="button"
+                          className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
+                          data-tip={tFn('connection.general.removeMember')}
+                          onClick={() =>
+                            setMembers((current) =>
+                              current.filter((row) => row.id !== member.id)
+                            )
+                          }
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {members.length > 0 && !membersValid && (
+                <div className="mt-1.5 text-[11px] text-destructive">
+                  {tFn('connection.general.membersInvalid')}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="form-grid">
             <Field label={tFn('connection.general.replicaSet')}>
@@ -628,57 +759,45 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
       {tab === 'auth' && (
         <>
-          <Field label={tFn('connection.auth.authentication')}>
-            <Select<'none' | 'scram'>
-              value={authType}
-              onChange={setAuthType}
-              options={[
-                { label: tFn('connection.auth.none'), value: 'none' },
-                { label: tFn('connection.auth.scram'), value: 'scram' }
-              ]}
-            />
-          </Field>
-
-          {authType === 'scram' && (
-            <>
-              <div className="form-grid">
-                <Field label={tFn('connection.auth.username')}>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} />
-                </Field>
-                <Field label={tFn('connection.auth.password')}>
-                  <Input
-                    type="password"
-                    value={password}
-                    placeholder={secretPlaceholder(editing?.hasPassword)}
-                    onChange={(e) => {
-                      setPassword(e.target.value)
-                      setPasswordTouched(true)
-                    }}
-                  />
-                </Field>
-              </div>
-              <div className="form-grid">
-                <Field label={tFn('connection.auth.authSource')}>
-                  <Input
-                    value={authSource}
-                    onChange={(e) => setAuthSource(e.target.value)}
-                    placeholder="admin"
-                  />
-                </Field>
-                <Field label={tFn('connection.auth.mechanism')}>
-                  <Select<ScramMechanism>
-                    value={mechanism}
-                    onChange={setMechanism}
-                    options={[
-                      { label: 'DEFAULT', value: 'DEFAULT' },
-                      { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
-                      { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
-                    ]}
-                  />
-                </Field>
-              </div>
-            </>
-          )}
+          <div className="mb-3 text-[11px] text-[var(--fg-3)]">
+            {tFn('connection.auth.emptyMeansNone')}
+          </div>
+          <div className="form-grid">
+            <Field label={tFn('connection.auth.username')} error={authError}>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+            </Field>
+            <Field label={tFn('connection.auth.password')}>
+              <Input
+                type="password"
+                value={password}
+                placeholder={secretPlaceholder(editing?.hasPassword)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setPasswordTouched(true)
+                }}
+              />
+            </Field>
+          </div>
+          <div className="form-grid">
+            <Field label={tFn('connection.auth.authSource')}>
+              <Input
+                value={authSource}
+                onChange={(e) => setAuthSource(e.target.value)}
+                placeholder="admin"
+              />
+            </Field>
+            <Field label={tFn('connection.auth.mechanism')}>
+              <Select<ScramMechanism>
+                value={mechanism}
+                onChange={setMechanism}
+                options={[
+                  { label: 'DEFAULT', value: 'DEFAULT' },
+                  { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
+                  { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
+                ]}
+              />
+            </Field>
+          </div>
         </>
       )}
 

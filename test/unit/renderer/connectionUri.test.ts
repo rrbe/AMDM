@@ -2,7 +2,14 @@
  * MongoDB connection-string parse/build for the connection form.
  */
 import { describe, it, expect } from 'vitest'
-import { parseMongoUri, buildMongoUri } from '@renderer/lib/connectionUri'
+import {
+  parseMongoUri,
+  buildMongoUri,
+  parseConnectionMembers,
+  formatConnectionMembers,
+  connectionMembersAreValid,
+  inferAuthType
+} from '@renderer/lib/connectionUri'
 
 describe('parseMongoUri', () => {
   it('parses a basic mongodb:// URI', () => {
@@ -167,5 +174,40 @@ describe('parse ∘ build round-trips the key fields', () => {
       tlsAllowInvalid: true,
       extraOptions: { w: 'majority' }
     })
+  })
+})
+
+describe('editable connection members', () => {
+  it('round-trips multiple members and IPv6 through host/port rows', () => {
+    const members = parseConnectionMembers('db1.example.com:5001,[::1]:5002')
+    expect(members).toEqual([
+      { host: 'db1.example.com', port: '5001' },
+      { host: '::1', port: '5002' }
+    ])
+    expect(formatConnectionMembers(members)).toBe('db1.example.com:5001,[::1]:5002')
+  })
+
+  it('uses the MongoDB default port and supports legacy saved connections', () => {
+    expect(parseConnectionMembers('db.example.com')).toEqual([
+      { host: 'db.example.com', port: '27017' }
+    ])
+    expect(parseConnectionMembers('db.example.com', 27018)).toEqual([
+      { host: 'db.example.com', port: '27018' }
+    ])
+  })
+
+  it('requires at least one host and a valid port for every row', () => {
+    expect(connectionMembersAreValid([{ host: 'db.example.com', port: '27017' }])).toBe(true)
+    expect(connectionMembersAreValid([])).toBe(false)
+    expect(connectionMembersAreValid([{ host: '', port: '27017' }])).toBe(false)
+    expect(connectionMembersAreValid([{ host: 'db.example.com', port: '65536' }])).toBe(false)
+  })
+})
+
+describe('inferred authentication', () => {
+  it('uses no authentication only when every credential field is blank', () => {
+    expect(inferAuthType({ username: '', password: '', authSource: '' })).toBe('none')
+    expect(inferAuthType({ username: 'user', password: '', authSource: '' })).toBe('scram')
+    expect(inferAuthType({ username: '', password: '', authSource: 'admin' })).toBe('scram')
   })
 })

@@ -1,4 +1,4 @@
-import { type ComponentProps, type ReactNode } from 'react'
+import { type ComponentProps, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 
 /**
@@ -33,6 +33,8 @@ interface DialogProps {
    * body (so focus doesn't land on the header ✕).
    */
   initialFocus?: ComponentProps<typeof BaseDialog.Popup>['initialFocus']
+  popupRef?: Ref<HTMLDivElement>
+  style?: CSSProperties
   children: ReactNode
 }
 
@@ -43,6 +45,8 @@ export function Dialog({
   backdropClassName = 'modal-backdrop',
   'aria-labelledby': ariaLabelledBy,
   initialFocus,
+  popupRef,
+  style,
   children
 }: DialogProps): JSX.Element {
   return (
@@ -50,7 +54,9 @@ export function Dialog({
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className={`ui-dialog-backdrop ${backdropClassName}`} />
         <BaseDialog.Popup
+          ref={popupRef}
           className={['ui-dialog', className].filter(Boolean).join(' ')}
+          style={style}
           aria-labelledby={ariaLabelledBy}
           initialFocus={initialFocus}
         >
