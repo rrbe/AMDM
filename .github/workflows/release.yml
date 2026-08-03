@@ -1,6 +1,6 @@
 name: Release
 
-# 打 tag 触发：给某个 commit 打上 vX.Y.Z 形式的 tag 并 push 到远端后，
+# 打 tag 触发：给某个 commit 打上 vYY.MM.N 形式的 tag 并 push 到远端后，
 # 在 macOS / Windows / Linux 三个 runner 上分别打包，再汇总创建一个
 # GitHub Release，把安装包作为附件挂上去。
 #
@@ -9,7 +9,9 @@ name: Release
 #   Windows -> .exe (NSIS, x64)
 #   Linux   -> .AppImage
 #
-# 版本号以 package.json 为真相源(发版前用 `pnpm version` bump 并打 tag),
+# 版本号以 package.json 为真相源：YY=年份、MM=月份、N=全局递增的发布序号。
+# 发版前用 `pnpm version` 更新 N 并打 tag；App 内展示的构建日期与 commit
+# 由 electron.vite.config.ts 在构建时追加，不写入 package.json，避免自引用 hash。
 # 这里只校验 tag 与之一致。质量闸门(typecheck + 单测)由 ci.yml 单独跑。
 on:
   push:

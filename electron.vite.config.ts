@@ -12,7 +12,7 @@ const buildDate = new Intl.DateTimeFormat('sv-SE', {
   .format(new Date())
   .replace(/-/g, '')
   .slice(2)
-const buildId = `v${version}-${buildDate}-${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
+const buildId = `${version}+${buildDate}-${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
 
 export default defineConfig({
   main: {
