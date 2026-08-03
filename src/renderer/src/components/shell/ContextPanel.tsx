@@ -3,6 +3,7 @@ import { Clock, Database, KeyRound, Plug, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { tabCollection } from '@renderer/lib/tabs'
+import { formatMongoHosts } from '@renderer/lib/connectionUri'
 
 export function ContextPanel(): JSX.Element {
   const { t } = useTranslation()
@@ -21,7 +22,7 @@ export function ContextPanel(): JSX.Element {
   const deployment = connection
     ? connection.useSrv
       ? connection.host
-      : `${connection.host}:${connection.port ?? 27017}`
+      : formatMongoHosts(connection.host, connection.port ?? 27017)
     : '—'
   const resultSummary = !result
     ? t('context.noResult')

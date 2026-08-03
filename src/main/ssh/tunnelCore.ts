@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { DiagnoseScope, SshAuthMethod } from '../../shared/types'
+import { formatMongoHosts, splitHostPort } from '../../shared/connectionUri'
 import type { DecryptedConnection } from '../mongo/uri'
 
 /** Auth + identity for a single SSH hop (a bastion or the terminal host). */
@@ -166,7 +167,16 @@ export function buildTunnelOptions(
     ? buildHop(config.ssh.jump, { passphrase: dec.jumpSshPassphrase }, readKey)
     : undefined
 
-  return { target, jump, destHost: config.host, destPort: config.port ?? 27017 }
+  // A tunnel forwards one socket, so keep the existing directConnection
+  // behavior and target the first configured seed.
+  const firstSeed = formatMongoHosts(config.host, config.port).split(',')[0]
+  const destination = splitHostPort(firstSeed)
+  return {
+    target,
+    jump,
+    destHost: destination.host,
+    destPort: destination.port ?? 27017
+  }
 }
 
 /**

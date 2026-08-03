@@ -225,4 +225,17 @@ describe('buildTunnelOptions — guards & defaults', () => {
     expect(o.target.port).toBe(22)
     expect(o.destPort).toBe(27017)
   })
+
+  it('forwards the first inline replica-set seed through the single tunnel', () => {
+    const o = buildTunnelOptions(
+      dec(
+        cfg(
+          { authMethod: 'password' },
+          { host: 'db1.internal:5001,db2.internal:5002', port: undefined }
+        )
+      ),
+      stubKey
+    )
+    expect(o).toMatchObject({ destHost: 'db1.internal', destPort: 5001 })
+  })
 })

@@ -1,5 +1,6 @@
 import type { MongoClientOptions } from 'mongodb'
 import type { ConnectionConfig } from '../../shared/types'
+import { formatMongoHosts } from '../../shared/connectionUri'
 
 export interface DecryptedConnection {
   config: ConnectionConfig
@@ -43,7 +44,7 @@ export function buildClientArgs(dec: DecryptedConnection, localTunnelPort?: numb
   } else if (config.useSrv) {
     uri = `mongodb+srv://${config.host}`
   } else {
-    uri = `mongodb://${config.host}:${config.port ?? 27017}`
+    uri = `mongodb://${formatMongoHosts(config.host, config.port ?? 27017)}`
     if (config.replicaSet) options.replicaSet = config.replicaSet
   }
 

@@ -17,6 +17,9 @@ importers:
       mongodb:
         specifier: ^6.10.0
         version: 6.21.0
+      mongodb-connection-string-url:
+        specifier: ^3.0.2
+        version: 3.0.2
       ssh2:
         specifier: ^1.16.0
         version: 1.17.0

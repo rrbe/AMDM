@@ -7,6 +7,7 @@
 export {
   parseMongoUri,
   buildMongoUri,
+  formatMongoHosts,
   type ParsedUri,
   type BuildUriInput
 } from '@shared/connectionUri'

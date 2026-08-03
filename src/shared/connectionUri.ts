@@ -1,19 +1,22 @@
 /**
- * Parse / build MongoDB connection strings. Pure, dependency-free, and shared by
- * both the renderer (form's "From URL" paste-to-parse) and the main process
- * (the "To URL" export, which can inline the decrypted password).
+ * Parse / build MongoDB connection strings. Shared by the renderer (form's
+ * "From URL" paste-to-parse) and the main process (the "To URL" export, which
+ * can inline the decrypted password).
  *
  * Tolerant of the common shapes:
  *   mongodb://user:pass@host:27017/db?replicaSet=rs0&authSource=admin&tls=true
  *   mongodb+srv://user:pass@cluster0.abcde.mongodb.net/db?retryWrites=true
  *
- * Limitation: our connection model stores a single host + an optional replicaSet
- * name. A URI listing multiple seed hosts is parsed to its FIRST host (the
- * driver still discovers the rest of the set from one reachable seed).
  */
+
+// @ts-expect-error v3 ships declarations but omits them from its exports map.
+import ConnectionString from 'mongodb-connection-string-url'
 
 export interface ParsedUri {
   useSrv: boolean
+  /** Every seed exactly as written in the URI (host or host:port). */
+  hosts: string[]
+  /** First seed split for backwards-compatible callers. */
   host: string
   port: number | null
   replicaSet: string
@@ -50,7 +53,7 @@ export interface BuildUriInput {
   options?: Record<string, string>
 }
 
-function splitHostPort(hp: string): { host: string; port: number | null } {
+export function splitHostPort(hp: string): { host: string; port: number | null } {
   // IPv6 literal: [::1]:27017
   if (hp.startsWith('[')) {
     const end = hp.indexOf(']')
@@ -61,12 +64,32 @@ function splitHostPort(hp: string): { host: string; port: number | null } {
       return { host, port: Number.isFinite(port) ? port : null }
     }
   }
+  // An unbracketed IPv6 literal has multiple colons and no unambiguous port.
+  if ((hp.match(/:/g) ?? []).length > 1) return { host: hp, port: null }
   const idx = hp.lastIndexOf(':')
   if (idx >= 0) {
     const port = parseInt(hp.slice(idx + 1), 10)
     return { host: hp.slice(0, idx), port: Number.isFinite(port) ? port : null }
   }
   return { host: hp, port: null }
+}
+
+/**
+ * Resolve the saved host field to a MongoDB seed list. New connections keep
+ * each member's port inline (`h1:27017,h2:27018`); `port` only supports older
+ * saved connections that stored one bare host and one separate port.
+ */
+export function formatMongoHosts(host: string, port?: number | null): string {
+  const hosts = host
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+  if (hosts.length !== 1 || port == null) return hosts.join(',')
+
+  const first = splitHostPort(hosts[0])
+  if (first.port != null) return hosts[0]
+  const hostname = first.host.includes(':') ? `[${first.host}]` : first.host
+  return `${hostname}:${port}`
 }
 
 const MAPPED_OPTION_KEYS = new Set([
@@ -80,69 +103,36 @@ const MAPPED_OPTION_KEYS = new Set([
 
 export function parseMongoUri(raw: string): ParsedUri {
   const uri = raw.trim()
-  const m = /^(mongodb(?:\+srv)?):\/\/(.*)$/is.exec(uri)
-  if (!m) throw new Error('Not a valid mongodb:// or mongodb+srv:// URI')
-
-  const useSrv = m[1].toLowerCase() === 'mongodb+srv'
-  let rest = m[2]
-
-  // query
-  let query = ''
-  const q = rest.indexOf('?')
-  if (q >= 0) {
-    query = rest.slice(q + 1)
-    rest = rest.slice(0, q)
-  }
-
-  // path → default database
-  let defaultDatabase = ''
-  const slash = rest.indexOf('/')
-  if (slash >= 0) {
-    defaultDatabase = decodeURIComponent(rest.slice(slash + 1))
-    rest = rest.slice(0, slash)
-  }
-
-  // userinfo
-  let hasAuth = false
-  let username = ''
-  let password: string | null = null
-  const at = rest.lastIndexOf('@')
-  let hostPart = rest
-  if (at >= 0) {
-    hasAuth = true
-    const userinfo = rest.slice(0, at)
-    hostPart = rest.slice(at + 1)
-    const c = userinfo.indexOf(':')
-    if (c >= 0) {
-      username = decodeURIComponent(userinfo.slice(0, c))
-      password = decodeURIComponent(userinfo.slice(c + 1))
-    } else {
-      username = decodeURIComponent(userinfo)
-    }
-  }
-
-  const firstHost = hostPart
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)[0]
-  if (!firstHost) throw new Error('No host found in URI')
-
-  const { host, port } = useSrv ? { host: firstHost, port: null } : splitHostPort(firstHost)
-
-  const params = new URLSearchParams(query)
+  const parsed = new ConnectionString(uri)
+  const useSrv = parsed.isSRV
+  const hosts = parsed.hosts
+  const { host, port } = useSrv ? { host: hosts[0], port: null } : splitHostPort(hosts[0])
+  const authority = uri.slice(uri.indexOf('://') + 3).split(/[/?]/, 1)[0]
+  const userinfo = authority.includes('@') ? authority.slice(0, authority.lastIndexOf('@')) : ''
+  const hasAuth = authority.includes('@')
+  const hasPassword = hasAuth && userinfo.includes(':')
+  const username = hasAuth ? decodeURIComponent(parsed.username) : ''
+  const password = hasPassword ? decodeURIComponent(parsed.password) : null
+  const defaultDatabase = decodeURIComponent(parsed.pathname.slice(1))
+  const params = parsed.searchParams
   const replicaSet = params.get('replicaSet') ?? ''
-  const authSource = params.get('authSource') ?? ''
-  const tlsEnabled = params.get('tls') === 'true' || params.get('ssl') === 'true'
+  // MongoDB URI semantics: authenticated URIs default authSource to the path
+  // database, then to admin when no path is present.
+  const authSource = params.get('authSource') ?? (hasAuth ? defaultDatabase : '')
+  const tlsEnabled =
+    params.get('tls')?.toLowerCase() === 'true' || params.get('ssl')?.toLowerCase() === 'true'
   const tlsAllowInvalid =
-    params.get('tlsAllowInvalidCertificates') === 'true' || params.get('tlsInsecure') === 'true'
+    params.get('tlsAllowInvalidCertificates')?.toLowerCase() === 'true' ||
+    params.get('tlsInsecure')?.toLowerCase() === 'true'
 
   const extraOptions: Record<string, string> = {}
-  params.forEach((value, key) => {
+  params.forEach((value: string, key: string) => {
     if (!MAPPED_OPTION_KEYS.has(key.toLowerCase())) extraOptions[key] = value
   })
 
   return {
     useSrv,
+    hosts,
     host,
     port,
     replicaSet,
@@ -169,7 +159,7 @@ export function buildMongoUri(i: BuildUriInput): string {
     auth += '@'
   }
 
-  const hostPart = i.useSrv ? i.host : `${i.host}${i.port ? `:${i.port}` : ''}`
+  const hostPart = i.useSrv ? i.host.trim() : formatMongoHosts(i.host, i.port)
   const path = i.defaultDatabase ? `/${encodeURIComponent(i.defaultDatabase)}` : ''
 
   const params: string[] = []

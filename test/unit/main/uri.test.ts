@@ -36,6 +36,13 @@ describe('buildClientArgs — host / topology', () => {
   it('sets replicaSet for a non-SRV host', () => {
     expect(buildClientArgs(dec(cfg({ replicaSet: 'rs0' }))).options.replicaSet).toBe('rs0')
   })
+  it('keeps every replica-set seed and its own port', () => {
+    expect(
+      buildClientArgs(
+        dec(cfg({ host: 'db1.example.com:5001,db2.example.com:5002', port: undefined }))
+      ).uri
+    ).toBe('mongodb://db1.example.com:5001,db2.example.com:5002')
+  })
   it('builds a mongodb+srv:// URI without a port', () => {
     expect(buildClientArgs(dec(cfg({ useSrv: true, host: 'cluster0.mongodb.net' }))).uri).toBe(
       'mongodb+srv://cluster0.mongodb.net'

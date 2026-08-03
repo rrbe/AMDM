@@ -19,7 +19,7 @@ import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { cn } from '@renderer/lib/utils'
-import { parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
+import { formatMongoHosts, parseMongoUri, PRESET_COLORS } from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
 
@@ -151,8 +151,13 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [name, setName] = useState(editing?.name ?? '')
   const [color, setColor] = useState(editing?.color ?? '')
   const [useSrv, setUseSrv] = useState(editing?.useSrv ?? false)
-  const [host, setHost] = useState(editing?.host ?? 'localhost')
-  const [port, setPort] = useState(String(editing?.port ?? 27017))
+  const [host, setHost] = useState(
+    editing
+      ? editing.useSrv
+        ? editing.host
+        : formatMongoHosts(editing.host, editing.port)
+      : 'localhost:27017'
+  )
   const [replicaSet, setReplicaSet] = useState(editing?.replicaSet ?? '')
   const [defaultDatabase, setDefaultDatabase] = useState(editing?.defaultDatabase ?? '')
   const [options, setOptions] = useState<Record<string, string>>(editing?.options ?? {})
@@ -245,8 +250,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     try {
       const p = parseMongoUri(fromText)
       setUseSrv(p.useSrv)
-      setHost(p.host)
-      setPort(p.port != null ? String(p.port) : '27017')
+      setHost(p.hosts.join(','))
       setReplicaSet(p.replicaSet)
       setDefaultDatabase(p.defaultDatabase)
       if (p.hasAuth) {
@@ -323,7 +327,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           color: color || undefined,
           useSrv,
           host: host.trim(),
-          port: useSrv ? undefined : Number(port) || 27017,
+          // Ports live beside each seed in `host`; `port` remains only as a
+          // backwards-compatible field for older saved connections.
+          port: undefined,
           replicaSet: replicaSet.trim() || undefined,
           defaultDatabase: defaultDatabase.trim() || undefined,
           options: Object.keys(options).length ? options : undefined,
@@ -374,7 +380,6 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       color,
       useSrv,
       host,
-      port,
       replicaSet,
       defaultDatabase,
       options,
@@ -577,19 +582,20 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             />
           </div>
 
-          <div className="form-grid">
-            <Field
-              label={useSrv ? tFn('connection.general.srvHost') : tFn('connection.general.host')}
-              style={{ gridColumn: useSrv ? '1 / span 2' : 'auto' }}
-            >
-              <Input value={host} onChange={(e) => setHost(e.target.value)} placeholder="localhost" />
-            </Field>
-            {!useSrv && (
-              <Field label={tFn('connection.general.port')}>
-                <Input value={port} onChange={(e) => setPort(e.target.value)} placeholder="27017" />
-              </Field>
-            )}
-          </div>
+          <Field
+            label={useSrv ? tFn('connection.general.srvHost') : tFn('connection.general.hosts')}
+            hint={useSrv ? undefined : tFn('connection.general.hostsHint')}
+          >
+            <Input
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              placeholder={
+                useSrv
+                  ? 'cluster.mongodb.net'
+                  : 'db1.example.com:27017,db2.example.com:27017'
+              }
+            />
+          </Field>
 
           <div className="form-grid">
             <Field label={tFn('connection.general.replicaSet')}>

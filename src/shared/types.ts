@@ -80,9 +80,10 @@ export interface ConnectionConfig {
 
   /** When true, build a `mongodb+srv://` URI from `host` (Atlas). */
   useSrv: boolean
-  /** Host (or SRV host). For non-SRV, paired with `port`. */
+  /** SRV host, or comma-separated non-SRV seed list (`host[:port],…`). */
   host: string
-  port?: number // default 27017 (ignored when useSrv)
+  /** Legacy single-host port; new non-SRV connections keep ports in `host`. */
+  port?: number // default 27017 (ignored when useSrv or host already contains ports)
   replicaSet?: string
   /** Optional default database to open the shell against. */
   defaultDatabase?: string
