@@ -124,7 +124,14 @@
       "replicaSet": "副本集",
       "replicaSetSshIgnored": "启用 SSH 隧道时副本集名称将被忽略（按单节点 directConnection 连接）。",
       "defaultDatabase": "默认数据库",
-      "extraOptions": "额外选项：{{opts}}"
+      "readPreference": "读取偏好",
+      "readPreferenceDefault": "默认（primary）",
+      "customOptions": "自定义选项",
+      "optionKey": "选项",
+      "optionValue": "值",
+      "addOption": "添加选项",
+      "removeOption": "删除选项",
+      "noOptions": "尚未添加选项。"
     },
     "auth": {
       "emptyMeansNone": "用户名、密码和认证数据库均留空时不使用身份认证。",

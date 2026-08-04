@@ -19,6 +19,11 @@ export interface ConnectionMember {
   port: string
 }
 
+export interface ConnectionOption {
+  key: string
+  value: string
+}
+
 /** Convert the persisted seed list into editable host/port rows. */
 export function parseConnectionMembers(
   hosts: string,
@@ -62,6 +67,29 @@ export function connectionMembersAreValid(members: ConnectionMember[]): boolean 
       )
     })
   )
+}
+
+/** Keep readPreference in its dedicated control and everything else in the editable table. */
+export function splitConnectionOptions(options: Record<string, string> = {}): {
+  readPreference: string
+  custom: ConnectionOption[]
+} {
+  const entries = Object.entries(options)
+  return {
+    readPreference: entries.find(([key]) => key.toLowerCase() === 'readpreference')?.[1] ?? '',
+    custom: entries.filter(([key]) => key.toLowerCase() !== 'readpreference').map(([key, value]) => ({ key, value }))
+  }
+}
+
+/** Convert editable option rows back to the persisted MongoClient option map. */
+export function buildConnectionOptions(readPreference: string, custom: ConnectionOption[]): Record<string, string> {
+  const options = Object.fromEntries(
+    custom
+      .map(({ key, value }) => [key.trim(), value.trim()])
+      .filter(([key]) => key && key.toLowerCase() !== 'readpreference')
+  )
+  if (readPreference) options.readPreference = readPreference
+  return options
 }
 
 export function inferAuthType(fields: {

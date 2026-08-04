@@ -124,7 +124,14 @@
       "replicaSet": "Replica Set",
       "replicaSetSshIgnored": "The replica set name is ignored when the SSH tunnel is enabled (connects to a single node via directConnection).",
       "defaultDatabase": "Default Database",
-      "extraOptions": "Extra options: {{opts}}"
+      "readPreference": "Read Preference",
+      "readPreferenceDefault": "Default (primary)",
+      "customOptions": "Custom Options",
+      "optionKey": "Option",
+      "optionValue": "Value",
+      "addOption": "Add Option",
+      "removeOption": "Remove Option",
+      "noOptions": "No custom options added yet."
     },
     "auth": {
       "emptyMeansNone": "Leave the username, password, and auth source blank to connect without authentication.",

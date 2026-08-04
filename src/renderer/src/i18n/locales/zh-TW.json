@@ -124,7 +124,14 @@
       "replicaSet": "副本集",
       "replicaSetSshIgnored": "啟用 SSH 通道時副本集名稱將被忽略（以單節點 directConnection 連線）。",
       "defaultDatabase": "預設資料庫",
-      "extraOptions": "額外選項：{{opts}}"
+      "readPreference": "讀取偏好",
+      "readPreferenceDefault": "預設（primary）",
+      "customOptions": "自訂選項",
+      "optionKey": "選項",
+      "optionValue": "值",
+      "addOption": "加入選項",
+      "removeOption": "刪除選項",
+      "noOptions": "尚未加入選項。"
     },
     "auth": {
       "emptyMeansNone": "使用者名稱、密碼和驗證資料庫均留空時不使用身份驗證。",

@@ -20,17 +20,21 @@ import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { cn } from '@renderer/lib/utils'
 import {
+  buildConnectionOptions,
   connectionMembersAreValid,
   formatConnectionMembers,
   inferAuthType,
   parseConnectionMembers,
   parseMongoUri,
   PRESET_COLORS,
-  type ConnectionMember
+  splitConnectionOptions,
+  type ConnectionMember,
+  type ConnectionOption
 } from '@renderer/lib/connectionUri'
 
 type Tab = 'general' | 'auth' | 'ssh' | 'tls'
 type MemberRow = ConnectionMember & { id: string }
+type OptionRow = ConnectionOption & { id: string }
 
 function genId(): string {
   return `conn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
@@ -38,6 +42,10 @@ function genId(): string {
 
 function memberRows(members: ConnectionMember[]): MemberRow[] {
   return members.map((member) => ({ ...member, id: genId() }))
+}
+
+function optionRows(options: ConnectionOption[]): OptionRow[] {
+  return options.map((option) => ({ ...option, id: genId() }))
 }
 
 interface ConnectionFormProps {
@@ -176,7 +184,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   )
   const [replicaSet, setReplicaSet] = useState(editing?.replicaSet ?? '')
   const [defaultDatabase, setDefaultDatabase] = useState(editing?.defaultDatabase ?? '')
-  const [options, setOptions] = useState<Record<string, string>>(editing?.options ?? {})
+  const [readPreference, setReadPreference] = useState(() => splitConnectionOptions(editing?.options).readPreference)
+  const [customOptions, setCustomOptions] = useState<OptionRow[]>(() =>
+    optionRows(splitConnectionOptions(editing?.options).custom)
+  )
 
   // ---- Auth ----
   const [username, setUsername] = useState(editing?.auth.username ?? '')
@@ -285,7 +296,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       }
       setTlsEnabled(p.tlsEnabled)
       setAllowInvalid(p.tlsAllowInvalid)
-      setOptions(p.extraOptions)
+      const parsedOptions = splitConnectionOptions(p.extraOptions)
+      setReadPreference(parsedOptions.readPreference)
+      setCustomOptions(optionRows(parsedOptions.custom))
       setFromError(null)
       setFromText('')
       setUrlPanel(null)
@@ -308,6 +321,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     [useSrv, srvHost, members]
   )
   const membersValid = useMemo(() => connectionMembersAreValid(members), [members])
+  const options = useMemo(() => buildConnectionOptions(readPreference, customOptions), [readPreference, customOptions])
 
   const refreshToUri = async (includePassword: boolean): Promise<void> => {
     setToBuilding(true)
@@ -655,70 +669,66 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               </div>
 
               <div className="overflow-hidden rounded-md border border-border">
-                <div className="grid grid-cols-[minmax(0,1fr)_112px_44px] bg-[var(--bg-2)] text-[11px] font-medium text-muted-foreground">
-                  <span className="px-3 py-1.5">{tFn('connection.general.memberHost')}</span>
-                  <span className="border-l border-border px-3 py-1.5">
-                    {tFn('connection.general.memberPort')}
-                  </span>
-                  <span className="border-l border-border" />
-                </div>
-                {members.length === 0 ? (
-                  <div className="border-t border-border px-3 py-3 text-[12px] text-[var(--fg-3)]">
-                    {tFn('connection.general.noMembers')}
+                <div className="max-h-[151px] overflow-y-auto">
+                  <div className="sticky top-0 z-10 grid h-7 grid-cols-[minmax(0,1fr)_112px_44px] items-center bg-[var(--bg-2)] text-[11px] font-medium text-muted-foreground">
+                    <span className="px-3">{tFn('connection.general.memberHost')}</span>
+                    <span className="h-full border-l border-border px-3 py-1.5">
+                      {tFn('connection.general.memberPort')}
+                    </span>
+                    <span className="h-full border-l border-border" />
                   </div>
-                ) : (
-                  members.map((member, index) => (
-                    <div
-                      key={member.id}
-                      className="grid grid-cols-[minmax(0,1fr)_112px_44px] items-stretch border-t border-border"
-                    >
-                      <Input
-                        className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
-                        value={member.host}
-                        aria-label={`${tFn('connection.general.memberHost')} ${index + 1}`}
-                        placeholder="db1.example.com"
-                        onChange={(event) =>
-                          setMembers((current) =>
-                            current.map((row) =>
-                              row.id === member.id ? { ...row, host: event.target.value } : row
-                            )
-                          )
-                        }
-                      />
-                      <div className="border-l border-border">
+                  {members.length === 0 ? (
+                    <div className="border-t border-border px-3 py-3 text-[12px] text-[var(--fg-3)]">
+                      {tFn('connection.general.noMembers')}
+                    </div>
+                  ) : (
+                    members.map((member, index) => (
+                      <div
+                        key={member.id}
+                        className="grid grid-cols-[minmax(0,1fr)_112px_44px] items-stretch border-t border-border"
+                      >
                         <Input
                           className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
-                          value={member.port}
-                          inputMode="numeric"
-                          aria-label={`${tFn('connection.general.memberPort')} ${index + 1}`}
-                          placeholder="27017"
+                          value={member.host}
+                          aria-label={`${tFn('connection.general.memberHost')} ${index + 1}`}
+                          placeholder="db1.example.com"
                           onChange={(event) =>
                             setMembers((current) =>
-                              current.map((row) =>
-                                row.id === member.id ? { ...row, port: event.target.value } : row
-                              )
+                              current.map((row) => (row.id === member.id ? { ...row, host: event.target.value } : row))
                             )
                           }
                         />
+                        <div className="border-l border-border">
+                          <Input
+                            className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
+                            value={member.port}
+                            inputMode="numeric"
+                            aria-label={`${tFn('connection.general.memberPort')} ${index + 1}`}
+                            placeholder="27017"
+                            onChange={(event) =>
+                              setMembers((current) =>
+                                current.map((row) =>
+                                  row.id === member.id ? { ...row, port: event.target.value } : row
+                                )
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-center border-l border-border">
+                          <button
+                            type="button"
+                            className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
+                            data-tip={tFn('connection.general.removeMember')}
+                            onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-center border-l border-border">
-                        <button
-                          type="button"
-                          className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
-                          data-tip={tFn('connection.general.removeMember')}
-                          onClick={() =>
-                            setMembers((current) =>
-                              current.filter((row) => row.id !== member.id)
-                            )
-                          }
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
               {members.length > 0 && !membersValid && (
                 <div className="mt-1.5 text-[11px] text-destructive">
@@ -736,6 +746,23 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 placeholder={tFn('connection.optional')}
               />
             </Field>
+            <Field label={tFn('connection.general.readPreference')}>
+              <Select
+                value={readPreference}
+                onChange={setReadPreference}
+                options={[
+                  {
+                    label: tFn('connection.general.readPreferenceDefault'),
+                    value: ''
+                  },
+                  { label: 'primary', value: 'primary' },
+                  { label: 'primaryPreferred', value: 'primaryPreferred' },
+                  { label: 'secondary', value: 'secondary' },
+                  { label: 'secondaryPreferred', value: 'secondaryPreferred' },
+                  { label: 'nearest', value: 'nearest' }
+                ]}
+              />
+            </Field>
             <Field label={tFn('connection.general.defaultDatabase')}>
               <Input
                 value={defaultDatabase}
@@ -743,17 +770,90 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 placeholder={tFn('connection.optional')}
               />
             </Field>
+            <Field label={tFn('connection.auth.authSource')}>
+              <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
+            </Field>
           </div>
 
           {sshEnabled && replicaSet.trim() && (
             <div className="hint">{tFn('connection.general.replicaSetSshIgnored')}</div>
           )}
 
-          {Object.keys(options).length > 0 && (
-            <div className="hint">
-              {tFn('connection.general.extraOptions', { opts: Object.entries(options).map(([k, v]) => `${k}=${v}`).join(' · ') })}
+          <div className="mb-3">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <div className="text-[11px] font-medium text-muted-foreground">
+                {tFn('connection.general.customOptions')}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setCustomOptions((current) => [...current, { id: genId(), key: '', value: '' }])}
+              >
+                <Plus size={14} />
+                {tFn('connection.general.addOption')}
+              </Button>
             </div>
-          )}
+            <div className="overflow-hidden rounded-md border border-border">
+              <div className="max-h-[151px] overflow-y-auto">
+                <div className="sticky top-0 z-10 grid h-7 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-center bg-[var(--bg-2)] text-[11px] font-medium text-muted-foreground">
+                  <span className="px-3">{tFn('connection.general.optionKey')}</span>
+                  <span className="h-full border-l border-border px-3 py-1.5">
+                    {tFn('connection.general.optionValue')}
+                  </span>
+                  <span className="h-full border-l border-border" />
+                </div>
+                {customOptions.length === 0 ? (
+                  <div className="border-t border-border px-3 py-3 text-[12px] text-[var(--fg-3)]">
+                    {tFn('connection.general.noOptions')}
+                  </div>
+                ) : (
+                  customOptions.map((option, index) => (
+                    <div
+                      key={option.id}
+                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-stretch border-t border-border"
+                    >
+                      <Input
+                        className="h-10 rounded-none border-0 bg-transparent px-3 font-mono focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
+                        value={option.key}
+                        aria-label={`${tFn('connection.general.optionKey')} ${index + 1}`}
+                        placeholder="retryWrites"
+                        onChange={(event) =>
+                          setCustomOptions((current) =>
+                            current.map((row) => (row.id === option.id ? { ...row, key: event.target.value } : row))
+                          )
+                        }
+                      />
+                      <div className="border-l border-border">
+                        <Input
+                          className="h-10 rounded-none border-0 bg-transparent px-3 font-mono focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
+                          value={option.value}
+                          aria-label={`${tFn('connection.general.optionValue')} ${index + 1}`}
+                          placeholder="true"
+                          onChange={(event) =>
+                            setCustomOptions((current) =>
+                              current.map((row) => (row.id === option.id ? { ...row, value: event.target.value } : row))
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center justify-center border-l border-border">
+                        <button
+                          type="button"
+                          className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
+                          data-tip={tFn('connection.general.removeOption')}
+                          onClick={() => setCustomOptions((current) => current.filter((row) => row.id !== option.id))}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </>
       )}
 
@@ -778,26 +878,17 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               />
             </Field>
           </div>
-          <div className="form-grid">
-            <Field label={tFn('connection.auth.authSource')}>
-              <Input
-                value={authSource}
-                onChange={(e) => setAuthSource(e.target.value)}
-                placeholder="admin"
-              />
-            </Field>
-            <Field label={tFn('connection.auth.mechanism')}>
-              <Select<ScramMechanism>
-                value={mechanism}
-                onChange={setMechanism}
-                options={[
-                  { label: 'DEFAULT', value: 'DEFAULT' },
-                  { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
-                  { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
-                ]}
-              />
-            </Field>
-          </div>
+          <Field className="w-[calc(50%-8px)]" label={tFn('connection.auth.mechanism')}>
+            <Select<ScramMechanism>
+              value={mechanism}
+              onChange={setMechanism}
+              options={[
+                { label: 'DEFAULT', value: 'DEFAULT' },
+                { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
+                { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
+              ]}
+            />
+          </Field>
         </>
       )}
 

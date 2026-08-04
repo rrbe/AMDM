@@ -8,6 +8,8 @@ import {
   parseConnectionMembers,
   formatConnectionMembers,
   connectionMembersAreValid,
+  splitConnectionOptions,
+  buildConnectionOptions,
   inferAuthType
 } from '@renderer/lib/connectionUri'
 
@@ -201,6 +203,31 @@ describe('editable connection members', () => {
     expect(connectionMembersAreValid([])).toBe(false)
     expect(connectionMembersAreValid([{ host: '', port: '27017' }])).toBe(false)
     expect(connectionMembersAreValid([{ host: 'db.example.com', port: '65536' }])).toBe(false)
+  })
+})
+
+describe('editable connection options', () => {
+  it('keeps readPreference dedicated and round-trips trimmed custom rows', () => {
+    const parsed = splitConnectionOptions({
+      ReadPreference: 'secondaryPreferred',
+      retryWrites: 'true'
+    })
+    expect(parsed).toEqual({
+      readPreference: 'secondaryPreferred',
+      custom: [{ key: 'retryWrites', value: 'true' }]
+    })
+    expect(
+      buildConnectionOptions(parsed.readPreference, [
+        ...parsed.custom,
+        { key: ' maxPoolSize ', value: ' 20 ' },
+        { key: '', value: 'ignored' },
+        { key: 'readPreference', value: 'primary' }
+      ])
+    ).toEqual({
+      retryWrites: 'true',
+      maxPoolSize: '20',
+      readPreference: 'secondaryPreferred'
+    })
   })
 })
 
