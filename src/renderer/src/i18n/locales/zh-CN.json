@@ -351,6 +351,8 @@
     "copyOwnerDocExtendedJson": "复制所在文档 (Extended JSON)"
   },
   "io": {
+    "exportCollection": "导出集合…",
+    "importCollection": "导入到集合…",
     "exportTitle": "导出 — {{ns}}",
     "importTitle": "导入 — {{ns}}",
     "close": "关闭",

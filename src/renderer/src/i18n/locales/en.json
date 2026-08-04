@@ -351,6 +351,8 @@
     "copyOwnerDocExtendedJson": "Copy owner document (Extended JSON)"
   },
   "io": {
+    "exportCollection": "Export collection…",
+    "importCollection": "Import into collection…",
     "exportTitle": "Export — {{ns}}",
     "importTitle": "Import — {{ns}}",
     "close": "Close",

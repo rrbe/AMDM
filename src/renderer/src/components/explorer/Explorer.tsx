@@ -265,7 +265,7 @@ export function Explorer({
       y: e.clientY,
       items: [
         {
-          label: 'Export collection…',
+          label: t('io.exportCollection'),
           icon: <Download size={14} />,
           onClick: () =>
             setIoModal({
@@ -276,7 +276,7 @@ export function Explorer({
             })
         },
         {
-          label: 'Import into collection…',
+          label: t('io.importCollection'),
           icon: <Upload size={14} />,
           onClick: () =>
             setIoModal({
@@ -350,20 +350,6 @@ export function Explorer({
         <div className="app-brand">
           <span>AMDM</span>
         </div>
-        {view === 'connections' && (
-          <button
-            className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
-            data-tip={t('explorer.search')}
-            aria-label={t('explorer.search')}
-            aria-pressed={searchOpen}
-            onClick={() => {
-              if (searchOpen) setSearch('')
-              setSearchOpen((open) => !open)
-            }}
-          >
-            <Search size={16} />
-          </button>
-        )}
         <button
           className="side-head-action"
           data-tip={t('explorer.collapse')}
@@ -434,6 +420,18 @@ export function Explorer({
           <div className="side-section side-section--conns">
             <div className="side-section-head">
               <span className="side-section-title">Connections</span>
+              <button
+                className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
+                data-tip={t('explorer.search')}
+                aria-label={t('explorer.search')}
+                aria-pressed={searchOpen}
+                onClick={() => {
+                  if (searchOpen) setSearch('')
+                  setSearchOpen((open) => !open)
+                }}
+              >
+                <Search size={16} />
+              </button>
             </div>
             <div className="explorer-body">
               {connections.length === 0 && (
