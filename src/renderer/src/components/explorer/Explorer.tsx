@@ -614,7 +614,12 @@ function ConnectionRow({
         ) : null}
       </span>
       <div className="conn-text">
-        <div className="conn-name">{conn.name}</div>
+        <div
+          className="conn-name"
+          style={{ color: conn.color ? `color-mix(in srgb, ${conn.color} 60%, var(--text-secondary))` : undefined }}
+        >
+          {conn.name}
+        </div>
         <div className="conn-sub" data-tip={sub} data-tip-overflow="">
           {sub}
         </div>

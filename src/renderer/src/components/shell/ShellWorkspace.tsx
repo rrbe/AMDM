@@ -171,11 +171,16 @@ export function ShellWorkspace(): JSX.Element {
 function TabBar(): JSX.Element {
   const { t } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
+  const connections = useAppStore((s) => s.connections)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
   const newTab = useAppStore((s) => s.newTab)
   const stripRef = useRef<HTMLDivElement>(null)
+  const connectionTextColor = (connectionId: string | null): string | undefined => {
+    const color = connections.find((conn) => conn.id === connectionId)?.color
+    return color ? `color-mix(in srgb, ${color} 60%, var(--text-secondary))` : undefined
+  }
 
   useEffect(() => {
     const strip = stripRef.current
@@ -214,7 +219,9 @@ function TabBar(): JSX.Element {
           label: (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                {tabLabel(tab, index)}
+                <span style={{ color: connectionTextColor(tab.connectionId) }}>
+                  {tabLabel(tab, index)}
+                </span>
               </span>
               <small className="shrink-0 text-[11px] text-muted-foreground">
                 {tab.activeDatabase}
@@ -239,7 +246,11 @@ function TabBar(): JSX.Element {
             active={tab.id === activeTabId}
             className="qtab"
             dataTabId={tab.id}
-            label={tabLabel(tab, i)}
+            label={
+              <span style={{ color: connectionTextColor(tab.connectionId) }}>
+                {tabLabel(tab, i)}
+              </span>
+            }
             closeLabel={t('shell.closeTab')}
             onSelect={() => setActiveTab(tab.id)}
             onClose={() => closeTab(tab.id)}
