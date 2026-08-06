@@ -21,6 +21,7 @@
  * NOTE on `unknown`: EJSON values arrive as `unknown` over IPC; we narrow with
  * runtime checks rather than trusting a shared type, since the shape is dynamic.
  */
+import type { CollectionSort } from '@shared/types'
 
 export type ValueType =
   | 'objectId'
@@ -268,12 +269,13 @@ export function isExpandable(value: unknown): boolean {
  * entries; arrays yield index→value. EJSON wrappers (and primitives) are leaves
  * and yield nothing.
  */
-export function entriesOf(value: unknown): Array<[string, unknown]> {
+export function entriesOf(value: unknown, sort: CollectionSort = 'natural'): Array<[string, unknown]> {
   if (Array.isArray(value)) {
     return value.map((v, i) => [String(i), v] as [string, unknown])
   }
   if (isPlainObject(value) && !isExtended(value)) {
-    return Object.entries(value)
+    const entries = Object.entries(value)
+    return sort === 'alpha' ? entries.sort(([a], [b]) => a.localeCompare(b)) : entries
   }
   return []
 }

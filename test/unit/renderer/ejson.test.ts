@@ -113,6 +113,16 @@ describe('isExpandable / entriesOf / summarize on containers', () => {
       ['b', 2]
     ])
   })
+  it('sorts object fields alphabetically without reordering arrays', () => {
+    expect(entriesOf({ b: 1, a: 2 }, 'alpha')).toEqual([
+      ['a', 2],
+      ['b', 1]
+    ])
+    expect(entriesOf(['b', 'a'], 'alpha')).toEqual([
+      ['0', 'b'],
+      ['1', 'a']
+    ])
+  })
   it('summarize gives a one-line count for collapsed containers', () => {
     expect(summarize([1, 2, 3])).toBe('[ 3 ]')
     expect(summarize({ a: 1, b: 2 })).toBe('{ 2 fields }')

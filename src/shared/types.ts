@@ -428,7 +428,7 @@ export interface AppSettings {
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  collectionSort: 'natural',
+  collectionSort: 'alpha',
   theme: 'system',
   language: 'system',
   sidebarWidth: 270,

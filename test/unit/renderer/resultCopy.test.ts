@@ -8,6 +8,7 @@ import {
   toShellText,
   toStrictEjson,
   plainScalarText,
+  compactJsonPreview,
   toCsv,
   toTsv
 } from '@renderer/lib/resultCopy'
@@ -50,6 +51,17 @@ describe('plainScalarText', () => {
   })
 })
 
+describe('compactJsonPreview', () => {
+  it('shows object content and bounds long previews', () => {
+    expect(compactJsonPreview([{ country: 'US', zipCode: '90220' }])).toBe(
+      '[\n  {\n    "country": "US",\n    "zipCode": "90220"\n  }\n]'
+    )
+    const preview = compactJsonPreview({ message: 'a'.repeat(100) }, 24)
+    expect(preview).toHaveLength(24)
+    expect(preview.endsWith('…')).toBe(true)
+  })
+})
+
 describe('toPlainJson / toStrictEjson / toShellText', () => {
   const doc = { _id: { $oid: OID }, n: { $numberInt: '5' } }
   it('toPlainJson pretty-prints the collapsed value', () => {
@@ -77,6 +89,11 @@ describe('CSV / TSV (RFC-4180 quoting)', () => {
   })
   it('derives a header from the union of columns; missing cells are empty', () => {
     expect(toCsv([{ a: 1 }, { b: 2 }])).toBe('a,b\n1,\n,2')
+  })
+  it('uses the same configurable field order as the table', () => {
+    const docs = [{ b: 1, a: 2 }]
+    expect(toCsv(docs)).toBe('a,b\n2,1')
+    expect(toCsv(docs, 'natural')).toBe('b,a\n1,2')
   })
   it('renders an ObjectId cell as its hex and an array cell as compact JSON', () => {
     expect(toCsv([{ id: { $oid: OID }, tags: [1, 2] }])).toBe(`id,tags\n${OID},"[1,2]"`)

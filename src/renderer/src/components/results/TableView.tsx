@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import type { CollectionSort } from '@shared/types'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
@@ -10,6 +11,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
 import {
   copyText,
+  compactJsonPreview,
   plainScalarText,
   toCsv,
   toPlainJson,
@@ -21,6 +23,8 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
+import { JsonView } from './JsonView'
+import { Modal } from '@renderer/components/common/Modal'
 
 /**
  * Virtualized table.
@@ -56,8 +60,10 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
+  const fieldSort = useAppStore((s) => s.settings.collectionSort)
   // Document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
+  const [preview, setPreview] = useState<{ column: string; value: unknown } | null>(null)
   // Inline edit: which cell, and whether the last commit failed validation.
   const [editing, setEditing] = useState<{ row: number; col: string } | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
@@ -92,7 +98,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     window.addEventListener('mouseup', onUp)
   }
 
-  const columns = useMemo<string[]>(() => deriveColumns(docs), [docs])
+  const columns = useMemo<string[]>(() => deriveColumns(docs, fieldSort), [docs, fieldSort])
 
   const rowVirtualizer = useVirtualizer({
     count: docs.length,
@@ -103,6 +109,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
 
   // Cmd/Ctrl+C: selected rows → a plain-JSON array; else the selected cell.
   useCopyHotkey(() => {
+    if (preview) return null
     if (selectedRows.size > 0) {
       const picked = [...selectedRows].sort((a, b) => a - b).map((i) => docs[i])
       return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
@@ -188,7 +195,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       setSelectedCell(col ? { row, col } : null)
       setAnchorRow(row)
     }
-    const items = tableMenuItems(rows, row, col, docs)
+    const items = tableMenuItems(rows, row, col, docs, fieldSort)
     const doc = docs[row]
     if (docCtx && docHasId(doc)) {
       items.push({ label: t('table.editDoc'), onClick: () => setEditIndex(row) })
@@ -220,6 +227,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       // lands in the inline cell editor so editing keeps focus.
       tabIndex={-1}
       onMouseDown={(e) => {
+        if (!e.currentTarget.contains(e.target as Node)) return
         if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
           claimCopyFocus(parentRef.current)
       }}
@@ -270,6 +278,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                   editError={editError}
                   onClick={(e) => clickCell(vi.index, col, e)}
                   onDoubleClick={() => canEditCell(vi.index, col) && startEditCell(vi.index, col)}
+                  onOpen={(value) => setPreview({ column: col, value })}
                   onCommit={(text) => void commitCell(vi.index, col, text)}
                   onCancel={() => {
                     setEditing(null)
@@ -294,6 +303,21 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
         />
       )}
 
+      {preview && (
+        <Modal
+          title={preview.column}
+          className="h-[420px] min-h-[300px] min-w-[380px] resize"
+          bodyClassName="flex-1 overflow-hidden"
+          backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
+          movable
+          onClose={() => setPreview(null)}
+        >
+          <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
+            <JsonView value={preview.value} />
+          </div>
+        </Modal>
+      )}
+
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
       )}
@@ -306,7 +330,8 @@ function tableMenuItems(
   rows: number[],
   row: number,
   col: string | null,
-  docs: unknown[]
+  docs: unknown[],
+  fieldSort: CollectionSort
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = []
   if (col) {
@@ -319,8 +344,8 @@ function tableMenuItems(
   items.push({ label: i18n.t('table.copyRowsPureJson', { count: rows.length }), onClick: () => void copyText(many ? toPlainJson(sel) : toPlainJson(single)) })
   items.push({ label: i18n.t('table.copyRowMongoShell'), onClick: () => void copyText(many ? toShellText(sel) : toShellText(single)) })
   items.push({ label: i18n.t('table.copyRowExtendedJson'), onClick: () => void copyText(many ? toStrictEjson(sel) : toStrictEjson(single)) })
-  items.push({ label: i18n.t('table.copyCsv'), onClick: () => void copyText(toCsv(sel)) })
-  items.push({ label: i18n.t('table.copyTsv'), onClick: () => void copyText(toTsv(sel)) })
+  items.push({ label: i18n.t('table.copyCsv'), onClick: () => void copyText(toCsv(sel, fieldSort)) })
+  items.push({ label: i18n.t('table.copyTsv'), onClick: () => void copyText(toTsv(sel, fieldSort)) })
   return items
 }
 
@@ -333,6 +358,7 @@ function Cell({
   editError,
   onClick,
   onDoubleClick,
+  onOpen,
   onCommit,
   onCancel,
   onContextMenu
@@ -345,6 +371,7 @@ function Cell({
   editError: string | null
   onClick: (e: MouseEvent) => void
   onDoubleClick: () => void
+  onOpen: (value: unknown) => void
   onCommit: (text: string) => void
   onCancel: () => void
   onContextMenu: (e: MouseEvent) => void
@@ -387,13 +414,22 @@ function Cell({
         : formatScalar(value)
   const text = typeof display === 'string' ? display : display.text
   const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
+  const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
   return (
     <div
       className={cellCls}
-      style={{ width }}
-      data-tip={text}
+      style={{ width, cursor: expandable ? 'pointer' : undefined }}
+      data-tip={expandable ? compactJsonPreview(value) : text}
+      role={expandable ? 'button' : undefined}
+      tabIndex={expandable ? 0 : undefined}
       onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onKeyDown={(e) => {
+        if (expandable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          onOpen(value)
+        }
+      }}
+      onDoubleClick={() => (expandable ? onOpen(value) : onDoubleClick())}
       onContextMenu={onContextMenu}
     >
       <span className={cls}>{text}</span>

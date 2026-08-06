@@ -75,6 +75,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
+  const fieldSort = useAppStore((s) => s.settings.collectionSort)
   // Index of the document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
   // Inline edit: which leaf node is being edited, and whether the last commit
@@ -127,7 +128,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
         docIndex
       })
       if (isOpen) {
-        for (const [childKey, childVal] of entriesOf(value)) {
+        for (const [childKey, childVal] of entriesOf(value, fieldSort)) {
           walk(childKey, childVal, depth + 1, `${path}.${childKey}`)
         }
       }
@@ -136,7 +137,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
     // expand state and child paths).
     docs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
     return out
-  }, [docs, expanded])
+  }, [docs, expanded, fieldSort])
 
   const rowVirtualizer = useVirtualizer({
     count: flat.length,

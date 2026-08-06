@@ -1,6 +1,14 @@
-import { useCallback, useId, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useId,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogClose, DialogTitle } from '@renderer/components/ui/Dialog'
+import { clampModalPosition } from '@renderer/lib/modalPosition'
 import { cn } from '@renderer/lib/utils'
 
 // Focusable controls we want to land initial focus on (scoped to the body, which
@@ -20,8 +28,21 @@ interface ModalProps {
   /** Width preset. `small` is kept for back-compat (= 'sm'). Default 'md'. */
   small?: boolean
   size?: 'sm' | 'md' | 'lg'
+  className?: string
+  bodyClassName?: string
+  backdropClassName?: string
+  /** Let the user move the modal by dragging its title bar. */
+  movable?: boolean
   /** Keep the opening top edge fixed while body content changes height. */
   lockTop?: boolean
+}
+
+interface ModalDrag {
+  pointerId: number
+  startX: number
+  startY: number
+  left: number
+  top: number
 }
 
 /**
@@ -41,22 +62,82 @@ export function Modal({
   footer,
   small,
   size,
+  className,
+  bodyClassName,
+  backdropClassName,
+  movable = false,
   lockTop = false
 }: ModalProps): JSX.Element {
   const { t } = useTranslation()
   const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
+  const popupElementRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<ModalDrag | null>(null)
   const [openingHalfHeight, setOpeningHalfHeight] = useState<number | null>(null)
   const width = small ? 'sm' : (size ?? 'md')
   const sheet = description != null || headerActions != null || navigation != null
   const popupRef = useCallback(
     (popup: HTMLDivElement | null) => {
+      popupElementRef.current = popup
+      if (movable && popup) {
+        const rect = popup.getBoundingClientRect()
+        popup.style.left = `${rect.left}px`
+        popup.style.top = `${rect.top}px`
+        popup.style.transform = 'none'
+        return
+      }
       if (lockTop && popup) {
         setOpeningHalfHeight((current) => current ?? popup.getBoundingClientRect().height / 2)
       }
     },
-    [lockTop]
+    [lockTop, movable]
   )
+
+  const startMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (
+      !movable ||
+      event.button !== 0 ||
+      (event.target instanceof Element && event.target.closest(FOCUSABLE))
+    )
+      return
+    const popup = popupElementRef.current
+    if (!popup) return
+    const rect = popup.getBoundingClientRect()
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      left: rect.left,
+      top: rect.top
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.preventDefault()
+  }
+
+  const move = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const drag = dragRef.current
+    const popup = popupElementRef.current
+    if (!drag || drag.pointerId !== event.pointerId || !popup) return
+    const rect = popup.getBoundingClientRect()
+    const next = clampModalPosition(
+      drag.left + event.clientX - drag.startX,
+      drag.top + event.clientY - drag.startY,
+      rect.width,
+      rect.height,
+      window.innerWidth,
+      window.innerHeight
+    )
+    popup.style.left = `${next.left}px`
+    popup.style.top = `${next.top}px`
+  }
+
+  const endMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (dragRef.current?.pointerId !== event.pointerId) return
+    dragRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
 
   return (
     <Dialog
@@ -68,8 +149,10 @@ export function Modal({
         'flex max-h-[88vh] max-w-[92vw] flex-col overflow-hidden rounded-[var(--radius-dialog)] border border-[var(--separator)] bg-[var(--surface-elevated)] text-foreground shadow-[var(--shadow-dialog)]',
         width === 'sm' && 'w-[480px]',
         width === 'md' && 'w-[660px]',
-        width === 'lg' && 'w-[760px]'
+        width === 'lg' && 'w-[760px]',
+        className
       )}
+      backdropClassName={backdropClassName}
       popupRef={popupRef}
       aria-labelledby={titleId}
       style={
@@ -86,8 +169,13 @@ export function Modal({
           'flex shrink-0 justify-between',
           sheet
             ? 'items-start gap-4 px-[26px] pb-1 pt-6'
-            : 'items-center border-b border-[var(--separator)] px-6 py-4 text-[15px] font-semibold'
+            : 'items-center border-b border-[var(--separator)] px-6 py-4 text-[15px] font-semibold',
+          movable && 'cursor-move touch-none select-none'
         )}
+        onPointerDown={startMove}
+        onPointerMove={move}
+        onPointerUp={endMove}
+        onPointerCancel={endMove}
       >
         <div className="min-w-0 flex-1">
           <DialogTitle
@@ -122,7 +210,11 @@ export function Modal({
         </div>
       )}
       <div
-        className={cn('min-h-0 overflow-y-auto', sheet ? 'px-[26px] pb-2 pt-[22px]' : 'px-6 py-5')}
+        className={cn(
+          'min-h-0 overflow-y-auto',
+          sheet ? 'px-[26px] pb-2 pt-[22px]' : 'px-6 py-5',
+          bodyClassName
+        )}
         ref={bodyRef}
       >
         {children}

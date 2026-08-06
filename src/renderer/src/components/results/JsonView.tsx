@@ -29,19 +29,19 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
  */
 
 interface JsonViewProps {
-  docs: unknown[]
+  value: unknown
 }
 
 const LINE_HEIGHT = 19
 
-export function JsonView({ docs }: JsonViewProps): JSX.Element {
+export function JsonView({ value }: JsonViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo<JsonLine[]>(() => toJsonLines(docs), [docs])
+  const lines = useMemo<JsonLine[]>(() => toJsonLines(value), [value])
 
   const virtualizer = useVirtualizer({
     count: lines.length,
@@ -51,7 +51,7 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
   })
 
   // A fresh result clears any lingering "all selected" state.
-  useEffect(() => setAllSelected(false), [docs])
+  useEffect(() => setAllSelected(false), [value])
 
   // Cmd/Ctrl+A → mark the whole result selected (and kill the overflowing
   // native select-all). Cmd+C then copies the full plain JSON.
@@ -71,16 +71,16 @@ export function JsonView({ docs }: JsonViewProps): JSX.Element {
   // ⌘C with no drag-selection copies the whole result as pure JSON (the JSON
   // view has no per-row/cell selection model); a real text selection still
   // falls through to native copy inside useCopyHotkey.
-  useCopyHotkey(() => toPlainJson(docs))
+  useCopyHotkey(() => toPlainJson(value))
 
   const openMenu = (e: MouseEvent): void => {
     e.preventDefault()
     const sel = window.getSelection()
     const selText = sel && !sel.isCollapsed ? sel.toString() : ''
     const items: ContextMenuItem[] = [
-      { label: i18n.t('result.copy.pureJson'), onClick: () => void copyText(toPlainJson(docs)) },
-      { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(docs)) },
-      { label: i18n.t('result.copy.extendedJson'), onClick: () => void copyText(toStrictEjson(docs)) }
+      { label: i18n.t('result.copy.pureJson'), onClick: () => void copyText(toPlainJson(value)) },
+      { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(value)) },
+      { label: i18n.t('result.copy.extendedJson'), onClick: () => void copyText(toStrictEjson(value)) }
     ]
     if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })

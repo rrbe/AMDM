@@ -7,11 +7,18 @@ import { deriveColumns, cellValue } from '@renderer/lib/tableShape'
 const OID = '64b7f0f0f0f0f0f0f0f0f0f0'
 
 describe('deriveColumns', () => {
-  it('unions top-level fields in first-seen order', () => {
-    expect(deriveColumns([{ b: 1 }, { a: 2 }, { b: 3, c: 4 }])).toEqual(['b', 'a', 'c'])
+  it('sorts the union of top-level fields alphabetically by default', () => {
+    expect(deriveColumns([{ b: 1 }, { a: 2 }, { b: 3, c: 4 }])).toEqual(['a', 'b', 'c'])
   })
-  it('flattens nested plain objects ONE level', () => {
-    expect(deriveColumns([{ address: { city: 'x', zip: '1' } }])).toEqual(['address.city', 'address.zip'])
+  it('keeps the union of top-level fields in first-seen order when requested', () => {
+    expect(deriveColumns([{ b: 1 }, { a: 2 }, { b: 3, c: 4 }], 'natural')).toEqual([
+      'b',
+      'a',
+      'c'
+    ])
+  })
+  it('keeps nested plain objects as a single column', () => {
+    expect(deriveColumns([{ address: { city: 'x', zip: '1' } }])).toEqual(['address'])
   })
   it('does NOT flatten EJSON wrappers (they are scalar leaves)', () => {
     expect(deriveColumns([{ id: { $oid: OID } }])).toEqual(['id'])
@@ -43,11 +50,8 @@ describe('cellValue', () => {
   it('reports a missing top-level field', () => {
     expect(cellValue({ a: 1 }, 'b')).toEqual({ present: false, value: undefined })
   })
-  it('navigates one dot level', () => {
-    expect(cellValue({ address: { city: 'x' } }, 'address.city')).toEqual({ present: true, value: 'x' })
-  })
-  it('reports a missing nested field', () => {
-    expect(cellValue({ address: { city: 'x' } }, 'address.zip')).toEqual({
+  it('does not navigate into a nested object', () => {
+    expect(cellValue({ address: { city: 'x' } }, 'address.city')).toEqual({
       present: false,
       value: undefined
     })

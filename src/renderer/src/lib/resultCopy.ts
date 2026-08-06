@@ -16,6 +16,7 @@
 import { isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
 import { cellValue, deriveColumns } from './tableShape'
+import type { CollectionSort } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import i18n from '@renderer/i18n'
 
@@ -126,6 +127,12 @@ export function plainScalarText(value: unknown): string {
   return JSON.stringify(p, null, 2)
 }
 
+/** Formatted, bounded JSON for previews such as table-cell tooltips. */
+export function compactJsonPreview(value: unknown, maxLength = 240): string {
+  const text = JSON.stringify(toPlainValue(value), null, 2) ?? String(value)
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text
+}
+
 // ----------------------------------------------------------------- CSV / TSV
 
 /** Quote a field (doubling internal quotes) only when it contains the delimiter,
@@ -148,8 +155,8 @@ function cellText(doc: unknown, column: string): string {
 
 /** Serialize docs as a delimited table (header row + one row per doc), using the
     same column derivation as the Table view. */
-function toDelimited(docs: unknown[], delimiter: string): string {
-  const cols = deriveColumns(docs)
+function toDelimited(docs: unknown[], delimiter: string, sort: CollectionSort): string {
+  const cols = deriveColumns(docs, sort)
   const header = cols.map((c) => escapeField(c, delimiter)).join(delimiter)
   const rows = docs.map((doc) =>
     cols.map((c) => escapeField(cellText(doc, c), delimiter)).join(delimiter)
@@ -158,13 +165,13 @@ function toDelimited(docs: unknown[], delimiter: string): string {
 }
 
 /** Comma-separated table with a header row. */
-export function toCsv(docs: unknown[]): string {
-  return toDelimited(docs, ',')
+export function toCsv(docs: unknown[], sort: CollectionSort = 'alpha'): string {
+  return toDelimited(docs, ',', sort)
 }
 
 /** Tab-separated table with a header row (pastes cleanly into Excel/Sheets). */
-export function toTsv(docs: unknown[]): string {
-  return toDelimited(docs, '\t')
+export function toTsv(docs: unknown[], sort: CollectionSort = 'alpha'): string {
+  return toDelimited(docs, '\t', sort)
 }
 
 /**

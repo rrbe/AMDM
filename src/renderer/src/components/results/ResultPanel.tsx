@@ -41,6 +41,7 @@ export function ResultPanel({
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
   const view = useAppStore((s) => s.resultView)
+  const fieldSort = useAppStore((s) => s.settings.collectionSort)
   const setView = useAppStore((s) => s.setResultView)
   const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
@@ -239,7 +240,7 @@ export function ResultPanel({
         ) : (
           <>
             {view === 'tree' && <TreeView docs={docs} docCtx={docCtx} />}
-            {view === 'json' && <JsonView docs={docs} />}
+            {view === 'json' && <JsonView value={docs} />}
             {view === 'table' && <TableView docs={docs} docCtx={docCtx} />}
           </>
         )}
@@ -254,8 +255,8 @@ export function ResultPanel({
             { label: t('result.copy.pureJson'), onClick: () => copyWithFeedback(toPlainJson(docs)) },
             { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
             { label: t('result.copy.extendedJson'), onClick: () => copyWithFeedback(toStrictEjson(docs)) },
-            { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs)) },
-            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs)) }
+            { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
+            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
         />
       )}
