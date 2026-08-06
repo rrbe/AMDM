@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AMDM 浅色界面概念稿</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+        --canvas: #ececef;
+        --surface: #ffffff;
+        --sidebar: rgba(247, 247, 248, 0.9);
+        --soft: #f5f5f7;
+        --hover: rgba(22, 24, 29, 0.045);
+        --selected: rgba(22, 24, 29, 0.075);
+        --selected-strong: rgba(22, 24, 29, 0.11);
+        --line: rgba(22, 24, 29, 0.09);
+        --text: #202124;
+        --text-2: #55585f;
+        --text-3: #898c93;
+        --ink: #242529;
+        --green: #2d9b63;
+        --blue: #4f73d9;
+        --orange: #c66a3d;
+        --purple: #8657b8;
+        --radius: 8px;
+        --shadow-window: 0 28px 80px rgba(24, 24, 28, 0.18), 0 3px 12px rgba(24, 24, 28, 0.08);
+        --shadow-float: 0 28px 80px rgba(24, 24, 28, 0.22), 0 4px 18px rgba(24, 24, 28, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        min-width: 980px;
+        min-height: 680px;
+        padding: 24px;
+        overflow: hidden;
+        color: var(--text);
+        background: var(--canvas);
+        font-size: 13px;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      .app-window {
+        position: relative;
+        display: grid;
+        grid-template-columns: 270px minmax(0, 1fr);
+        width: min(1440px, calc(100vw - 48px));
+        height: min(900px, calc(100vh - 48px));
+        min-height: 632px;
+        overflow: hidden;
+        border: 1px solid rgba(22, 24, 29, 0.08);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: var(--shadow-window);
+      }
+
+      .sidebar {
+        position: relative;
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        padding: 0 10px;
+        background: var(--sidebar);
+        backdrop-filter: blur(28px) saturate(1.25);
+        -webkit-backdrop-filter: blur(28px) saturate(1.25);
+      }
+
+      .window-head {
+        display: flex;
+        height: 54px;
+        flex: 0 0 54px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px 0 2px;
+      }
+
+      .traffic-lights {
+        display: flex;
+        gap: 8px;
+        padding-left: 2px;
+      }
+
+      .traffic-lights i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+      }
+
+      .traffic-lights i:nth-child(1) {
+        background: #ff5f57;
+      }
+
+      .traffic-lights i:nth-child(2) {
+        background: #febc2e;
+      }
+
+      .traffic-lights i:nth-child(3) {
+        background: #28c840;
+      }
+
+      .icon-button,
+      .nav-item,
+      .row,
+      .tab,
+      .view-switch button,
+      .ghost-action,
+      .button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .icon-button {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        padding: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-3);
+      }
+
+      .icon-button:hover,
+      .ghost-action:hover {
+        background: var(--hover);
+        color: var(--text);
+      }
+
+      svg.icon {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.7;
+      }
+
+      .sidebar-nav {
+        display: flex;
+        gap: 3px;
+        padding: 2px 0 15px;
+      }
+
+      .nav-item {
+        display: inline-flex;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 0 10px;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--text-3);
+      }
+
+      .nav-item.is-active {
+        background: var(--selected);
+        color: var(--text);
+        font-weight: 560;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 2px 7px 8px;
+      }
+
+      .section-title {
+        flex: 1;
+        color: var(--text-2);
+        font-size: 12px;
+        font-weight: 560;
+      }
+
+      .tree {
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+        padding-bottom: 8px;
+      }
+
+      .row {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        height: 30px;
+        align-items: center;
+        gap: 7px;
+        padding: 0 8px;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-2);
+        text-align: left;
+      }
+
+      .row:hover {
+        background: var(--hover);
+      }
+
+      .row.is-active {
+        background: var(--selected);
+        color: var(--text);
+      }
+
+      .row.connection {
+        height: 42px;
+        margin-bottom: 2px;
+      }
+
+      .row.child {
+        padding-left: 27px;
+      }
+
+      .row.grandchild {
+        padding-left: 47px;
+      }
+
+      .twisty {
+        width: 11px;
+        color: var(--text-3);
+        font-size: 10px;
+      }
+
+      .database-glyph,
+      .collection-glyph {
+        width: 10px;
+        height: 10px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: #c8c9cd;
+      }
+
+      .collection-glyph {
+        border-radius: 3px;
+        background: #d7d8dc;
+      }
+
+      .conn-copy {
+        min-width: 0;
+        flex: 1;
+        line-height: 1.18;
+      }
+
+      .conn-name,
+      .label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .conn-name {
+        display: block;
+        color: var(--text);
+        font-weight: 520;
+      }
+
+      .conn-sub {
+        display: block;
+        margin-top: 3px;
+        overflow: hidden;
+        color: var(--text-3);
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .status {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: #c5c6ca;
+      }
+
+      .status.online {
+        background: var(--green);
+        box-shadow: 0 0 0 3px rgba(45, 155, 99, 0.1);
+      }
+
+      .new-connection {
+        display: flex;
+        width: calc(100% - 4px);
+        height: 34px;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin: 8px 2px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--selected);
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 560;
+      }
+
+      .new-connection:hover {
+        background: var(--selected-strong);
+      }
+
+      .sidebar-footer {
+        display: grid;
+        height: 46px;
+        flex: 0 0 46px;
+        grid-template-columns: 32px 1fr 32px;
+        align-items: center;
+        padding: 0 2px;
+      }
+
+      .build {
+        color: var(--text-3);
+        font-size: 10px;
+        text-align: center;
+      }
+
+      .workspace {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        background: var(--surface);
+      }
+
+      .tabbar {
+        display: flex;
+        height: 48px;
+        flex: 0 0 48px;
+        align-items: flex-end;
+        gap: 4px;
+        padding: 7px 8px 0;
+        background: #f1f1f3;
+      }
+
+      .tab-strip {
+        display: flex;
+        min-width: 0;
+        height: 41px;
+        flex: 1;
+        align-items: flex-end;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+      }
+
+      .tab-strip::-webkit-scrollbar,
+      .result-tab-strip::-webkit-scrollbar {
+        display: none;
+      }
+
+      .tab {
+        position: relative;
+        display: inline-flex;
+        width: 178px;
+        height: 40px;
+        flex: 0 0 178px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        border-radius: 10px 10px 0 0;
+        background: transparent;
+        color: var(--text-2);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .tab:hover:not(.is-active) {
+        background: rgba(22, 24, 29, 0.045);
+      }
+
+      .tab.is-active {
+        z-index: 2;
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .tab.is-active::before,
+      .tab.is-active::after {
+        position: absolute;
+        bottom: 0;
+        width: 10px;
+        height: 10px;
+        pointer-events: none;
+        content: "";
+      }
+
+      .tab.is-active::before {
+        left: -10px;
+        border-bottom-right-radius: 10px;
+        box-shadow: 5px 5px 0 5px var(--surface);
+      }
+
+      .tab.is-active::after {
+        right: -10px;
+        border-bottom-left-radius: 10px;
+        box-shadow: -5px 5px 0 5px var(--surface);
+      }
+
+      .tab-label {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tab .close {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 18px;
+        border-radius: 50%;
+        color: var(--text-3);
+        font-size: 12px;
+        line-height: 18px;
+        text-align: center;
+      }
+
+      .tab .close:hover {
+        background: var(--selected);
+        color: var(--text);
+      }
+
+      .tab-divider {
+        position: absolute;
+        top: 11px;
+        right: 0;
+        width: 1px;
+        height: 18px;
+        background: rgba(22, 24, 29, 0.14);
+      }
+
+      .tab.is-active .tab-divider,
+      .tab:has(+ .tab.is-active) .tab-divider {
+        opacity: 0;
+      }
+
+      .tab-actions {
+        display: flex;
+        height: 41px;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .tab-picker {
+        position: relative;
+      }
+
+      .tab-picker summary {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 8px;
+        color: var(--text-2);
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .tab-picker summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .tab-picker summary:hover,
+      .tab-picker[open] summary {
+        background: var(--selected);
+      }
+
+      .tab-picker-menu {
+        position: absolute;
+        z-index: 15;
+        top: 36px;
+        right: 0;
+        width: 272px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.97);
+        box-shadow: 0 14px 40px rgba(24, 24, 28, 0.16), 0 2px 8px rgba(24, 24, 28, 0.08);
+        backdrop-filter: blur(20px);
+      }
+
+      .tab-picker-head {
+        padding: 6px 8px 8px;
+        color: var(--text-3);
+        font-size: 11px;
+        font-weight: 560;
+      }
+
+      .tab-picker-item {
+        display: flex;
+        width: 100%;
+        height: 34px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-2);
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .tab-picker-item:hover,
+      .tab-picker-item.is-active {
+        background: var(--selected);
+        color: var(--text);
+      }
+
+      .tab-picker-item span:first-child {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tab-picker-item small {
+        color: var(--text-3);
+      }
+
+      .query-head {
+        display: flex;
+        height: 46px;
+        flex: 0 0 46px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 18px;
+      }
+
+      .breadcrumb {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        color: var(--text-3);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .breadcrumb strong {
+        color: var(--text);
+        font-weight: 560;
+      }
+
+      .breadcrumb code {
+        color: var(--text-2);
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 32px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: var(--selected);
+        font-weight: 560;
+      }
+
+      .button:hover {
+        background: var(--selected-strong);
+      }
+
+      .button.primary {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .button.primary:hover {
+        background: #0f1012;
+      }
+
+      .editor {
+        position: relative;
+        height: 142px;
+        flex: 0 0 142px;
+        margin: 0 14px;
+        padding: 17px 20px;
+        border-radius: 10px;
+        background: #fafafa;
+        color: #313238;
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.75;
+      }
+
+      .editor .line-number {
+        display: inline-block;
+        width: 26px;
+        color: #b1b3b9;
+        user-select: none;
+      }
+
+      .syntax-key {
+        color: var(--purple);
+      }
+
+      .syntax-string {
+        color: var(--green);
+      }
+
+      .syntax-number {
+        color: var(--blue);
+      }
+
+      .results {
+        display: flex;
+        min-height: 0;
+        flex: 1;
+        flex-direction: column;
+      }
+
+      .result-tabbar {
+        display: flex;
+        height: 41px;
+        flex: 0 0 41px;
+        align-items: flex-end;
+        padding: 5px 12px 0;
+        background: #f1f1f3;
+      }
+
+      .result-tab-strip {
+        display: flex;
+        min-width: 0;
+        height: 36px;
+        align-items: flex-end;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .result-tab {
+        width: 190px;
+        height: 35px;
+        flex-basis: 190px;
+        font-size: 12px;
+      }
+
+      .results-head {
+        display: flex;
+        height: 44px;
+        flex: 0 0 44px;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .view-switch {
+        display: flex;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+
+      .view-switch button {
+        height: 28px;
+        padding: 0 10px;
+        border-right: 1px solid var(--line);
+        border-radius: 0;
+        background: transparent;
+        color: var(--text-2);
+        font-size: 11px;
+      }
+
+      .view-switch button:last-child {
+        border-right: 0;
+      }
+
+      .view-switch button.is-active {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .result-meta {
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      .results-spacer {
+        flex: 1;
+      }
+
+      .page-size {
+        height: 28px;
+        padding: 0 22px 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        outline: none;
+        background: var(--surface);
+        color: var(--text-2);
+        font-size: 11px;
+      }
+
+      .pager {
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      .table-wrap {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 0 20px 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+        font-size: 11px;
+      }
+
+      th,
+      td {
+        overflow: hidden;
+        padding: 10px 10px;
+        border-bottom: 1px solid rgba(22, 24, 29, 0.065);
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      th {
+        color: var(--text-3);
+        font-family: inherit;
+        font-weight: 520;
+      }
+
+      tbody tr:hover {
+        background: var(--hover);
+      }
+
+      td.key {
+        color: var(--orange);
+      }
+
+      td.string {
+        color: var(--green);
+      }
+
+      td.number {
+        color: var(--blue);
+      }
+
+      .modal-backdrop {
+        position: absolute;
+        z-index: 20;
+        display: grid;
+        inset: 0;
+        place-items: center;
+        padding: 28px;
+        background: rgba(30, 31, 35, 0.2);
+        backdrop-filter: blur(10px) saturate(0.9);
+        -webkit-backdrop-filter: blur(10px) saturate(0.9);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease;
+      }
+
+      .modal-backdrop.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .connection-sheet {
+        display: flex;
+        width: min(760px, calc(100% - 20px));
+        max-height: min(760px, calc(100% - 24px));
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(22, 24, 29, 0.08);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: var(--shadow-float);
+        transform: translateY(10px) scale(0.985);
+        transition: transform 180ms ease;
+      }
+
+      .modal-backdrop.is-open .connection-sheet {
+        transform: translateY(0) scale(1);
+      }
+
+      .sheet-head {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: flex-start;
+        gap: 18px;
+        padding: 24px 26px 4px;
+      }
+
+      .sheet-title {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .sheet-title h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 630;
+        letter-spacing: -0.02em;
+      }
+
+      .sheet-title p {
+        margin: 6px 0 0;
+        color: var(--text-3);
+        font-size: 12px;
+      }
+
+      .sheet-tools {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .ghost-action {
+        height: 30px;
+        padding: 0 9px;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-2);
+      }
+
+      .sheet-tabs {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 24px;
+        padding: 18px 26px 0;
+      }
+
+      .sheet-tab {
+        position: relative;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text-3);
+        cursor: pointer;
+      }
+
+      .sheet-tab.is-active {
+        color: var(--text);
+        font-weight: 560;
+      }
+
+      .sheet-tab.is-active::after {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--ink);
+        content: "";
+      }
+
+      .sheet-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 22px 26px 10px;
+      }
+
+      .form-section + .form-section {
+        margin-top: 26px;
+      }
+
+      .form-section h2 {
+        margin: 0 0 14px;
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 15px 16px;
+      }
+
+      .field {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      .field label,
+      .field-label {
+        color: var(--text-2);
+        font-size: 11px;
+        font-weight: 540;
+      }
+
+      .input,
+      .select {
+        width: 100%;
+        height: 38px;
+        padding: 0 12px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        outline: none;
+        background: var(--soft);
+        color: var(--text);
+      }
+
+      .input:hover,
+      .select:hover {
+        background: #f1f1f3;
+      }
+
+      .input:focus,
+      .select:focus {
+        border-color: rgba(22, 24, 29, 0.34);
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(22, 24, 29, 0.07);
+      }
+
+      .host-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 112px 30px;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .remove {
+        margin-bottom: 4px;
+      }
+
+      .add-member {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 8px;
+        padding: 4px 2px;
+        border: 0;
+        background: transparent;
+        color: var(--text-2);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .color-row {
+        display: flex;
+        height: 38px;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .color-dot {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 2px solid transparent;
+        border-radius: 50%;
+        background: var(--dot);
+        box-shadow: 0 0 0 1px rgba(22, 24, 29, 0.05);
+        cursor: pointer;
+      }
+
+      .color-dot.is-active {
+        border-color: #fff;
+        box-shadow: 0 0 0 2px var(--ink);
+      }
+
+      .options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 16px;
+      }
+
+      .option {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 4px 0;
+      }
+
+      .option input {
+        width: 15px;
+        height: 15px;
+        margin: 1px 0 0;
+        accent-color: var(--ink);
+      }
+
+      .option strong {
+        display: block;
+        font-size: 12px;
+        font-weight: 560;
+      }
+
+      .option small {
+        display: block;
+        margin-top: 3px;
+        color: var(--text-3);
+        line-height: 1.35;
+      }
+
+      .sheet-footer {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 26px 22px;
+      }
+
+      .sheet-footer .spacer {
+        flex: 1;
+      }
+
+      .test-status {
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      @media (max-width: 1160px) {
+        body {
+          padding: 12px;
+        }
+
+        .app-window {
+          width: calc(100vw - 24px);
+          height: calc(100vh - 24px);
+          grid-template-columns: 244px minmax(0, 1fr);
+        }
+
+        .query-head {
+          padding-right: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg aria-hidden="true" width="0" height="0" style="position: absolute">
+      <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></symbol>
+      <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3" /><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7" /></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" /></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.2 13.4a7.6 7.6 0 0 0 0-2.8l2-1.5-2-3.4-2.5 1a7.2 7.2 0 0 0-2.4-1.4L14 2.7h-4l-.4 2.6a7.2 7.2 0 0 0-2.4 1.4l-2.5-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2.8l-2 1.5 2 3.4 2.5-1a7.2 7.2 0 0 0 2.4 1.4l.4 2.6h4l.4-2.6a7.2 7.2 0 0 0 2.4-1.4l2.5 1 2-3.4z" /></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></symbol>
+    </svg>
+
+    <main class="app-window">
+      <aside class="sidebar">
+        <header class="window-head">
+          <div class="traffic-lights"><i></i><i></i><i></i></div>
+          <button class="icon-button" aria-label="收起侧边栏">
+            <svg class="icon"><use href="#i-panel" /></svg>
+          </button>
+        </header>
+
+        <nav class="sidebar-nav" aria-label="主导航">
+          <button class="nav-item is-active"><svg class="icon"><use href="#i-database" /></svg><span>Data</span></button>
+          <button class="nav-item" aria-label="Saved Queries"><svg class="icon"><use href="#i-bookmark" /></svg></button>
+          <button class="nav-item" aria-label="History"><svg class="icon"><use href="#i-clock" /></svg></button>
+        </nav>
+
+        <div class="section-head">
+          <span class="section-title">Connections</span>
+          <button class="icon-button" aria-label="搜索"><svg class="icon"><use href="#i-search" /></svg></button>
+        </div>
+
+        <div class="tree">
+          <button class="row connection is-active">
+            <span class="twisty">▾</span>
+            <span class="conn-copy"><span class="conn-name">Production Atlas</span><span class="conn-sub">cluster0.mongodb.net</span></span>
+            <span class="status online"></span>
+          </button>
+          <button class="row child"><span class="twisty">▾</span><span class="database-glyph"></span><span class="label">analytics</span></button>
+          <button class="row grandchild is-active"><span class="collection-glyph"></span><span class="label">events</span></button>
+          <button class="row grandchild"><span class="collection-glyph"></span><span class="label">sessions</span></button>
+          <button class="row grandchild"><span class="collection-glyph"></span><span class="label">users</span></button>
+          <button class="row child"><span class="twisty">›</span><span class="database-glyph"></span><span class="label">admin</span></button>
+          <button class="row child"><span class="twisty">›</span><span class="database-glyph"></span><span class="label">app</span></button>
+
+          <button class="row connection" style="margin-top: 8px">
+            <span class="twisty">›</span>
+            <span class="conn-copy"><span class="conn-name">Local Development</span><span class="conn-sub">localhost:27017</span></span>
+            <span class="status"></span>
+          </button>
+        </div>
+
+        <button class="new-connection" id="open-connection"><svg class="icon"><use href="#i-plus" /></svg><span>New Connection</span></button>
+
+        <footer class="sidebar-footer">
+          <button class="icon-button" aria-label="主题"><svg class="icon"><use href="#i-sun" /></svg></button>
+          <span class="build">20260804-1430</span>
+          <button class="icon-button" aria-label="设置"><svg class="icon"><use href="#i-settings" /></svg></button>
+        </footer>
+      </aside>
+
+      <section class="workspace">
+        <header class="tabbar">
+          <div class="tab-strip" aria-label="查询标签">
+            <button class="tab is-active" data-query-tab="events"><span class="tab-label">events</span><span class="close">×</span><span class="tab-divider"></span></button>
+            <button class="tab" data-query-tab="aggregation"><span class="tab-label">Aggregation 1</span><span class="close">×</span><span class="tab-divider"></span></button>
+            <button class="tab" data-query-tab="countries"><span class="tab-label">Orders by Country</span><span class="close">×</span><span class="tab-divider"></span></button>
+            <button class="tab" data-query-tab="slow"><span class="tab-label">Slow Queries</span><span class="close">×</span><span class="tab-divider"></span></button>
+            <button class="tab" data-query-tab="users"><span class="tab-label">Active Users</span><span class="close">×</span><span class="tab-divider"></span></button>
+            <button class="tab" data-query-tab="untitled"><span class="tab-label">Untitled Query</span><span class="close">×</span><span class="tab-divider"></span></button>
+          </div>
+          <div class="tab-actions">
+            <button class="icon-button" aria-label="新建查询"><svg class="icon"><use href="#i-plus" /></svg></button>
+            <details class="tab-picker">
+              <summary aria-label="选择已打开的查询">⌄</summary>
+              <div class="tab-picker-menu">
+                <div class="tab-picker-head">Open Queries · 6</div>
+                <button class="tab-picker-item is-active" data-query-picker="events"><span>events</span><small>analytics</small></button>
+                <button class="tab-picker-item" data-query-picker="aggregation"><span>Aggregation 1</span><small>analytics</small></button>
+                <button class="tab-picker-item" data-query-picker="countries"><span>Orders by Country</span><small>orders</small></button>
+                <button class="tab-picker-item" data-query-picker="slow"><span>Slow Queries</span><small>admin</small></button>
+                <button class="tab-picker-item" data-query-picker="users"><span>Active Users</span><small>app</small></button>
+                <button class="tab-picker-item" data-query-picker="untitled"><span>Untitled Query</span><small>app</small></button>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        <div class="query-head">
+          <div class="breadcrumb"><strong>Production Atlas</strong> &nbsp;›&nbsp; <code>analytics</code> &nbsp;›&nbsp; <code>events</code></div>
+          <button class="button primary"><svg class="icon"><use href="#i-play" /></svg><span>Run</span></button>
+          <button class="icon-button" aria-label="更多操作">•••</button>
+        </div>
+
+        <div class="editor" aria-label="查询编辑器">
+          <div><span class="line-number">1</span>db.events.<span class="syntax-key">find</span>({</div>
+          <div><span class="line-number">2</span>&nbsp;&nbsp;type: <span class="syntax-string">"purchase"</span>,</div>
+          <div><span class="line-number">3</span>&nbsp;&nbsp;amount: { <span class="syntax-key">$gte</span>: <span class="syntax-number">100</span> }</div>
+          <div><span class="line-number">4</span>}).sort({ createdAt: <span class="syntax-number">-1</span> }).limit(<span class="syntax-number">100</span>)</div>
+        </div>
+
+        <section class="results">
+          <div class="result-tabbar">
+            <div class="result-tab-strip" aria-label="查询结果标签">
+              <button class="tab result-tab is-active"><span class="tab-label">Result 3 · 100 docs</span><span class="close">×</span><span class="tab-divider"></span></button>
+              <button class="tab result-tab"><span class="tab-label">Result 2 · 24 docs</span><span class="close">×</span><span class="tab-divider"></span></button>
+              <button class="tab result-tab"><span class="tab-label">Result 1 · 84 docs</span><span class="close">×</span><span class="tab-divider"></span></button>
+            </div>
+          </div>
+          <header class="results-head">
+            <div class="view-switch" aria-label="结果视图">
+              <button>Tree</button>
+              <button>JSON</button>
+              <button class="is-active">Table</button>
+            </div>
+            <span class="result-meta">100 documents · 84 ms</span>
+            <span class="results-spacer"></span>
+            <select class="page-size" aria-label="每页数量"><option>100 / page</option><option>50 / page</option><option>20 / page</option></select>
+            <button class="icon-button" aria-label="上一页">‹</button>
+            <span class="pager">1–100</span>
+            <button class="icon-button" aria-label="下一页">›</button>
+            <button class="icon-button" aria-label="复制全部"><svg class="icon"><use href="#i-copy" /></svg></button>
+            <button class="icon-button" aria-label="展开">↗</button>
+          </header>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th style="width: 25%">_id</th><th style="width: 18%">type</th><th style="width: 14%">amount</th><th style="width: 20%">country</th><th>createdAt</th></tr></thead>
+              <tbody>
+                <tr><td class="key">67a2…91e8</td><td class="string">"purchase"</td><td class="number">249.00</td><td class="string">"Singapore"</td><td>2026-08-04 13:52</td></tr>
+                <tr><td class="key">67a2…91a1</td><td class="string">"purchase"</td><td class="number">168.50</td><td class="string">"China"</td><td>2026-08-04 13:48</td></tr>
+                <tr><td class="key">67a2…905c</td><td class="string">"purchase"</td><td class="number">129.00</td><td class="string">"Japan"</td><td>2026-08-04 13:31</td></tr>
+                <tr><td class="key">67a2…8f02</td><td class="string">"purchase"</td><td class="number">315.80</td><td class="string">"Australia"</td><td>2026-08-04 13:12</td></tr>
+                <tr><td class="key">67a2…8d71</td><td class="string">"purchase"</td><td class="number">199.99</td><td class="string">"United States"</td><td>2026-08-04 12:56</td></tr>
+                <tr><td class="key">67a2…8c19</td><td class="string">"purchase"</td><td class="number">520.00</td><td class="string">"Germany"</td><td>2026-08-04 12:44</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <div class="modal-backdrop" id="connection-modal" aria-hidden="true">
+        <section class="connection-sheet" role="dialog" aria-modal="true" aria-labelledby="connection-title">
+          <header class="sheet-head">
+            <div class="sheet-title"><h1 id="connection-title">New Connection</h1><p>连接信息保留在本机，密码由系统钥匙串安全保存。</p></div>
+            <div class="sheet-tools">
+              <button class="ghost-action">From URL</button>
+              <button class="ghost-action">To URL</button>
+              <button class="icon-button" id="close-connection" aria-label="关闭">×</button>
+            </div>
+          </header>
+
+          <nav class="sheet-tabs" aria-label="连接设置">
+            <button class="sheet-tab is-active">General</button>
+            <button class="sheet-tab">Authentication</button>
+            <button class="sheet-tab">SSH</button>
+            <button class="sheet-tab">TLS</button>
+          </nav>
+
+          <div class="sheet-body">
+            <section class="form-section">
+              <h2>Identity</h2>
+              <div class="form-grid">
+                <div class="field"><label for="connection-name">Connection name</label><input class="input" id="connection-name" value="Production Atlas" /></div>
+                <div class="field"><span class="field-label">Color</span><div class="color-row"><button class="color-dot" style="--dot: #c8c9cd" aria-label="灰色"></button><button class="color-dot is-active" style="--dot: #7798db" aria-label="蓝色"></button><button class="color-dot" style="--dot: #63a783" aria-label="绿色"></button><button class="color-dot" style="--dot: #d4975c" aria-label="橙色"></button><button class="color-dot" style="--dot: #a07dba" aria-label="紫色"></button></div></div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <h2>MongoDB server</h2>
+              <div class="host-row">
+                <div class="field"><label for="host">Host</label><input class="input" id="host" value="cluster0.mongodb.net" /></div>
+                <div class="field"><label for="port">Port</label><input class="input" id="port" value="27017" /></div>
+                <button class="icon-button remove" aria-label="删除地址">×</button>
+              </div>
+              <button class="add-member"><span>＋</span><span>Add member</span></button>
+            </section>
+
+            <section class="form-section">
+              <h2>Connection details</h2>
+              <div class="form-grid">
+                <div class="field"><label for="replica">Replica set</label><input class="input" id="replica" placeholder="Optional" /></div>
+                <div class="field"><label for="read-preference">Read preference</label><select class="select" id="read-preference"><option>Default</option><option>primary</option><option>secondaryPreferred</option></select></div>
+                <div class="field"><label for="database">Default database</label><input class="input" id="database" value="analytics" /></div>
+                <div class="field"><label for="source">Authentication source</label><input class="input" id="source" placeholder="admin" /></div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <h2>Options</h2>
+              <div class="options">
+                <label class="option"><input type="checkbox" checked /><span><strong>Use SRV record</strong><small>Discover hosts from DNS automatically</small></span></label>
+                <label class="option"><input type="checkbox" checked /><span><strong>Retry writes</strong><small>Retry supported write operations once</small></span></label>
+              </div>
+            </section>
+          </div>
+
+          <footer class="sheet-footer">
+            <button class="button">Test Connection</button>
+            <span class="test-status">Ready to test</span>
+            <span class="spacer"></span>
+            <button class="button" id="cancel-connection">Cancel</button>
+            <button class="button primary">Save Connection</button>
+          </footer>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const modal = document.querySelector("#connection-modal");
+      const openModal = () => {
+        modal.classList.add("is-open");
+        modal.setAttribute("aria-hidden", "false");
+        document.querySelector("#connection-name").focus();
+      };
+      const closeModal = () => {
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+        document.querySelector("#open-connection").focus();
+      };
+      document.querySelector("#open-connection").addEventListener("click", openModal);
+      document.querySelector("#close-connection").addEventListener("click", closeModal);
+      document.querySelector("#cancel-connection").addEventListener("click", closeModal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal();
+      });
+      const selectQueryTab = (id) => {
+        document.querySelectorAll("[data-query-tab]").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.queryTab === id));
+        document.querySelectorAll("[data-query-picker]").forEach((item) => item.classList.toggle("is-active", item.dataset.queryPicker === id));
+        document.querySelector(`[data-query-tab="${id}"]`).scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        document.querySelector(".tab-picker").open = false;
+      };
+      document.querySelectorAll("[data-query-tab]").forEach((tab) => tab.addEventListener("click", () => selectQueryTab(tab.dataset.queryTab)));
+      document.querySelectorAll("[data-query-picker]").forEach((item) => item.addEventListener("click", () => selectQueryTab(item.dataset.queryPicker)));
+      document.querySelectorAll(".result-tab").forEach((tab) => tab.addEventListener("click", () => {
+        document.querySelectorAll(".result-tab").forEach((item) => item.classList.toggle("is-active", item === tab));
+      }));
+      document.querySelectorAll(".view-switch button").forEach((button) => button.addEventListener("click", () => {
+        document.querySelectorAll(".view-switch button").forEach((item) => item.classList.toggle("is-active", item === button));
+      }));
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+      });
+    </script>
+  </body>
+</html>

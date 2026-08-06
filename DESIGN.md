@@ -1,11 +1,13 @@
 # AMDM — 设计系统
 
-**Warm Stone + Ink**：暖灰纸面承载内容,石墨色只用于主操作、选中和焦点;语法与数据保留语义色。亮色与暗色同等对待。
+**Neutral Paper + Graphite**：浅色以白色内容面和中性浅灰 Chrome 建立层级;暗色使用无色相倾向的石墨灰,通过同一套语义令牌重新映射表面、文字、边界与数据色。
+
+浅色布局与组件构成以 `prototypes/light-ui-concept.html` 为视觉基准;Electron 使用原生窗口框架,不重复绘制原型中的窗口外壳。
 
 ## 1. 原则与令牌
 
-- 颜色只定义在 `styles/tokens.css`;组件使用语义 token 或 Tailwind 语义类,不写裸 hex。
-- `styles/index.css` 的 `@theme inline` 映射 shadcn 色名。项目的 `--accent` 是品牌 Ink,映射为 `primary`;shadcn `accent` 对应 `--bg-3` hover 底色。
+- 颜色只定义在 `styles/tokens.css`;组件使用 `--surface-*`、`--interaction-*`、`--text-*` 等语义 token 或 Tailwind 语义类,不写裸 hex。
+- `styles/index.css` 的 `@theme inline` 直接映射语义 token;旧 `--bg-*`、`--fg-*` 仅作为迁移期兼容别名。
 - 数据与代码共用 `--t-*` 类型色。新增 BSON 类型时同步修改 `serialize-core.ts`、`lib/ejson.ts` 和 `lib/pineEditorTheme.ts`。
 - 常驻表面保持扁平;阴影只用于菜单、弹窗等真正悬浮层。
 
@@ -40,5 +42,5 @@
 ## 6. 护栏
 
 - Ink 只做结构性强调;不用渐变、装饰性 emoji 或大面积强调填充。
-- 亮暗主题必须同时调整;新增颜色必须同时提供两套值。
+- 亮暗主题共享同一套语义 token;新增颜色必须提供两套映射,不能在业务组件中增加主题分支。
 - 反馈不得引发布局位移;交互基础能力不得绕过现有无障碍原语。
