@@ -37,13 +37,13 @@ export function ContextPanel(): JSX.Element {
             : result.errorName || t('result.errorName')
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-[var(--bg-1)]">
-      <div className="flex h-11 shrink-0 items-center border-b border-border px-3">
+    <div className="flex h-full min-h-0 w-full flex-col bg-[var(--surface-sidebar)]">
+      <div className="flex h-11 shrink-0 items-center px-3">
         <span className="text-[13px] font-semibold text-foreground">{t('context.title')}</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-3">
-        <section className="rounded-[var(--radius-lg)] border border-border bg-[var(--bg-elevated)] p-3">
+      <div className="min-h-0 flex-1 overflow-auto px-3 pb-3">
+        <section className="py-2">
           <h2 className="m-0 mb-2.5 text-[12px] font-medium text-muted-foreground">
             {t('context.target')}
           </h2>
@@ -56,7 +56,7 @@ export function ContextPanel(): JSX.Element {
         </section>
 
         {collection && (
-          <section className="mt-3 rounded-[var(--radius-lg)] border border-border bg-[var(--bg-elevated)] p-3">
+          <section className="mt-4 py-2">
             <h2 className="m-0 mb-2.5 text-[12px] font-medium text-muted-foreground">
               {t('context.collection')}
             </h2>
@@ -90,7 +90,7 @@ export function ContextPanel(): JSX.Element {
           </section>
         )}
 
-        <section className="mt-3 rounded-[var(--radius-lg)] border border-border bg-[var(--bg-elevated)] p-3">
+        <section className="mt-4 py-2">
           <h2 className="m-0 mb-2.5 text-[12px] font-medium text-muted-foreground">
             {t('context.lastResult')}
           </h2>

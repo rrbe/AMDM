@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
@@ -8,6 +8,7 @@ import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { ContextMenu } from '@renderer/components/ContextMenu'
+import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
@@ -299,35 +300,29 @@ function ResultTabStrip({
   const { t } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
+  const stripRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!activeId) return
+    stripRef.current
+      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeId])
+
   return (
-    <div className="result-tabs">
+    <div ref={stripRef} className="result-tabs">
       {results.map((r) => (
-        <div
+        <DocumentTab
           key={r.id}
-          className={r.id === activeId ? 'rtab active' : 'rtab'}
-          onClick={() => setActiveResultTab(r.id)}
-          onAuxClick={(e) => {
-            // Middle-click closes, matching the query-tab convention.
-            if (e.button === 1) {
-              e.preventDefault()
-              closeResultTab(r.id)
-            }
-          }}
-        >
-          <span className="rtab-label" data-tip={r.query ? firstLine(r.query.code) : undefined}>
-            {resultTabLabel(r)}
-          </span>
-          <button
-            className="rtab-close"
-            aria-label={t('result.closeTab')}
-            onClick={(e) => {
-              e.stopPropagation()
-              closeResultTab(r.id)
-            }}
-          >
-            <X size={11} />
-          </button>
-        </div>
+          active={r.id === activeId}
+          className="rtab"
+          dataTabId={r.id}
+          label={resultTabLabel(r)}
+          tooltip={r.query ? firstLine(r.query.code) : undefined}
+          closeLabel={t('result.closeTab')}
+          onSelect={() => setActiveResultTab(r.id)}
+          onClose={() => closeResultTab(r.id)}
+        />
       ))}
     </div>
   )

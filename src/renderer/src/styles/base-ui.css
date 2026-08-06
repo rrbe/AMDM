@@ -44,7 +44,7 @@
   outline: none;
 }
 .ctx-item[data-highlighted] {
-  background: var(--bg-3);
+  background: var(--interaction-hover);
 }
 .ctx-item[data-disabled] {
   color: var(--fg-3);

@@ -33,33 +33,27 @@
 @import './theme-polish.css';
 @import './base-ui.css';
 
-/* ---------------------------------------------------------------------------
-   Bridge Tailwind/shadcn utility color names → our semantic tokens (defined in
-   tokens.css). `inline` makes utilities reference var(--*) directly so they
-   re-skin under [data-theme='dark']. NAMING NOTE: our --accent is the brand
-   Ink → mapped to shadcn `primary`; shadcn's `accent` (subtle hover surface)
-   maps to --bg-3. shadcn `input`/`ring` borrow --border-strong/--accent.
-   --------------------------------------------------------------------------- */
+/* Bridge Tailwind/shadcn names to the semantic tokens in tokens.css. */
 @theme inline {
-  --color-background: var(--bg-0);
-  --color-foreground: var(--fg-0);
-  --color-card: var(--bg-elevated);
-  --color-card-foreground: var(--fg-0);
-  --color-popover: var(--bg-elevated);
-  --color-popover-foreground: var(--fg-0);
-  --color-primary: var(--accent);
-  --color-primary-foreground: var(--accent-fg);
-  --color-secondary: var(--bg-2);
-  --color-secondary-foreground: var(--fg-0);
-  --color-muted: var(--bg-1);
-  --color-muted-foreground: var(--fg-2);
-  --color-accent: var(--bg-3);
-  --color-accent-foreground: var(--fg-0);
+  --color-background: var(--surface-content);
+  --color-foreground: var(--text-primary);
+  --color-card: var(--surface-elevated);
+  --color-card-foreground: var(--text-primary);
+  --color-popover: var(--surface-elevated);
+  --color-popover-foreground: var(--text-primary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--surface-control);
+  --color-secondary-foreground: var(--text-primary);
+  --color-muted: var(--surface-sidebar);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--interaction-hover);
+  --color-accent-foreground: var(--text-primary);
   --color-destructive: var(--err);
-  --color-destructive-foreground: #ffffff;
-  --color-border: var(--border);
-  --color-input: var(--border-strong);
-  --color-ring: var(--accent);
+  --color-destructive-foreground: var(--primary-foreground);
+  --color-border: var(--separator);
+  --color-input: var(--separator-strong);
+  --color-ring: var(--primary);
 
   --font-sans: var(--font-ui);
   --font-mono: var(--font-mono);

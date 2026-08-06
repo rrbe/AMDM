@@ -1,5 +1,5 @@
 /* ============================================================================
-   Warm Stone theme — structural touches & component polish
+   Shared structural touches & component polish
    Appended last so these win at equal specificity over the base rules above.
    ============================================================================ */
 
@@ -19,28 +19,28 @@ body {
   input,
   select,
   textarea {
-    background: var(--bg-2);
-    border-radius: var(--radius);
+    background: var(--surface-control);
+    border-radius: var(--radius-control);
     transition:
-      border-color 0.12s,
-      box-shadow 0.12s,
-      background 0.12s;
+      border-color var(--motion-fast) var(--ease-standard),
+      box-shadow var(--motion-fast) var(--ease-standard),
+      background var(--motion-fast) var(--ease-standard);
   }
   input:focus,
   select:focus,
   textarea:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--focus-soft);
   }
 
   /* Buttons stay flat; color and border carry their state. */
   button {
-    background: var(--bg-elevated);
-    border-radius: var(--radius);
+    background: var(--surface-control);
+    border-radius: var(--radius-control);
     transition:
-      background 0.12s,
-      border-color 0.12s,
-      color 0.12s;
+      background var(--motion-fast) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard),
+      color var(--motion-fast) var(--ease-standard);
   }
   button.primary {
     color: var(--accent-fg);
@@ -50,7 +50,7 @@ body {
   }
   button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    box-shadow: 0 0 0 3px var(--focus-soft);
   }
 }
 
@@ -69,84 +69,31 @@ body {
   background: var(--accent-soft-strong);
 }
 
-/* ---- Hairline under the work toolbar ---- */
-.work-header {
-  border-bottom: 1px solid var(--rule);
-}
-
-/* ---- Connection rows: inset sticky band with a quiet selected outline ---- */
+/* ---- Connection rows ---- */
 .conn-item {
-  border-radius: var(--radius-sm);
-}
-.conn-item.active {
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  border-radius: 0 var(--radius-row) var(--radius-row) 0;
 }
 
 /* ---- Catalog tree rows ---- */
 .tree-node {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-row);
 }
 
-/* ---- Result view switcher → segmented control ---- */
-.view-switch {
-  border: 1px solid var(--border);
-  background: var(--bg-2);
-  border-radius: var(--radius);
-  overflow: visible;
-  padding: 2px;
-  gap: 2px;
-}
-.view-switch button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--fg-2);
-  border-radius: var(--radius-sm);
-  padding: 3px 8px;
-  background: transparent;
-}
-.view-switch button:hover {
-  color: var(--fg-0);
-  background: transparent;
-}
-.view-switch button.active {
-  background: var(--bg-elevated);
-  color: var(--fg-0);
-}
-[data-theme='dark'] .view-switch button.active {
-  background: var(--bg-elevated);
-  color: var(--fg-0);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-/* ---- Result meta: warm "truncated" amber ---- */
+/* ---- Result meta ---- */
 .result-meta .truncated {
   color: var(--warn);
 }
 
-/* ---- Table: editorial uppercase column heads with an ink underline ---- */
+/* ---- Table column heads ---- */
 .tbl-head {
-  background: var(--bg-2);
-  border-bottom: 1.5px solid var(--rule);
+  background: var(--surface-content);
 }
 .tbl-th {
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: var(--fg-2);
-}
-
-/* ---- Modal backdrop (the .modal box itself is now Tailwind in common/Modal) ---- */
-.modal-backdrop {
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(3px);
-}
-[data-theme='dark'] .modal-backdrop {
-  background: rgba(0, 0, 0, 0.6);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-muted);
 }
 
 /* ---- Sidebar footer: app-level theme cycle (System / Light / Dark icon) ---- */
@@ -156,8 +103,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-1);
+  background: var(--surface-sidebar);
 }
 .side-foot-build {
   min-width: 0;
@@ -186,8 +132,8 @@ body {
   cursor: pointer;
 }
 .theme-cycle:hover {
-  background: var(--bg-3);
-  color: var(--fg-0);
+  background: var(--interaction-hover);
+  color: var(--text-primary);
 }
 .theme-cycle svg {
   display: block;
@@ -201,15 +147,29 @@ body {
   z-index: 3000;
   max-width: 360px;
   padding: 4px 7px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  color: var(--fg-0);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-popover);
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .conn-signal--connecting::after,
+  .toast {
+    animation: none !important;
+  }
 }

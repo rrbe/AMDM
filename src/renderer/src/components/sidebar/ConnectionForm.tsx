@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ClipboardPaste, Link, MessageSquareText, Plus, Trash2 } from 'lucide-react'
 import type {
@@ -12,7 +12,7 @@ import type {
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
-import { Dialog } from '@renderer/components/ui/Dialog'
+import { Dialog, DialogTitle } from '@renderer/components/ui/Dialog'
 import { Tabs } from '@renderer/components/ui/Tabs'
 import { Field } from '@renderer/components/ui/Field'
 import { Input } from '@renderer/components/ui/Input'
@@ -157,6 +157,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
   // ---- URL popups (From URL / To URL) ----
   const [urlPanel, setUrlPanel] = useState<'from' | 'to' | null>(null)
+  const fromUrlTitleId = useId()
+  const toUrlTitleId = useId()
+  const urlReturnFocusRef = useRef<HTMLButtonElement | null>(null)
   const [parseNote, setParseNote] = useState<string | null>(null)
   // From URL: paste a connection string, parse it into the fields below.
   const [fromText, setFromText] = useState('')
@@ -201,9 +204,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [sshHost, setSshHost] = useState(editing?.ssh.host ?? '')
   const [sshPort, setSshPort] = useState(String(editing?.ssh.port ?? 22))
   const [sshUser, setSshUser] = useState(editing?.ssh.username ?? '')
-  const [sshAuthMethod, setSshAuthMethod] = useState<SshAuthMethod>(
-    editing?.ssh.authMethod ?? 'password'
-  )
+  const [sshAuthMethod, setSshAuthMethod] = useState<SshAuthMethod>(editing?.ssh.authMethod ?? 'password')
   const [privateKeyPath, setPrivateKeyPath] = useState(editing?.ssh.privateKeyPath ?? '')
   const [sshPassword, setSshPassword] = useState('')
   const [sshPasswordTouched, setSshPasswordTouched] = useState(false)
@@ -225,7 +226,10 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
   // Browse for a private key file via the native picker, default to ~/.ssh.
   const browseKey = async (setter: (v: string) => void): Promise<void> => {
-    const p = await pickFile({ title: tFn('connection.ssh.pickKey'), defaultPath: '~/.ssh' })
+    const p = await pickFile({
+      title: tFn('connection.ssh.pickKey'),
+      defaultPath: '~/.ssh'
+    })
     if (p) setter(p)
   }
 
@@ -265,9 +269,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
   // ---- TLS ----
   const [tlsEnabled, setTlsEnabled] = useState(editing?.tls.enabled ?? false)
-  const [allowInvalidCertificates, setAllowInvalid] = useState(
-    editing?.tls.allowInvalidCertificates ?? false
-  )
+  const [allowInvalidCertificates, setAllowInvalid] = useState(editing?.tls.allowInvalidCertificates ?? false)
   const [caFile, setCaFile] = useState(editing?.tls.caFile ?? '')
   const [certificateKeyFile, setCertKeyFile] = useState(editing?.tls.certificateKeyFile ?? '')
 
@@ -313,13 +315,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   // Works while creating or editing. The "include real password" choice only
   // matters when the connection uses username/password auth.
   const authType = inferAuthType({ username, password, authSource })
-  const authError =
-    authType === 'scram' && !username.trim() ? tFn('connection.auth.usernameRequired') : undefined
+  const authError = authType === 'scram' && !username.trim() ? tFn('connection.auth.usernameRequired') : undefined
   const hasPasswordAuth = authType === 'scram' && !!username.trim()
-  const host = useMemo(
-    () => (useSrv ? srvHost.trim() : formatConnectionMembers(members)),
-    [useSrv, srvHost, members]
-  )
+  const host = useMemo(() => (useSrv ? srvHost.trim() : formatConnectionMembers(members)), [useSrv, srvHost, members])
   const membersValid = useMemo(() => connectionMembersAreValid(members), [members])
   const options = useMemo(() => buildConnectionOptions(readPreference, customOptions), [readPreference, customOptions])
 
@@ -360,62 +358,60 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   }
 
   const buildInput = useMemo(
-    () =>
-      (): ConnectionInput => {
-        const input: ConnectionInput = {
-          id: editing?.id ?? genId(),
-          name: name.trim() || 'Untitled',
-          color: color || undefined,
-          useSrv,
-          host: host.trim(),
-          // Ports live beside each seed in `host`; `port` remains only as a
-          // backwards-compatible field for older saved connections.
-          port: undefined,
-          replicaSet: replicaSet.trim() || undefined,
-          defaultDatabase: defaultDatabase.trim() || undefined,
-          options: Object.keys(options).length ? options : undefined,
-          auth: {
-            type: authType,
-            username: authType === 'scram' ? username.trim() || undefined : undefined,
-            authSource: authType === 'scram' ? authSource.trim() || undefined : undefined,
-            mechanism: authType === 'scram' ? mechanism : undefined
-          },
-          ssh: {
-            enabled: sshEnabled,
-            host: sshHost.trim() || undefined,
-            port: Number(sshPort) || 22,
-            username: sshUser.trim() || undefined,
-            authMethod: sshAuthMethod,
-            privateKeyPath:
-              sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined,
-            // Preserve the TOFU-pinned host key across edits (verified silently at connect).
-            pinnedHostKey: editing?.ssh.pinnedHostKey,
-            jump: jumpEnabled
-              ? {
-                  host: jumpHost.trim() || undefined,
-                  port: Number(jumpPort) || 22,
-                  username: jumpUser.trim() || undefined,
-                  authMethod: 'privateKey',
-                  privateKeyPath: jumpKeyPath.trim() || undefined,
-                  pinnedHostKey: editing?.ssh.jump?.pinnedHostKey
-                }
-              : undefined
-          },
-          tls: {
-            enabled: tlsEnabled,
-            allowInvalidCertificates,
-            caFile: caFile.trim() || undefined,
-            certificateKeyFile: certificateKeyFile.trim() || undefined
-          }
+    () => (): ConnectionInput => {
+      const input: ConnectionInput = {
+        id: editing?.id ?? genId(),
+        name: name.trim() || 'Untitled',
+        color: color || undefined,
+        useSrv,
+        host: host.trim(),
+        // Ports live beside each seed in `host`; `port` remains only as a
+        // backwards-compatible field for older saved connections.
+        port: undefined,
+        replicaSet: replicaSet.trim() || undefined,
+        defaultDatabase: defaultDatabase.trim() || undefined,
+        options: Object.keys(options).length ? options : undefined,
+        auth: {
+          type: authType,
+          username: authType === 'scram' ? username.trim() || undefined : undefined,
+          authSource: authType === 'scram' ? authSource.trim() || undefined : undefined,
+          mechanism: authType === 'scram' ? mechanism : undefined
+        },
+        ssh: {
+          enabled: sshEnabled,
+          host: sshHost.trim() || undefined,
+          port: Number(sshPort) || 22,
+          username: sshUser.trim() || undefined,
+          authMethod: sshAuthMethod,
+          privateKeyPath: sshAuthMethod === 'privateKey' ? privateKeyPath.trim() || undefined : undefined,
+          // Preserve the TOFU-pinned host key across edits (verified silently at connect).
+          pinnedHostKey: editing?.ssh.pinnedHostKey,
+          jump: jumpEnabled
+            ? {
+                host: jumpHost.trim() || undefined,
+                port: Number(jumpPort) || 22,
+                username: jumpUser.trim() || undefined,
+                authMethod: 'privateKey',
+                privateKeyPath: jumpKeyPath.trim() || undefined,
+                pinnedHostKey: editing?.ssh.jump?.pinnedHostKey
+              }
+            : undefined
+        },
+        tls: {
+          enabled: tlsEnabled,
+          allowInvalidCertificates,
+          caFile: caFile.trim() || undefined,
+          certificateKeyFile: certificateKeyFile.trim() || undefined
         }
-        // Secrets: only include if the user typed (else keep stored value).
-        if (authType === 'none') input.password = ''
-        else if (passwordTouched) input.password = password
-        if (sshPasswordTouched) input.sshPassword = sshPassword
-        if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
-        if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
-        return input
-      },
+      }
+      // Secrets: only include if the user typed (else keep stored value).
+      if (authType === 'none') input.password = ''
+      else if (passwordTouched) input.password = password
+      if (sshPasswordTouched) input.sshPassword = sshPassword
+      if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
+      if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
+      return input
+    },
     [
       editing,
       name,
@@ -484,19 +480,59 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     setJumpDiagBusy(false)
   }
 
-  const secretPlaceholder = (has?: boolean): string =>
-    has ? tFn('connection.secret.placeholder') : ''
+  const secretPlaceholder = (has?: boolean): string => (has ? tFn('connection.secret.placeholder') : '')
 
   return (
     <Modal
       title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
+      description={tFn('connection.description')}
       onClose={handleModalClose}
       size="lg"
       lockTop
+      headerActions={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={(event) => {
+              urlReturnFocusRef.current = event.currentTarget
+              setFromError(null)
+              setUrlPanel('from')
+            }}
+          >
+            <Plus size={15} />
+            <span>{tFn('connection.uri.fromUrl')}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={(event) => {
+              urlReturnFocusRef.current = event.currentTarget
+              openToUrl()
+            }}
+          >
+            <Link size={15} />
+            <span>{tFn('connection.uri.toUrl')}</span>
+          </Button>
+        </>
+      }
+      navigation={
+        <Tabs<Tab>
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: 'general', label: tFn('connection.tab.general') },
+            { value: 'auth', label: tFn('connection.tab.auth') },
+            { value: 'ssh', label: 'SSH' },
+            { value: 'tls', label: 'TLS' }
+          ]}
+        />
+      }
       footer={
         <>
           <Button
-            variant="ghost"
             busy={testing}
             disabled={!host.trim() || (!useSrv && !membersValid) || !!sshError || !!authError}
             onClick={() => void runTest()}
@@ -518,7 +554,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     ...(test.serverVersion ? [`v${test.serverVersion}`] : []),
                     ...(test.topology ? [test.topology] : [])
                   ].join(' · ')
-                : tFn('connection.testResult.failed', { error: test.error ?? 'unknown' })}
+                : tFn('connection.testResult.failed', {
+                    error: test.error ?? 'unknown'
+                  })}
             </span>
           )}
           {sshError && (
@@ -532,9 +570,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
             </span>
           )}
           <span className="flex-1" />
-          <Button variant="ghost" onClick={onClose}>
-            {tFn('connection.action.cancel')}
-          </Button>
+          <Button onClick={onClose}>{tFn('connection.action.cancel')}</Button>
           <Button
             variant="primary"
             busy={saving}
@@ -546,181 +582,256 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         </>
       }
     >
-      {/* From URL / To URL: two independent one-way helpers, each in its own
-          popup. From URL parses a pasted string INTO the fields; To URL exports
-          the current fields OUT as a connection string. */}
-      <div className="mb-5 flex items-center gap-2">
-        <button
-          type="button"
-          className="inline-flex w-32 items-center justify-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-5 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
-          onClick={() => {
-            setFromError(null)
-            setUrlPanel('from')
-          }}
-        >
-          <Plus size={15} />
-          <span>{tFn('connection.uri.fromUrl')}</span>
-        </button>
-        <button
-          type="button"
-          className="inline-flex w-32 items-center justify-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-secondary px-5 py-1.5 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-[var(--accent)]"
-          onClick={openToUrl}
-        >
-          <Link size={15} />
-          <span>{tFn('connection.uri.toUrl')}</span>
-        </button>
-        {parseNote && <span className="ml-1 text-[12px] text-[var(--ok)]">{parseNote}</span>}
-      </div>
-
-      <Tabs<Tab>
-        value={tab}
-        onChange={setTab}
-        className="mb-5"
-        items={[
-          { value: 'general', label: tFn('connection.tab.general') },
-          { value: 'auth', label: tFn('connection.tab.auth') },
-          { value: 'ssh', label: 'SSH' },
-          { value: 'tls', label: 'TLS' }
-        ]}
-      />
+      {parseNote && <div className="mb-4 text-[12px] text-[var(--ok)]">{parseNote}</div>}
 
       {tab === 'general' && (
         <>
-          <div className="form-grid">
-            <Field label={tFn('connection.general.name')}>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My MongoDB" />
-            </Field>
-            <div className="flex flex-col gap-1.5">
-              <label className="mb-0 text-[11px] font-medium text-muted-foreground">
-                {tFn('connection.general.color')}
-              </label>
-              <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                <button
-                  type="button"
-                  className={cn(
-                    'relative size-6 shrink-0 rounded-full border-2 border-border bg-secondary p-0 transition-colors hover:border-[var(--border-strong)]',
-                    color === '' && 'border-[var(--fg-0)]'
-                  )}
-                  data-tip={tFn('connection.general.noColor')}
-                  aria-label={tFn('connection.general.noColor')}
-                  onClick={() => setColor('')}
-                >
-                  <span
-                    className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
-                    aria-hidden
-                  />
-                </button>
-                {PRESET_COLORS.map((c) => (
+          <section className="connection-form-section">
+            <h2>{tFn('connection.section.identity')}</h2>
+            <div className="form-grid mb-0">
+              <Field label={tFn('connection.general.name')}>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My MongoDB" />
+              </Field>
+              <div className="flex flex-col gap-1.5">
+                <label className="mb-0 text-[11px] font-medium text-muted-foreground">
+                  {tFn('connection.general.color')}
+                </label>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
                   <button
                     type="button"
-                    key={c}
                     className={cn(
-                      'size-6 shrink-0 rounded-full border-2 border-transparent p-0 transition hover:border-[var(--border-strong)]',
-                      color === c && 'border-[var(--fg-0)] shadow-[0_0_0_2px_var(--bg-1)]'
+                      'relative size-5 shrink-0 rounded-full border-2 border-[var(--separator)] bg-[var(--surface-control)] p-0 transition-colors hover:border-[var(--separator-strong)]',
+                      color === '' && 'border-[var(--primary)]'
                     )}
-                    style={{ background: c }}
-                    aria-label={c}
-                    onClick={() => setColor(c)}
-                  />
-                ))}
+                    data-tip={tFn('connection.general.noColor')}
+                    aria-label={tFn('connection.general.noColor')}
+                    onClick={() => setColor('')}
+                  >
+                    <span
+                      className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
+                      aria-hidden
+                    />
+                  </button>
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      type="button"
+                      key={c}
+                      className={cn(
+                        'size-5 shrink-0 rounded-full border-2 border-transparent p-0 transition hover:border-[var(--separator-strong)]',
+                        color === c && 'border-[var(--surface-elevated)] shadow-[0_0_0_2px_var(--primary)]'
+                      )}
+                      style={{ background: c }}
+                      aria-label={c}
+                      onClick={() => setColor(c)}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="form-row">
-            <Checkbox
-              checked={useSrv}
-              onCheckedChange={setUseSrv}
-              label={tFn('connection.general.useSrv')}
-            />
-          </div>
+          <section className="connection-form-section">
+            <h2>{tFn('connection.section.server')}</h2>
+            <div className="form-row">
+              <Checkbox checked={useSrv} onCheckedChange={setUseSrv} label={tFn('connection.general.useSrv')} />
+            </div>
 
-          {useSrv ? (
-            <Field
-              label={tFn('connection.general.srvHost')}
-              hint={tFn('connection.general.srvHostHint')}
-            >
-              <Input
-                value={srvHost}
-                onChange={(e) => setSrvHost(e.target.value)}
-                placeholder="cluster.mongodb.net"
-              />
-            </Field>
-          ) : (
-            <div className="mb-3">
+            {useSrv ? (
+              <Field label={tFn('connection.general.srvHost')} hint={tFn('connection.general.srvHostHint')}>
+                <Input value={srvHost} onChange={(e) => setSrvHost(e.target.value)} placeholder="cluster.mongodb.net" />
+              </Field>
+            ) : (
+              <div>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-medium text-muted-foreground">{tFn('connection.general.hosts')}</div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
+                  >
+                    <Plus size={14} />
+                    {tFn('connection.general.addMember')}
+                  </Button>
+                </div>
+
+                <div className="overflow-visible">
+                  <div className="max-h-[151px] overflow-y-auto">
+                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                      <span>{tFn('connection.general.memberHost')}</span>
+                      <span>{tFn('connection.general.memberPort')}</span>
+                      <span />
+                    </div>
+                    {members.length === 0 ? (
+                      <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noMembers')}</div>
+                    ) : (
+                      members.map((member, index) => (
+                        <div
+                          key={member.id}
+                          className="mt-2 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2"
+                        >
+                          <Input
+                            value={member.host}
+                            aria-label={`${tFn('connection.general.memberHost')} ${index + 1}`}
+                            placeholder="db1.example.com"
+                            onChange={(event) =>
+                              setMembers((current) =>
+                                current.map((row) =>
+                                  row.id === member.id ? { ...row, host: event.target.value } : row
+                                )
+                              )
+                            }
+                          />
+                          <div>
+                            <Input
+                              value={member.port}
+                              inputMode="numeric"
+                              aria-label={`${tFn('connection.general.memberPort')} ${index + 1}`}
+                              placeholder="27017"
+                              onChange={(event) =>
+                                setMembers((current) =>
+                                  current.map((row) =>
+                                    row.id === member.id ? { ...row, port: event.target.value } : row
+                                  )
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="flex items-center justify-center">
+                            <button
+                              type="button"
+                              className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
+                              data-tip={tFn('connection.general.removeMember')}
+                              onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                {members.length > 0 && !membersValid && (
+                  <div className="mt-1.5 text-[11px] text-destructive">{tFn('connection.general.membersInvalid')}</div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="connection-form-section">
+            <h2>{tFn('connection.section.details')}</h2>
+            <div className="form-grid mb-0">
+              <Field label={tFn('connection.general.replicaSet')}>
+                <Input
+                  value={replicaSet}
+                  onChange={(e) => setReplicaSet(e.target.value)}
+                  placeholder={tFn('connection.optional')}
+                />
+              </Field>
+              <Field label={tFn('connection.general.readPreference')}>
+                <Select
+                  value={readPreference}
+                  onChange={setReadPreference}
+                  options={[
+                    {
+                      label: tFn('connection.general.readPreferenceDefault'),
+                      value: ''
+                    },
+                    { label: 'primary', value: 'primary' },
+                    { label: 'primaryPreferred', value: 'primaryPreferred' },
+                    { label: 'secondary', value: 'secondary' },
+                    {
+                      label: 'secondaryPreferred',
+                      value: 'secondaryPreferred'
+                    },
+                    { label: 'nearest', value: 'nearest' }
+                  ]}
+                />
+              </Field>
+              <Field label={tFn('connection.general.defaultDatabase')}>
+                <Input
+                  value={defaultDatabase}
+                  onChange={(e) => setDefaultDatabase(e.target.value)}
+                  placeholder={tFn('connection.optional')}
+                />
+              </Field>
+              <Field label={tFn('connection.auth.authSource')}>
+                <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
+              </Field>
+            </div>
+
+            {sshEnabled && replicaSet.trim() && (
+              <div className="hint">{tFn('connection.general.replicaSetSshIgnored')}</div>
+            )}
+          </section>
+
+          <section className="connection-form-section">
+            <h2>{tFn('connection.section.options')}</h2>
+            <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
                 <div className="text-[11px] font-medium text-muted-foreground">
-                  {tFn('connection.general.hosts')}
+                  {tFn('connection.general.customOptions')}
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() =>
-                    setMembers((current) => [
-                      ...current,
-                      { id: genId(), host: '', port: '27017' }
-                    ])
-                  }
+                  onClick={() => setCustomOptions((current) => [...current, { id: genId(), key: '', value: '' }])}
                 >
                   <Plus size={14} />
-                  {tFn('connection.general.addMember')}
+                  {tFn('connection.general.addOption')}
                 </Button>
               </div>
-
-              <div className="overflow-hidden rounded-md border border-border">
+              <div className="overflow-visible">
                 <div className="max-h-[151px] overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid h-7 grid-cols-[minmax(0,1fr)_112px_44px] items-center bg-[var(--bg-2)] text-[11px] font-medium text-muted-foreground">
-                    <span className="px-3">{tFn('connection.general.memberHost')}</span>
-                    <span className="h-full border-l border-border px-3 py-1.5">
-                      {tFn('connection.general.memberPort')}
-                    </span>
-                    <span className="h-full border-l border-border" />
+                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                    <span>{tFn('connection.general.optionKey')}</span>
+                    <span>{tFn('connection.general.optionValue')}</span>
+                    <span />
                   </div>
-                  {members.length === 0 ? (
-                    <div className="border-t border-border px-3 py-3 text-[12px] text-[var(--fg-3)]">
-                      {tFn('connection.general.noMembers')}
-                    </div>
+                  {customOptions.length === 0 ? (
+                    <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noOptions')}</div>
                   ) : (
-                    members.map((member, index) => (
+                    customOptions.map((option, index) => (
                       <div
-                        key={member.id}
-                        className="grid grid-cols-[minmax(0,1fr)_112px_44px] items-stretch border-t border-border"
+                        key={option.id}
+                        className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2"
                       >
                         <Input
-                          className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
-                          value={member.host}
-                          aria-label={`${tFn('connection.general.memberHost')} ${index + 1}`}
-                          placeholder="db1.example.com"
+                          className="font-mono"
+                          value={option.key}
+                          aria-label={`${tFn('connection.general.optionKey')} ${index + 1}`}
+                          placeholder="retryWrites"
                           onChange={(event) =>
-                            setMembers((current) =>
-                              current.map((row) => (row.id === member.id ? { ...row, host: event.target.value } : row))
+                            setCustomOptions((current) =>
+                              current.map((row) => (row.id === option.id ? { ...row, key: event.target.value } : row))
                             )
                           }
                         />
-                        <div className="border-l border-border">
+                        <div>
                           <Input
-                            className="h-10 rounded-none border-0 bg-transparent px-3 focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
-                            value={member.port}
-                            inputMode="numeric"
-                            aria-label={`${tFn('connection.general.memberPort')} ${index + 1}`}
-                            placeholder="27017"
+                            className="font-mono"
+                            value={option.value}
+                            aria-label={`${tFn('connection.general.optionValue')} ${index + 1}`}
+                            placeholder="true"
                             onChange={(event) =>
-                              setMembers((current) =>
+                              setCustomOptions((current) =>
                                 current.map((row) =>
-                                  row.id === member.id ? { ...row, port: event.target.value } : row
+                                  row.id === option.id ? { ...row, value: event.target.value } : row
                                 )
                               )
                             }
                           />
                         </div>
-                        <div className="flex items-center justify-center border-l border-border">
+                        <div className="flex items-center justify-center">
                           <button
                             type="button"
                             className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
-                            data-tip={tFn('connection.general.removeMember')}
-                            onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
+                            aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
+                            data-tip={tFn('connection.general.removeOption')}
+                            onClick={() => setCustomOptions((current) => current.filter((row) => row.id !== option.id))}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -730,138 +841,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   )}
                 </div>
               </div>
-              {members.length > 0 && !membersValid && (
-                <div className="mt-1.5 text-[11px] text-destructive">
-                  {tFn('connection.general.membersInvalid')}
-                </div>
-              )}
             </div>
-          )}
-
-          <div className="form-grid">
-            <Field label={tFn('connection.general.replicaSet')}>
-              <Input
-                value={replicaSet}
-                onChange={(e) => setReplicaSet(e.target.value)}
-                placeholder={tFn('connection.optional')}
-              />
-            </Field>
-            <Field label={tFn('connection.general.readPreference')}>
-              <Select
-                value={readPreference}
-                onChange={setReadPreference}
-                options={[
-                  {
-                    label: tFn('connection.general.readPreferenceDefault'),
-                    value: ''
-                  },
-                  { label: 'primary', value: 'primary' },
-                  { label: 'primaryPreferred', value: 'primaryPreferred' },
-                  { label: 'secondary', value: 'secondary' },
-                  { label: 'secondaryPreferred', value: 'secondaryPreferred' },
-                  { label: 'nearest', value: 'nearest' }
-                ]}
-              />
-            </Field>
-            <Field label={tFn('connection.general.defaultDatabase')}>
-              <Input
-                value={defaultDatabase}
-                onChange={(e) => setDefaultDatabase(e.target.value)}
-                placeholder={tFn('connection.optional')}
-              />
-            </Field>
-            <Field label={tFn('connection.auth.authSource')}>
-              <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
-            </Field>
-          </div>
-
-          {sshEnabled && replicaSet.trim() && (
-            <div className="hint">{tFn('connection.general.replicaSetSshIgnored')}</div>
-          )}
-
-          <div className="mb-3">
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <div className="text-[11px] font-medium text-muted-foreground">
-                {tFn('connection.general.customOptions')}
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setCustomOptions((current) => [...current, { id: genId(), key: '', value: '' }])}
-              >
-                <Plus size={14} />
-                {tFn('connection.general.addOption')}
-              </Button>
-            </div>
-            <div className="overflow-hidden rounded-md border border-border">
-              <div className="max-h-[151px] overflow-y-auto">
-                <div className="sticky top-0 z-10 grid h-7 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-center bg-[var(--bg-2)] text-[11px] font-medium text-muted-foreground">
-                  <span className="px-3">{tFn('connection.general.optionKey')}</span>
-                  <span className="h-full border-l border-border px-3 py-1.5">
-                    {tFn('connection.general.optionValue')}
-                  </span>
-                  <span className="h-full border-l border-border" />
-                </div>
-                {customOptions.length === 0 ? (
-                  <div className="border-t border-border px-3 py-3 text-[12px] text-[var(--fg-3)]">
-                    {tFn('connection.general.noOptions')}
-                  </div>
-                ) : (
-                  customOptions.map((option, index) => (
-                    <div
-                      key={option.id}
-                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-stretch border-t border-border"
-                    >
-                      <Input
-                        className="h-10 rounded-none border-0 bg-transparent px-3 font-mono focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
-                        value={option.key}
-                        aria-label={`${tFn('connection.general.optionKey')} ${index + 1}`}
-                        placeholder="retryWrites"
-                        onChange={(event) =>
-                          setCustomOptions((current) =>
-                            current.map((row) => (row.id === option.id ? { ...row, key: event.target.value } : row))
-                          )
-                        }
-                      />
-                      <div className="border-l border-border">
-                        <Input
-                          className="h-10 rounded-none border-0 bg-transparent px-3 font-mono focus-visible:border-0 focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
-                          value={option.value}
-                          aria-label={`${tFn('connection.general.optionValue')} ${index + 1}`}
-                          placeholder="true"
-                          onChange={(event) =>
-                            setCustomOptions((current) =>
-                              current.map((row) => (row.id === option.id ? { ...row, value: event.target.value } : row))
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-center border-l border-border">
-                        <button
-                          type="button"
-                          className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
-                          data-tip={tFn('connection.general.removeOption')}
-                          onClick={() => setCustomOptions((current) => current.filter((row) => row.id !== option.id))}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+          </section>
         </>
       )}
 
       {tab === 'auth' && (
         <>
-          <div className="mb-3 text-[11px] text-[var(--fg-3)]">
-            {tFn('connection.auth.emptyMeansNone')}
-          </div>
+          <div className="mb-3 text-[11px] text-[var(--fg-3)]">{tFn('connection.auth.emptyMeansNone')}</div>
           <div className="form-grid">
             <Field label={tFn('connection.auth.username')} error={authError}>
               <Input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -895,11 +882,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       {tab === 'ssh' && (
         <>
           <div className="form-row">
-            <Checkbox
-              checked={sshEnabled}
-              onCheckedChange={setSshEnabled}
-              label={tFn('connection.ssh.enableLabel')}
-            />
+            <Checkbox checked={sshEnabled} onCheckedChange={setSshEnabled} label={tFn('connection.ssh.enableLabel')} />
           </div>
 
           {sshEnabled && (
@@ -921,8 +904,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     value={sshAuthMethod}
                     onChange={setSshAuthMethod}
                     options={[
-                      { label: tFn('connection.ssh.methodPassword'), value: 'password' },
-                      { label: tFn('connection.ssh.methodPrivateKey'), value: 'privateKey' }
+                      {
+                        label: tFn('connection.ssh.methodPassword'),
+                        value: 'password'
+                      },
+                      {
+                        label: tFn('connection.ssh.methodPrivateKey'),
+                        value: 'privateKey'
+                      }
                     ]}
                   />
                 </Field>
@@ -961,10 +950,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                     <Input
                       type="password"
                       value={sshPassphrase}
-                      placeholder={
-                        secretPlaceholder(editing?.hasSshPassphrase) ||
-                        tFn('connection.ssh.passphraseHint')
-                      }
+                      placeholder={secretPlaceholder(editing?.hasSshPassphrase) || tFn('connection.ssh.passphraseHint')}
                       onChange={(e) => {
                         setSshPassphrase(e.target.value)
                         setSshPassphraseTouched(true)
@@ -993,11 +979,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                       <Input value={jumpHost} onChange={(e) => setJumpHost(e.target.value)} />
                     </Field>
                     <Field label={tFn('connection.ssh.jumpPort')}>
-                      <Input
-                        value={jumpPort}
-                        onChange={(e) => setJumpPort(e.target.value)}
-                        placeholder="22"
-                      />
+                      <Input value={jumpPort} onChange={(e) => setJumpPort(e.target.value)} placeholder="22" />
                     </Field>
                   </div>
                   <Field label={tFn('connection.ssh.jumpUsername')}>
@@ -1022,8 +1004,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                       type="password"
                       value={jumpSshPassphrase}
                       placeholder={
-                        secretPlaceholder(editing?.hasJumpSshPassphrase) ||
-                        tFn('connection.ssh.passphraseHint')
+                        secretPlaceholder(editing?.hasJumpSshPassphrase) || tFn('connection.ssh.passphraseHint')
                       }
                       onChange={(e) => {
                         setJumpSshPassphrase(e.target.value)
@@ -1044,11 +1025,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       {tab === 'tls' && (
         <>
           <div className="form-row">
-            <Checkbox
-              checked={tlsEnabled}
-              onCheckedChange={setTlsEnabled}
-              label={tFn('connection.tls.enableLabel')}
-            />
+            <Checkbox checked={tlsEnabled} onCheckedChange={setTlsEnabled} label={tFn('connection.tls.enableLabel')} />
           </div>
 
           {tlsEnabled && (
@@ -1087,18 +1064,22 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[var(--shadow-lg)]"
-        backdropClassName="fixed inset-0 z-[1100] bg-black/35"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-[var(--radius-dialog)] border border-[var(--separator-strong)] bg-[var(--surface-elevated)] p-[18px] shadow-[var(--shadow-dialog)]"
+        backdropClassName="url-popup-backdrop"
+        aria-labelledby={fromUrlTitleId}
+        finalFocus={() => urlReturnFocusRef.current}
       >
         <div className="flex items-start gap-3">
-          <ClipboardPaste size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <ClipboardPaste size={16} className="mt-0.5 shrink-0 text-[var(--primary)]" />
           <div className="flex flex-col gap-0.5">
-            <span className="text-[13px] font-semibold">{tFn('connection.uri.fromUrlTitle')}</span>
+            <DialogTitle id={fromUrlTitleId} render={<span className="text-[13px] font-semibold" />}>
+              {tFn('connection.uri.fromUrlTitle')}
+            </DialogTitle>
             <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.fromUrlHint')}</span>
           </div>
         </div>
         <textarea
-          className="w-full resize-y rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--primary)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           autoFocus
           rows={3}
           spellCheck={false}
@@ -1129,20 +1110,24 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         onOpenChange={(o) => {
           if (!o) setUrlPanel(null)
         }}
-        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-lg border border-[var(--border-strong)] bg-card p-[18px] shadow-[var(--shadow-lg)]"
-        backdropClassName="fixed inset-0 z-[1100] bg-black/35"
+        className="z-[1101]! flex w-[470px] max-w-[92vw] flex-col gap-3.5 rounded-[var(--radius-dialog)] border border-[var(--separator-strong)] bg-[var(--surface-elevated)] p-[18px] shadow-[var(--shadow-dialog)]"
+        backdropClassName="url-popup-backdrop"
+        aria-labelledby={toUrlTitleId}
+        finalFocus={() => urlReturnFocusRef.current}
       >
         <div className="flex items-start gap-3">
-          <Link size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <Link size={16} className="mt-0.5 shrink-0 text-[var(--primary)]" />
           <div className="flex flex-col gap-0.5">
-            <span className="text-[13px] font-semibold">{tFn('connection.uri.toUrlTitle')}</span>
+            <DialogTitle id={toUrlTitleId} render={<span className="text-[13px] font-semibold" />}>
+              {tFn('connection.uri.toUrlTitle')}
+            </DialogTitle>
             <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.toUrlHint')}</span>
           </div>
         </div>
         {/* Editable: regenerated on open / password-toggle, but the user can tweak
             it before copying. Copy uses whatever is in the box. */}
         <textarea
-          className="w-full resize-y rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--primary)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           rows={3}
           spellCheck={false}
           autoComplete="off"
@@ -1157,7 +1142,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         />
         {hasPasswordAuth && (
           <Checkbox
-            className="w-full gap-2.5 rounded-md border border-border bg-secondary px-3 py-2.5 hover:border-[var(--border-strong)]"
+            className="w-full gap-2.5 px-1 py-1.5"
             checked={toIncludePassword}
             onCheckedChange={setIncludePassword}
             label={tFn('connection.uri.includePassword')}
@@ -1169,12 +1154,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           <Button variant="ghost" type="button" onClick={() => setUrlPanel(null)}>
             {tFn('connection.action.cancel')}
           </Button>
-          <Button
-            variant="primary"
-            type="button"
-            disabled={!toUriText || toBuilding}
-            onClick={() => void copyToUri()}
-          >
+          <Button variant="primary" type="button" disabled={!toUriText || toBuilding} onClick={() => void copyToUri()}>
             {tFn('connection.uri.copyAction')}
           </Button>
         </div>

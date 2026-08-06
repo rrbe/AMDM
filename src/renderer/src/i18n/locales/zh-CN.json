@@ -86,7 +86,20 @@
     "diagnoseFailed": "连通性检测失败：{{error}}"
   },
   "connection": {
+    "status": {
+      "disconnected": "未连接",
+      "connecting": "连接中…",
+      "connected": "已连接",
+      "error": "连接错误"
+    },
     "title": { "edit": "编辑连接", "new": "新建连接" },
+    "description": "连接信息保留在本机，密码由系统钥匙串安全保存。",
+    "section": {
+      "identity": "标识",
+      "server": "MongoDB 服务器",
+      "details": "连接详情",
+      "options": "选项"
+    },
     "action": { "test": "测试连接", "cancel": "取消", "save": "保存" },
     "testResult": { "okPrefix": "连接成功", "failed": "失败：{{error}}" },
     "uri": {
@@ -218,6 +231,7 @@
     "closeTab": "关闭标签页",
     "newTabTip": "新建查询标签页 (⌘T)",
     "newTabLabel": "新建查询标签页",
+    "tabListLabel": "全部查询标签页",
     "loadingEditor": "编辑器加载中…",
     "on": "开",
     "off": "关",

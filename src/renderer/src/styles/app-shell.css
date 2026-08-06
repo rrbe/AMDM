@@ -52,8 +52,8 @@
   color: var(--fg-2);
 }
 .sidebar-toggle-open:hover {
-  background: var(--bg-3);
-  color: var(--fg-0);
+  background: var(--interaction-hover);
+  color: var(--text-primary);
 }
 .explorer-collapsed .tab-bar {
   padding-left: 44px;
@@ -85,7 +85,7 @@
   position: absolute;
   background: var(--accent);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
 .resize-handle--col::before {
   inset: 0 3px; /* 1px-wide centered vertical line */
@@ -117,6 +117,9 @@
    occupy the leading edge of the sidebar; query tabs remain clickable. */
 .is-mac .explorer-head.app-drag {
   padding-left: 78px;
+}
+.is-mac .app-brand span {
+  display: none;
 }
 .is-mac .sidebar-toggle-slot {
   left: 72px;

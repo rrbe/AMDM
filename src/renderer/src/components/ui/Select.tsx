@@ -8,8 +8,8 @@ import { cn } from '@renderer/lib/utils'
  * by a simple `value / onChange / options` API; the trigger auto-renders the
  * selected option's label via the `items` prop.
  *
- * shadcn-style Tailwind skin: the trigger mimics the inset input (Stone + Ink
- * focus ring); the popup is a bordered elevated card, highlighted items
+ * shadcn-style Tailwind skin: the trigger uses the control surface and graphite
+ * focus ring; the popup is a bordered elevated surface, highlighted items
  * (`[data-highlighted]`) use the subtle accent surface. The popup is body-portaled,
  * so its positioner carries a z-index above dialogs.
  */
@@ -29,6 +29,10 @@ interface SelectProps<T> {
   name?: string
   /** Extra class(es) merged onto the trigger. */
   className?: string
+  /** Optional compact trigger content; options still provide the popup labels. */
+  triggerContent?: ReactNode
+  popupHeader?: ReactNode
+  popupClassName?: string
   'aria-label'?: string
 }
 
@@ -41,6 +45,9 @@ export function Select<T extends string | number = string>({
   id,
   name,
   className,
+  triggerContent,
+  popupHeader,
+  popupClassName,
   'aria-label': ariaLabel
 }: SelectProps<T>): JSX.Element {
   return (
@@ -56,15 +63,17 @@ export function Select<T extends string | number = string>({
     >
       <BaseSelect.Trigger
         className={cn(
-          'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 text-left text-[13px] text-foreground outline-none transition-[border-color,box-shadow] hover:border-[var(--border-strong)] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] data-[popup-open]:border-[var(--accent)] data-[popup-open]:shadow-[0_0_0_3px_var(--accent-soft)] data-[disabled]:cursor-default data-[disabled]:opacity-55',
+          'flex h-[38px] w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-transparent bg-[var(--surface-control)] px-3 text-left text-[13px] text-foreground outline-none transition-[border-color,background-color,box-shadow] hover:bg-[var(--surface-chrome)] focus-visible:border-[var(--separator-strong)] focus-visible:bg-[var(--surface-elevated)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] data-[popup-open]:border-[var(--separator-strong)] data-[popup-open]:bg-[var(--surface-elevated)] data-[popup-open]:shadow-[0_0_0_3px_var(--focus-soft)] data-[disabled]:cursor-default data-[disabled]:opacity-55',
           className
         )}
         aria-label={ariaLabel}
       >
-        <BaseSelect.Value
-          placeholder={placeholder}
-          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-        />
+        {triggerContent ?? (
+          <BaseSelect.Value
+            placeholder={placeholder}
+            className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+          />
+        )}
         <BaseSelect.Icon className="flex shrink-0 text-muted-foreground">
           <ChevronDown size={14} />
         </BaseSelect.Icon>
@@ -77,17 +86,23 @@ export function Select<T extends string | number = string>({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <BaseSelect.Popup className="max-h-[var(--available-height)] min-w-[var(--anchor-width)] overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
+          <BaseSelect.Popup
+            className={cn(
+              'max-h-[var(--available-height)] min-w-[var(--anchor-width)] overflow-y-auto rounded-[var(--radius-control)] border border-[var(--separator-strong)] bg-[var(--surface-elevated)] p-1 shadow-[var(--shadow-popover)]',
+              popupClassName
+            )}
+          >
+            {popupHeader}
             <BaseSelect.List>
               {options.map((o) => (
                 <BaseSelect.Item
                   key={String(o.value)}
                   value={o.value}
                   disabled={o.disabled}
-                  className="flex cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-accent data-[highlighted]:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-50"
+                  className="flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[var(--interaction-hover)] data-[highlighted]:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-50"
                 >
                   <BaseSelect.ItemText>{o.label}</BaseSelect.ItemText>
-                  <BaseSelect.ItemIndicator className="ml-auto inline-flex text-[var(--accent)]">
+                  <BaseSelect.ItemIndicator className="ml-auto inline-flex text-[var(--primary)]">
                     <Check size={14} />
                   </BaseSelect.ItemIndicator>
                 </BaseSelect.Item>

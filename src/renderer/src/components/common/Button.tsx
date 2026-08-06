@@ -14,13 +14,13 @@ import { cn } from '@renderer/lib/utils'
  * distinct patterns and stay as raw `<button>`.
  */
 const buttonVariants = cva(
-  'busy-btn relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium leading-none select-none outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] disabled:opacity-50 disabled:cursor-default [&_svg]:shrink-0',
+  'busy-btn relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-control)] font-medium leading-none select-none outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] disabled:opacity-50 disabled:cursor-default [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'border border-border bg-secondary text-foreground hover:bg-accent hover:border-[var(--border-strong)]',
-        primary: 'border border-[var(--accent)] bg-primary text-primary-foreground hover:bg-[var(--accent-hover)]',
-        ghost: 'border border-transparent bg-transparent text-foreground hover:bg-accent',
+        default: 'border border-transparent bg-[var(--interaction-selected)] text-foreground hover:bg-[var(--interaction-pressed)]',
+        primary: 'border border-[var(--primary)] bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]',
+        ghost: 'border border-transparent bg-transparent text-foreground hover:bg-[var(--interaction-hover)]',
         danger: 'border border-transparent bg-transparent text-destructive hover:bg-destructive/10'
       },
       size: {

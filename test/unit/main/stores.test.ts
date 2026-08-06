@@ -68,8 +68,8 @@ describe('settingsStore', () => {
     expect(settingsStore.get()).toMatchObject({
       queryLimit: 50,
       theme: 'system',
-      sidebarWidth: 280,
-      editorHeight: 120
+      sidebarWidth: 270,
+      editorHeight: 142
     })
   })
   it('merges + persists an update', () => {
@@ -80,7 +80,7 @@ describe('settingsStore', () => {
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
     settingsStore.init()
-    expect(settingsStore.get()).toMatchObject({ theme: 'dark', queryLimit: 50, sidebarWidth: 280 })
+    expect(settingsStore.get()).toMatchObject({ theme: 'dark', queryLimit: 50, sidebarWidth: 270 })
   })
 })
 

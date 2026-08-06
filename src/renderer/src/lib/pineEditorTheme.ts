@@ -1,7 +1,7 @@
 /**
  * CodeMirror themes — light + dark variants that match the app's
- * "Warm Stone + Ink" design system (see styles/tokens.css): warm paper
- * surfaces, a graphite accent (caret / selection), and semantic syntax colors.
+ * semantic design tokens (see styles/tokens.css): neutral paper in light mode,
+ * a graphite accent (caret / selection), and semantic syntax colors.
  * We build them with
  * @uiw/codemirror-themes' `createTheme` so the editor reads as part of the same
  * surface rather than CodeMirror's generic light/dark defaults.
@@ -37,40 +37,40 @@ interface PinePalette {
 
 const LIGHT: PinePalette = {
   base: 'light',
-  bg: '#f2f2ee',
-  text: '#20211f',
-  caret: '#252623',
-  selection: 'rgba(37, 38, 35, 0.16)',
-  lineHighlight: 'rgba(0, 0, 0, 0.035)',
-  gutterFg: '#9d9f97',
-  keyword: '#8a3fd0',
-  string: '#1a8f4c',
-  number: '#2563eb',
-  bool: '#8a3fd0',
-  property: '#20211f',
-  punct: '#72746d',
-  comment: '#9d9f97',
-  type: '#c0481f',
-  regexp: '#8a3fd0'
+  bg: '#fafafa',
+  text: '#202124',
+  caret: '#242529',
+  selection: 'rgba(22, 24, 29, 0.11)',
+  lineHighlight: 'rgba(22, 24, 29, 0.045)',
+  gutterFg: '#898c93',
+  keyword: '#8657b8',
+  string: '#237f50',
+  number: '#4565c4',
+  bool: '#8657b8',
+  property: '#202124',
+  punct: '#55585f',
+  comment: '#898c93',
+  type: '#a95732',
+  regexp: '#8657b8'
 }
 
 const DARK: PinePalette = {
   base: 'dark',
-  bg: '#171815',
-  text: '#efefe9',
-  caret: '#deded7',
-  selection: 'rgba(222, 222, 215, 0.14)',
-  lineHighlight: 'rgba(255, 255, 255, 0.045)',
-  gutterFg: '#73756d',
-  keyword: '#c79bff',
-  string: '#5fd39a',
-  number: '#74a8ff',
-  bool: '#c79bff',
-  property: '#efefe9',
-  punct: '#a1a39a',
-  comment: '#73756d',
-  type: '#ff8a5c',
-  regexp: '#c79bff'
+  bg: '#1b1b1e',
+  text: '#f1f1f3',
+  caret: '#f0f0f2',
+  selection: 'rgba(255, 255, 255, 0.13)',
+  lineHighlight: 'rgba(255, 255, 255, 0.05)',
+  gutterFg: '#858890',
+  keyword: '#c5a0f0',
+  string: '#67c78f',
+  number: '#79a7ff',
+  bool: '#c5a0f0',
+  property: '#f1f1f3',
+  punct: '#b8bac0',
+  comment: '#858890',
+  type: '#ff9b73',
+  regexp: '#c5a0f0'
 }
 
 function build(p: PinePalette): ReturnType<typeof createTheme> {

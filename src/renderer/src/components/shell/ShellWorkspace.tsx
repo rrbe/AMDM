@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
+  ChevronDown,
   ChevronRight,
   LoaderCircle,
   PanelRightClose,
   PanelRightOpen,
   Play,
   Plus,
-  Save,
-  X
+  Save
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
@@ -19,6 +19,8 @@ import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
+import { DocumentTab } from '@renderer/components/common/DocumentTab'
+import { Select } from '@renderer/components/ui/Select'
 
 /**
  * The main work area: a tab strip, header (active connection + database +
@@ -42,7 +44,7 @@ export function ShellWorkspace(): JSX.Element {
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [showSave, setShowSave] = useState(false)
-  const [contextOpen, setContextOpen] = useState(true)
+  const [contextOpen, setContextOpen] = useState(false)
   const [resultsExpanded, setResultsExpanded] = useState(false)
   const selectedCode = useRef<string>()
 
@@ -77,15 +79,11 @@ export function ShellWorkspace(): JSX.Element {
 
             <div className="work-actions">
               {running ? (
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => void stopShell()}
-                >
+                <Button variant="danger" onClick={() => void stopShell()}>
                   <LoaderCircle className="animate-spin" aria-hidden /> {t('shell.stopTip')}
                 </Button>
               ) : (
-                <Button size="sm" variant="primary" disabled={busy} onClick={runEditor}>
+                <Button variant="primary" disabled={busy} onClick={runEditor}>
                   <Play aria-hidden /> {t('shell.runBtn')}
                 </Button>
               )}
@@ -177,6 +175,21 @@ function TabBar(): JSX.Element {
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
   const newTab = useAppStore((s) => s.newTab)
+  const stripRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const strip = stripRef.current
+    if (!strip) return
+    const revealActive = (): void => {
+      strip
+        .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+    revealActive()
+    const observer = new ResizeObserver(revealActive)
+    observer.observe(strip)
+    return () => observer.disconnect()
+  }, [activeTabId])
 
   // ⌘T / Ctrl+T opens a new query tab (reads the action via getState to keep
   // this listener stable). ⌘W is left alone — it's Electron's window close.
@@ -193,41 +206,57 @@ function TabBar(): JSX.Element {
 
   return (
     <div className="tab-bar app-drag">
-      <div className="tab-strip">
+      <Select
+        value={activeTabId}
+        onChange={setActiveTab}
+        options={tabs.map((tab, index) => ({
+          value: tab.id,
+          label: (
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {tabLabel(tab, index)}
+              </span>
+              <small className="shrink-0 text-[11px] text-muted-foreground">
+                {tab.activeDatabase}
+              </small>
+            </span>
+          )
+        }))}
+        className="query-tab-picker"
+        triggerContent={<ChevronDown size={15} aria-hidden />}
+        popupClassName="w-[272px]"
+        popupHeader={
+          <div className="px-2 py-2 text-[11px] font-medium text-muted-foreground">
+            {t('shell.tabListLabel')} · {tabs.length}
+          </div>
+        }
+        aria-label={t('shell.tabListLabel')}
+      />
+      <div ref={stripRef} className="tab-strip">
         {tabs.map((tab, i) => (
-          <div
+          <DocumentTab
             key={tab.id}
-            className={tab.id === activeTabId ? 'qtab active' : 'qtab'}
-            onClick={() => setActiveTab(tab.id)}
-            onAuxClick={(e) => {
-              // Middle-click closes, matching browser tab convention.
-              if (e.button === 1) {
-                e.preventDefault()
-                closeTab(tab.id)
-              }
-            }}
-          >
-            <span className="qtab-status" aria-hidden>
-              {tab.running ? (
+            active={tab.id === activeTabId}
+            className="qtab"
+            dataTabId={tab.id}
+            label={tabLabel(tab, i)}
+            closeLabel={t('shell.closeTab')}
+            onSelect={() => setActiveTab(tab.id)}
+            onClose={() => closeTab(tab.id)}
+            status={
+              tab.running ? (
                 <LoaderCircle className="qtab-spinner animate-spin" />
               ) : tab.runFailed ? (
                 <span className="qtab-error-dot" />
-              ) : null}
-            </span>
-            <span className="qtab-label">{tabLabel(tab, i)}</span>
-            <button
-              className="qtab-close"
-              aria-label={t('shell.closeTab')}
-              onClick={(e) => {
-                e.stopPropagation()
-                closeTab(tab.id)
-              }}
-            >
-              <X size={12} />
-            </button>
-          </div>
+              ) : null
+            }
+          />
         ))}
-        <button className="qtab-new" data-tip={t('shell.newTabTip')} aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
+        <button
+          className="qtab-new"
+          aria-label={t('shell.newTabLabel')}
+          onClick={() => newTab()}
+        >
           <Plus size={14} />
         </button>
       </div>

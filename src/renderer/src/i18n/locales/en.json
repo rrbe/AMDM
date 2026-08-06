@@ -86,7 +86,20 @@
     "diagnoseFailed": "Connectivity check failed: {{error}}"
   },
   "connection": {
+    "status": {
+      "disconnected": "Disconnected",
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "error": "Connection error"
+    },
     "title": { "edit": "Edit Connection", "new": "New Connection" },
+    "description": "Connection details stay on this device; secrets are protected by the system keychain.",
+    "section": {
+      "identity": "Identity",
+      "server": "MongoDB server",
+      "details": "Connection details",
+      "options": "Options"
+    },
     "action": { "test": "Test connection", "cancel": "Cancel", "save": "Save" },
     "testResult": { "okPrefix": "OK", "failed": "Failed: {{error}}" },
     "uri": {
@@ -218,6 +231,7 @@
     "closeTab": "Close tab",
     "newTabTip": "New query tab (⌘T)",
     "newTabLabel": "New query tab",
+    "tabListLabel": "All query tabs",
     "loadingEditor": "Loading editor…",
     "on": "On",
     "off": "Off",

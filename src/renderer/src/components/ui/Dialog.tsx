@@ -33,6 +33,7 @@ interface DialogProps {
    * body (so focus doesn't land on the header ✕).
    */
   initialFocus?: ComponentProps<typeof BaseDialog.Popup>['initialFocus']
+  finalFocus?: ComponentProps<typeof BaseDialog.Popup>['finalFocus']
   popupRef?: Ref<HTMLDivElement>
   style?: CSSProperties
   children: ReactNode
@@ -45,6 +46,7 @@ export function Dialog({
   backdropClassName = 'modal-backdrop',
   'aria-labelledby': ariaLabelledBy,
   initialFocus,
+  finalFocus,
   popupRef,
   style,
   children
@@ -59,6 +61,7 @@ export function Dialog({
           style={style}
           aria-labelledby={ariaLabelledBy}
           initialFocus={initialFocus}
+          finalFocus={finalFocus}
         >
           {children}
         </BaseDialog.Popup>

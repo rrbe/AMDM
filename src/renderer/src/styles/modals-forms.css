@@ -2,11 +2,19 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--backdrop-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  backdrop-filter: blur(10px) saturate(0.9);
+  -webkit-backdrop-filter: blur(10px) saturate(0.9);
+}
+.url-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: var(--backdrop-nested);
 }
 /* The .modal* box and .tabs rules were removed — common/Modal and ui/Tabs are
    now styled with Tailwind. The .modal-backdrop overlay (above) is still used by
@@ -20,6 +28,15 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+}
+.connection-form-section + .connection-form-section {
+  margin-top: 26px;
+}
+.connection-form-section > h2 {
+  margin: 0 0 14px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 620;
 }
 .hint {
   color: var(--fg-3);
@@ -45,14 +62,14 @@
   /* Opaque elevated surface — a floating toast must NOT use the translucent
      --err-bg tint, or the content behind it bleeds through. Severity is carried
      by the colored left bar + icon, not a wash over the whole panel. */
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
-  color: var(--fg-0);
+  background: var(--surface-elevated);
+  border: 1px solid var(--separator-strong);
+  border-left: 3px solid var(--separator-strong);
+  color: var(--text-primary);
   padding: 10px 12px;
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
-  animation: toast-in 0.18s ease-out;
+  border-radius: var(--radius-row);
+  box-shadow: var(--shadow-popover);
+  animation: toast-in var(--motion-base) var(--ease-standard);
 }
 .toast-icon {
   flex: 0 0 auto;
@@ -75,8 +92,8 @@
   cursor: pointer;
 }
 .toast-close:hover:not(:disabled) {
-  background: var(--bg-3);
-  color: var(--fg-0);
+  background: var(--interaction-hover);
+  color: var(--text-primary);
 }
 .toast-error {
   border-left-color: var(--err);
@@ -97,10 +114,10 @@
   color: var(--warn);
 }
 .toast-info {
-  border-left-color: var(--accent);
+  border-left-color: var(--primary);
 }
 .toast-info .toast-icon {
-  color: var(--accent);
+  color: var(--primary);
 }
 @keyframes toast-in {
   from {

@@ -472,7 +472,7 @@ export function Explorer({
           </div>
 
           <div className="explorer-create">
-            <button className="primary btn-new-conn" onClick={() => setConnForm({ open: true })}>
+            <button className="btn-new-conn" onClick={() => setConnForm({ open: true })}>
               <Plus size={15} />
               <span>{t('explorer.newConnection')}</span>
             </button>
@@ -570,6 +570,7 @@ function ConnectionRow({
   onConnect: () => void
   onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const { conn, state, error, expandable, expanded } = row
   const isConnected = state === 'connected'
   const sub =
@@ -586,6 +587,10 @@ function ConnectionRow({
           ? 'connecting'
           : 'off'
   }`
+  const statusLabel =
+    state === 'error' && error
+      ? `${t('connection.status.error')}: ${error}`
+      : t(`connection.status.${state}`)
 
   return (
     <div
@@ -616,15 +621,9 @@ function ConnectionRow({
       </div>
       <span
         className="conn-status"
-        data-tip={
-          state === 'connected'
-            ? 'Connected'
-            : state === 'connecting'
-              ? 'Connecting…'
-              : state === 'error'
-                ? error || 'Connection error'
-                : 'Disconnected'
-        }
+        role="status"
+        aria-label={statusLabel}
+        data-tip={statusLabel}
       >
         <span className={signalClass} />
       </span>

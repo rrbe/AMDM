@@ -7,10 +7,10 @@
 .ctx-menu {
   position: fixed;
   /* Match the shadcn Select/Menu popup: elevated surface + token shadow. */
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
+  background: var(--surface-elevated);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-popover);
   padding: 4px;
   display: flex;
   flex-direction: column;
@@ -31,7 +31,7 @@
   cursor: pointer;
 }
 .ctx-item:hover {
-  background: var(--bg-3);
+  background: var(--interaction-hover);
 }
 .ctx-item.danger {
   color: var(--err);
@@ -67,7 +67,7 @@
 .ctx-sep {
   height: 1px;
   margin: 4px 6px;
-  background: var(--border);
+  background: var(--separator);
 }
 
 /* ---- Import/Export modals (ExportModal / ImportModal) ---- */
@@ -112,8 +112,8 @@
   margin-bottom: 12px;
 }
 .io-note.warn {
-  background: rgba(210, 153, 34, 0.12);
-  border: 1px solid rgba(210, 153, 34, 0.4);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
   color: var(--warn);
 }
 .io-result {
@@ -159,4 +159,3 @@
   color: var(--accent);
   border-color: var(--accent);
 }
-

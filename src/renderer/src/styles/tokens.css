@@ -1,16 +1,17 @@
 /* =========================================================================
-   AMDM — 设计令牌（Warm Stone + Ink 体系）
-   暖灰纸面承载内容，石墨色负责主操作 / 选中 / 焦点环；语法/数据着色继续保留
-   语义彩（绿字符串、蓝数字、橙红 ObjectId…）。亮暗两套同等对待（亮 = :root
-   默认，暗 = [data-theme='dark']，只重指调色板，切回亮色自然落回 :root）。
-   - 语义令牌名保持不变 → 全部既有手写 CSS 不改即随令牌重新上色（换肤=纯令牌级）。
-   - Tailwind/shadcn 工具类经 styles/index.css 的 @theme inline 映射到这里的令牌。
-   - CodeMirror 编辑器在 lib/pineEditorTheme.ts 另持一份解析 hex —— 改这里务必同步。
+   AMDM — 设计令牌（Neutral Paper + Graphite）
+   语义令牌是新样式的唯一入口；旧 --bg-* / --fg-* 名称仅作为迁移期兼容别名。
+   亮暗主题共享同一套语义层级，仅替换令牌值。
+   CodeMirror 在 lib/pineEditorTheme.ts 持有对应的解析 hex，改色时必须同步。
    --------------------------------------------------------------------------- */
 :root {
   /* ---- Shape + type (theme-independent) ---- */
-  --radius: 7px;
-  --radius-sm: 6px;
+  --radius-control: 8px;
+  --radius-row: 8px;
+  --radius-tab: 10px 10px 0 0;
+  --radius-dialog: 16px;
+  --radius: var(--radius-control);
+  --radius-sm: var(--radius-control);
   --radius-lg: 10px;
   --row-h: 24px;
   /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
@@ -33,112 +34,147 @@
   --ls-tight: -0.01em;
   --ls-normal: 0;
   --ls-wide: 0.01em;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  --accent-fg: #ffffff;
+  /* ---- LIGHT · Neutral Paper + Graphite (default) ---- */
+  --surface-canvas: #ececef;
+  --surface-content: #ffffff;
+  --surface-sidebar: #f7f7f8;
+  --surface-chrome: #f1f1f3;
+  --surface-inset: #fafafa;
+  --surface-control: #f5f5f7;
+  --surface-elevated: #ffffff;
 
-  /* ---- LIGHT · Warm Stone (default) ---- */
-  --bg-app: #e1e2dd; /* window chrome behind panels */
-  --bg-0: #edece8; /* primary content surface (work area, lists, results) */
-  --bg-1: #e6e7e2; /* sidebar / header chrome */
-  --bg-2: #dedfda; /* raised / inset (inputs, table head, segmented) */
-  --bg-3: #d3d4ce; /* hover */
-  --bg-elevated: #f2f2ee; /* menus, modal, popover, active segment */
-  --bg-sel: rgba(37, 38, 35, 0.09); /* selected row tint */
-  --bg-editor: #f2f2ee;
+  --interaction-hover: rgba(22, 24, 29, 0.045);
+  --interaction-selected: rgba(22, 24, 29, 0.075);
+  --interaction-pressed: rgba(22, 24, 29, 0.11);
+  --focus-soft: rgba(22, 24, 29, 0.08);
+  --backdrop-dialog: rgba(30, 31, 35, 0.2);
+  --backdrop-nested: rgba(0, 0, 0, 0.32);
 
-  /* Borders + the hairline rule */
-  --border: #d1d2cc;
-  --border-strong: #c1c2bb;
-  --rule: #d7d8d2; /* hairline under title bars / column heads */
+  --text-primary: #202124;
+  --text-secondary: #55585f;
+  --text-muted: #898c93;
+  --text-disabled: #b2b4ba;
 
-  /* Text — warm graphite ink */
-  --fg-0: #20211f;
-  --fg-1: #444640;
-  --fg-2: #72746d;
-  --fg-3: #9d9f97;
+  --separator: rgba(22, 24, 29, 0.09);
+  --separator-strong: rgba(22, 24, 29, 0.16);
 
-  /* Accent — graphite; semantic data colors remain independent below. */
-  --accent: #252623;
-  --accent-hover: #11120f;
-  --accent-soft: rgba(37, 38, 35, 0.1);
-  --accent-soft-strong: rgba(37, 38, 35, 0.16);
+  --primary: #242529;
+  --primary-hover: #101114;
+  --primary-foreground: #ffffff;
 
   /* Status */
-  --ok: #16a34a;
-  --warn: #b45309;
-  --err: #dc2626;
-  --err-bg: rgba(220, 38, 38, 0.08);
+  --ok: #237f50;
+  --warn: #9a5c1d;
+  --err: #c63f3f;
+  --err-bg: rgba(198, 63, 63, 0.09);
 
   /* Value type colors (Tree/Table/JSON) — semantic syntax palette */
-  --t-string: #1a8f4c;
-  --t-number: #2563eb;
-  --t-boolean: #8a3fd0;
-  --t-null: #a1a1aa;
-  --t-objectId: #c0481f;
-  --t-date: #2563eb;
-  --t-key: #20211f;
-  --t-binary: #c0481f;
-  --t-regex: #8a3fd0;
-  --t-special: #c0481f;
+  --t-string: #237f50;
+  --t-number: #4565c4;
+  --t-boolean: #8657b8;
+  --t-null: #6f7279;
+  --t-objectId: #a95732;
+  --t-date: #4565c4;
+  --t-key: var(--text-primary);
+  --t-binary: #a95732;
+  --t-regex: #8657b8;
+  --t-special: #a95732;
 
-  /* Shadows — neutral, soft */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.09), 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* Legacy aliases; remove as old CSS partitions migrate to semantic names. */
+  --bg-app: var(--surface-chrome);
+  --bg-0: var(--surface-content);
+  --bg-1: var(--surface-sidebar);
+  --bg-2: var(--surface-control);
+  --bg-3: var(--interaction-hover);
+  --bg-elevated: var(--surface-elevated);
+  --bg-sel: var(--interaction-selected);
+  --bg-editor: var(--surface-inset);
+  --border: var(--separator);
+  --border-strong: var(--separator-strong);
+  --rule: var(--separator);
+  --fg-0: var(--text-primary);
+  --fg-1: var(--text-secondary);
+  --fg-2: var(--text-muted);
+  --fg-3: var(--text-muted);
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --accent-fg: var(--primary-foreground);
+  --accent-soft: var(--focus-soft);
+  --accent-soft-strong: var(--interaction-pressed);
+
+  --shadow-popover:
+    0 12px 36px rgba(24, 24, 28, 0.14),
+    0 2px 8px rgba(24, 24, 28, 0.06);
+  --shadow-dialog:
+    0 28px 80px rgba(24, 24, 28, 0.22),
+    0 4px 18px rgba(24, 24, 28, 0.1);
+  --shadow-md: var(--shadow-popover);
+  --shadow-lg: var(--shadow-dialog);
 
   /* Dot halos (status glow) */
-  --halo-ok: rgba(22, 163, 74, 0.18);
-  --halo-warn: rgba(180, 83, 9, 0.18);
-  --halo-err: rgba(220, 38, 38, 0.16);
+  --halo-ok: rgba(35, 127, 80, 0.18);
+  --halo-warn: rgba(154, 92, 29, 0.18);
+  --halo-err: rgba(198, 63, 63, 0.16);
 }
 
-/* ---- DARK · Warm Stone Night ---- */
+/* ---- DARK · neutral graphite ---- */
 [data-theme='dark'] {
-  --bg-app: #141512;
-  --bg-0: #191a17;
-  --bg-1: #20211d;
-  --bg-2: #2a2b26;
-  --bg-3: #35362f;
-  --bg-elevated: #242520;
-  --bg-sel: rgba(222, 222, 215, 0.09);
-  --bg-editor: #171815;
+  --surface-canvas: #111113;
+  --surface-chrome: #18181a;
+  --surface-sidebar: #1c1c1f;
+  --surface-content: #212124;
+  --surface-inset: #1b1b1e;
+  --surface-control: #29292d;
+  --surface-elevated: #2c2c31;
 
-  --border: #30312c;
-  --border-strong: #484a42;
-  --rule: #2b2c27;
+  --interaction-hover: rgba(255, 255, 255, 0.05);
+  --interaction-selected: rgba(255, 255, 255, 0.09);
+  --interaction-pressed: rgba(255, 255, 255, 0.13);
+  --focus-soft: rgba(255, 255, 255, 0.18);
+  --backdrop-dialog: rgba(0, 0, 0, 0.55);
+  --backdrop-nested: rgba(0, 0, 0, 0.55);
 
-  --fg-0: #efefe9;
-  --fg-1: #d4d5ce;
-  --fg-2: #a1a39a;
-  --fg-3: #73756d;
+  --text-primary: #f1f1f3;
+  --text-secondary: #b8bac0;
+  --text-muted: #858890;
+  --text-disabled: #60636a;
 
-  --accent: #deded7;
-  --accent-hover: #ecece5;
-  --accent-soft: rgba(222, 222, 215, 0.09);
-  --accent-soft-strong: rgba(222, 222, 215, 0.14);
-  --accent-fg: #20211f;
+  --separator: rgba(255, 255, 255, 0.08);
+  --separator-strong: rgba(255, 255, 255, 0.14);
 
-  --ok: #34d399;
-  --warn: #e0a23a;
-  --err: #ff6f5c;
-  --err-bg: rgba(255, 111, 92, 0.13);
+  --primary: #f0f0f2;
+  --primary-hover: #ffffff;
+  --primary-foreground: #202124;
 
-  --t-string: #5fd39a;
-  --t-number: #74a8ff;
-  --t-boolean: #c79bff;
-  --t-null: #71717a;
-  --t-objectId: #ff8a5c;
-  --t-date: #74a8ff;
-  --t-key: #efefe9;
-  --t-binary: #ff8a5c;
-  --t-regex: #c79bff;
-  --t-special: #ff8a5c;
+  --ok: #67c78f;
+  --warn: #d59a52;
+  --err: #ff7b72;
+  --err-bg: rgba(255, 123, 114, 0.13);
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.38);
-  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.46);
-  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55), 0 6px 16px rgba(0, 0, 0, 0.42);
+  --t-string: #67c78f;
+  --t-number: #79a7ff;
+  --t-boolean: #c5a0f0;
+  --t-null: #858890;
+  --t-objectId: #ff9b73;
+  --t-date: #79a7ff;
+  --t-key: var(--text-primary);
+  --t-binary: #ff9b73;
+  --t-regex: #c5a0f0;
+  --t-special: #ff9b73;
 
-  --halo-ok: rgba(52, 211, 153, 0.15);
-  --halo-warn: rgba(224, 162, 58, 0.15);
-  --halo-err: rgba(255, 111, 92, 0.15);
+  --shadow-popover:
+    0 14px 40px rgba(0, 0, 0, 0.46),
+    0 2px 10px rgba(0, 0, 0, 0.28);
+  --shadow-dialog:
+    0 30px 80px rgba(0, 0, 0, 0.62),
+    0 6px 20px rgba(0, 0, 0, 0.36);
+
+  --halo-ok: rgba(103, 199, 143, 0.15);
+  --halo-warn: rgba(213, 154, 82, 0.15);
+  --halo-err: rgba(255, 123, 114, 0.15);
 }

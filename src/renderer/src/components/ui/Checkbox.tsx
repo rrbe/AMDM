@@ -8,7 +8,7 @@ import { cn } from '@renderer/lib/utils'
  * the clickable control (Base UI renders a `role="checkbox"` button, so wrapping
  * the box + label inside `Checkbox.Root` makes both toggle it).
  *
- * shadcn-style Tailwind skin: the box fills with the blue accent when checked
+ * The box fills with the primary graphite color when checked
  * (driven by the root's `data-checked`, read via the `group` pattern).
  */
 interface CheckboxProps {
@@ -44,10 +44,10 @@ export function Checkbox({
       name={name}
     >
       <span
-        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--border-strong)] bg-secondary transition-colors group-data-[checked]:border-[var(--accent)] group-data-[checked]:bg-[var(--accent)] group-focus-visible:border-[var(--accent)] group-focus-visible:shadow-[0_0_0_3px_var(--accent-soft)]"
+        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)] group-focus-visible:border-[var(--primary)] group-focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
         aria-hidden
       >
-        <BaseCheckbox.Indicator className="inline-flex text-[var(--accent-fg)]">
+        <BaseCheckbox.Indicator className="inline-flex text-[var(--primary-foreground)]">
           <Check size={12} strokeWidth={3} />
         </BaseCheckbox.Indicator>
       </span>

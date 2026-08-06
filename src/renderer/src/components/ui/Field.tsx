@@ -66,7 +66,7 @@ export function Field({
         <BaseField.Label className="mb-0 text-[11px] font-medium text-muted-foreground">{label}</BaseField.Label>
       )}
       {children}
-      {hint != null && <BaseField.Description className="text-[11px] text-[var(--fg-3)]">{hint}</BaseField.Description>}
+      {hint != null && <BaseField.Description className="text-[11px] text-[var(--text-muted)]">{hint}</BaseField.Description>}
       <BaseField.Error className="text-[11px] text-destructive empty:hidden" />
       {error != null && <div className="text-[11px] text-destructive">{error}</div>}
     </BaseField.Root>

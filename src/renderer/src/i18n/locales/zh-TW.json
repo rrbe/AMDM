@@ -86,7 +86,20 @@
     "diagnoseFailed": "連通性檢測失敗：{{error}}"
   },
   "connection": {
+    "status": {
+      "disconnected": "未連線",
+      "connecting": "連線中…",
+      "connected": "已連線",
+      "error": "連線錯誤"
+    },
     "title": { "edit": "編輯連線", "new": "新增連線" },
+    "description": "連線資訊保留在本機，密碼由系統鑰匙圈安全儲存。",
+    "section": {
+      "identity": "識別",
+      "server": "MongoDB 伺服器",
+      "details": "連線詳細資料",
+      "options": "選項"
+    },
     "action": { "test": "測試連線", "cancel": "取消", "save": "儲存" },
     "testResult": { "okPrefix": "連線成功", "failed": "失敗：{{error}}" },
     "uri": {
@@ -218,6 +231,7 @@
     "closeTab": "關閉分頁",
     "newTabTip": "新增查詢分頁 (⌘T)",
     "newTabLabel": "新增查詢分頁",
+    "tabListLabel": "全部查詢分頁",
     "loadingEditor": "編輯器載入中…",
     "on": "開",
     "off": "關",
