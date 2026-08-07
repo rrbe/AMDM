@@ -591,11 +591,52 @@ export const useAppStore = create<AppState>((set, get) => ({
         await get().loadCollections(connId, payload.db)
       }
     } else if (kind === 'collection' && payload.db && payload.coll) {
-      // No-op: collection children (Indexes/Users) are static folders;
-      // their contents load when those folders expand.
+      const db = payload.db
+      const coll = payload.coll
+      const key = `${db}/${coll}`
+      const collection = get().catalogs[connId]?.collections[db]?.find((item) => item.name === coll)
+      if (
+        collection &&
+        collection.type !== 'view' &&
+        collection.estimatedCount === undefined &&
+        !get().catalogs[connId]?.loading.has(nodeId)
+      ) {
+        set((s) => withLoading(s, connId, nodeId, true))
+        void Promise.all([
+          window.api.catalog.collectionCount(connId, db, coll),
+          window.api.catalog.indexes(connId, db, coll)
+        ])
+          .then(([estimatedCount, indexes]) =>
+            set((s) => {
+              const c = s.catalogs[connId]
+              const collections = c?.collections[db]
+              if (!c || !collections?.includes(collection)) return {}
+              return {
+                catalogs: {
+                  ...s.catalogs,
+                  [connId]: {
+                    ...c,
+                    collections: {
+                      ...c.collections,
+                      [db]: collections.map((item) =>
+                        item.name === coll ? { ...item, estimatedCount } : item
+                      )
+                    },
+                    indexes: { ...c.indexes, [key]: indexes }
+                  }
+                }
+              }
+            })
+          )
+          .catch(() => {})
+          .finally(() =>
+            set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : {}))
+          )
+      }
     } else if (kind === 'indexes' && payload.db && payload.coll) {
       const key = `${payload.db}/${payload.coll}`
-      if (get().catalogs[connId]?.indexes[key] === undefined) {
+      const cat = get().catalogs[connId]
+      if (cat?.indexes[key] === undefined && !cat.loading.has(`${connId}:coll:${key}`)) {
         await get().loadIndexes(connId, payload.db, payload.coll)
       }
     } else if (kind === 'users' && payload.db) {

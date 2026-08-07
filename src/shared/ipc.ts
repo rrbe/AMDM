@@ -44,6 +44,7 @@ export const IPC = {
 
   catalogDatabases: 'catalog:databases',
   catalogCollections: 'catalog:collections',
+  catalogCollectionCount: 'catalog:collectionCount',
   catalogIndexes: 'catalog:indexes',
   catalogUsers: 'catalog:users',
   catalogSampleFields: 'catalog:sampleFields',
@@ -99,6 +100,7 @@ export interface Api {
   catalog: {
     databases(connectionId: string): Promise<DatabaseInfo[]>
     collections(connectionId: string, database: string): Promise<CollectionInfo[]>
+    collectionCount(connectionId: string, database: string, collection: string): Promise<number>
     indexes(connectionId: string, database: string, collection: string): Promise<IndexInfo[]>
     users(connectionId: string, database: string): Promise<UserInfo[]>
     /** Bounded, cached field-name sampling for autocomplete. */

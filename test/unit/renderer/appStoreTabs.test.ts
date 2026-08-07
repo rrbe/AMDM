@@ -205,6 +205,65 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().tabs).toBe(tabs)
   })
 
+  it('loads collection and index counts together after collection expansion', async () => {
+    let resolveCount!: (count: number) => void
+    let resolveIndexes!: (indexes: Array<{ name: string; key: Record<string, unknown> }>) => void
+    const collectionCount = vi.fn(
+      () => new Promise<number>((resolve) => (resolveCount = resolve))
+    )
+    const indexes = vi.fn(
+      () =>
+        new Promise<Array<{ name: string; key: Record<string, unknown> }>>(
+          (resolve) => (resolveIndexes = resolve)
+        )
+    )
+    vi.stubGlobal('window', { api: { catalog: { collectionCount, indexes } } })
+    const collection = { name: 'orders', type: 'collection' as const }
+    useAppStore.setState({
+      catalogs: {
+        c1: {
+          databases: [{ name: 'db1' }],
+          collections: { db1: [collection] },
+          indexes: {},
+          users: {},
+          expanded: new Set<string>(),
+          loading: new Set<string>()
+        }
+      }
+    })
+
+    const nodeId = 'c1:coll:db1/orders'
+    await useAppStore.getState().toggleNode('c1', nodeId, 'collection', {
+      db: 'db1',
+      coll: 'orders'
+    })
+
+    expect(collectionCount).toHaveBeenCalledWith('c1', 'db1', 'orders')
+    expect(indexes).toHaveBeenCalledWith('c1', 'db1', 'orders')
+    expect(useAppStore.getState().catalogs.c1.expanded.has(nodeId)).toBe(true)
+    expect(useAppStore.getState().catalogs.c1.loading.has(nodeId)).toBe(true)
+    expect(useAppStore.getState().catalogs.c1.collections.db1?.[0].estimatedCount).toBeUndefined()
+
+    resolveCount(42)
+    await Promise.resolve()
+    expect(useAppStore.getState().catalogs.c1.collections.db1?.[0].estimatedCount).toBeUndefined()
+    expect(useAppStore.getState().catalogs.c1.indexes['db1/orders']).toBeUndefined()
+
+    const loadedIndexes = [{ name: '_id_', key: { _id: 1 } }]
+    resolveIndexes(loadedIndexes)
+    await vi.waitFor(() => {
+      expect(useAppStore.getState().catalogs.c1.collections.db1?.[0].estimatedCount).toBe(42)
+      expect(useAppStore.getState().catalogs.c1.indexes['db1/orders']).toBe(loadedIndexes)
+      expect(useAppStore.getState().catalogs.c1.loading.has(nodeId)).toBe(false)
+    })
+
+    await useAppStore.getState().toggleNode('c1', 'c1:idx:db1/orders', 'indexes', {
+      db: 'db1',
+      coll: 'orders'
+    })
+    expect(indexes).toHaveBeenCalledTimes(1)
+  })
+
   it('refreshes only the requested connection database list', async () => {
     const databases = vi.fn().mockResolvedValue([{ name: 'fresh' }])
     vi.stubGlobal('window', { api: { catalog: { databases } } })

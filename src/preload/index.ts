@@ -24,6 +24,8 @@ const api: Api = {
     databases: (connectionId) => ipcRenderer.invoke(IPC.catalogDatabases, connectionId),
     collections: (connectionId, database) =>
       ipcRenderer.invoke(IPC.catalogCollections, connectionId, database),
+    collectionCount: (connectionId, database, collection) =>
+      ipcRenderer.invoke(IPC.catalogCollectionCount, connectionId, database, collection),
     indexes: (connectionId, database, collection) =>
       ipcRenderer.invoke(IPC.catalogIndexes, connectionId, database, collection),
     users: (connectionId, database) => ipcRenderer.invoke(IPC.catalogUsers, connectionId, database),

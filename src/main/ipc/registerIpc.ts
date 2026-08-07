@@ -22,7 +22,14 @@ import { settingsStore } from '../store/settingsStore'
 import { sessionManager } from '../mongo/sessionManager'
 import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
-import { listCollections, listDatabases, listIndexes, listUsers, sampleFields } from '../mongo/catalog'
+import {
+  estimateCollectionCount,
+  listCollections,
+  listDatabases,
+  listIndexes,
+  listUsers,
+  sampleFields
+} from '../mongo/catalog'
 import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { exportData } from '../io/exporter'
@@ -151,6 +158,9 @@ export function registerIpc(): void {
   // catalog
   ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id))
   ipcMain.handle(IPC.catalogCollections, (_e, id: string, db: string) => listCollections(id, db))
+  ipcMain.handle(IPC.catalogCollectionCount, (_e, id: string, db: string, coll: string) =>
+    estimateCollectionCount(id, db, coll)
+  )
   ipcMain.handle(IPC.catalogIndexes, (_e, id: string, db: string, coll: string) =>
     listIndexes(id, db, coll)
   )

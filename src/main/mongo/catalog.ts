@@ -1,7 +1,12 @@
 import type { MongoClient } from 'mongodb'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import { sessionManager } from './sessionManager'
-import { listCollectionsOnDb, listIndexesOnDb, sampleFieldsOnDb } from './catalogCore'
+import {
+  estimateCollectionCountOnDb,
+  listCollectionsOnDb,
+  listIndexesOnDb,
+  sampleFieldsOnDb
+} from './catalogCore'
 
 /**
  * True when an error is the benign result of a concurrent disconnect: a lazy
@@ -102,6 +107,17 @@ export async function listCollections(
   return guardClosed(
     () => listCollectionsOnDb(sessionManager.getClient(connectionId).db(database)),
     []
+  )
+}
+
+export async function estimateCollectionCount(
+  connectionId: string,
+  database: string,
+  collection: string
+): Promise<number> {
+  return guardClosed(
+    () => estimateCollectionCountOnDb(sessionManager.getClient(connectionId).db(database), collection),
+    0
   )
 }
 

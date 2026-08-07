@@ -24,6 +24,10 @@ export async function listCollectionsOnDb(db: Db): Promise<CollectionInfo[]> {
   }))
 }
 
+export function estimateCollectionCountOnDb(db: Db, collection: string): Promise<number> {
+  return db.collection(collection).estimatedDocumentCount()
+}
+
 export async function listIndexesOnDb(db: Db, collection: string): Promise<IndexInfo[]> {
   const idx = await db.collection(collection).indexes()
   return idx.map((i) => {

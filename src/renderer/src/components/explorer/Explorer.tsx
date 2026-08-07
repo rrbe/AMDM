@@ -40,6 +40,7 @@ import {
 import { formatScalar } from '@renderer/lib/ejson'
 import { tabCollection } from '@renderer/lib/tabs'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
+import { formatBytes } from '@renderer/lib/formatBytes'
 import {
   applyConnectionOrder,
   reorderConnectionIds,
@@ -111,6 +112,9 @@ interface TreeRow {
       dashed/muted, mirroring Compass. */
   empty?: boolean
   count?: number
+  /** Approximate storage size shown beside an exact child count. */
+  sizeOnDisk?: number
+  approximateCount?: boolean
   /** Present on collection rows: enables the Export/Import hover actions. */
   collection?: { db: string; name: string }
   onClick?: () => void
@@ -732,7 +736,13 @@ function CatalogRow({
       >
         {row.label}
       </span>
-      {typeof row.count === 'number' && <span className="tree-count">{row.count}</span>}
+      {typeof row.count === 'number' && (
+        <span className="tree-count">
+          ({row.approximateCount ? '~' : ''}
+          {row.count.toLocaleString()}
+          {typeof row.sizeOnDisk === 'number' ? ` | ${formatBytes(row.sizeOnDisk)}` : ''})
+        </span>
+      )}
       {row.loading && (
         <span className="tree-spinner">
           <Loader2 size={12} className="spin" />
@@ -785,6 +795,8 @@ function flattenCatalog(
       expandable: true,
       expanded: dbExpanded,
       loading: cat.loading.has(dbNodeId),
+      count: cat.collections[db.name]?.length,
+      sizeOnDisk: cat.collections[db.name] === undefined ? undefined : db.sizeOnDisk,
       onToggle: () => openDatabase(a, connId, db.name, dbNodeId),
       onClick: () => openDatabase(a, connId, db.name, dbNodeId)
     })
@@ -809,8 +821,9 @@ function flattenCatalog(
         kind: 'collection',
         expandable: true,
         expanded: collExpanded,
-        loading: false,
+        loading: cat.loading.has(collNodeId),
         count: coll.estimatedCount,
+        approximateCount: coll.estimatedCount !== undefined,
         collection: { db: db.name, name: coll.name },
         // Toggle expands sub-folders; clicking the row seeds the editor.
         onToggle: () =>

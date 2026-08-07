@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { Db } from 'mongodb'
 import {
+  estimateCollectionCountOnDb,
   listCollectionsOnDb,
   listIndexesOnDb,
   sampleFieldsOnDb
@@ -42,6 +43,11 @@ describe('listCollectionsOnDb', () => {
     const byName = Object.fromEntries(cols.map((c) => [c.name, c.type]))
     expect(byName.users).toBe('collection')
     expect(byName.adults).toBe('view')
+  })
+
+  it('uses MongoDB metadata for an estimated document count', async () => {
+    await db.collection('users').insertMany([{ n: 1 }, { n: 2 }, { n: 3 }])
+    expect(await estimateCollectionCountOnDb(db, 'users')).toBe(3)
   })
 })
 
