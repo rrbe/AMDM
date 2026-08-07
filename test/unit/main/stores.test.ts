@@ -82,6 +82,12 @@ describe('settingsStore', () => {
     settingsStore.init()
     expect(settingsStore.get()).toMatchObject({ theme: 'dark', queryLimit: 50, sidebarWidth: 270 })
   })
+
+  it('persists connection order', () => {
+    settingsStore.update({ connectionOrder: ['b', 'a'] })
+    settingsStore.init()
+    expect(settingsStore.get().connectionOrder).toEqual(['b', 'a'])
+  })
 })
 
 describe('connectionStore — secret handling', () => {

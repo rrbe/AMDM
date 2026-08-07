@@ -401,6 +401,8 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
 export interface AppSettings {
+  /** User-defined ordering of connection ids; missing/new ids append naturally. */
+  connectionOrder: string[]
   /** 'natural' = server order; 'alpha' = A→Z by name. */
   collectionSort: CollectionSort
   /** 'system' = follow OS (default); 'light' = Stone; 'dark' = Stone Night. */
@@ -428,6 +430,7 @@ export interface AppSettings {
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  connectionOrder: [],
   collectionSort: 'alpha',
   theme: 'system',
   language: 'system',

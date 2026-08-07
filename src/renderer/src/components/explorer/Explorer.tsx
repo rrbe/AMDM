@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from 'react'
+import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
@@ -40,6 +40,11 @@ import {
 import { formatScalar } from '@renderer/lib/ejson'
 import { tabCollection } from '@renderer/lib/tabs'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
+import {
+  applyConnectionOrder,
+  reorderConnectionIds,
+  type DropEdge
+} from '@renderer/lib/connectionOrder'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -165,6 +170,7 @@ export function Explorer({
   const catalogs = useAppStore((s) => s.catalogs)
   const expandedConnections = useAppStore((s) => s.expandedConnections)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
+  const connectionOrder = useAppStore((s) => s.settings.connectionOrder)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
   const theme = useAppStore((s) => s.settings.theme)
   const activeTab = useAppStore(getActiveTab)
@@ -195,6 +201,10 @@ export function Explorer({
     y: number
     items: ContextMenuEntry[]
   } | null>(null)
+  const orderedConnections = useMemo(
+    () => applyConnectionOrder(connections, connectionOrder),
+    [connections, connectionOrder]
+  )
 
   // Right-click a connection → manage it or refresh only its database list.
   const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
@@ -301,7 +311,7 @@ export function Explorer({
       browseCollection
     }
     const out: Row[] = []
-    for (const conn of connections) {
+    for (const conn of orderedConnections) {
       const state = statuses[conn.id]?.state ?? 'disconnected'
       const connected = state === 'connected'
       const expanded = connected && expandedConnections.has(conn.id)
@@ -323,7 +333,7 @@ export function Explorer({
     }
     return out
   }, [
-    connections,
+    orderedConnections,
     statuses,
     catalogs,
     expandedConnections,
@@ -343,6 +353,11 @@ export function Explorer({
     )
   }, [rows, search])
   const activeCollection = tabCollection(activeTab)
+  const moveConnection = (sourceId: string, targetId: string, edge: DropEdge): void => {
+    const ids = orderedConnections.map((connection) => connection.id)
+    const next = reorderConnectionIds(ids, sourceId, targetId, edge)
+    if (next !== ids) void updateSettings({ connectionOrder: next })
+  }
 
   return (
     <div className="explorer">
@@ -451,6 +466,7 @@ export function Explorer({
                     onSelect={() => setActiveConnection(row.id)}
                     onToggle={() => toggleConnectionExpanded(row.id)}
                     onConnect={() => void connect(row.id)}
+                    onMove={moveConnection}
                     onContextMenu={(e) => openConnMenu(e, row)}
                   />
                 ) : (
@@ -561,6 +577,7 @@ function ConnectionRow({
   onSelect,
   onToggle,
   onConnect,
+  onMove,
   onContextMenu
 }: {
   row: ConnRow
@@ -568,9 +585,12 @@ function ConnectionRow({
   onSelect: () => void
   onToggle: () => void
   onConnect: () => void
+  onMove: (sourceId: string, targetId: string, edge: DropEdge) => void
   onContextMenu: (e: MouseEvent) => void
 }): JSX.Element {
   const { t } = useTranslation()
+  const [dragging, setDragging] = useState(false)
+  const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
   const { conn, state, error, expandable, expanded } = row
   const isConnected = state === 'connected'
   const sub =
@@ -594,9 +614,35 @@ function ConnectionRow({
 
   return (
     <div
-      className={isActive ? 'conn-item active' : 'conn-item'}
+      className={`conn-item${isActive ? ' active' : ''}${dragging ? ' dragging' : ''}${dropEdge ? ` drop-${dropEdge}` : ''}`}
+      draggable
+      aria-grabbed={dragging}
       onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : state !== 'connecting' && onConnect())}
+      onDragStart={(e: DragEvent<HTMLDivElement>) => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', row.id)
+        setDragging(true)
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        const rect = e.currentTarget.getBoundingClientRect()
+        setDropEdge(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropEdge(null)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        const sourceId = e.dataTransfer.getData('text/plain')
+        if (sourceId && dropEdge) onMove(sourceId, row.id, dropEdge)
+        setDropEdge(null)
+      }}
+      onDragEnd={() => {
+        setDragging(false)
+        setDropEdge(null)
+      }}
       onContextMenu={onContextMenu}
       style={conn.color ? { borderLeftColor: conn.color } : undefined}
     >
