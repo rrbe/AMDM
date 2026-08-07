@@ -138,7 +138,7 @@
 ## 11. 表单与 Modal
 
 - Modal 使用 Elevated Surface、单层外边界和 Dialog Shadow。
-- Backdrop 建议使用 `rgba(0, 0, 0, 0.55)`；可保留小幅模糊，但不能依靠重模糊隐藏背景结构。
+- Backdrop 使用 `rgba(0, 0, 0, 0.55)` 压暗背景,不使用 `backdrop-filter` 模糊整个 App。
 - Input、Select、Textarea 使用 Control Surface，静止边界较弱。
 - Focus 使用浅灰边界和 `--focus-soft`，不能删除焦点环。
 - Field Group 使用标题和间距，不增加深灰卡片。
