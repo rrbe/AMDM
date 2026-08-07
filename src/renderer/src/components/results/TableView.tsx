@@ -24,7 +24,7 @@ import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonView } from './JsonView'
-import { Modal } from '@renderer/components/common/Modal'
+import { ResizableModal } from '@renderer/components/common/Modal'
 
 /**
  * Virtualized table.
@@ -304,18 +304,15 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       )}
 
       {preview && (
-        <Modal
+        <ResizableModal
           title={preview.column}
-          className="h-[420px] min-h-[300px] min-w-[380px] resize"
-          bodyClassName="flex-1 overflow-hidden"
           backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
-          movable
           onClose={() => setPreview(null)}
         >
           <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
             <JsonView value={preview.value} />
           </div>
-        </Modal>
+        </ResizableModal>
       )}
 
       {menu && (

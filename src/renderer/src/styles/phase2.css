@@ -293,12 +293,12 @@
 /* ---- Document editor (DocEditor) ---- */
 .doc-edit-area {
   width: 100%;
-  min-height: 320px;
-  max-height: 56vh;
+  min-height: 0;
+  flex: 1;
   font-family: var(--font-mono);
   font-size: var(--fs);
   line-height: 1.5;
-  resize: vertical;
+  resize: none;
   white-space: pre;
   overflow: auto;
 }
@@ -345,4 +345,3 @@
   font-size: var(--fs-sm);
   margin-top: 10px;
 }
-

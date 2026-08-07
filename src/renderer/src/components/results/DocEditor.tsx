@@ -11,7 +11,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Modal } from '@renderer/components/common/Modal'
+import { ResizableModal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { toJsonLines, indentFor } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -69,8 +69,10 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
   }
 
   return (
-    <Modal
+    <ResizableModal
       title={t('docEditor.title', { collection })}
+      className="h-[560px] min-h-[420px]"
+      bodyClassName="flex flex-col gap-2"
       onClose={onClose}
       footer={
         <>
@@ -92,6 +94,6 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
       <div className="hint">
         {t('docEditor.hint')}
       </div>
-    </Modal>
+    </ResizableModal>
   )
 }

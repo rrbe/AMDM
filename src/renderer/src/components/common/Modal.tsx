@@ -37,6 +37,8 @@ interface ModalProps {
   lockTop?: boolean
 }
 
+type ResizableModalProps = Omit<ModalProps, 'movable'>
+
 interface ModalDrag {
   pointerId: number
   startX: number
@@ -230,5 +232,21 @@ export function Modal({
         </div>
       )}
     </Dialog>
+  )
+}
+
+/** Modal variant for data-heavy content: movable, resizable, and body-filling. */
+export function ResizableModal({
+  className,
+  bodyClassName,
+  ...props
+}: ResizableModalProps): JSX.Element {
+  return (
+    <Modal
+      {...props}
+      movable
+      className={cn('h-[420px] min-h-[300px] min-w-[380px] resize', className)}
+      bodyClassName={cn('flex-1 overflow-hidden', bodyClassName)}
+    />
   )
 }
