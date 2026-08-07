@@ -79,7 +79,7 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
 /**
  * Unified left panel: a single tree that merges connections and their catalogs.
  *
- *   Connection → Databases → (Users) + Collections → (Indexes) → leaves
+ *   Connection → Databases → Collections → (Indexes) → leaves + (Users)
  *
  * Top-level rows are connections — each shows only a live status signal, name,
  * and hosts; management and refresh actions live in right-click menus. A
@@ -745,48 +745,9 @@ function flattenCatalog(
 
     if (!dbExpanded) continue
 
-    // Users folder lives at the database level (users are a db concept).
-    const usersNodeId = `${connId}:users:${db.name}`
-    const usersExpanded = cat.expanded.has(usersNodeId)
-    const usersList = cat.users[db.name]
-    rows.push({
-      type: 'tree',
-      id: usersNodeId,
-      connId,
-      depth: 2,
-      label: 'Users',
-      icon: 'users',
-      kind: 'users',
-      expandable: true,
-      expanded: usersExpanded,
-      loading: cat.loading.has(usersNodeId),
-      count: usersList?.length,
-      onToggle: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name }),
-      onClick: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name })
-    })
-    if (usersExpanded && usersList) {
-      for (const u of usersList) {
-        rows.push({
-          type: 'tree',
-          id: `${usersNodeId}:${u.db}.${u.user}`,
-          connId,
-          depth: 3,
-          label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || 'no roles'})`,
-          icon: 'user',
-          kind: 'leaf',
-          expandable: false,
-          expanded: false,
-          loading: false
-        })
-      }
-      if (usersList.length === 0) {
-        rows.push(leafNote(`${usersNodeId}:empty`, connId, 3, 'no users'))
-      }
-    }
-
     const collsRaw = cat.collections[db.name]
-    if (collsRaw === undefined) continue
-    const colls = sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
+    const colls =
+      collsRaw === undefined ? [] : sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
 
     for (const coll of colls) {
       const collNodeId = `${connId}:coll:${db.name}/${coll.name}`
@@ -868,8 +829,47 @@ function flattenCatalog(
       }
     }
 
-    if (colls.length === 0) {
+    if (collsRaw !== undefined && colls.length === 0) {
       rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, 'no collections'))
+    }
+
+    // Users are a database concept, shown after the database's collections.
+    const usersNodeId = `${connId}:users:${db.name}`
+    const usersExpanded = cat.expanded.has(usersNodeId)
+    const usersList = cat.users[db.name]
+    rows.push({
+      type: 'tree',
+      id: usersNodeId,
+      connId,
+      depth: 2,
+      label: 'Users',
+      icon: 'users',
+      kind: 'users',
+      expandable: true,
+      expanded: usersExpanded,
+      loading: cat.loading.has(usersNodeId),
+      count: usersList?.length,
+      onToggle: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name }),
+      onClick: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name })
+    })
+    if (usersExpanded && usersList) {
+      for (const u of usersList) {
+        rows.push({
+          type: 'tree',
+          id: `${usersNodeId}:${u.db}.${u.user}`,
+          connId,
+          depth: 3,
+          label: `${u.user} (${u.roles.map((r) => r.role).join(', ') || 'no roles'})`,
+          icon: 'user',
+          kind: 'leaf',
+          expandable: false,
+          expanded: false,
+          loading: false
+        })
+      }
+      if (usersList.length === 0) {
+        rows.push(leafNote(`${usersNodeId}:empty`, connId, 3, 'no users'))
+      }
     }
   }
 
