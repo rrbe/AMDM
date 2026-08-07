@@ -21,7 +21,7 @@
     "dist:prepare": "pnpm clean && pnpm build && pnpm prepare:sparkle",
     "dist": "pnpm dist:prepare && electron-builder",
     "dist:dir": "pnpm dist:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
-    "install:mac": "pnpm dist:dir --mac --arm64 && rm -rf /Applications/AMDM.app && ditto dist/mac-arm64/AMDM.app /Applications/AMDM.app && open /Applications/AMDM.app"
+    "install:mac": "pnpm dist:dir --mac --arm64 && if pgrep -x AMDM >/dev/null; then osascript -e 'tell application \"AMDM\" to quit'; while pgrep -x AMDM >/dev/null; do sleep 0.1; done; fi && rm -rf /Applications/AMDM.app && ditto dist/mac-arm64/AMDM.app /Applications/AMDM.app && open /Applications/AMDM.app"
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",
