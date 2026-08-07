@@ -9,17 +9,19 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "prepare:sparkle": "node scripts/prepare-sparkle.mjs",
-    "generate:sparkle-appcast": "node scripts/generate-sparkle-appcast.mjs",
     "start": "electron-vite preview",
-    "clean": "node -e \"for (const path of ['out', 'dist', 'coverage', 'tsconfig.node.tsbuildinfo', 'tsconfig.web.tsbuildinfo']) require('node:fs').rmSync(path, { recursive: true, force: true })\"",
-    "dist": "pnpm clean && pnpm build && pnpm prepare:sparkle && electron-builder",
-    "dist:dir": "pnpm clean && pnpm build && pnpm prepare:sparkle && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
     "test": "vitest run",
     "test:unit": "vitest run test/unit test/contract",
-    "test:integration": "vitest run test/integration"
+    "test:integration": "vitest run test/integration",
+    "clean": "node -e \"for (const path of ['out', 'dist', 'coverage', 'tsconfig.node.tsbuildinfo', 'tsconfig.web.tsbuildinfo']) require('node:fs').rmSync(path, { recursive: true, force: true })\"",
+    "prepare:sparkle": "node scripts/prepare-sparkle.mjs",
+    "generate:sparkle-appcast": "node scripts/generate-sparkle-appcast.mjs",
+    "dist:prepare": "pnpm clean && pnpm build && pnpm prepare:sparkle",
+    "dist": "pnpm dist:prepare && electron-builder",
+    "dist:dir": "pnpm dist:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "install:mac": "pnpm dist:dir --mac --arm64 && rm -rf /Applications/AMDM.app && ditto dist/mac-arm64/AMDM.app /Applications/AMDM.app && open /Applications/AMDM.app"
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",
