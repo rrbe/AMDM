@@ -270,6 +270,9 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
       inMultiDoc && picked.length > 1
         ? bulkDocMenuItems(picked.map((i) => docs[i]))
         : treeMenuItems(node, docs)
+    if (canEditNode(node)) {
+      items.unshift({ label: t('tree.editCell'), onClick: () => startEdit(node) })
+    }
     const rootDoc = rootDocOf(node)
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
@@ -341,15 +344,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
                   </span>
                 )}
               </div>
-              <div
-                className="kv-val"
-                onDoubleClick={(e) => {
-                  if (canEditNode(node)) {
-                    e.stopPropagation()
-                    startEdit(node)
-                  }
-                }}
-              >
+              <div className="kv-val">
                 {isEditing ? (
                   <CellInput
                     initial={editableText(node.value) ?? ''}

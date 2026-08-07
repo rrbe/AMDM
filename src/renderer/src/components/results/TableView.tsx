@@ -133,7 +133,6 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     setAnchorRow(anchor)
   }
   // Single-click a cell: select its whole row AND focus that cell (cell overlay).
-  // Double-click edits (see the Cell handlers) — no modifier key needed here.
   const clickCell = (row: number, col: string, e: MouseEvent): void => {
     setSelectedCell({ row, col })
     applyRowSelection(row, e)
@@ -192,10 +191,13 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
     const rows = selectedRows.has(row) ? [...selectedRows].sort((a, b) => a - b) : [row]
     if (!selectedRows.has(row)) {
       setSelectedRows(new Set([row]))
-      setSelectedCell(col ? { row, col } : null)
       setAnchorRow(row)
     }
+    setSelectedCell(col ? { row, col } : null)
     const items = tableMenuItems(rows, row, col, docs, fieldSort)
+    if (col && canEditCell(row, col)) {
+      items.unshift({ label: t('table.editCell'), onClick: () => startEditCell(row, col) })
+    }
     const doc = docs[row]
     if (docCtx && docHasId(doc)) {
       items.push({ label: t('table.editDoc'), onClick: () => setEditIndex(row) })
@@ -277,7 +279,6 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
                   editing={editing?.row === vi.index && editing?.col === col}
                   editError={editError}
                   onClick={(e) => clickCell(vi.index, col, e)}
-                  onDoubleClick={() => canEditCell(vi.index, col) && startEditCell(vi.index, col)}
                   onOpen={(value) => setPreview({ column: col, value })}
                   onCommit={(text) => void commitCell(vi.index, col, text)}
                   onCancel={() => {
@@ -354,7 +355,6 @@ function Cell({
   editing,
   editError,
   onClick,
-  onDoubleClick,
   onOpen,
   onCommit,
   onCancel,
@@ -367,7 +367,6 @@ function Cell({
   editing: boolean
   editError: string | null
   onClick: (e: MouseEvent) => void
-  onDoubleClick: () => void
   onOpen: (value: unknown) => void
   onCommit: (text: string) => void
   onCancel: () => void
@@ -395,7 +394,6 @@ function Cell({
         className={cellCls}
         style={{ width }}
         onClick={onClick}
-        onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
       >
         <span className="empty">—</span>
@@ -426,7 +424,7 @@ function Cell({
           onOpen(value)
         }
       }}
-      onDoubleClick={() => (expandable ? onOpen(value) : onDoubleClick())}
+      onDoubleClick={expandable ? () => onOpen(value) : undefined}
       onContextMenu={onContextMenu}
     >
       <span className={cls}>{text}</span>
