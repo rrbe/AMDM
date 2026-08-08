@@ -211,6 +211,8 @@ export interface ShellRequest {
   skip?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
+  /** Default server-side limit for read operations. Explicit query options win. */
+  timeoutMS?: number
   /** Opaque per-run id. When present the main process registers an
       AbortController under it so the run can be cancelled via `shell.abort`. */
   execId?: string
@@ -416,6 +418,8 @@ export interface AppSettings {
   /** Page size for query results — how many docs a cursor fetches per page
       (bounded; never the whole collection). */
   queryLimit: number
+  /** Default MongoDB maxTimeMS for read operations; 0 disables the limit. */
+  queryTimeoutMS: number
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
@@ -428,6 +432,7 @@ export interface AppSettings {
 }
 
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
+export const QUERY_TIMEOUTS_MS = [0, 10_000, 30_000, 60_000, 300_000] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
   connectionOrder: [],
@@ -437,6 +442,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sidebarWidth: 270,
   editorHeight: 142,
   queryLimit: 50,
+  queryTimeoutMS: 30_000,
   editorFontSize: 13,
   editorWordWrap: false,
   editorTabSize: 2,

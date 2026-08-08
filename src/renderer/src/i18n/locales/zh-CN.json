@@ -49,6 +49,10 @@
     "sortAlpha": "按字母",
     "queryLimit": "每页结果数",
     "queryLimitHint": "每页查询拉取的文档数量。",
+    "queryTimeout": "查询超时",
+    "queryTimeoutHint": "读取操作的默认 maxTimeMS；语句中显式设置的值优先。",
+    "queryTimeoutOff": "不限制",
+    "queryTimeoutSeconds": "{{seconds}} 秒",
     "editorFontSize": "编辑器字号",
     "editorWordWrap": "自动换行长行",
     "editorTabSize": "缩进宽度"
@@ -225,6 +229,7 @@
     "explainTip": "运行 explain('executionStats')",
     "explainBtn": "Explain",
     "stopTip": "停止执行",
+    "stopping": "正在停止…",
     "stopBtn": "停止",
     "runBtn": "运行",
     "resizeEditor": "调整编辑器大小",

@@ -37,7 +37,7 @@ const AsyncWriter =
   AsyncWriterModule
 import { ObjectId, Long, Int32, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
 import { FindCursor, AggregationCursor, AbstractCursor } from 'mongodb'
-import type { Collection, Db, Document, FindOptions } from 'mongodb'
+import type { Collection, Db, DistinctOptions, Document, FindOptions } from 'mongodb'
 import type { ShellOutputLine, ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 
@@ -546,10 +546,12 @@ for (const proto of [findCursorProto, AggregationCursor.prototype as unknown as 
 function buildFindOptions(
   projection?: Document,
   options?: Document,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMS?: number
 ): FindOptions | undefined {
-  if (!projection && !options && !signal) return undefined
+  if (!projection && !options && !signal && !timeoutMS) return undefined
   return {
+    ...(timeoutMS ? { maxTimeMS: timeoutMS } : {}),
     ...(options ?? {}),
     ...(projection ? { projection } : {}),
     ...(signal ? { signal } : {})
@@ -566,29 +568,57 @@ function withSignal(options: Document | undefined, signal?: AbortSignal): Docume
   return { ...(options ?? {}), signal }
 }
 
+/** Apply the configured read timeout without overriding an explicit maxTimeMS. */
+function withReadOptions(
+  options: Document | undefined,
+  signal?: AbortSignal,
+  timeoutMS?: number
+): Document | undefined {
+  if (!signal && !timeoutMS) return options
+  return {
+    ...(timeoutMS ? { maxTimeMS: timeoutMS } : {}),
+    ...(options ?? {}),
+    ...(signal ? { signal } : {})
+  }
+}
+
 /**
  * Wrap a Collection so a handful of shell-only spellings work, while every
  * other method/property passes straight through to the real driver Collection.
  * `signal`, when present, is injected into the cursor-producing ops so a slow
  * find/aggregate can be cancelled server-side (the "Stop" button).
  */
-function makeCollProxy(coll: Collection, signal?: AbortSignal): Collection {
+function makeCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: number): Collection {
   return new Proxy(coll, {
     get(target, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
       switch (prop) {
         case 'find':
           return (filter?: Document, projection?: Document, options?: Document) =>
-            target.find(filter ?? {}, buildFindOptions(projection, options, signal))
+            target.find(filter ?? {}, buildFindOptions(projection, options, signal, timeoutMS))
         case 'findOne':
           return (filter?: Document, projection?: Document, options?: Document) =>
             markSyntheticPromise(
-              target.findOne(filter ?? {}, buildFindOptions(projection, options, signal))
+              target.findOne(filter ?? {}, buildFindOptions(projection, options, signal, timeoutMS))
             )
         // Inject the signal so a runaway aggregation can be cancelled mid-flight.
         case 'aggregate':
           return (pipeline?: Document[], options?: Document) =>
-            target.aggregate(pipeline ?? [], withSignal(options, signal))
+            target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
+        case 'countDocuments':
+          return (filter?: Document, options?: Document) =>
+            markSyntheticPromise(
+              target.countDocuments(filter ?? {}, withReadOptions(options, signal, timeoutMS))
+            )
+        case 'distinct':
+          return (key: string, filter?: Document, options?: Document) => {
+            const readOptions = withReadOptions(options, signal, timeoutMS)
+            return markSyntheticPromise(
+              readOptions
+                ? target.distinct(key, filter ?? {}, readOptions as DistinctOptions)
+                : target.distinct(key, filter ?? {})
+            )
+          }
         // mongosh `getIndexes()` → driver `indexes()`.
         case 'getIndexes':
           return () => markSyntheticPromise(target.indexes())
@@ -615,23 +645,23 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal): Collection {
  * snippets copied from mongosh / NoSQLBooster run unchanged. Anything genuinely
  * unsupported surfaces as an error rather than silent wrong behavior.
  */
-export function makeDbProxy(db: Db, signal?: AbortSignal): Db {
+export function makeDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): Db {
   return new Proxy(db, {
     get(target, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
       switch (prop) {
         case 'getCollection':
-          return (name: string) => makeCollProxy(target.collection(name), signal)
+          return (name: string) => makeCollProxy(target.collection(name), signal, timeoutMS)
         // Driver `db.collection(name)` also yields a wrapped collection so the
         // find/findOne projection shim applies regardless of spelling.
         case 'collection':
-          return (name: string) => makeCollProxy(target.collection(name), signal)
+          return (name: string) => makeCollProxy(target.collection(name), signal, timeoutMS)
         case 'getSiblingDB':
-          return (name: string) => makeDbProxy(target.client.db(name), signal)
+          return (name: string) => makeDbProxy(target.client.db(name), signal, timeoutMS)
         // db-level aggregation (`db.aggregate([...])`) — cancellable too.
         case 'aggregate':
           return (pipeline?: Document[], options?: Document) =>
-            target.aggregate(pipeline ?? [], withSignal(options, signal))
+            target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
         // mongosh `db.runCommand(cmd)` → driver `db.command(cmd)`.
         case 'runCommand':
           return (cmd: Document) =>
@@ -640,17 +670,25 @@ export function makeDbProxy(db: Db, signal?: AbortSignal): Db {
         case 'adminCommand':
           return (cmd: Document) =>
             markSyntheticPromise(target.admin().command(cmd, withSignal(undefined, signal)))
+        case 'command':
+          return (cmd: Document, options?: Document) =>
+            markSyntheticPromise(target.command(cmd, withSignal(options, signal)))
+        case 'listCollections':
+          return (filter?: Document, options?: Document) =>
+            target.listCollections(filter ?? {}, withReadOptions(options, signal, timeoutMS))
         case 'getCollectionNames':
           return () =>
             markSyntheticPromise(
               target
-                .listCollections({}, { nameOnly: true })
+                .listCollections({}, withReadOptions({ nameOnly: true }, signal, timeoutMS))
                 .toArray()
                 .then((cs) => cs.map((c) => c.name))
             )
         case 'getCollectionInfos':
           return (filter?: Document) =>
-            markSyntheticPromise(target.listCollections(filter ?? {}).toArray())
+            markSyntheticPromise(
+              target.listCollections(filter ?? {}, withReadOptions(undefined, signal, timeoutMS)).toArray()
+            )
         case 'getName':
           return () => target.databaseName
         case 'version':
@@ -672,7 +710,7 @@ export function makeDbProxy(db: Db, signal?: AbortSignal): Db {
           : val
       }
       // Unknown property → treat as a collection name (mongosh: `db.<coll>`).
-      return makeCollProxy(target.collection(prop))
+      return makeCollProxy(target.collection(prop), signal, timeoutMS)
     }
   })
 }
@@ -741,11 +779,12 @@ export class OutputCollector {
 export function makeSandbox(
   db: Db,
   signal?: AbortSignal,
-  out?: OutputCollector
+  out?: OutputCollector,
+  timeoutMS?: number
 ): Record<string, unknown> {
   const print = (...args: unknown[]): void => out?.push('print', args)
   return {
-    db: makeDbProxy(db, signal),
+    db: makeDbProxy(db, signal, timeoutMS),
     ObjectId: callableCtor(ObjectId),
     ISODate: (s?: string) => (s ? new Date(s) : new Date()),
     Date,
@@ -821,30 +860,35 @@ async function drainCursor(
   }
   const truncated = docs.length > limit
   if (truncated) docs.pop()
-  await cursor.close?.().catch(() => {})
+  try {
+    await withAbort(Promise.resolve(cursor.close?.()), signal)
+  } catch (err) {
+    if (signal?.aborted) throw err
+  }
   return { docs, truncated }
-}
-
-/**
- * Reject as soon as `signal` aborts. Used to race a pending `await` so the UI
- * unblocks even for driver ops that don't honor the signal natively; the
- * orphaned operation settles later and its result is discarded.
- */
-function abortRace(signal: AbortSignal): Promise<never> {
-  return new Promise((_resolve, reject) => {
-    const fail = (): void => reject(signal.reason ?? new Error('Aborted'))
-    if (signal.aborted) return fail()
-    signal.addEventListener('abort', fail, { once: true })
-  })
 }
 
 /** Await `p`, but bail out the moment `signal` aborts. */
 function withAbort<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return p
-  // Keep the original promise's eventual rejection handled so racing past it
-  // doesn't surface as an unhandledRejection.
-  p.catch(() => {})
-  return Promise.race([p, abortRace(signal)])
+  if (signal.aborted) {
+    p.catch(() => {})
+    return Promise.reject(signal.reason ?? new Error('Aborted'))
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => reject(signal.reason ?? new Error('Aborted'))
+    signal.addEventListener('abort', onAbort, { once: true })
+    p.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(err)
+      }
+    )
+  })
 }
 
 /** A driver write result (insert/update/delete/replace/bulkWrite). */
@@ -935,11 +979,12 @@ async function runReplCommand(
   db: Db,
   cmd: ReplCommand,
   signal: AbortSignal | undefined,
+  timeoutMS: number | undefined,
   started: number
 ): Promise<ShellResult> {
   const docResult = async (docs: unknown[]): Promise<ShellResult> => ({
     kind: 'documents',
-    data: await serializerPool.serialize(docs),
+    data: await withAbort(serializerPool.serialize(docs), signal),
     count: docs.length,
     elapsedMs: Date.now() - started
   })
@@ -947,7 +992,7 @@ async function runReplCommand(
   if (cmd.type === 'use') {
     return {
       kind: 'ack',
-      data: await serializerPool.serializeOne({ ok: 1, switchedTo: cmd.db }),
+      data: await withAbort(serializerPool.serializeOne({ ok: 1, switchedTo: cmd.db }), signal),
       useDatabase: cmd.db,
       elapsedMs: Date.now() - started
     }
@@ -963,7 +1008,12 @@ async function runReplCommand(
     }
     case 'collections':
     case 'tables':
-      return docResult(await withAbort(db.listCollections({}, { nameOnly: true }).toArray(), signal))
+      return docResult(
+        await withAbort(
+          db.listCollections({}, withReadOptions({ nameOnly: true }, signal, timeoutMS)).toArray(),
+          signal
+        )
+      )
     case 'users': {
       const res = (await withAbort(db.command({ usersInfo: 1 }), signal)) as { users?: unknown[] }
       return docResult(Array.isArray(res.users) ? res.users : [])
@@ -992,6 +1042,8 @@ export interface RunShellOptions {
   skip?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
+  /** Default MongoDB maxTimeMS for read operations; explicit options win. */
+  timeoutMS?: number
   /** Cancellation handle. Threaded into find/aggregate/command ops for true
       server-side cancellation, and raced against pending awaits so the run
       bails promptly when the user hits "Stop". */
@@ -1024,6 +1076,7 @@ async function runShellOnDbImpl(
 ): Promise<ShellResult> {
   const limit = options.limit ?? DEFAULT_LIMIT
   const signal = options.signal
+  const timeoutMS = options.timeoutMS
   const started = Date.now()
   const collection = detectCollection(code)
   const out = new OutputCollector()
@@ -1031,16 +1084,20 @@ async function runShellOnDbImpl(
   // including errors (the output produced before a failure is the best clue).
   const withOutput = async (r: ShellResult): Promise<ShellResult> => {
     if (out.size === 0) return r
-    return { ...r, output: await out.toLines(), ...(out.truncated ? { outputTruncated: true } : {}) }
+    return {
+      ...r,
+      output: await withAbort(out.toLines(), signal),
+      ...(out.truncated ? { outputTruncated: true } : {})
+    }
   }
 
   try {
     // mongosh REPL commands (`show dbs`, `use x`) — handled before the vm path
     // since they aren't valid JS. Errors (e.g. auth) fall to the catch below.
     const repl = parseReplCommand(code)
-    if (repl) return await withOutput(await runReplCommand(db, repl, signal, started))
+    if (repl) return await withOutput(await runReplCommand(db, repl, signal, timeoutMS, started))
 
-    const sandbox = makeSandbox(db, signal, out)
+    const sandbox = makeSandbox(db, signal, out, timeoutMS)
     const context = vm.createContext(sandbox)
     // Implicit await: run the async-rewriter2 transpilation of the user code.
     // Driver promises (tagged by our proxies/prototype patches) are awaited at
@@ -1063,7 +1120,7 @@ async function runShellOnDbImpl(
         const plan = await withAbort(result.explain('executionStats'), signal)
         return await withOutput({
           kind: 'explain',
-          data: await serializerPool.serializeOne(plan),
+          data: await withAbort(serializerPool.serializeOne(plan), signal),
           collection,
           elapsedMs: Date.now() - started
         })
@@ -1089,7 +1146,7 @@ async function runShellOnDbImpl(
       const { docs, truncated } = await drainCursor(result, limit, signal)
       return await withOutput({
         kind: 'documents',
-        data: await serializerPool.serialize(docs),
+        data: await withAbort(serializerPool.serialize(docs), signal),
         count: docs.length,
         truncated,
         pageable,
@@ -1102,7 +1159,7 @@ async function runShellOnDbImpl(
     if (Array.isArray(result)) {
       return await withOutput({
         kind: 'documents',
-        data: await serializerPool.serialize(result),
+        data: await withAbort(serializerPool.serialize(result), signal),
         count: result.length,
         truncated: false,
         collection,
@@ -1113,7 +1170,7 @@ async function runShellOnDbImpl(
     if (isWriteAck(result)) {
       return await withOutput({
         kind: 'ack',
-        data: await serializerPool.serializeOne(result),
+        data: await withAbort(serializerPool.serializeOne(result), signal),
         collection,
         elapsedMs
       })
@@ -1121,7 +1178,7 @@ async function runShellOnDbImpl(
 
     return await withOutput({
       kind: 'value',
-      data: await serializerPool.serializeOne(result ?? null),
+      data: await withAbort(serializerPool.serializeOne(result ?? null), signal),
       collection,
       elapsedMs
     })
@@ -1129,13 +1186,13 @@ async function runShellOnDbImpl(
     // A user-initiated stop surfaces as whatever the driver/race threw; collapse
     // all of them to one clean "Aborted" result rather than a scary stack.
     if (signal?.aborted) {
-      return await withOutput({
+      return {
         kind: 'error',
         error: '执行已停止',
         errorName: 'Aborted',
         collection,
         elapsedMs: Date.now() - started
-      })
+      }
     }
     const { error, errorName } = describeError(err)
     return await withOutput({

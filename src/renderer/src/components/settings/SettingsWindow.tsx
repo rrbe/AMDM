@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type CollectionSort, type Language, type ThemeMode } from '@shared/types'
+import {
+  QUERY_LIMITS,
+  QUERY_TIMEOUTS_MS,
+  type CollectionSort,
+  type Language,
+  type ThemeMode
+} from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
 import { matchesSettingsSearch } from '@renderer/lib/settingsSearch'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -60,7 +66,13 @@ export function SettingsWindow(): JSX.Element {
       id: 'query',
       label: t('settings.sectionQuery'),
       icon: Search,
-      keywords: [t('settings.sectionQuery'), t('settings.queryLimit'), t('settings.queryLimitHint')]
+      keywords: [
+        t('settings.sectionQuery'),
+        t('settings.queryLimit'),
+        t('settings.queryLimitHint'),
+        t('settings.queryTimeout'),
+        t('settings.queryTimeoutHint')
+      ]
     },
     {
       id: 'editor',
@@ -209,14 +221,30 @@ export function SettingsWindow(): JSX.Element {
           )}
 
           {displayedSectionId === 'query' && (
-            <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
-              <Select<number>
-                value={settings.queryLimit}
-                onChange={(queryLimit) => void updateSettings({ queryLimit })}
-                options={QUERY_LIMITS.map((value) => ({ label: String(value), value }))}
-                aria-label={t('settings.queryLimit')}
-              />
-            </Field>
+            <>
+              <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
+                <Select<number>
+                  value={settings.queryLimit}
+                  onChange={(queryLimit) => void updateSettings({ queryLimit })}
+                  options={QUERY_LIMITS.map((value) => ({ label: String(value), value }))}
+                  aria-label={t('settings.queryLimit')}
+                />
+              </Field>
+              <Field label={t('settings.queryTimeout')} hint={t('settings.queryTimeoutHint')}>
+                <Select<number>
+                  value={settings.queryTimeoutMS}
+                  onChange={(queryTimeoutMS) => void updateSettings({ queryTimeoutMS })}
+                  options={QUERY_TIMEOUTS_MS.map((value) => ({
+                    label:
+                      value === 0
+                        ? t('settings.queryTimeoutOff')
+                        : t('settings.queryTimeoutSeconds', { seconds: value / 1000 }),
+                    value
+                  }))}
+                  aria-label={t('settings.queryTimeout')}
+                />
+              </Field>
+            </>
           )}
 
           {displayedSectionId === 'editor' && (

@@ -34,6 +34,7 @@ export function ShellWorkspace(): JSX.Element {
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
   const code = useAppStore((s) => getActiveTab(s).code)
   const running = useAppStore((s) => getActiveTab(s).running)
+  const stopping = useAppStore((s) => getActiveTab(s).stopping)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
   const formatCode = useAppStore((s) => s.formatCode)
@@ -79,8 +80,9 @@ export function ShellWorkspace(): JSX.Element {
 
             <div className="work-actions">
               {running ? (
-                <Button variant="danger" onClick={() => void stopShell()}>
-                  <LoaderCircle className="animate-spin" aria-hidden /> {t('shell.stopTip')}
+                <Button variant="danger" disabled={stopping} onClick={() => void stopShell()}>
+                  <LoaderCircle className="animate-spin" aria-hidden />
+                  {t(stopping ? 'shell.stopping' : 'shell.stopTip')}
                 </Button>
               ) : (
                 <Button variant="primary" disabled={busy} onClick={runEditor}>

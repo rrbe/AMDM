@@ -68,6 +68,8 @@ export interface QueryTab {
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
+  /** True after Stop is requested and before the run settles. */
+  stopping: boolean
   /** True when the last completed run failed; user-initiated Stop is not a failure. */
   runFailed: boolean
   /** execId of this tab's in-flight run, for Stop / cleanup on close. */
@@ -86,6 +88,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     activeResultId: null,
     resultSeq: 0,
     running: false,
+    stopping: false,
     runFailed: false,
     runningExecId: null,
     ...init

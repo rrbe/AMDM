@@ -67,6 +67,7 @@ describe('settingsStore', () => {
   it('returns defaults when nothing is stored', () => {
     expect(settingsStore.get()).toMatchObject({
       queryLimit: 50,
+      queryTimeoutMS: 30_000,
       theme: 'system',
       sidebarWidth: 270,
       editorHeight: 142
@@ -80,7 +81,12 @@ describe('settingsStore', () => {
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
     settingsStore.init()
-    expect(settingsStore.get()).toMatchObject({ theme: 'dark', queryLimit: 50, sidebarWidth: 270 })
+    expect(settingsStore.get()).toMatchObject({
+      theme: 'dark',
+      queryLimit: 50,
+      queryTimeoutMS: 30_000,
+      sidebarWidth: 270
+    })
   })
 
   it('persists connection order', () => {

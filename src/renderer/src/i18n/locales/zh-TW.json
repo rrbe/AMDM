@@ -49,6 +49,10 @@
     "sortAlpha": "依字母",
     "queryLimit": "每頁結果數",
     "queryLimitHint": "每頁查詢擷取的文件數量。",
+    "queryTimeout": "查詢逾時",
+    "queryTimeoutHint": "讀取操作的預設 maxTimeMS；語句中明確設定的值優先。",
+    "queryTimeoutOff": "不限制",
+    "queryTimeoutSeconds": "{{seconds}} 秒",
     "editorFontSize": "編輯器字型大小",
     "editorWordWrap": "自動換行過長的行",
     "editorTabSize": "縮排寬度"
@@ -225,6 +229,7 @@
     "explainTip": "執行 explain('executionStats')",
     "explainBtn": "Explain",
     "stopTip": "停止執行",
+    "stopping": "正在停止…",
     "stopBtn": "停止",
     "runBtn": "執行",
     "resizeEditor": "調整編輯器大小",

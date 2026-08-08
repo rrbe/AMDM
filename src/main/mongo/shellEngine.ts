@@ -41,6 +41,7 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
       limit: req.limit,
       skip: req.skip,
       explain: req.explain,
+      timeoutMS: req.timeoutMS,
       signal: controller?.signal
     })
   } finally {

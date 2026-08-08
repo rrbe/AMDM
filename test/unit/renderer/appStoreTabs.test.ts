@@ -335,9 +335,10 @@ describe('connection-bound tabs', () => {
           finish = resolve
         })
     )
+    const abort = vi.fn().mockResolvedValue(true)
     vi.stubGlobal('window', {
       api: {
-        shell: { execute },
+        shell: { execute, abort },
         history: { list: vi.fn().mockResolvedValue([]) }
       }
     })
@@ -352,13 +353,28 @@ describe('connection-bound tabs', () => {
     })
 
     const failedRun = useAppStore.getState().runShell()
-    expect(useAppStore.getState().tabs[0]).toMatchObject({ running: true, runFailed: false })
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      running: true,
+      stopping: false,
+      runFailed: false
+    })
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ timeoutMS: 30_000 }))
     finish({ kind: 'error', errorName: 'MongoServerError', error: 'boom' })
     await failedRun
     expect(useAppStore.getState().tabs[0]).toMatchObject({ running: false, runFailed: true })
 
-    execute.mockResolvedValueOnce({ kind: 'error', errorName: 'Aborted', error: '执行已停止' })
-    await useAppStore.getState().runShell()
-    expect(useAppStore.getState().tabs[0]).toMatchObject({ running: false, runFailed: false })
+    const stoppedRun = useAppStore.getState().runShell()
+    const stopping = useAppStore.getState().stopShell()
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ running: true, stopping: true })
+    void useAppStore.getState().stopShell()
+    expect(abort).toHaveBeenCalledOnce()
+    await stopping
+    finish({ kind: 'error', errorName: 'Aborted', error: '执行已停止' })
+    await stoppedRun
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      running: false,
+      stopping: false,
+      runFailed: false
+    })
   })
 })

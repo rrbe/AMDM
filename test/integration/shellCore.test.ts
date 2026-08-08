@@ -10,7 +10,7 @@
  * `db.x.insertOne(); db.x.find()` sequences naturally, exactly like mongosh.
  * The completion value keeps REPL semantics (the last expression).
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Db } from 'mongodb'
 import { runShellOnDb, detectCollection } from '../../src/main/mongo/shellCore'
 import type { RunShellOptions } from '../../src/main/mongo/shellCore'
@@ -542,6 +542,19 @@ describe('abort / stop (AbortSignal cancellation)', () => {
     const r = await run('db.nums.find({})', { signal: new AbortController().signal })
     expect(r.kind).toBe('documents')
     expect(r.count).toBe(5)
+  })
+
+  it('discards serialization as soon as the run is aborted', async () => {
+    const serialize = vi
+      .spyOn(serializerPool, 'serializeOne')
+      .mockImplementationOnce(() => new Promise(() => {}))
+    const controller = new AbortController()
+    const pending = run('42', { signal: controller.signal })
+    await vi.waitFor(() => expect(serialize).toHaveBeenCalledOnce())
+
+    controller.abort()
+    await expect(pending).resolves.toMatchObject({ kind: 'error', errorName: 'Aborted' })
+    serialize.mockRestore()
   })
 })
 

@@ -50,6 +50,7 @@ describe('createTab', () => {
       activeResultId: null,
       resultSeq: 0,
       running: false,
+      stopping: false,
       runFailed: false,
       runningExecId: null
     })
