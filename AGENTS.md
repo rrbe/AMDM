@@ -8,6 +8,11 @@
 2. **使用 Conventional Commits**：commit 信息格式为 `<type>: <summary>`，type 使用 `feat`、`fix`、`chore`、`refactor`、`docs`、`test`、`perf`、`style` 等常见前缀。
 3. **直接提交到 `master`**：功能改动不创建功能分支、不走 PR；用户要求提交时直接提交到 `master`。
 
+## 版本发布规则
+
+- 用户说 `bump version <version>` 时，视为明确授权执行完整发版流程，而不只是修改版本号：更新 `package.json` 中的版本并完成校验；提交并推送 `master`；创建并推送与版本一致的 `v<version>` tag；持续监视该 tag 触发的 Release workflow。
+- 只有 Release workflow 成功、GitHub Release 已发布且预期的 macOS、Windows、Linux 安装包及 Sparkle appcast 均存在，才可报告发版完成。workflow 失败时应继续诊断并修复，不得把“已推送 tag”或“Action 仍在运行”当作完成。
+
 ## 项目介绍
 
 一个精简、**性能优先**的 MongoDB 桌面 GUI（Electron + React + TypeScript + Vite）。
