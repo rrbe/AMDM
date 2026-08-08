@@ -250,6 +250,7 @@ export function ShellEditor({
           basicSetup={{
             lineNumbers: true,
             highlightActiveLine: true,
+            highlightSelectionMatches: false,
             foldGutter: false,
             autocompletion: false
             // tabSize is set via the EditorState.tabSize extension (configurable).
