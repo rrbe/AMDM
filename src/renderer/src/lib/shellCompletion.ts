@@ -13,7 +13,6 @@
  * `CompletionSource` Promise contract; honors abort to drop stale requests.
  */
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
-import { snippetCompletion } from '@codemirror/autocomplete'
 import {
   mongoCompletionSource,
   activeContext,
@@ -23,6 +22,7 @@ import {
 } from '@renderer/lib/mongoCompletion'
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import type { TsCompletionEntry } from '@renderer/lib/tsAutocomplete/protocol'
+import { methodCompletion } from '@renderer/lib/completionInfo'
 
 /** Cursor is completing a property after a `.` on an expression (not in a string). */
 export function isMemberCompletion(before: string): boolean {
@@ -59,42 +59,6 @@ function kindToType(kind: string): Completion['type'] {
   }
 }
 
-// Method call snippets (CodeMirror snippet syntax — `${}` is a tab stop, `${x}`
-// a labelled placeholder). Curated for the common ones; others fall to a default.
-const METHOD_SNIPPETS: Record<string, string> = {
-  find: 'find({ ${} })',
-  findOne: 'findOne({ ${} })',
-  aggregate: 'aggregate([ ${} ])',
-  limit: 'limit(${10})',
-  skip: 'skip(${0})',
-  sort: 'sort({ ${field}: ${-1} })',
-  project: 'project({ ${field}: ${1} })',
-  projection: 'projection({ ${field}: ${1} })',
-  countDocuments: 'countDocuments({ ${} })',
-  distinct: 'distinct(${field})',
-  insertOne: 'insertOne({ ${} })',
-  insertMany: 'insertMany([ ${} ])',
-  updateOne: 'updateOne({ ${filter} }, { $set: { ${} } })',
-  updateMany: 'updateMany({ ${filter} }, { $set: { ${} } })',
-  replaceOne: 'replaceOne({ ${filter} }, { ${} })',
-  deleteOne: 'deleteOne({ ${} })',
-  deleteMany: 'deleteMany({ ${} })',
-  createIndex: 'createIndex({ ${field}: ${1} })',
-  getSiblingDB: 'getSiblingDB(${db})',
-  getCollection: 'getCollection(${name})',
-  runCommand: 'runCommand({ ${} })'
-}
-const ZERO_ARG_METHODS = new Set([
-  'toArray', 'itcount', 'count', 'size', 'pretty', 'hasNext', 'next', 'explain',
-  'getName', 'getCollectionNames', 'getCollectionInfos', 'drop', 'dropIndexes',
-  'getIndexes', 'indexes', 'listIndexes', 'stats', 'admin', 'estimatedDocumentCount'
-])
-
-function methodSnippet(name: string): string {
-  if (METHOD_SNIPPETS[name]) return METHOD_SNIPPETS[name]
-  return `${name}(\${})` // a `${}` field places the cursor inside the parens
-}
-
 function isMethodKind(kind: string): boolean {
   return kind === 'method' || kind === 'function' || kind === 'local function'
 }
@@ -109,13 +73,7 @@ function mapEntry(e: TsCompletionEntry, onDb: boolean): Completion {
   // Methods insert as call snippets (limit → limit(10), find → find({ })…).
   if (isMethodKind(e.kind)) {
     const detail = onDb ? 'db' : undefined
-    // Zero-arg methods use a plain `name()` apply, NOT a snippet: a field-less
-    // snippet sets no selection, so the cursor would land at the start (`db.|`)
-    // instead of after the parens. A string apply puts the cursor at the end.
-    if (ZERO_ARG_METHODS.has(e.name)) {
-      return { label: e.name, type: 'method', detail, boost, apply: `${e.name}()` }
-    }
-    return snippetCompletion(methodSnippet(e.name), { label: e.name, type: 'method', detail, boost })
+    return methodCompletion(e.name, detail, boost)
   }
   return { label: e.name, type: kindToType(e.kind), boost }
 }

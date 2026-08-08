@@ -33,6 +33,7 @@ import {
   type OpContext,
   type ValueChoice
 } from '@renderer/lib/completionRegistry'
+import { methodCompletion, withCompletionInfo } from '@renderer/lib/completionInfo'
 
 // --------------------------------------------------------------------------
 // Method vocabularies — the regex-fallback path. The TS engine is the primary
@@ -61,7 +62,8 @@ const CURSOR_METHODS = [
 // --------------------------------------------------------------------------
 
 function opt(label: string, type: Completion['type'], detail: string, boost?: number): Completion {
-  return boost === undefined ? { label, type, detail } : { label, type, detail, boost }
+  if (type === 'method') return methodCompletion(label, detail, boost)
+  return withCompletionInfo(boost === undefined ? { label, type, detail } : { label, type, detail, boost })
 }
 
 /**

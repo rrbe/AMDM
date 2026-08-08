@@ -332,55 +332,152 @@
   pointer-events: none;
 }
 
+/* Mongo shell semantic tokens layered over the JavaScript grammar. Keep this
+   palette aligned with tokens.css and pineEditorTheme.ts. */
+.editor-wrap .cm-shell-db,
+.editor-wrap .cm-shell-collection {
+  color: var(--t-boolean);
+}
+.editor-wrap .cm-shell-method {
+  color: var(--t-date);
+}
+.editor-wrap .cm-shell-operator,
+.editor-wrap .cm-shell-constructor {
+  color: var(--t-special);
+}
+.editor-wrap .cm-shell-field {
+  color: var(--t-boolean);
+}
+
 /* ---- Completion dropdown ----
-   Distinguish the suggestion label from its type detail, and align the
-   selected row with the app accent (CodeMirror's default is a clashing blue).
-   The doubled `.cm-tooltip.cm-tooltip-autocomplete` raises specificity above
-   CodeMirror's runtime-injected base theme so these win regardless of order. */
-.cm-tooltip.cm-tooltip-autocomplete > ul > li {
-  padding: 2px 6px;
+   Use the same popover shell for the suggestion list and its documentation.
+   Scope the selectors to the editor so they outrank CodeMirror's
+   runtime-injected base theme regardless of injection order. */
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete,
+.editor-wrap .cm-tooltip.cm-completionInfo {
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-elevated);
+  padding: 0;
+  box-shadow: var(--shadow-popover);
+}
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete {
+  overflow: visible;
+}
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete > ul {
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: inherit;
+  background: transparent;
+  padding: 4px;
+}
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete > ul > li {
+  border-radius: 5px;
+  padding: 4px 7px;
+  line-height: 20px;
 }
 .cm-tooltip-autocomplete .cm-completionLabel {
-  font-weight: 600;
-  color: var(--fg-0);
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
 }
 .cm-tooltip-autocomplete .cm-completionMatchedText {
-  text-decoration: none;
+  color: var(--t-date);
   font-weight: 700;
-  color: var(--accent);
+  text-decoration: none;
 }
 .cm-tooltip-autocomplete .cm-completionDetail {
   margin-left: 0.8em;
-  font-style: italic;
+  color: var(--text-muted);
   font-size: 0.82em;
-  color: var(--fg-3); /* very muted — recedes behind the label */
+  font-style: italic;
 }
-.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
-  background: var(--accent);
-  color: var(--accent-fg);
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--interaction-selected);
+  color: var(--text-primary);
 }
-.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionLabel,
-.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText {
-  color: var(--accent-fg);
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionLabel {
+  color: var(--text-primary);
 }
-.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail {
-  color: var(--accent-fg);
-  opacity: 0.72;
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText {
+  color: var(--t-date);
 }
-/* Icon set: keep only the high-recognition glyphs — ƒ (method) and 𝑥 (field).
-   CodeMirror's defaults for the other types (○ class, □ property, 🔑 keyword,
-   abc text…) read as noise beside the type label, so blank them. The .8em icon
-   column keeps its width, so labels stay aligned. */
-.cm-tooltip-autocomplete .cm-completionIcon-class::after,
-.cm-tooltip-autocomplete .cm-completionIcon-property::after,
-.cm-tooltip-autocomplete .cm-completionIcon-keyword::after,
-.cm-tooltip-autocomplete .cm-completionIcon-text::after,
-.cm-tooltip-autocomplete .cm-completionIcon-constant::after,
-.cm-tooltip-autocomplete .cm-completionIcon-enum::after,
-.cm-tooltip-autocomplete .cm-completionIcon-interface::after,
-.cm-tooltip-autocomplete .cm-completionIcon-namespace::after,
-.cm-tooltip-autocomplete .cm-completionIcon-type::after {
-  content: '';
+.editor-wrap .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail {
+  color: var(--text-muted);
+  opacity: 1;
+}
+/* Labels and their detail already communicate the completion kind and scope. */
+.cm-tooltip-autocomplete .cm-completionIcon {
+  display: none;
+}
+
+/* Completion documentation (`Completion.info`) and snippet fields. The example
+   uses Lezer's static token classes so it shares the editor's syntax palette. */
+.editor-wrap .cm-tooltip.cm-completionInfo {
+  max-width: min(420px, 46vw);
+  overflow: hidden;
+}
+.cm-completion-doc {
+  width: min(380px, 42vw);
+  padding: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.cm-completion-doc-signature {
+  display: block;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: var(--fw-semibold);
+}
+.cm-completion-doc p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+.cm-completion-doc-label {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide);
+}
+.cm-completion-doc pre {
+  margin: 5px 0 0;
+  overflow-x: auto;
+  border: 1px solid var(--separator);
+  border-radius: 6px;
+  background: var(--surface-inset);
+  padding: 8px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+}
+.cm-completion-doc .tok-keyword,
+.cm-completion-doc .tok-atom,
+.cm-completion-doc .tok-bool,
+.cm-completion-doc .tok-propertyName {
+  color: var(--t-boolean);
+}
+.cm-completion-doc .tok-string {
+  color: var(--t-string);
+}
+.cm-completion-doc .tok-number {
+  color: var(--t-number);
+}
+.cm-completion-doc .tok-className,
+.cm-completion-doc .tok-typeName {
+  color: var(--t-special);
+}
+.cm-completion-doc .tok-comment,
+.cm-completion-doc .tok-punctuation {
+  color: var(--text-muted);
+}
+.editor-wrap .cm-snippetField {
+  border-bottom: 1px solid var(--t-date);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--t-date) 14%, transparent);
+}
+.editor-wrap .cm-snippetFieldPosition {
+  border-left: 1px solid var(--t-date);
 }
 
 /* Keep the data workspace usable at compact window widths. */

@@ -29,6 +29,7 @@ interface PinePalette {
   number: string
   bool: string
   property: string
+  method: string
   punct: string
   comment: string
   type: string
@@ -47,7 +48,8 @@ const LIGHT: PinePalette = {
   string: '#237f50',
   number: '#4565c4',
   bool: '#8657b8',
-  property: '#202124',
+  property: '#8657b8',
+  method: '#4565c4',
   punct: '#55585f',
   comment: '#898c93',
   type: '#a95732',
@@ -66,7 +68,8 @@ const DARK: PinePalette = {
   string: '#67c78f',
   number: '#79a7ff',
   bool: '#c5a0f0',
-  property: '#f1f1f3',
+  property: '#c5a0f0',
+  method: '#79a7ff',
   punct: '#b8bac0',
   comment: '#858890',
   type: '#ff9b73',
@@ -93,14 +96,14 @@ function build(p: PinePalette): ReturnType<typeof createTheme> {
       { tag: [t.string, t.special(t.string)], color: p.string },
       { tag: [t.number], color: p.number },
       { tag: [t.bool, t.null, t.atom], color: p.bool },
-      // `db.coll.find()` — the method chain reads as pine, like the prototype.
-      { tag: [t.propertyName, t.function(t.propertyName), t.function(t.variableName)], color: p.property },
+      { tag: [t.propertyName, t.definition(t.propertyName)], color: p.property },
+      // Keep called members distinct from collection and document keys.
+      { tag: [t.function(t.propertyName), t.function(t.variableName)], color: p.method },
       { tag: [t.variableName, t.definition(t.variableName)], color: p.text },
       { tag: [t.punctuation, t.separator, t.bracket, t.brace, t.squareBracket, t.paren], color: p.punct },
       { tag: [t.comment, t.lineComment, t.blockComment], color: p.comment, fontStyle: 'italic' },
       { tag: [t.className, t.typeName, t.namespace], color: p.type },
-      { tag: [t.regexp], color: p.regexp },
-      { tag: [t.propertyName, t.definition(t.propertyName)], color: p.property }
+      { tag: [t.regexp], color: p.regexp }
     ]
   })
 }

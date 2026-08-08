@@ -16,6 +16,7 @@ import { syntaxTree, indentUnit, getIndentUnit } from '@codemirror/language'
 import { shellCompletionSource } from '@renderer/lib/shellCompletion'
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
+import { shellSemanticHighlight } from '@renderer/lib/shellSemanticHighlight'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
@@ -36,6 +37,16 @@ import { ContextMenu, type ContextMenuEntry } from '@renderer/components/Context
  * word/line motion, etc.) stays intact.
  */
 const CodeMirror = lazy(() => import('@uiw/react-codemirror'))
+
+// The React wrapper reconfigures CodeMirror whenever this object identity
+// changes. Keep it stable so a store update does not discard active snippets.
+const BASIC_SETUP = {
+  lineNumbers: true,
+  highlightActiveLine: true,
+  highlightSelectionMatches: false,
+  foldGutter: false,
+  autocompletion: false
+} as const
 
 const FONT_MIN = 10
 const FONT_MAX = 24
@@ -151,6 +162,7 @@ export function ShellEditor({
   const extensions = useMemo(
     () => [
       javascript({ typescript: false }),
+      shellSemanticHighlight,
       EditorView.updateListener.of((update) => {
         if (update.selectionSet || update.docChanged) {
           selectionHandler.current(selectionCode(update.state))
@@ -247,14 +259,7 @@ export function ShellEditor({
             // loads off the critical path and the service is warm by first use.
             tsAutocomplete.warm()
           }}
-          basicSetup={{
-            lineNumbers: true,
-            highlightActiveLine: true,
-            highlightSelectionMatches: false,
-            foldGutter: false,
-            autocompletion: false
-            // tabSize is set via the EditorState.tabSize extension (configurable).
-          }}
+          basicSetup={BASIC_SETUP}
         />
       </Suspense>
       {menu && (
