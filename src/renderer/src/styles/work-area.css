@@ -290,7 +290,7 @@
   min-height: 80px;
   /* Keep the result panel usable; mirrors the JS drag clamp in ShellWorkspace. */
   max-height: calc(100vh - 300px);
-  margin: 0 14px;
+  margin: 0 14px 4px;
   overflow: hidden;
   border-radius: 10px;
   border-bottom: 0;

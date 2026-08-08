@@ -218,7 +218,6 @@ export function ResultPanel({
         {result.kind === 'documents' && <ResultPager result={result} />}
         <button
           className="ghost result-action"
-          data-tip={copied ? t('notify.copied') : t('result.copyAllTip')}
           aria-label={copied ? t('notify.copied') : t('result.copyAllTip')}
           onClick={(e) => {
             if (showConsole) {
@@ -276,7 +275,6 @@ function ResultExpandButton({
   return (
     <button
       className={`ghost result-action${expanded ? ' is-active' : ''}`}
-      data-tip={label}
       aria-label={label}
       aria-pressed={expanded}
       onClick={() => onExpandedChange(!expanded)}
@@ -478,7 +476,6 @@ function ErrorView({
           </div>
           <button
             className="ghost result-action shrink-0"
-            data-tip={copied ? t('notify.copied') : t('result.copyErrorTip')}
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}
             onClick={() => onCopy(`${name}: ${message}`)}
           >

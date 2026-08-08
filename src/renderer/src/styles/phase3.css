@@ -25,6 +25,7 @@
   border: none;
   background: transparent;
   color: var(--fg-1);
+  outline: none;
   font-size: var(--fs);
   text-align: left;
   border-radius: var(--radius-sm);

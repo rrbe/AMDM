@@ -172,13 +172,16 @@ export function registerIpc(): void {
   // shell — run, then record an automatic history entry
   ipcMain.handle(IPC.shellExecute, async (_e, req: ShellRequest) => {
     const result = await executeShell(req)
-    queryStore.addHistory({
-      code: req.code,
-      connectionId: req.connectionId,
-      database: req.database,
-      ok: result.kind !== 'error',
-      summary: historySummary(result.kind, result.count, result.elapsedMs, result.errorName)
-    })
+    queryStore.addHistory(
+      {
+        code: req.code,
+        connectionId: req.connectionId,
+        database: req.database,
+        ok: result.kind !== 'error',
+        summary: historySummary(result.kind, result.count, result.elapsedMs, result.errorName)
+      },
+      settingsStore.get().historyLimit
+    )
     return result
   })
   // Cancel an in-flight run (slow find/aggregate). Returns false if it already
@@ -191,7 +194,10 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.queriesDelete, (_e, id: string) => queryStore.deleteQuery(id))
 
   // history
-  ipcMain.handle(IPC.historyList, () => queryStore.listHistory())
+  ipcMain.handle(IPC.historyList, () => {
+    queryStore.trimHistory(settingsStore.get().historyLimit)
+    return queryStore.listHistory()
+  })
   ipcMain.handle(IPC.historyClear, () => queryStore.clearHistory())
 
   // document edit/delete
@@ -209,7 +215,11 @@ export function registerIpc(): void {
 
   // settings
   ipcMain.handle(IPC.settingsGet, () => settingsStore.get())
-  ipcMain.handle(IPC.settingsUpdate, (_e, patch: Partial<AppSettings>) => settingsStore.update(patch))
+  ipcMain.handle(IPC.settingsUpdate, (_e, patch: Partial<AppSettings>) => {
+    const settings = settingsStore.update(patch)
+    if (patch.historyLimit !== undefined) queryStore.trimHistory(settings.historyLimit)
+    return settings
+  })
 
   registerUpdatesIpc()
 }

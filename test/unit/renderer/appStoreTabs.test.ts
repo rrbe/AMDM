@@ -152,8 +152,10 @@ describe('connection-bound tabs', () => {
       postMessage = channel.postMessage
     }
     vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel)
+    const listHistory = vi.fn().mockResolvedValue([])
     vi.stubGlobal('window', {
       api: {
+        history: { list: listHistory },
         settings: {
           get: vi.fn().mockResolvedValue(DEFAULT_SETTINGS),
           update: vi.fn().mockImplementation((patch) =>
@@ -171,6 +173,9 @@ describe('connection-bound tabs', () => {
 
     receive({ data: { ...DEFAULT_SETTINGS, collectionSort: 'natural' } } as MessageEvent)
     expect(useAppStore.getState().settings.collectionSort).toBe('natural')
+
+    receive({ data: { ...DEFAULT_SETTINGS, historyLimit: 100 } } as MessageEvent)
+    await vi.waitFor(() => expect(listHistory).toHaveBeenCalledOnce())
   })
 
   it('refreshes only the requested database collections', async () => {

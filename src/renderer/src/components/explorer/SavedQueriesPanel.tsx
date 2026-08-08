@@ -77,7 +77,7 @@ export function SavedQueriesView({
     <section className="library-view">
       <div className="library-head">
         <h1>{t('savedQueries.title')}</h1>
-        <span className="library-count">{savedQueries.length}</span>
+        <span className="library-count">· {savedQueries.length}</span>
       </div>
       <div className="library-body">
         <SavedTab
@@ -116,7 +116,17 @@ export function HistoryView({
     <section className="library-view">
       <div className="library-head">
         <h1>{t('savedQueries.tabHistory')}</h1>
-        <span className="library-count">{history.length}</span>
+        <span className="library-count">· {history.length}</span>
+        {history.length > 0 && (
+          <Button
+            className="ml-auto"
+            variant="danger"
+            size="sm"
+            onClick={() => void clearHistory()}
+          >
+            {t('savedQueries.clearHistory')}
+          </Button>
+        )}
       </div>
       <div className="library-body">
         <HistoryTab
@@ -131,7 +141,6 @@ export function HistoryView({
               database: entry.database
             })
           }
-          onClear={() => void clearHistory()}
         />
       </div>
     </section>
@@ -269,41 +278,31 @@ function SavedTab({
 
 function HistoryTab({
   entries,
-  onLoad,
-  onClear
+  onLoad
 }: {
   entries: HistoryEntry[]
   onLoad: (entry: HistoryEntry) => void
-  onClear: () => void
 }): JSX.Element {
   const { t } = useTranslation()
   if (entries.length === 0) {
     return <div className="sq-empty muted">{t('savedQueries.emptyHistory')}</div>
   }
   return (
-    <>
-      <div className="sq-toolbar">
-        <span className="spacer" />
-        <Button variant="danger" onClick={onClear}>
-          {t('savedQueries.clearHistory')}
-        </Button>
-      </div>
-      <div className="sq-list">
-        {entries.map((h) => (
-          <div key={h.id} className="sq-row" onClick={() => onLoad(h)} data-tip={h.code}>
-            <code className="sq-code">{codePreview(h.code)}</code>
-            <div className="sq-sub muted">
-              <span>db: {h.database}</span>
-              <span>·</span>
-              <span>{formatTime(h.ranAt)}</span>
-              <span>·</span>
-              <span className={h.ok ? 'lib-ok' : 'lib-err'}>
-                {h.summary ?? (h.ok ? 'ok' : 'error')}
-              </span>
-            </div>
+    <div className="sq-list">
+      {entries.map((h) => (
+        <div key={h.id} className="sq-row" onClick={() => onLoad(h)} data-tip={h.code}>
+          <code className="sq-code">{codePreview(h.code)}</code>
+          <div className="sq-sub muted">
+            <span>db: {h.database}</span>
+            <span>·</span>
+            <span>{formatTime(h.ranAt)}</span>
+            <span>·</span>
+            <span className={h.ok ? 'lib-ok' : 'lib-err'}>
+              {h.summary ?? (h.ok ? 'ok' : 'error')}
+            </span>
           </div>
-        ))}
-      </div>
-    </>
+        </div>
+      ))}
+    </div>
   )
 }

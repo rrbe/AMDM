@@ -53,6 +53,8 @@
     "queryTimeoutHint": "讀取操作的預設 maxTimeMS；語句中明確設定的值優先。",
     "queryTimeoutOff": "不限制",
     "queryTimeoutSeconds": "{{seconds}} 秒",
+    "historyLimit": "查詢歷史保留數量",
+    "historyLimitHint": "最多保留多少筆已執行的查詢。",
     "editorFontSize": "編輯器字型大小",
     "editorWordWrap": "自動換行過長的行",
     "editorTabSize": "縮排寬度"

@@ -226,7 +226,7 @@
   padding: 6px 8px 4px 10px;
 }
 .side-section-title {
-  flex: 1;
+  min-width: 0;
   font-size: var(--fs-sm);
   font-weight: 500;
   letter-spacing: 0.01em;
@@ -235,16 +235,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.side-section-head .side-head-action {
+  margin-left: auto;
+}
 
-.sq-toolbar {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  padding: 0 8px 4px;
-}
-.sq-toolbar .spacer {
-  flex: 1;
-}
 .sq-empty {
   padding: 18px 14px;
   font-size: var(--fs-sm);
@@ -384,8 +378,8 @@
      in a single scroll container (.explorer-body), which gives the iOS-style
      hand-off for free — when the next connection reaches the top it paints over
      the previously pinned one (later in the DOM = higher paint order). The
-     opaque background (matching the sidebar at rest; hover/active still
-     override) hides the catalog rows scrolling beneath the pinned header. */
+     opaque background (matching the sidebar at rest; hover still overrides it)
+     hides the catalog rows scrolling beneath the pinned header. */
   position: sticky;
   top: 0;
   z-index: 3;
@@ -400,10 +394,6 @@
     var(--surface-sidebar);
 }
 .conn-item.active {
-  /* --bg-sel is a translucent tint; layered alone it would let catalog rows
-     bleed through when this row is pinned by sticky scroll. Compositing it over
-     an opaque --bg-1 base keeps the same look at rest but stays fully opaque
-     while pinned. */
   background: linear-gradient(var(--interaction-selected), var(--interaction-selected)),
     var(--surface-sidebar);
 }

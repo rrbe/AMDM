@@ -4,8 +4,6 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import type { HistoryEntry, SavedQuery, SavedQueryInput } from '../../shared/types'
 
-const HISTORY_CAP = 200
-
 interface QueryFile {
   version: 1
   queries: SavedQuery[]
@@ -74,13 +72,17 @@ class QueryStore {
     return this.data.history
   }
 
-  addHistory(entry: {
-    code: string
-    connectionId: string
-    database: string
-    ok: boolean
-    summary?: string
-  }): void {
+  addHistory(
+    entry: {
+      code: string
+      connectionId: string
+      database: string
+      ok: boolean
+      summary?: string
+    },
+    limit: number
+  ): void {
+    const cap = Math.max(1, Math.floor(limit) || 1)
     const item: HistoryEntry = {
       id: randomUUID(),
       ranAt: Date.now(),
@@ -88,9 +90,16 @@ class QueryStore {
     }
     // Newest first, capped.
     this.data.history.unshift(item)
-    if (this.data.history.length > HISTORY_CAP) {
-      this.data.history.length = HISTORY_CAP
+    if (this.data.history.length > cap) {
+      this.data.history.length = cap
     }
+    this.persist()
+  }
+
+  trimHistory(limit: number): void {
+    const cap = Math.max(1, Math.floor(limit) || 1)
+    if (this.data.history.length <= cap) return
+    this.data.history.length = cap
     this.persist()
   }
 

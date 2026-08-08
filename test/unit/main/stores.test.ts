@@ -49,15 +49,17 @@ describe('queryStore — saved queries', () => {
 describe('queryStore — history', () => {
   const entry = (code: string) => ({ code, connectionId: 'c', database: 'd', ok: true })
 
-  it('prepends newest-first and caps at 200', () => {
-    for (let i = 0; i < 205; i++) queryStore.addHistory(entry(String(i)))
+  it('prepends newest-first and applies the configured cap immediately', () => {
+    for (let i = 0; i < 5; i++) queryStore.addHistory(entry(String(i)), 3)
     const hist = queryStore.listHistory()
-    expect(hist).toHaveLength(200)
-    expect(hist[0].code).toBe('204') // newest first
-    expect(hist[199].code).toBe('5') // oldest kept (0..4 dropped)
+    expect(hist).toHaveLength(3)
+    expect(hist[0].code).toBe('4') // newest first
+    expect(hist[2].code).toBe('2') // oldest kept (0..1 dropped)
+    queryStore.trimHistory(1)
+    expect(queryStore.listHistory().map((item) => item.code)).toEqual(['4'])
   })
   it('clears history', () => {
-    queryStore.addHistory(entry('x'))
+    queryStore.addHistory(entry('x'), 200)
     queryStore.clearHistory()
     expect(queryStore.listHistory()).toEqual([])
   })
@@ -68,6 +70,7 @@ describe('settingsStore', () => {
     expect(settingsStore.get()).toMatchObject({
       queryLimit: 50,
       queryTimeoutMS: 30_000,
+      historyLimit: 200,
       theme: 'system',
       sidebarWidth: 270,
       editorHeight: 142
@@ -85,6 +88,7 @@ describe('settingsStore', () => {
       theme: 'dark',
       queryLimit: 50,
       queryTimeoutMS: 30_000,
+      historyLimit: 200,
       sidebarWidth: 270
     })
   })

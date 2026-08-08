@@ -309,7 +309,9 @@ function subscribeToSettings(): void {
   if (!channel) return
   settingsSubscribed = true
   channel.addEventListener('message', (event: MessageEvent<AppSettings>) => {
+    const historyLimitChanged = useAppStore.getState().settings.historyLimit !== event.data.historyLimit
     useAppStore.setState({ settings: event.data })
+    if (historyLimitChanged) void useAppStore.getState().loadHistory()
   })
 }
 

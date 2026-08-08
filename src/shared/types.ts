@@ -420,6 +420,8 @@ export interface AppSettings {
   queryLimit: number
   /** Default MongoDB maxTimeMS for read operations; 0 disables the limit. */
   queryTimeoutMS: number
+  /** Maximum number of executed queries retained in History. */
+  historyLimit: number
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
@@ -433,6 +435,7 @@ export interface AppSettings {
 
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
 export const QUERY_TIMEOUTS_MS = [0, 10_000, 30_000, 60_000, 300_000] as const
+export const HISTORY_LIMITS = [50, 100, 200, 500, 1000] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
   connectionOrder: [],
@@ -443,6 +446,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorHeight: 142,
   queryLimit: 50,
   queryTimeoutMS: 30_000,
+  historyLimit: 200,
   editorFontSize: 13,
   editorWordWrap: false,
   editorTabSize: 2,

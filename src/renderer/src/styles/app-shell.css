@@ -92,9 +92,12 @@
 }
 .resize-handle--row::before {
   inset: 3px 0; /* 1px-tall centered horizontal line */
+  background: var(--separator);
+  opacity: 1;
 }
 .resize-handle:hover::before,
 .resize-handle.dragging::before {
+  background: var(--accent);
   opacity: 0.6;
 }
 

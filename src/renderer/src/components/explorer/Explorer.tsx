@@ -32,13 +32,11 @@ import {
 import type { CollectionSort, ConnectionConfig, ConnectionState } from '@shared/types'
 import {
   useAppStore,
-  getActiveTab,
   type CatalogState,
   type NodeKind,
   type NodePayload
 } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
-import { tabCollection } from '@renderer/lib/tabs'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { formatBytes } from '@renderer/lib/formatBytes'
 import {
@@ -173,11 +171,9 @@ export function Explorer({
   const statuses = useAppStore((s) => s.statuses)
   const catalogs = useAppStore((s) => s.catalogs)
   const expandedConnections = useAppStore((s) => s.expandedConnections)
-  const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connectionOrder = useAppStore((s) => s.settings.connectionOrder)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
   const theme = useAppStore((s) => s.settings.theme)
-  const activeTab = useAppStore(getActiveTab)
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -193,6 +189,7 @@ export function Explorer({
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const [connForm, setConnForm] = useState<{
     open: boolean
     editing?: ConnectionConfig
@@ -356,7 +353,6 @@ export function Explorer({
         : row.label.toLocaleLowerCase().includes(query)
     )
   }, [rows, search])
-  const activeCollection = tabCollection(activeTab)
   const moveConnection = (sourceId: string, targetId: string, edge: DropEdge): void => {
     const ids = orderedConnections.map((connection) => connection.id)
     const next = reorderConnectionIds(ids, sourceId, targetId, edge)
@@ -439,6 +435,7 @@ export function Explorer({
           <div className="side-section side-section--conns">
             <div className="side-section-head">
               <span className="side-section-title">Connections</span>
+              <span className="library-count">· {connections.length}</span>
               <button
                 className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
                 data-tip={t('explorer.search')}
@@ -466,7 +463,8 @@ export function Explorer({
                   <ConnectionRow
                     key={row.id}
                     row={row}
-                    isActive={activeConnectionId === row.id}
+                    isActive={selectedRowId === row.id}
+                    onActivate={() => setSelectedRowId(row.id)}
                     onSelect={() => setActiveConnection(row.id)}
                     onToggle={() => toggleConnectionExpanded(row.id)}
                     onConnect={() => void connect(row.id)}
@@ -477,13 +475,8 @@ export function Explorer({
                   <CatalogRow
                     key={row.id}
                     row={row}
-                    isActive={
-                      row.connId === activeConnectionId &&
-                      (row.collection
-                        ? row.collection.db === activeTab.activeDatabase &&
-                          row.collection.name === activeCollection
-                        : row.kind === 'database' && row.label === activeTab.activeDatabase)
-                    }
+                    isActive={selectedRowId === row.id}
+                    onActivate={() => setSelectedRowId(row.id)}
                     onContextMenu={openCatalogMenu}
                   />
                 )
@@ -578,6 +571,7 @@ export function Explorer({
 function ConnectionRow({
   row,
   isActive,
+  onActivate,
   onSelect,
   onToggle,
   onConnect,
@@ -586,6 +580,7 @@ function ConnectionRow({
 }: {
   row: ConnRow
   isActive: boolean
+  onActivate: () => void
   onSelect: () => void
   onToggle: () => void
   onConnect: () => void
@@ -621,6 +616,7 @@ function ConnectionRow({
       className={`conn-item${isActive ? ' active' : ''}${dragging ? ' dragging' : ''}${dropEdge ? ` drop-${dropEdge}` : ''}`}
       draggable
       aria-grabbed={dragging}
+      onClickCapture={onActivate}
       onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : state !== 'connecting' && onConnect())}
       onDragStart={(e: DragEvent<HTMLDivElement>) => {
@@ -689,10 +685,12 @@ function ConnectionRow({
 function CatalogRow({
   row,
   isActive,
+  onActivate,
   onContextMenu
 }: {
   row: TreeRow
   isActive: boolean
+  onActivate: () => void
   onContextMenu: (e: MouseEvent, row: TreeRow) => void
 }): JSX.Element {
   const coll = row.collection
@@ -706,6 +704,7 @@ function CatalogRow({
     <div
       className={className}
       style={{ paddingLeft: 8 + row.depth * 14 }}
+      onClickCapture={row.onClick ? onActivate : undefined}
       onClick={row.onClick}
       onContextMenu={row.kind === 'database' || coll ? (e) => onContextMenu(e, row) : undefined}
     >

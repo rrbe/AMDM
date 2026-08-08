@@ -53,6 +53,8 @@
     "queryTimeoutHint": "Default maxTimeMS for reads; an explicit query value takes precedence.",
     "queryTimeoutOff": "No limit",
     "queryTimeoutSeconds": "{{seconds}} seconds",
+    "historyLimit": "Query history limit",
+    "historyLimitHint": "Maximum number of executed queries kept in History.",
     "editorFontSize": "Editor font size",
     "editorWordWrap": "Soft-wrap long lines",
     "editorTabSize": "Indent width"

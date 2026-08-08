@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  HISTORY_LIMITS,
   QUERY_LIMITS,
   QUERY_TIMEOUTS_MS,
   type CollectionSort,
@@ -71,7 +72,9 @@ export function SettingsWindow(): JSX.Element {
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
         t('settings.queryTimeout'),
-        t('settings.queryTimeoutHint')
+        t('settings.queryTimeoutHint'),
+        t('settings.historyLimit'),
+        t('settings.historyLimitHint')
       ]
     },
     {
@@ -242,6 +245,14 @@ export function SettingsWindow(): JSX.Element {
                     value
                   }))}
                   aria-label={t('settings.queryTimeout')}
+                />
+              </Field>
+              <Field label={t('settings.historyLimit')} hint={t('settings.historyLimitHint')}>
+                <Select<number>
+                  value={settings.historyLimit}
+                  onChange={(historyLimit) => void updateSettings({ historyLimit })}
+                  options={HISTORY_LIMITS.map((value) => ({ label: String(value), value }))}
+                  aria-label={t('settings.historyLimit')}
                 />
               </Field>
             </>
