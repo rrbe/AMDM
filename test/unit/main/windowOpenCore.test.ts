@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { isSettingsWindowUrl } from '../../../src/main/windowOpenCore'
+import { bringWindowToFront } from '../../../src/main/windowOpenCore'
 
-describe('isSettingsWindowUrl', () => {
-  it('allows only the settings hash on the current renderer page', () => {
-    const current = 'file:///Applications/AMDM.app/Contents/Resources/app.asar/out/renderer/index.html'
+describe('bringWindowToFront', () => {
+  it('restores minimized windows before showing and focusing them', () => {
+    const calls: string[] = []
+    bringWindowToFront({
+      isMinimized: () => true,
+      restore: () => calls.push('restore'),
+      show: () => calls.push('show'),
+      moveTop: () => calls.push('moveTop'),
+      focus: () => calls.push('focus')
+    })
 
-    expect(isSettingsWindowUrl(`${current}#settings`, current)).toBe(true)
-    expect(isSettingsWindowUrl(`${current}#other`, current)).toBe(false)
-    expect(isSettingsWindowUrl('https://example.com/#settings', current)).toBe(false)
+    expect(calls).toEqual(['restore', 'show', 'moveTop', 'focus'])
   })
 })

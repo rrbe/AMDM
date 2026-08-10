@@ -32,7 +32,7 @@ type QueryPrompt =
   | { kind: 'missing'; query: StoredQuerySelection; connectionName?: string }
 
 function openSettingsWindow(): void {
-  window.open('#settings', 'amdm-settings')?.focus()
+  void window.api.app.openSettings()
 }
 
 export default function App(): JSX.Element {

@@ -117,7 +117,7 @@ function buildConnectionUri(input: ConnectionInput, includePassword: boolean): s
   })
 }
 
-export function registerIpc(): void {
+export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void): void {
   // connections
   ipcMain.handle(IPC.connectionsList, () => connectionStore.listConnections())
   ipcMain.handle(IPC.connectionsSave, (_e, input: ConnectionInput) =>
@@ -230,6 +230,10 @@ export function registerIpc(): void {
   )
 
   // settings
+  ipcMain.handle(IPC.appOpenSettings, (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    if (owner) openSettingsWindow(owner)
+  })
   ipcMain.handle(IPC.settingsGet, () => settingsStore.get())
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: Partial<AppSettings>) => {
     const settings = settingsStore.update(patch)

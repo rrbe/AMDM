@@ -7,6 +7,9 @@ import { IPC, type Api } from '../shared/ipc'
  * around a channel declared in the shared IPC contract.
  */
 const api: Api = {
+  app: {
+    openSettings: () => ipcRenderer.invoke(IPC.appOpenSettings)
+  },
   connections: {
     list: () => ipcRenderer.invoke(IPC.connectionsList),
     save: (input) => ipcRenderer.invoke(IPC.connectionsSave, input),

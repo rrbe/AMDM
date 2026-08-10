@@ -11,11 +11,47 @@ import { sessionManager } from './mongo/sessionManager'
 import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
 import { startSparkle } from './sparkle'
-import { isSettingsWindowUrl } from './windowOpenCore'
+import { bringWindowToFront } from './windowOpenCore'
 
 // Default geometry, also the floor on size. Saved bounds are reconciled against
 // these + the connected displays in windowStateCore (off-screen safety).
 const WINDOW_DEFAULTS = { width: 1440, height: 920, minWidth: 980, minHeight: 620 }
+let settingsWindow: BrowserWindow | null = null
+
+function openSettingsWindow(owner: BrowserWindow): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    bringWindowToFront(settingsWindow)
+    return
+  }
+
+  const win = new BrowserWindow({
+    width: 900,
+    height: 620,
+    minWidth: 720,
+    minHeight: 500,
+    show: false,
+    title: 'Settings',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 13 } : undefined,
+    backgroundColor: '#edece8',
+    icon: appIcon,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  settingsWindow = win
+  win.on('closed', () => {
+    if (settingsWindow === win) settingsWindow = null
+  })
+  win.once('ready-to-show', () => bringWindowToFront(win))
+
+  const url = new URL(owner.webContents.getURL())
+  url.hash = '#settings'
+  void win.loadURL(url.toString())
+}
 
 function createWindow(): void {
   const saved = windowStateStore.get()
@@ -105,28 +141,6 @@ function createWindow(): void {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isSettingsWindowUrl(url, win.webContents.getURL())) {
-      return {
-        action: 'allow',
-        overrideBrowserWindowOptions: {
-          width: 900,
-          height: 620,
-          minWidth: 720,
-          minHeight: 500,
-          title: 'Settings',
-          titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-          trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 13 } : undefined,
-          backgroundColor: '#edece8',
-          icon: appIcon,
-          webPreferences: {
-            preload: join(__dirname, '../preload/index.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-            sandbox: false
-          }
-        }
-      }
-    }
     shell.openExternal(url)
     return { action: 'deny' }
   })
@@ -152,7 +166,7 @@ app.whenReady().then(() => {
   settingsStore.init()
   schemaStore.init()
   windowStateStore.init()
-  registerIpc()
+  registerIpc(openSettingsWindow)
   createWindow()
   startSparkle()
 

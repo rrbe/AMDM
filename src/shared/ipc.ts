@@ -77,6 +77,8 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
 
+  appOpenSettings: 'app:openSettings',
+
   updatesCheck: 'updates:check',
 
   dialogOpenFile: 'dialog:openFile'
@@ -84,6 +86,9 @@ export const IPC = {
 
 /** The API shape exposed on `window.api` (see preload). */
 export interface Api {
+  app: {
+    openSettings(): Promise<void>
+  }
   connections: {
     list(): Promise<ConnectionConfig[]>
     save(input: ConnectionInput): Promise<ConnectionConfig>

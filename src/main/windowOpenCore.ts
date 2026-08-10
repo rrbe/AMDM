@@ -1,14 +1,10 @@
-export function isSettingsWindowUrl(targetUrl: string, currentUrl: string): boolean {
-  try {
-    const target = new URL(targetUrl)
-    const current = new URL(currentUrl)
-    return (
-      target.protocol === current.protocol &&
-      target.host === current.host &&
-      target.pathname === current.pathname &&
-      target.hash === '#settings'
-    )
-  } catch {
-    return false
-  }
+import type { BrowserWindow } from 'electron'
+
+type ForegroundWindow = Pick<BrowserWindow, 'isMinimized' | 'restore' | 'show' | 'moveTop' | 'focus'>
+
+export function bringWindowToFront(win: ForegroundWindow): void {
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.moveTop()
+  win.focus()
 }
