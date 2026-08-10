@@ -78,6 +78,8 @@
   font-size: var(--fs);
   line-height: 1.4;
   word-break: break-word;
+  user-select: text;
+  cursor: text;
 }
 .toast-close {
   flex: 0 0 auto;

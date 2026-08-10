@@ -56,6 +56,9 @@ export function TooltipLayer(): JSX.Element | null {
     }
 
     const onOver = (e: MouseEvent): void => {
+      const node = e.target as Node | null
+      // The tooltip itself is interactive so its text can be selected/copied.
+      if (node && boxRef.current?.contains(node)) return
       const el = (e.target as Element | null)?.closest('[data-tip]') ?? null
       if (el === current.current) return
       // Moved to a different (or no) trigger: cancel any pending show first.
@@ -79,26 +82,35 @@ export function TooltipLayer(): JSX.Element | null {
     }
 
     const onOut = (e: MouseEvent): void => {
+      const from = e.target as Node | null
+      const to = e.relatedTarget as Node | null
+      if (from && boxRef.current?.contains(from)) {
+        if (e.buttons === 0 && (!to || (!boxRef.current?.contains(to) && !current.current?.contains(to)))) clear()
+        return
+      }
       const el = (e.target as Element | null)?.closest('[data-tip]') ?? null
       if (!el || el !== current.current) return
-      const to = e.relatedTarget as Node | null
-      // Ignore moves between descendants of the same trigger.
-      if (to && el.contains(to)) return
+      // Ignore moves between descendants of the trigger or into the tooltip.
+      if (to && (el.contains(to) || boxRef.current?.contains(to))) return
+      clear()
+    }
+
+    const onMouseDown = (e: MouseEvent): void => {
+      const node = e.target as Node | null
+      if (node && boxRef.current?.contains(node)) return
       clear()
     }
 
     document.addEventListener('mouseover', onOver)
     document.addEventListener('mouseout', onOut)
-    // Any of these invalidate the anchored position → dismiss rather than chase.
-    document.addEventListener('mousedown', clear)
-    document.addEventListener('keydown', clear)
+    // Pointer movement, scrolling, or focus loss invalidates the anchored position.
+    document.addEventListener('mousedown', onMouseDown)
     window.addEventListener('scroll', clear, true)
     window.addEventListener('blur', clear)
     return () => {
       document.removeEventListener('mouseover', onOver)
       document.removeEventListener('mouseout', onOut)
-      document.removeEventListener('mousedown', clear)
-      document.removeEventListener('keydown', clear)
+      document.removeEventListener('mousedown', onMouseDown)
       window.removeEventListener('scroll', clear, true)
       window.removeEventListener('blur', clear)
       if (timer.current) clearTimeout(timer.current)
