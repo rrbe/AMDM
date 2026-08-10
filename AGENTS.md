@@ -104,7 +104,7 @@ pnpm test:unit --coverage # v8 覆盖率报告
   - **永远全局**:`tokens.css` 令牌、第三方选择器(CodeMirror `.cm-*`、Base UI `[data-*]`)、跨组件复用的共享数据词汇(`.v-*` 类型色、`.kv-row`、`.vrow`)。
   - **CSS Module**(`Foo.module.css`,作用域隔离):自包含组件。
   - 复用既有 result/tree/table/explorer 词汇的老组件 → 暂留全局,随迁移再说;不强制回迁。
-- **调试与验收本 App 优先连接真实 Electron,使用 Chrome DevTools/CDP 检查 DOM、计算样式、事件、Focus、滚动与状态**；不要把截图作为默认调试手段。仅在颜色、留白、圆角、模糊等必须判断最终视觉观感时使用截图补充,截图不能替代交互与计算样式实测。
+- **调试与验收本 App 必须连接当前真实 Electron Renderer,使用 Electron 自身的 DevTools/CDP 检查 DOM、计算样式、事件、Focus、滚动与状态；禁止改用、启动或连接普通 Chrome 实例（包括默认指向 Chrome Profile 的 DevTools 工具）。**如果暂时无法附加 Electron CDP,应先为当前 Electron 开启远程调试端口或使用其内置 DevTools,不能拿 Chrome 页面代替。不要把截图作为默认调试手段；仅在颜色、留白、圆角、模糊等必须判断最终视觉观感时使用截图补充,截图不能替代交互与计算样式实测。
 
 ## 性能铁律（不可妥协,每个功能都必须遵守）
 
