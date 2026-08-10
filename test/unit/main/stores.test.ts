@@ -14,7 +14,7 @@ import { queryStore } from '../../../src/main/store/queryStore'
 import { settingsStore } from '../../../src/main/store/settingsStore'
 import { connectionStore } from '../../../src/main/store/connectionStore'
 import { schemaStore } from '../../../src/main/store/schemaStore'
-import type { ConnectionInput, SchemaAnalysis, SchemaTarget } from '../../../src/shared/types'
+import type { ConnectionInput, EditorColorScheme, SchemaAnalysis, SchemaTarget } from '../../../src/shared/types'
 
 let dir = ''
 
@@ -75,6 +75,8 @@ describe('settingsStore', () => {
       queryTimeoutMS: 30_000,
       historyLimit: 200,
       theme: 'system',
+      activeEditorColorSchemeId: 'pine',
+      editorColorSchemes: [],
       sidebarWidth: 270,
       editorHeight: 142
     })
@@ -100,6 +102,37 @@ describe('settingsStore', () => {
     settingsStore.update({ connectionOrder: ['b', 'a'] })
     settingsStore.init()
     expect(settingsStore.get().connectionOrder).toEqual(['b', 'a'])
+  })
+
+  it('persists named editor color schemes', () => {
+    const scheme: EditorColorScheme = {
+      id: 'ocean',
+      name: 'Ocean',
+      light: {
+        background: '#ffffff',
+        foreground: '#111111',
+        keyword: '#222222',
+        string: '#333333',
+        number: '#444444',
+        type: '#555555',
+        comment: '#666666'
+      },
+      dark: {
+        background: '#000000',
+        foreground: '#eeeeee',
+        keyword: '#dddddd',
+        string: '#cccccc',
+        number: '#bbbbbb',
+        type: '#aaaaaa',
+        comment: '#999999'
+      }
+    }
+    settingsStore.update({ activeEditorColorSchemeId: scheme.id, editorColorSchemes: [scheme] })
+    settingsStore.init()
+    expect(settingsStore.get()).toMatchObject({
+      activeEditorColorSchemeId: scheme.id,
+      editorColorSchemes: [scheme]
+    })
   })
 })
 

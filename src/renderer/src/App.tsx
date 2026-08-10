@@ -11,6 +11,14 @@ import { TooltipLayer } from '@renderer/components/common/TooltipLayer'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
+import { useIsDark } from '@renderer/lib/useIsDark'
+import {
+  applyEditorColorPalette,
+  EDITOR_PALETTE_PREVIEW_CHANNEL,
+  isEditorColorPalette,
+  resolveEditorColorScheme,
+  type EditorPalettePreviewMessage
+} from '@renderer/lib/editorColorScheme'
 
 type QueryPrompt =
   | {
@@ -35,14 +43,18 @@ export default function App(): JSX.Element {
   const theme = useAppStore((s) => s.settings.theme)
   const language = useAppStore((s) => s.settings.language)
   const sidebarWidth = useAppStore((s) => s.settings.sidebarWidth)
+  const activeEditorColorSchemeId = useAppStore((s) => s.settings.activeEditorColorSchemeId)
+  const editorColorSchemes = useAppStore((s) => s.settings.editorColorSchemes)
   const connect = useAppStore((s) => s.connect)
   const applyQuery = useAppStore((s) => s.applyQuery)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const { t } = useTranslation()
+  const isDark = useIsDark()
 
   const [view, setView] = useState<ExplorerView>('connections')
   const [explorerOpen, setExplorerOpen] = useState(true)
   const [queryPrompt, setQueryPrompt] = useState<QueryPrompt | null>(null)
+  const [palettePreview, setPalettePreview] = useState<EditorPalettePreviewMessage['palette']>(null)
   const queryAttempt = useRef(0)
 
   useEffect(() => {
@@ -80,6 +92,25 @@ export default function App(): JSX.Element {
     mql.addEventListener('change', apply)
     return () => mql.removeEventListener('change', apply)
   }, [theme])
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return
+    const channel = new BroadcastChannel(EDITOR_PALETTE_PREVIEW_CHANNEL)
+    const receive = (event: MessageEvent<EditorPalettePreviewMessage>): void => {
+      if (event.data?.palette === null) setPalettePreview(null)
+      else if (isEditorColorPalette(event.data?.palette)) setPalettePreview(event.data.palette)
+    }
+    channel.addEventListener('message', receive)
+    return () => {
+      channel.removeEventListener('message', receive)
+      channel.close()
+    }
+  }, [])
+
+  useEffect(() => {
+    const saved = resolveEditorColorScheme({ activeEditorColorSchemeId, editorColorSchemes })
+    applyEditorColorPalette(document.documentElement, palettePreview ?? saved[isDark ? 'dark' : 'light'])
+  }, [activeEditorColorSchemeId, editorColorSchemes, isDark, palettePreview])
 
   const activeConnected =
     activeConnectionId !== null && statuses[activeConnectionId]?.state === 'connected'

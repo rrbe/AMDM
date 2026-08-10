@@ -2,7 +2,7 @@
    AMDM — 设计令牌（Neutral Paper + Graphite）
    语义令牌是新样式的唯一入口；旧 --bg-* / --fg-* 名称仅作为迁移期兼容别名。
    亮暗主题共享同一套语义层级，仅替换令牌值。
-   CodeMirror 在 lib/pineEditorTheme.ts 持有对应的解析 hex，改色时必须同步。
+   CodeMirror 与结果视图通过运行时 --editor-* / --t-* 变量共享用户配色。
    --------------------------------------------------------------------------- */
 :root {
   /* ---- Shape + type (theme-independent) ---- */
@@ -85,6 +85,15 @@
   --t-regex: #8657b8;
   --t-special: #a95732;
 
+  /* User-selectable editor palette. App.tsx overrides these at runtime. */
+  --editor-background: #fafafa;
+  --editor-foreground: #202124;
+  --editor-keyword: #8657b8;
+  --editor-string: #237f50;
+  --editor-number: #4565c4;
+  --editor-type: #a95732;
+  --editor-comment: #898c93;
+
   /* Legacy aliases; remove as old CSS partitions migrate to semantic names. */
   --bg-app: var(--surface-chrome);
   --bg-0: var(--surface-content);
@@ -166,6 +175,14 @@
   --t-binary: #ff9b73;
   --t-regex: #c5a0f0;
   --t-special: #ff9b73;
+
+  --editor-background: #1b1b1e;
+  --editor-foreground: #f1f1f3;
+  --editor-keyword: #c5a0f0;
+  --editor-string: #67c78f;
+  --editor-number: #79a7ff;
+  --editor-type: #ff9b73;
+  --editor-comment: #858890;
 
   --shadow-popover:
     0 14px 40px rgba(0, 0, 0, 0.46),

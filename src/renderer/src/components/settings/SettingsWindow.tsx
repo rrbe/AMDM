@@ -18,6 +18,7 @@ import { Field } from '@renderer/components/ui/Field'
 import { Select } from '@renderer/components/ui/Select'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 
 type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor'
 
@@ -85,7 +86,10 @@ export function SettingsWindow(): JSX.Element {
         t('settings.sectionEditor'),
         t('settings.editorFontSize'),
         t('settings.editorWordWrap'),
-        t('settings.editorTabSize')
+        t('settings.editorTabSize'),
+        t('settings.editorColors.title'),
+        t('settings.editorColors.scheme'),
+        t('settings.editorColors.keyword')
       ]
     }
   ] as const
@@ -288,6 +292,7 @@ export function SettingsWindow(): JSX.Element {
                 onCheckedChange={(editorWordWrap) => void updateSettings({ editorWordWrap })}
                 label={t('settings.editorWordWrap')}
               />
+              <EditorColorSchemeSettings />
             </>
           )}
         </div>

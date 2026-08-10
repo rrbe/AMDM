@@ -449,6 +449,25 @@ export type CollectionSort = 'natural' | 'alpha'
  */
 export type ThemeMode = 'light' | 'dark' | 'system'
 
+export interface EditorColorPalette {
+  background: string
+  foreground: string
+  keyword: string
+  string: string
+  number: string
+  type: string
+  comment: string
+}
+
+export interface EditorColorScheme {
+  id: string
+  name: string
+  light: EditorColorPalette
+  dark: EditorColorPalette
+}
+
+export const PINE_COLOR_SCHEME_ID = 'pine'
+
 /**
  * UI language. 'system' (default) resolves to the OS/app locale at startup
  * (zh-CN / zh-TW / en), falling back to English; the others pin a locale.
@@ -481,6 +500,10 @@ export interface AppSettings {
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
   editorTabSize: number
+  /** Active built-in or user-defined editor/result color scheme id. */
+  activeEditorColorSchemeId: string
+  /** User-defined schemes; the built-in Pine scheme stays in code. */
+  editorColorSchemes: EditorColorScheme[]
   /** Remembered "To URL" choice: inline the real password (vs `<password>`
       placeholder). Defaults off; persisted so the user's last pick sticks. */
   exportIncludeRealPassword: boolean
@@ -503,5 +526,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorFontSize: 13,
   editorWordWrap: false,
   editorTabSize: 2,
+  activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,
+  editorColorSchemes: [],
   exportIncludeRealPassword: false
 }
