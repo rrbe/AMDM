@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  DEFAULT_SETTINGS,
   HISTORY_LIMITS,
   QUERY_LIMITS,
   QUERY_TIMEOUTS_MS,
@@ -85,8 +86,10 @@ export function SettingsWindow(): JSX.Element {
       keywords: [
         t('settings.sectionEditor'),
         t('settings.editorFontSize'),
+        t('settings.dataFontSize'),
         t('settings.editorWordWrap'),
         t('settings.editorTabSize'),
+        t('settings.resetEditorSettings'),
         t('settings.editorColors.title'),
         t('settings.editorColors.scheme'),
         t('settings.editorColors.keyword')
@@ -276,6 +279,17 @@ export function SettingsWindow(): JSX.Element {
                     aria-label={t('settings.editorFontSize')}
                   />
                 </Field>
+                <Field label={t('settings.dataFontSize')}>
+                  <NumberField
+                    min={9}
+                    max={28}
+                    value={settings.dataFontSize}
+                    onChange={(n) => {
+                      if (n != null) void updateSettings({ dataFontSize: n })
+                    }}
+                    aria-label={t('settings.dataFontSize')}
+                  />
+                </Field>
                 <Field label={t('settings.editorTabSize')}>
                   <Select<number>
                     value={settings.editorTabSize}
@@ -292,6 +306,28 @@ export function SettingsWindow(): JSX.Element {
                 onCheckedChange={(editorWordWrap) => void updateSettings({ editorWordWrap })}
                 label={t('settings.editorWordWrap')}
               />
+              <div className="mb-6 mt-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={
+                    settings.editorFontSize === DEFAULT_SETTINGS.editorFontSize &&
+                    settings.dataFontSize === DEFAULT_SETTINGS.dataFontSize &&
+                    settings.editorTabSize === DEFAULT_SETTINGS.editorTabSize &&
+                    settings.editorWordWrap === DEFAULT_SETTINGS.editorWordWrap
+                  }
+                  onClick={() =>
+                    void updateSettings({
+                      editorFontSize: DEFAULT_SETTINGS.editorFontSize,
+                      dataFontSize: DEFAULT_SETTINGS.dataFontSize,
+                      editorTabSize: DEFAULT_SETTINGS.editorTabSize,
+                      editorWordWrap: DEFAULT_SETTINGS.editorWordWrap
+                    })
+                  }
+                >
+                  {t('settings.resetEditorSettings')}
+                </Button>
+              </div>
               <EditorColorSchemeSettings />
             </>
           )}

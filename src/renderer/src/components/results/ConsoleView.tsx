@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ShellOutputLine } from '@shared/types'
@@ -16,13 +16,12 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 
 interface ConsoleViewProps {
   output: ShellOutputLine[]
+  fontSize: number
   /** True when the engine dropped lines beyond the capture cap. */
   truncated?: boolean
 }
 
-const LINE_HEIGHT = 19
-
-export function ConsoleView({ output, truncated }: ConsoleViewProps): JSX.Element {
+export function ConsoleView({ output, fontSize, truncated }: ConsoleViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -31,9 +30,11 @@ export function ConsoleView({ output, truncated }: ConsoleViewProps): JSX.Elemen
   const virtualizer = useVirtualizer({
     count: lines.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => LINE_HEIGHT,
+    estimateSize: () => fontSize + 6,
     overscan: 20
   })
+
+  useEffect(() => virtualizer.measure(), [fontSize, virtualizer])
 
   useCopyHotkey(() => consoleText(output))
 
@@ -55,7 +56,7 @@ export function ConsoleView({ output, truncated }: ConsoleViewProps): JSX.Elemen
               <div
                 key={vi.index}
                 className={`vrow json-line console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
-                style={{ transform: `translateY(${vi.start}px)`, height: LINE_HEIGHT }}
+                style={{ transform: `translateY(${vi.start}px)`, height: fontSize + 6 }}
               >
                 <pre>
                   {indentFor(line.depth)}

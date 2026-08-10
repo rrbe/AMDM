@@ -42,6 +42,7 @@ export function ResultPanel({
   const result = active?.result ?? null
   const view = useAppStore((s) => s.resultView)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const setView = useAppStore((s) => s.setResultView)
   const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
@@ -151,7 +152,7 @@ export function ResultPanel({
         />
         {hasOutput && (
           <div className="result-body">
-            <ConsoleView output={result.output!} truncated={result.outputTruncated} />
+            <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
           </div>
         )}
       </div>
@@ -235,12 +236,12 @@ export function ResultPanel({
 
       <div className="result-body">
         {showConsole ? (
-          <ConsoleView output={result.output!} truncated={result.outputTruncated} />
+          <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
         ) : (
           <>
-            {view === 'tree' && <TreeView docs={docs} docCtx={docCtx} />}
-            {view === 'json' && <JsonView value={docs} />}
-            {view === 'table' && <TableView docs={docs} docCtx={docCtx} />}
+            {view === 'tree' && <TreeView docs={docs} fontSize={dataFontSize} docCtx={docCtx} />}
+            {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} />}
+            {view === 'table' && <TableView docs={docs} fontSize={dataFontSize} docCtx={docCtx} />}
           </>
         )}
       </div>

@@ -30,11 +30,10 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 
 interface JsonViewProps {
   value: unknown
+  fontSize: number
 }
 
-const LINE_HEIGHT = 19
-
-export function JsonView({ value }: JsonViewProps): JSX.Element {
+export function JsonView({ value, fontSize }: JsonViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const [allSelected, setAllSelected] = useState(false)
@@ -46,9 +45,11 @@ export function JsonView({ value }: JsonViewProps): JSX.Element {
   const virtualizer = useVirtualizer({
     count: lines.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => LINE_HEIGHT,
+    estimateSize: () => fontSize + 6,
     overscan: 20
   })
+
+  useEffect(() => virtualizer.measure(), [fontSize, virtualizer])
 
   // A fresh result clears any lingering "all selected" state.
   useEffect(() => setAllSelected(false), [value])
@@ -113,7 +114,7 @@ export function JsonView({ value }: JsonViewProps): JSX.Element {
               <div
                 key={vi.index}
                 className="vrow json-line"
-                style={{ transform: `translateY(${vi.start}px)`, height: LINE_HEIGHT }}
+                style={{ transform: `translateY(${vi.start}px)`, height: fontSize + 6 }}
               >
                 <pre>
                   {indentFor(line.depth)}

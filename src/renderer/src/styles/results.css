@@ -78,7 +78,7 @@
   overflow: hidden;
   position: relative;
   font-family: var(--font-mono);
-  font-size: var(--fs);
+  font-size: var(--data-font-size);
 }
 
 /* error panel */
@@ -90,6 +90,7 @@
   border-radius: 6px;
   color: var(--fg-0);
   font-family: var(--font-mono);
+  font-size: var(--data-font-size);
 }
 .error-panel .error-name {
   color: var(--err);
@@ -135,7 +136,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  height: var(--row-h);
+  height: calc(var(--data-font-size) + 6px);
   white-space: nowrap;
 }
 
@@ -147,7 +148,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  height: var(--row-h);
+  height: calc(var(--data-font-size) + 11px);
   white-space: nowrap;
   border-bottom: 1px dashed var(--border);
   /* DESIGN.md §5: data grids own selection via click-to-select + ⌘C, not native
@@ -194,7 +195,7 @@
   width: 96px;
   padding: 0 10px;
   text-align: right;
-  font-size: var(--fs-sm);
+  font-size: 0.92em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -228,10 +229,10 @@
 .cell-edit-input {
   width: 100%;
   box-sizing: border-box;
-  height: calc(var(--row-h) - 4px);
+  height: calc(var(--data-font-size) + 7px);
   padding: 0 4px;
   font-family: var(--font-mono);
-  font-size: var(--fs);
+  font-size: var(--data-font-size);
   color: var(--fg-0);
   background: var(--surface-content);
   border: 1px solid var(--primary);
@@ -336,14 +337,14 @@
   display: flex;
   background: var(--surface-content);
   border-bottom: 1px dashed var(--border);
-  height: var(--row-h);
+  height: calc(var(--data-font-size) + 11px);
 }
 .tbl-th {
   position: relative;
   flex: 0 0 auto;
-  height: var(--row-h);
+  height: calc(var(--data-font-size) + 11px);
   padding: 0 10px;
-  line-height: var(--row-h);
+  line-height: calc(var(--data-font-size) + 11px);
   border-right: 1px dashed var(--border);
   font-weight: 500;
   color: var(--text-muted);
@@ -381,8 +382,8 @@
 .tbl-td {
   flex: 0 0 auto;
   padding: 0 10px;
-  height: var(--row-h);
-  line-height: var(--row-h);
+  height: calc(var(--data-font-size) + 11px);
+  line-height: calc(var(--data-font-size) + 11px);
   border-right: 1px dashed var(--border);
   overflow: hidden;
   text-overflow: ellipsis;

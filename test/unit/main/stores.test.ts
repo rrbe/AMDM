@@ -74,6 +74,7 @@ describe('settingsStore', () => {
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
+      dataFontSize: 13,
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],

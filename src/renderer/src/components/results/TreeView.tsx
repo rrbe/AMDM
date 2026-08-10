@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CollectionSort } from '@shared/types'
@@ -65,16 +65,16 @@ interface FlatNode {
 
 interface TreeViewProps {
   docs: unknown[]
+  fontSize: number
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
 
-const ROW_HEIGHT = 24
 const DEFAULT_KEY_WIDTH = 280
 const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
-export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
+export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
@@ -145,9 +145,11 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   const rowVirtualizer = useVirtualizer({
     count: flat.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => fontSize + 11,
     overscan: 12
   })
+
+  useEffect(() => rowVirtualizer.measure(), [fontSize, rowVirtualizer])
 
   // Drag the divider to resize the key column.
   const startResize = useCallback(

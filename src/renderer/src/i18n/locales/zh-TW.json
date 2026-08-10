@@ -56,8 +56,10 @@
     "historyLimit": "查詢歷史保留數量",
     "historyLimitHint": "最多保留多少筆已執行的查詢。",
     "editorFontSize": "編輯器字型大小",
+    "dataFontSize": "資料區域字型大小",
     "editorWordWrap": "自動換行過長的行",
     "editorTabSize": "縮排寬度",
+    "resetEditorSettings": "恢復預設設定",
     "editorColors": {
       "title": "編輯器配色方案",
       "scheme": "配色方案",

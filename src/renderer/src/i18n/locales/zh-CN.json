@@ -56,8 +56,10 @@
     "historyLimit": "查询历史保留数量",
     "historyLimitHint": "最多保留多少条已执行的查询。",
     "editorFontSize": "编辑器字号",
+    "dataFontSize": "数据区域字号",
     "editorWordWrap": "自动换行长行",
     "editorTabSize": "缩进宽度",
+    "resetEditorSettings": "恢复默认设置",
     "editorColors": {
       "title": "编辑器配色方案",
       "scheme": "配色方案",

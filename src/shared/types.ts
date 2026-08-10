@@ -496,6 +496,8 @@ export interface AppSettings {
   historyLimit: number
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number
+  /** Data result views font size in px (Tree / JSON / Table / Console). */
+  dataFontSize: number
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
@@ -524,6 +526,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   queryTimeoutMS: 30_000,
   historyLimit: 200,
   editorFontSize: 13,
+  dataFontSize: 13,
   editorWordWrap: false,
   editorTabSize: 2,
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,

@@ -13,7 +13,6 @@
   --radius: var(--radius-control);
   --radius-sm: var(--radius-control);
   --radius-lg: 10px;
-  --row-h: 24px;
   /* Drag-resizable panel sizes (JS overrides these from persisted settings). */
   --sidebar-width: 280px;
   --editor-height: 120px;
@@ -21,6 +20,7 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Monaco', monospace;
   --fs: 13px;
   --fs-sm: 12px;
+  --data-font-size: 13px;
 
   /* Typography scale (NEW — was scattered as literals across partitions). */
   --fw-normal: 400;

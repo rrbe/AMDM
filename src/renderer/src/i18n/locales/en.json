@@ -56,8 +56,10 @@
     "historyLimit": "Query history limit",
     "historyLimitHint": "Maximum number of executed queries kept in History.",
     "editorFontSize": "Editor font size",
+    "dataFontSize": "Data area font size",
     "editorWordWrap": "Soft-wrap long lines",
     "editorTabSize": "Indent width",
+    "resetEditorSettings": "Restore default settings",
     "editorColors": {
       "title": "Editor color schemes",
       "scheme": "Color scheme",

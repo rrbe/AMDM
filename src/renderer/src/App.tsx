@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PanelLeftOpen } from 'lucide-react'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -43,6 +43,7 @@ export default function App(): JSX.Element {
   const theme = useAppStore((s) => s.settings.theme)
   const language = useAppStore((s) => s.settings.language)
   const sidebarWidth = useAppStore((s) => s.settings.sidebarWidth)
+  const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const activeEditorColorSchemeId = useAppStore((s) => s.settings.activeEditorColorSchemeId)
   const editorColorSchemes = useAppStore((s) => s.settings.editorColorSchemes)
   const connect = useAppStore((s) => s.connect)
@@ -169,7 +170,7 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--data-font-size': `${dataFontSize}px` } as CSSProperties}>
       <div className={explorerOpen ? 'app-body' : 'app-body explorer-collapsed'}>
         {explorerOpen && (
           <Explorer

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CollectionSort } from '@shared/types'
@@ -48,16 +48,16 @@ import { ResizableModal } from '@renderer/components/common/Modal'
 
 interface TableViewProps {
   docs: unknown[]
+  fontSize: number
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
 
-const ROW_HEIGHT = 24
 const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 
-export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
+export function TableView({ docs, fontSize, docCtx }: TableViewProps): JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
@@ -104,9 +104,11 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const rowVirtualizer = useVirtualizer({
     count: docs.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => fontSize + 11,
     overscan: 12
   })
+
+  useEffect(() => rowVirtualizer.measure(), [fontSize, rowVirtualizer])
 
   // Cmd/Ctrl+C: selected rows → a plain-JSON array; else the selected cell.
   useCopyHotkey(() => {
@@ -251,7 +253,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
           claimCopyFocus(parentRef.current)
       }}
     >
-      <div className="tbl" style={{ width: totalWidth, height: rowVirtualizer.getTotalSize() + ROW_HEIGHT }}>
+      <div className="tbl" style={{ width: totalWidth, height: rowVirtualizer.getTotalSize() + fontSize + 11 }}>
         {/* Sticky header */}
         <div className="tbl-head" style={{ width: totalWidth }}>
           <div className="tbl-th idx" style={{ width: INDEX_COL_WIDTH }}>
@@ -275,7 +277,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
             <div
               key={vi.index}
               className={`tbl-row${selectedRows.has(vi.index) ? ' selected' : ''}`}
-              style={{ transform: `translateY(${vi.start + ROW_HEIGHT}px)`, width: totalWidth }}
+              style={{ transform: `translateY(${vi.start + fontSize + 11}px)`, width: totalWidth }}
             >
               <div
                 className="tbl-td idx idx-select"
@@ -328,7 +330,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
           onClose={() => setPreview(null)}
         >
           <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
-            <JsonView value={preview.value} />
+            <JsonView value={preview.value} fontSize={fontSize} />
           </div>
         </ResizableModal>
       )}
