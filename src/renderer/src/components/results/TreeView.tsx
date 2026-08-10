@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import type { CollectionSort } from '@shared/types'
 import {
   entriesOf,
   formatScalar,
@@ -13,14 +14,16 @@ import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeSelection } from '@renderer/lib/selection'
 import { useAppStore } from '@renderer/store/useAppStore'
-import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
+import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
   copyText,
   plainScalarText,
+  toCsv,
   toPlainJson,
-  toPlainValue,
+  toPlainKeyValue,
   toShellText,
-  toStrictEjson
+  toStrictEjson,
+  toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
@@ -95,7 +98,7 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   // the single-node `selectedId` — selecting one clears the other.
   const [selectedDocs, setSelectedDocs] = useState<Set<number>>(() => new Set())
   const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   const toggle = (id: string): void => {
     setExpanded((prev) => {
@@ -266,17 +269,29 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
       }
     }
     const picked = [...selectedDocs].sort((a, b) => a - b)
-    const items =
-      inMultiDoc && picked.length > 1
-        ? bulkDocMenuItems(picked.map((i) => docs[i]))
-        : treeMenuItems(node, docs)
-    if (canEditNode(node)) {
-      items.unshift({ label: t('tree.editCell'), onClick: () => startEdit(node) })
-    }
     const rootDoc = rootDocOf(node)
+    const selected = inMultiDoc && picked.length > 1 ? picked.map((index) => docs[index]) : [rootDoc]
+    const items: ContextMenuEntry[] = []
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
-      items.push({ label: t('tree.editDoc'), onClick: () => setEditIndex(rootIndex) })
+      items.push({
+        label: t('result.dataMenu.edit'),
+        children: [
+          { label: t('tree.editDoc'), onClick: () => setEditIndex(rootIndex) },
+          {
+            label: t('tree.editCell'),
+            disabled: !canEditNode(node),
+            onClick: () => startEdit(node)
+          }
+        ]
+      })
+    }
+    items.push({
+      label: t('result.dataMenu.copy'),
+      children: treeCopyMenuItems(node, selected, fieldSort)
+    })
+    if (docCtx && docHasId(rootDoc)) {
+      items.push('separator')
       items.push({
         label: t('tree.deleteDoc'),
         danger: true,
@@ -385,35 +400,49 @@ export function TreeView({ docs, docCtx }: TreeViewProps): JSX.Element {
   )
 }
 
-/** Right-click copy menu when several top-level documents are multi-selected. */
-function bulkDocMenuItems(picked: unknown[]): ContextMenuItem[] {
-  const n = picked.length
-  return [
-    { label: i18n.t('tree.copyDocsPureJson', { count: n }), onClick: () => void copyText(toPlainJson(picked)) },
-    { label: i18n.t('tree.copyDocsMongoShell', { count: n }), onClick: () => void copyText(toShellText(picked)) },
-    { label: i18n.t('tree.copyDocsExtendedJson', { count: n }), onClick: () => void copyText(toStrictEjson(picked)) }
-  ]
-}
-
-/** Right-click copy menu for a tree node (value / key / field / document). */
-function treeMenuItems(node: FlatNode, docs: unknown[]): ContextMenuItem[] {
-  const rootDoc = docs[Number(node.id.split('.')[0])]
-  if (node.depth === 0) {
-    return [
-      { label: i18n.t('tree.copyDocPureJson'), onClick: () => void copyText(toPlainJson(node.value)) },
-      { label: i18n.t('tree.copyDocMongoShell'), onClick: () => void copyText(toShellText(node.value)) },
-      { label: i18n.t('tree.copyDocExtendedJson'), onClick: () => void copyText(toStrictEjson(node.value)) }
-    ]
-  }
+/** Right-click copy submenu for a tree field / document selection. */
+function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: CollectionSort): ContextMenuEntry[] {
+  const hasField = node.depth > 0
   const valueText = node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
-  const fieldJson = node.expandable ? toPlainJson(node.value) : JSON.stringify(toPlainValue(node.value))
+  const formatted = docs.length > 1 ? docs : docs[0]
   return [
-    { label: i18n.t('tree.copyValue'), onClick: () => void copyText(valueText) },
-    { label: i18n.t('tree.copyKey'), onClick: () => void copyText(node.keyLabel) },
-    { label: i18n.t('tree.copyField'), onClick: () => void copyText(`${JSON.stringify(node.keyLabel)}: ${fieldJson}`) },
-    { label: i18n.t('tree.copyOwnerDocPureJson'), onClick: () => void copyText(toPlainJson(rootDoc)) },
-    { label: i18n.t('tree.copyOwnerDocMongoShell'), onClick: () => void copyText(toShellText(rootDoc)) },
-    { label: i18n.t('tree.copyOwnerDocExtendedJson'), onClick: () => void copyText(toStrictEjson(rootDoc)) }
+    {
+      label: i18n.t('result.dataMenu.copyKey'),
+      disabled: !hasField,
+      onClick: () => void copyText(node.keyLabel)
+    },
+    {
+      label: i18n.t('result.dataMenu.copyValue'),
+      disabled: !hasField,
+      onClick: () => void copyText(valueText)
+    },
+    {
+      label: i18n.t('result.dataMenu.copyKeyValue'),
+      disabled: !hasField,
+      onClick: () => void copyText(toPlainKeyValue(node.keyLabel, node.value))
+    },
+    'separator',
+    {
+      label: i18n.t('result.dataMenu.copyPureJson'),
+      onClick: () => void copyText(toPlainJson(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyMongoShell'),
+      onClick: () => void copyText(toShellText(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyExtendedJson'),
+      onClick: () => void copyText(toStrictEjson(formatted))
+    },
+    'separator',
+    {
+      label: i18n.t('result.dataMenu.copyCsv'),
+      onClick: () => void copyText(toCsv(docs, fieldSort))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyTsv'),
+      onClick: () => void copyText(toTsv(docs, fieldSort))
+    }
   ]
 }
 

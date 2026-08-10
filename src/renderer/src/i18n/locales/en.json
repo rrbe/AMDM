@@ -303,6 +303,18 @@
       "csv": "Copy as CSV",
       "tsv": "Copy as TSV"
     },
+    "dataMenu": {
+      "edit": "Edit",
+      "copy": "Copy",
+      "copyKey": "Copy Key",
+      "copyValue": "Copy Value",
+      "copyKeyValue": "Copy Key-Value Pair",
+      "copyPureJson": "Copy as Pure JSON",
+      "copyMongoShell": "Copy as MongoShell JS",
+      "copyExtendedJson": "Copy as Extended JSON",
+      "copyCsv": "Copy as CSV",
+      "copyTsv": "Copy as TSV"
+    },
     "docCount_one": "{{count}} doc",
     "docCount_other": "{{count}} docs",
     "outputLines_one": "{{count}} output line",
@@ -341,14 +353,7 @@
     "saveFailed": "Save failed",
     "editCell": "Edit cell",
     "editDoc": "Edit document…",
-    "deleteDoc": "Delete document",
-    "copyCell": "Copy cell",
-    "copyRowsPureJson_one": "Copy row (Pure JSON)",
-    "copyRowsPureJson_other": "Copy {{count}} rows (Pure JSON)",
-    "copyRowMongoShell": "Copy row (MongoShell JS)",
-    "copyRowExtendedJson": "Copy row (Extended JSON)",
-    "copyCsv": "Copy as CSV",
-    "copyTsv": "Copy as TSV"
+    "deleteDoc": "Delete document"
   },
   "tree": {
     "noDocuments": "No documents.",
@@ -356,22 +361,7 @@
     "documentType": "Document",
     "editCell": "Edit cell",
     "editDoc": "Edit document…",
-    "deleteDoc": "Delete document",
-    "copyDocsPureJson_one": "Copy document (Pure JSON)",
-    "copyDocsPureJson_other": "Copy {{count}} documents (Pure JSON)",
-    "copyDocsMongoShell_one": "Copy document (MongoShell JS)",
-    "copyDocsMongoShell_other": "Copy {{count}} documents (MongoShell JS)",
-    "copyDocsExtendedJson_one": "Copy document (Extended JSON)",
-    "copyDocsExtendedJson_other": "Copy {{count}} documents (Extended JSON)",
-    "copyDocPureJson": "Copy document (Pure JSON)",
-    "copyDocMongoShell": "Copy document (MongoShell JS)",
-    "copyDocExtendedJson": "Copy document (Extended JSON)",
-    "copyValue": "Copy value",
-    "copyKey": "Copy key",
-    "copyField": "Copy field",
-    "copyOwnerDocPureJson": "Copy owner document (Pure JSON)",
-    "copyOwnerDocMongoShell": "Copy owner document (MongoShell JS)",
-    "copyOwnerDocExtendedJson": "Copy owner document (Extended JSON)"
+    "deleteDoc": "Delete document"
   },
   "io": {
     "exportCollection": "Export collection…",

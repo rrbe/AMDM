@@ -127,6 +127,11 @@ export function plainScalarText(value: unknown): string {
   return JSON.stringify(p, null, 2)
 }
 
+/** Plain-JSON field fragment for a context-menu "Copy Key-Value" action. */
+export function toPlainKeyValue(key: string, value: unknown): string {
+  return `${JSON.stringify(key)}: ${JSON.stringify(toPlainValue(value), null, 2) ?? 'null'}`
+}
+
 /** Formatted, bounded JSON for previews such as table-cell tooltips. */
 export function compactJsonPreview(value: unknown, maxLength = 240): string {
   const text = JSON.stringify(toPlainValue(value), null, 2) ?? String(value)

@@ -6,6 +6,7 @@
    `position: fixed` below). No backdrop element anymore. */
 .ctx-menu {
   position: fixed;
+  min-width: 160px;
   /* Match the shadcn Select/Menu popup: elevated surface + token shadow. */
   background: var(--surface-elevated);
   border: 1px solid var(--separator-strong);
@@ -56,6 +57,16 @@
   color: var(--fg-3);
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
+}
+.ctx-submenu-arrow {
+  margin-left: 16px;
+  color: var(--fg-3);
+  font-size: 16px;
+  line-height: 1;
+}
+.ctx-item[data-popup-open] .ctx-submenu-arrow,
+.ctx-item[data-highlighted] .ctx-submenu-arrow {
+  color: inherit;
 }
 .ctx-item:disabled {
   color: var(--fg-3);

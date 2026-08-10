@@ -8,6 +8,7 @@ import {
   toShellText,
   toStrictEjson,
   plainScalarText,
+  toPlainKeyValue,
   compactJsonPreview,
   toCsv,
   toTsv
@@ -48,6 +49,13 @@ describe('plainScalarText', () => {
     expect(plainScalarText(true)).toBe('true')
     expect(plainScalarText({ $undefined: true })).toBe('null')
     expect(plainScalarText({ a: 1 })).toBe('{\n  "a": 1\n}')
+  })
+})
+
+describe('toPlainKeyValue', () => {
+  it('copies a JSON field fragment with a plain EJSON value', () => {
+    expect(toPlainKeyValue('id', { $oid: OID })).toBe(`"id": "${OID}"`)
+    expect(toPlainKeyValue('nested', { a: 1 })).toBe('"nested": {\n  "a": 1\n}')
   })
 })
 

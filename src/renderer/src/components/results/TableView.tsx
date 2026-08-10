@@ -8,13 +8,14 @@ import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeSelection } from '@renderer/lib/selection'
 import { useAppStore } from '@renderer/store/useAppStore'
-import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
+import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
   copyText,
   compactJsonPreview,
   plainScalarText,
   toCsv,
   toPlainJson,
+  toPlainKeyValue,
   toShellText,
   toStrictEjson,
   toTsv
@@ -79,7 +80,7 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: string } | null>(null)
   const [selectedRows, setSelectedRows] = useState<Set<number>>(() => new Set())
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // Drag a header cell's right-edge handle to resize that column.
   const startColResize = (col: string, e: MouseEvent): void => {
@@ -194,13 +195,29 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
       setAnchorRow(row)
     }
     setSelectedCell(col ? { row, col } : null)
-    const items = tableMenuItems(rows, row, col, docs, fieldSort)
-    if (col && canEditCell(row, col)) {
-      items.unshift({ label: t('table.editCell'), onClick: () => startEditCell(row, col) })
-    }
     const doc = docs[row]
+    const items: ContextMenuEntry[] = []
     if (docCtx && docHasId(doc)) {
-      items.push({ label: t('table.editDoc'), onClick: () => setEditIndex(row) })
+      items.push({
+        label: t('result.dataMenu.edit'),
+        children: [
+          { label: t('table.editDoc'), onClick: () => setEditIndex(row) },
+          {
+            label: t('table.editCell'),
+            disabled: col == null || !canEditCell(row, col),
+            onClick: () => {
+              if (col != null) startEditCell(row, col)
+            }
+          }
+        ]
+      })
+    }
+    items.push({
+      label: t('result.dataMenu.copy'),
+      children: tableCopyMenuItems(rows, row, col, docs, fieldSort)
+    })
+    if (docCtx && docHasId(doc)) {
+      items.push('separator')
       items.push({
         label: t('table.deleteDoc'),
         danger: true,
@@ -324,27 +341,58 @@ export function TableView({ docs, docCtx }: TableViewProps): JSX.Element {
 }
 
 /** Right-click copy menu for a table cell / row(s). */
-function tableMenuItems(
+function tableCopyMenuItems(
   rows: number[],
   row: number,
   col: string | null,
   docs: unknown[],
   fieldSort: CollectionSort
-): ContextMenuItem[] {
-  const items: ContextMenuItem[] = []
-  if (col) {
-    const { present, value } = cellValue(docs[row], col)
-    items.push({ label: i18n.t('table.copyCell'), onClick: () => void copyText(present ? plainScalarText(value) : '') })
-  }
+): ContextMenuEntry[] {
+  const cell = col == null ? { present: false, value: undefined } : cellValue(docs[row], col)
+  const hasValue = col != null && cell.present
   const single = docs[row]
   const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
   const many = rows.length > 1
-  items.push({ label: i18n.t('table.copyRowsPureJson', { count: rows.length }), onClick: () => void copyText(many ? toPlainJson(sel) : toPlainJson(single)) })
-  items.push({ label: i18n.t('table.copyRowMongoShell'), onClick: () => void copyText(many ? toShellText(sel) : toShellText(single)) })
-  items.push({ label: i18n.t('table.copyRowExtendedJson'), onClick: () => void copyText(many ? toStrictEjson(sel) : toStrictEjson(single)) })
-  items.push({ label: i18n.t('table.copyCsv'), onClick: () => void copyText(toCsv(sel, fieldSort)) })
-  items.push({ label: i18n.t('table.copyTsv'), onClick: () => void copyText(toTsv(sel, fieldSort)) })
-  return items
+  const formatted = many ? sel : single
+  return [
+    {
+      label: i18n.t('result.dataMenu.copyKey'),
+      disabled: col == null,
+      onClick: () => void copyText(col ?? '')
+    },
+    {
+      label: i18n.t('result.dataMenu.copyValue'),
+      disabled: !hasValue,
+      onClick: () => void copyText(plainScalarText(cell.value))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyKeyValue'),
+      disabled: !hasValue,
+      onClick: () => void copyText(toPlainKeyValue(col ?? '', cell.value))
+    },
+    'separator',
+    {
+      label: i18n.t('result.dataMenu.copyPureJson'),
+      onClick: () => void copyText(toPlainJson(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyMongoShell'),
+      onClick: () => void copyText(toShellText(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyExtendedJson'),
+      onClick: () => void copyText(toStrictEjson(formatted))
+    },
+    'separator',
+    {
+      label: i18n.t('result.dataMenu.copyCsv'),
+      onClick: () => void copyText(toCsv(sel, fieldSort))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyTsv'),
+      onClick: () => void copyText(toTsv(sel, fieldSort))
+    }
+  ]
 }
 
 function Cell({

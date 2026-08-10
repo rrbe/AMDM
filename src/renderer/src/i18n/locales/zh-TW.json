@@ -303,6 +303,18 @@
       "csv": "複製為 CSV",
       "tsv": "複製為 TSV"
     },
+    "dataMenu": {
+      "edit": "編輯",
+      "copy": "複製",
+      "copyKey": "複製鍵",
+      "copyValue": "複製值",
+      "copyKeyValue": "複製鍵值對",
+      "copyPureJson": "複製為 Pure JSON",
+      "copyMongoShell": "複製為 MongoShell JS",
+      "copyExtendedJson": "複製為 Extended JSON",
+      "copyCsv": "複製為 CSV",
+      "copyTsv": "複製為 TSV"
+    },
     "docCount_one": "{{count}} 筆文件",
     "docCount_other": "{{count}} 筆文件",
     "outputLines_one": "{{count}} 行輸出",
@@ -341,14 +353,7 @@
     "saveFailed": "儲存失敗",
     "editCell": "編輯儲存格",
     "editDoc": "編輯文件…",
-    "deleteDoc": "刪除文件",
-    "copyCell": "複製儲存格",
-    "copyRowsPureJson_one": "複製列 (Pure JSON)",
-    "copyRowsPureJson_other": "複製 {{count}} 列 (Pure JSON)",
-    "copyRowMongoShell": "複製列 (MongoShell JS)",
-    "copyRowExtendedJson": "複製列 (Extended JSON)",
-    "copyCsv": "複製為 CSV",
-    "copyTsv": "複製為 TSV"
+    "deleteDoc": "刪除文件"
   },
   "tree": {
     "noDocuments": "無文件。",
@@ -356,22 +361,7 @@
     "documentType": "文件",
     "editCell": "編輯儲存格",
     "editDoc": "編輯文件…",
-    "deleteDoc": "刪除文件",
-    "copyDocsPureJson_one": "複製文件 (Pure JSON)",
-    "copyDocsPureJson_other": "複製 {{count}} 個文件 (Pure JSON)",
-    "copyDocsMongoShell_one": "複製文件 (MongoShell JS)",
-    "copyDocsMongoShell_other": "複製 {{count}} 個文件 (MongoShell JS)",
-    "copyDocsExtendedJson_one": "複製文件 (Extended JSON)",
-    "copyDocsExtendedJson_other": "複製 {{count}} 個文件 (Extended JSON)",
-    "copyDocPureJson": "複製文件 (Pure JSON)",
-    "copyDocMongoShell": "複製文件 (MongoShell JS)",
-    "copyDocExtendedJson": "複製文件 (Extended JSON)",
-    "copyValue": "複製值",
-    "copyKey": "複製鍵",
-    "copyField": "複製欄位",
-    "copyOwnerDocPureJson": "複製所在文件 (Pure JSON)",
-    "copyOwnerDocMongoShell": "複製所在文件 (MongoShell JS)",
-    "copyOwnerDocExtendedJson": "複製所在文件 (Extended JSON)"
+    "deleteDoc": "刪除文件"
   },
   "io": {
     "exportCollection": "匯出集合…",

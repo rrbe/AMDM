@@ -6,8 +6,8 @@ import { Menu, type MenuEntry, type MenuItemDef } from '@renderer/components/ui/
  * internally now backed by Base UI via `ui/Menu`, which adds keyboard nav,
  * outside-press / Esc dismissal, and focus management.
  *
- * The item types are re-exported aliases of `ui/Menu`'s — structurally identical
- * to the old ones, so the ~7 consumers need no changes.
+ * The item types are re-exported aliases of `ui/Menu`'s. Existing flat menus
+ * remain valid; callers can add `children` to opt into a nested submenu.
  */
 export type ContextMenuItem = MenuItemDef
 export type ContextMenuEntry = MenuEntry
