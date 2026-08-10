@@ -29,8 +29,11 @@ import type {
   HistoryEntry,
   ImportRequest,
   IndexInfo,
+  MongoJsonSchema,
   SavedQuery,
   SavedQueryInput,
+  SchemaModel,
+  SchemaTarget,
   ShellResult,
   TestResult,
   UserInfo
@@ -213,6 +216,12 @@ interface AppState {
   sampleFields(connId: string, db: string, coll: string): Promise<string[]>
   /** Synchronous read of cached field names (for completion sources). */
   getFields(connId: string, db: string, coll: string): string[]
+
+  // ---- actions: Schema analysis / local model ----
+  loadSchemaModel(target: SchemaTarget): Promise<SchemaModel | null>
+  analyzeSchema(target: SchemaTarget): Promise<SchemaModel | null>
+  saveSchemaDraft(target: SchemaTarget, draft: MongoJsonSchema): Promise<SchemaModel | null>
+  overwriteSchemaDraft(target: SchemaTarget): Promise<SchemaModel | null>
 
   // ---- actions: document edit/delete (Phase 2) ----
   updateDocument(req: DocUpdateRequest): Promise<DocMutateResult>
@@ -1159,6 +1168,49 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getFields(connId, db, coll) {
     return get().fieldCache[`${connId}:${db}.${coll}`] ?? []
+  },
+
+  // -------------------------------------------------------------- Schema model
+  async loadSchemaModel(target) {
+    try {
+      return await window.api.schemas.get(target)
+    } catch (e) {
+      set({ lastError: tr('notify.loadSchemaFailed', { error: errMessage(e) }) })
+      return null
+    }
+  },
+
+  async analyzeSchema(target) {
+    try {
+      const model = await window.api.schemas.analyze(target)
+      get().notify('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }))
+      return model
+    } catch (e) {
+      set({ lastError: tr('notify.analyzeSchemaFailed', { error: errMessage(e) }) })
+      return null
+    }
+  },
+
+  async saveSchemaDraft(target, draft) {
+    try {
+      const model = await window.api.schemas.saveDraft(target, draft)
+      get().notify('success', tr('notify.schemaSaved'))
+      return model
+    } catch (e) {
+      set({ lastError: tr('notify.saveSchemaFailed', { error: errMessage(e) }) })
+      return null
+    }
+  },
+
+  async overwriteSchemaDraft(target) {
+    try {
+      const model = await window.api.schemas.overwriteDraft(target)
+      get().notify('success', tr('notify.schemaOverwritten'))
+      return model
+    } catch (e) {
+      set({ lastError: tr('notify.overwriteSchemaFailed', { error: errMessage(e) }) })
+      return null
+    }
   },
 
   // ----------------------------------------------------------- document mutations

@@ -30,7 +30,7 @@ export default defineConfig({
         'src/renderer/src/lib/**',
         'src/main/mongo/*Core.ts',
         'src/main/mongo/uri.ts',
-        'src/main/workers/serialize-core.ts',
+        'src/main/workers/*-core.ts',
         'src/main/store/**'
       ],
       reporter: ['text', 'html']

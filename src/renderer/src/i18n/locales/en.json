@@ -89,7 +89,14 @@
     "clipboardUnavailable": "Copy failed: clipboard unavailable",
     "copied": "Copied to clipboard",
     "buildUriFailed": "Failed to build connection string: {{error}}",
-    "diagnoseFailed": "Connectivity check failed: {{error}}"
+    "diagnoseFailed": "Connectivity check failed: {{error}}",
+    "loadSchemaFailed": "Failed to load Schema: {{error}}",
+    "analyzeSchemaFailed": "Failed to analyze Schema: {{error}}",
+    "saveSchemaFailed": "Failed to save Schema: {{error}}",
+    "overwriteSchemaFailed": "Failed to overwrite Schema: {{error}}",
+    "schemaAnalyzed": "Schema analysis complete: {{count}} documents sampled",
+    "schemaSaved": "Schema draft saved",
+    "schemaOverwritten": "Draft replaced with the analysis result"
   },
   "connection": {
     "status": {
@@ -222,6 +229,37 @@
       "dark": "Theme: Dark — click for System"
     },
     "toggleTheme": "Toggle color theme"
+  },
+  "schema": {
+    "menu": "Analyze Schema",
+    "title": "Schema · {{collection}}",
+    "loading": "Loading Schema…",
+    "loadFailed": "Unable to load Schema. Check that the connection is still available.",
+    "updateAnalysis": "Update Analysis",
+    "analysisTab": "Analysis",
+    "modelTab": "Edit Model",
+    "structuredTab": "Structured",
+    "sampleCount": "Random sample: {{count}} documents",
+    "fieldCount": "Field nodes: {{count}}",
+    "analyzedAt": "Analyzed: {{time}}",
+    "field": "Field",
+    "bsonType": "BSON Type",
+    "occurrence": "Occurrence",
+    "documents": "Documents",
+    "emptyCollection": "The collection is empty; there are no fields to analyze.",
+    "required": "Required",
+    "requiredShort": "Required",
+    "description": "Description",
+    "typePlaceholder": "object, string",
+    "addField": "Add Field",
+    "addNestedField": "Add Nested Field",
+    "deleteField": "Delete Field",
+    "advancedHint": "Contains advanced rules; edit them in the JSON view",
+    "overwriteDraft": "Replace from Analysis",
+    "overwriteConfirm": "Replace the current draft with the latest analysis? Manual changes will be lost.",
+    "discardConfirm": "This Schema has unsaved changes. Close anyway?",
+    "saveDraft": "Save Draft",
+    "close": "Close"
   },
   "shell": {
     "fallbackConnTitle": "Shell",

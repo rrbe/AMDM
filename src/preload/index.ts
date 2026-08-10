@@ -32,6 +32,12 @@ const api: Api = {
     sampleFields: (connectionId, database, collection) =>
       ipcRenderer.invoke(IPC.catalogSampleFields, connectionId, database, collection)
   },
+  schemas: {
+    get: (target) => ipcRenderer.invoke(IPC.schemasGet, target),
+    analyze: (target) => ipcRenderer.invoke(IPC.schemasAnalyze, target),
+    saveDraft: (target, draft) => ipcRenderer.invoke(IPC.schemasSaveDraft, target, draft),
+    overwriteDraft: (target) => ipcRenderer.invoke(IPC.schemasOverwriteDraft, target)
+  },
   shell: {
     execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request),
     abort: (execId) => ipcRenderer.invoke(IPC.shellAbort, execId)

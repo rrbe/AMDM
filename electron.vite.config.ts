@@ -15,9 +15,9 @@ export default defineConfig({
       }
     },
     build: {
-      // exceljs, @mongosh/async-rewriter2, the MongoDB driver and its
-      // connection-string parser are
-      // bundled (not externalized) on purpose: electron-builder 26's pnpm
+      // exceljs, @mongosh/async-rewriter2, the Schema analyzer, the MongoDB driver and its
+      // connection-string parser are bundled (not externalized) on purpose:
+      // electron-builder 26's pnpm
       // dependency collector reconstructs
       // the nested tree from the lockfile and drops some leaf transitive deps —
       // util-deprecate under exceljs's readable-stream, and ms /
@@ -29,7 +29,14 @@ export default defineConfig({
       // is safe. (electron-vite 5 externalizes all deps by default — the
       // exclude list here is what keeps them inlined.)
       externalizeDeps: {
-        exclude: ['exceljs', '@mongosh/async-rewriter2', 'mongodb', 'mongodb-connection-string-url']
+        exclude: [
+          'exceljs',
+          '@mongosh/async-rewriter2',
+          '@mongodb-js/mongodb-schema',
+          'reservoir',
+          'mongodb',
+          'mongodb-connection-string-url'
+        ]
       },
       rollupOptions: {
         input: {

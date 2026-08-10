@@ -89,7 +89,14 @@
     "clipboardUnavailable": "複製失敗：剪貼簿不可用",
     "copied": "已複製到剪貼簿",
     "buildUriFailed": "產生連線字串失敗：{{error}}",
-    "diagnoseFailed": "連通性檢測失敗：{{error}}"
+    "diagnoseFailed": "連通性檢測失敗：{{error}}",
+    "loadSchemaFailed": "載入 Schema 失敗：{{error}}",
+    "analyzeSchemaFailed": "分析 Schema 失敗：{{error}}",
+    "saveSchemaFailed": "儲存 Schema 失敗：{{error}}",
+    "overwriteSchemaFailed": "覆蓋 Schema 失敗：{{error}}",
+    "schemaAnalyzed": "Schema 分析完成，抽樣 {{count}} 筆文件",
+    "schemaSaved": "Schema 編輯稿已儲存",
+    "schemaOverwritten": "已用分析結果覆蓋編輯稿"
   },
   "connection": {
     "status": {
@@ -222,6 +229,37 @@
       "dark": "佈景：暗色 — 點擊切換為系統"
     },
     "toggleTheme": "切換顏色佈景"
+  },
+  "schema": {
+    "menu": "分析 Schema",
+    "title": "Schema · {{collection}}",
+    "loading": "正在載入 Schema…",
+    "loadFailed": "無法載入 Schema。請確認連線仍然可用。",
+    "updateAnalysis": "更新分析",
+    "analysisTab": "分析結果",
+    "modelTab": "編輯模型",
+    "structuredTab": "結構化",
+    "sampleCount": "隨機樣本：{{count}} 筆",
+    "fieldCount": "欄位節點：{{count}}",
+    "analyzedAt": "分析時間：{{time}}",
+    "field": "欄位",
+    "bsonType": "BSON 類型",
+    "occurrence": "出現率",
+    "documents": "文件數",
+    "emptyCollection": "集合是空的，目前沒有可分析欄位。",
+    "required": "必填",
+    "requiredShort": "必填",
+    "description": "描述",
+    "typePlaceholder": "object, string",
+    "addField": "新增欄位",
+    "addNestedField": "新增巢狀欄位",
+    "deleteField": "刪除欄位",
+    "advancedHint": "包含進階規則；可在 JSON 檢視中編輯",
+    "overwriteDraft": "用分析結果覆蓋",
+    "overwriteConfirm": "確定用最新分析結果覆蓋目前編輯稿嗎？人工修改將遺失。",
+    "discardConfirm": "目前 Schema 有未儲存修改，確定關閉嗎？",
+    "saveDraft": "儲存編輯稿",
+    "close": "關閉"
   },
   "shell": {
     "fallbackConnTitle": "Shell",

@@ -22,8 +22,11 @@ import type {
   HistoryEntry,
   ImportRequest,
   IndexInfo,
+  MongoJsonSchema,
   SavedQuery,
   SavedQueryInput,
+  SchemaModel,
+  SchemaTarget,
   ShellRequest,
   ShellResult,
   TestResult,
@@ -48,6 +51,11 @@ export const IPC = {
   catalogIndexes: 'catalog:indexes',
   catalogUsers: 'catalog:users',
   catalogSampleFields: 'catalog:sampleFields',
+
+  schemasGet: 'schemas:get',
+  schemasAnalyze: 'schemas:analyze',
+  schemasSaveDraft: 'schemas:saveDraft',
+  schemasOverwriteDraft: 'schemas:overwriteDraft',
 
   shellExecute: 'shell:execute',
   shellAbort: 'shell:abort',
@@ -105,6 +113,14 @@ export interface Api {
     users(connectionId: string, database: string): Promise<UserInfo[]>
     /** Bounded, cached field-name sampling for autocomplete. */
     sampleFields(connectionId: string, database: string, collection: string): Promise<string[]>
+  }
+  schemas: {
+    get(target: SchemaTarget): Promise<SchemaModel | null>
+    /** Re-sample the collection; an existing user draft is preserved. */
+    analyze(target: SchemaTarget): Promise<SchemaModel>
+    saveDraft(target: SchemaTarget, draft: MongoJsonSchema): Promise<SchemaModel>
+    /** Explicitly replace the user draft with the latest generated Schema. */
+    overwriteDraft(target: SchemaTarget): Promise<SchemaModel>
   }
   shell: {
     execute(request: ShellRequest): Promise<ShellResult>

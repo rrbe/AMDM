@@ -12,13 +12,16 @@ import type {
   DocUpdateRequest,
   ExportRequest,
   ImportRequest,
+  MongoJsonSchema,
   OpenFileOptions,
   SavedQueryInput,
+  SchemaTarget,
   ShellRequest
 } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
 import { settingsStore } from '../store/settingsStore'
+import { schemaStore } from '../store/schemaStore'
 import { sessionManager } from '../mongo/sessionManager'
 import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
@@ -32,6 +35,7 @@ import {
 } from '../mongo/catalog'
 import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
+import { analyzeCollectionSchema } from '../mongo/schemaAnalysis'
 import { exportData } from '../io/exporter'
 import { importData } from '../io/importer'
 import { registerUpdatesIpc } from './registerUpdatesIpc'
@@ -122,6 +126,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.connectionsDelete, async (_e, id: string) => {
     await sessionManager.disconnect(id)
     connectionStore.deleteConnection(id)
+    schemaStore.deleteConnection(id)
   })
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
@@ -168,6 +173,17 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.catalogSampleFields, (_e, id: string, db: string, coll: string) =>
     sampleFields(id, db, coll)
   )
+
+  // local Schema analysis + editable model
+  ipcMain.handle(IPC.schemasGet, (_e, target: SchemaTarget) => schemaStore.get(target))
+  ipcMain.handle(IPC.schemasAnalyze, async (_e, target: SchemaTarget) => {
+    const analysis = await analyzeCollectionSchema(target, settingsStore.get().queryTimeoutMS)
+    return schemaStore.saveAnalysis(target, analysis)
+  })
+  ipcMain.handle(IPC.schemasSaveDraft, (_e, target: SchemaTarget, draft: MongoJsonSchema) =>
+    schemaStore.saveDraft(target, draft)
+  )
+  ipcMain.handle(IPC.schemasOverwriteDraft, (_e, target: SchemaTarget) => schemaStore.overwriteDraft(target))
 
   // shell — run, then record an automatic history entry
   ipcMain.handle(IPC.shellExecute, async (_e, req: ShellRequest) => {

@@ -4,6 +4,7 @@ import appIcon from '../../build/icon.png?asset'
 import { connectionStore } from './store/connectionStore'
 import { queryStore } from './store/queryStore'
 import { settingsStore } from './store/settingsStore'
+import { schemaStore } from './store/schemaStore'
 import { windowStateStore } from './store/windowStateStore'
 import { resolveWindowBounds } from './store/windowStateCore'
 import { sessionManager } from './mongo/sessionManager'
@@ -149,6 +150,7 @@ app.whenReady().then(() => {
   connectionStore.init()
   queryStore.init()
   settingsStore.init()
+  schemaStore.init()
   windowStateStore.init()
   registerIpc()
   createWindow()

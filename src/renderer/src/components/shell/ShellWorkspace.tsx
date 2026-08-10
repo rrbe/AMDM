@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
+  ChartNoAxesColumnIncreasing,
   ChevronDown,
   ChevronRight,
   LoaderCircle,
@@ -21,6 +22,8 @@ import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
+import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
+import type { SchemaTarget } from '@shared/types'
 
 /**
  * The main work area: a tab strip, header (active connection + database +
@@ -45,12 +48,17 @@ export function ShellWorkspace(): JSX.Element {
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [showSave, setShowSave] = useState(false)
+  const [schemaTarget, setSchemaTarget] = useState<SchemaTarget | null>(null)
   const [contextOpen, setContextOpen] = useState(false)
   const [resultsExpanded, setResultsExpanded] = useState(false)
   const selectedCode = useRef<string>()
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
+  const availableSchemaTarget: SchemaTarget | null =
+    activeConnectionId && targetCollection
+      ? { connectionId: activeConnectionId, database: activeDatabase || 'test', collection: targetCollection }
+      : null
   const busy = running || !code.trim()
   const runEditor = (): void => {
     void runShell(selectedCode.current)
@@ -89,6 +97,15 @@ export function ShellWorkspace(): JSX.Element {
                   <Play aria-hidden /> {t('shell.runBtn')}
                 </Button>
               )}
+              <button
+                className="work-icon-btn"
+                disabled={!availableSchemaTarget}
+                onClick={() => availableSchemaTarget && setSchemaTarget(availableSchemaTarget)}
+                data-tip={t('schema.menu')}
+                aria-label={t('schema.menu')}
+              >
+                <ChartNoAxesColumnIncreasing size={15} />
+              </button>
               <button
                 className="work-icon-btn"
                 disabled={busy}
@@ -162,6 +179,7 @@ export function ShellWorkspace(): JSX.Element {
       </div>
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
+      {schemaTarget && <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />}
     </div>
   )
 }

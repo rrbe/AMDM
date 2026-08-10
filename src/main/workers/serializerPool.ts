@@ -19,9 +19,11 @@
 import { Worker } from 'node:worker_threads'
 import { join } from 'node:path'
 import { serialize as bsonSerialize } from 'bson'
+import type { SchemaAnalysis } from '../../shared/types'
 import { serializeValue, extractFieldPaths } from './serialize-core'
+import { analyzeSchemaDocuments } from './schema-analysis-core'
 
-type Op = 'serialize' | 'fields'
+type Op = 'serialize' | 'fields' | 'schema'
 
 interface Pending {
   resolve: (value: unknown) => void
@@ -110,6 +112,17 @@ class SerializerPool {
       return (await this.run('fields', items)) as string[]
     } catch {
       return extractFieldPaths(docs)
+    }
+  }
+
+  /** Infer a recursive Schema from bounded documents, off-thread. */
+  async analyzeSchema(docs: unknown[]): Promise<Omit<SchemaAnalysis, 'analyzedAt'>> {
+    if (docs.length === 0) return analyzeSchemaDocuments(docs)
+    try {
+      const items = docs.map((doc) => bsonSerialize({ v: doc }))
+      return (await this.run('schema', items)) as Omit<SchemaAnalysis, 'analyzedAt'>
+    } catch {
+      return analyzeSchemaDocuments(docs)
     }
   }
 

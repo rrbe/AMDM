@@ -197,6 +197,59 @@ export interface UserInfo {
 }
 
 // ---------------------------------------------------------------------------
+// Schema analysis / local modeling
+// ---------------------------------------------------------------------------
+
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+
+/** MongoDB-flavoured JSON Schema kept as plain JSON for IPC + local storage. */
+export interface MongoJsonSchema {
+  [key: string]: JsonValue
+}
+
+export interface SchemaTarget {
+  connectionId: string
+  database: string
+  collection: string
+}
+
+/** One observed BSON type within a sampled field. */
+export interface SchemaTypeStat {
+  name: string
+  bsonType: string
+  count: number
+  probability: number
+  /** Nested document fields. */
+  fields?: SchemaFieldStat[]
+  /** Element types when this type is an array. */
+  types?: SchemaTypeStat[]
+}
+
+/** Recursive field statistics inferred from the sampled documents. */
+export interface SchemaFieldStat {
+  name: string
+  count: number
+  probability: number
+  types: SchemaTypeStat[]
+}
+
+export interface SchemaAnalysis {
+  analyzedAt: number
+  /** Actual documents returned by the bounded sample. */
+  sampleSize: number
+  fields: SchemaFieldStat[]
+  generated: MongoJsonSchema
+}
+
+/** Persisted local model: observed data and the user's desired schema stay separate. */
+export interface SchemaModel {
+  target: SchemaTarget
+  analysis: SchemaAnalysis
+  draft: MongoJsonSchema
+  draftUpdatedAt: number
+}
+
+// ---------------------------------------------------------------------------
 // Shell execution
 // ---------------------------------------------------------------------------
 

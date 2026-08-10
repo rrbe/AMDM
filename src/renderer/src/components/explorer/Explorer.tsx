@@ -2,6 +2,7 @@ import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
+  ChartNoAxesColumnIncreasing,
   ChevronRight,
   Clock,
   Clock3,
@@ -29,7 +30,12 @@ import {
   Users as UsersIcon,
   X
 } from 'lucide-react'
-import type { CollectionSort, ConnectionConfig, ConnectionState } from '@shared/types'
+import type {
+  CollectionSort,
+  ConnectionConfig,
+  ConnectionState,
+  SchemaTarget
+} from '@shared/types'
 import {
   useAppStore,
   type CatalogState,
@@ -48,6 +54,7 @@ import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
+import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
 import {
   HistoryView,
   SavedQueriesView,
@@ -114,7 +121,7 @@ interface TreeRow {
   sizeOnDisk?: number
   approximateCount?: boolean
   /** Present on collection rows: enables the Export/Import hover actions. */
-  collection?: { db: string; name: string }
+  collection?: { db: string; name: string; type: 'collection' | 'view' | 'timeseries' }
   onClick?: () => void
   onToggle?: () => void
 }
@@ -197,6 +204,7 @@ export function Explorer({
     open: false
   })
   const [ioModal, setIoModal] = useState<IoModal>(null)
+  const [schemaTarget, setSchemaTarget] = useState<SchemaTarget | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{
     x: number
     y: number
@@ -275,6 +283,18 @@ export function Explorer({
       x: e.clientX,
       y: e.clientY,
       items: [
+        {
+          label: t('schema.menu'),
+          icon: <ChartNoAxesColumnIncreasing size={14} />,
+          disabled: coll.type === 'view',
+          onClick: () =>
+            setSchemaTarget({
+              connectionId: row.connId,
+              database: coll.db,
+              collection: coll.name
+            })
+        },
+        'separator',
         {
           label: t('io.exportCollection'),
           icon: <Download size={14} />,
@@ -556,6 +576,9 @@ export function Explorer({
           onClose={() => setIoModal(null)}
         />
       )}
+      {schemaTarget && (
+        <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
+      )}
       {ctxMenu && (
         <ContextMenu
           x={ctxMenu.x}
@@ -823,7 +846,7 @@ function flattenCatalog(
         loading: cat.loading.has(collNodeId),
         count: coll.estimatedCount,
         approximateCount: coll.estimatedCount !== undefined,
-        collection: { db: db.name, name: coll.name },
+        collection: { db: db.name, name: coll.name, type: coll.type },
         // Toggle expands sub-folders; clicking the row seeds the editor.
         onToggle: () =>
           void a.toggleNode(connId, collNodeId, 'collection', {

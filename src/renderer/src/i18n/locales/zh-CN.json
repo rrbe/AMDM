@@ -89,7 +89,14 @@
     "clipboardUnavailable": "复制失败：剪贴板不可用",
     "copied": "已复制到剪贴板",
     "buildUriFailed": "生成连接串失败：{{error}}",
-    "diagnoseFailed": "连通性检测失败：{{error}}"
+    "diagnoseFailed": "连通性检测失败：{{error}}",
+    "loadSchemaFailed": "加载 Schema 失败：{{error}}",
+    "analyzeSchemaFailed": "分析 Schema 失败：{{error}}",
+    "saveSchemaFailed": "保存 Schema 失败：{{error}}",
+    "overwriteSchemaFailed": "覆盖 Schema 失败：{{error}}",
+    "schemaAnalyzed": "Schema 分析完成，抽样 {{count}} 条文档",
+    "schemaSaved": "Schema 编辑稿已保存",
+    "schemaOverwritten": "已用分析结果覆盖编辑稿"
   },
   "connection": {
     "status": {
@@ -222,6 +229,37 @@
       "dark": "主题：深色 — 点击切换为系统"
     },
     "toggleTheme": "切换颜色主题"
+  },
+  "schema": {
+    "menu": "分析 Schema",
+    "title": "Schema · {{collection}}",
+    "loading": "正在加载 Schema…",
+    "loadFailed": "无法加载 Schema。请确认连接仍然可用。",
+    "updateAnalysis": "更新分析",
+    "analysisTab": "分析结果",
+    "modelTab": "编辑模型",
+    "structuredTab": "结构化",
+    "sampleCount": "随机样本：{{count}} 条",
+    "fieldCount": "字段节点：{{count}}",
+    "analyzedAt": "分析时间：{{time}}",
+    "field": "字段",
+    "bsonType": "BSON 类型",
+    "occurrence": "出现率",
+    "documents": "文档数",
+    "emptyCollection": "集合为空，当前没有可分析字段。",
+    "required": "必填",
+    "requiredShort": "必填",
+    "description": "描述",
+    "typePlaceholder": "object, string",
+    "addField": "添加字段",
+    "addNestedField": "添加嵌套字段",
+    "deleteField": "删除字段",
+    "advancedHint": "包含高级规则；可在 JSON 视图中编辑",
+    "overwriteDraft": "用分析结果覆盖",
+    "overwriteConfirm": "确定用最新分析结果覆盖当前编辑稿吗？人工修改将丢失。",
+    "discardConfirm": "当前 Schema 有未保存修改，确定关闭吗？",
+    "saveDraft": "保存编辑稿",
+    "close": "关闭"
   },
   "shell": {
     "fallbackConnTitle": "Shell",

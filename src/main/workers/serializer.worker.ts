@@ -15,10 +15,12 @@
 import { parentPort, type MessagePort } from 'node:worker_threads'
 import { deserialize } from 'bson'
 import { serializeValue, extractFieldPaths } from './serialize-core'
+import { analyzeSchemaDocuments } from './schema-analysis-core'
 
 type Job =
   | { id: number; op: 'serialize'; items: Uint8Array[] }
   | { id: number; op: 'fields'; items: Uint8Array[] }
+  | { id: number; op: 'schema'; items: Uint8Array[] }
 
 interface Response {
   id: number
@@ -33,13 +35,15 @@ function unwrap(item: Uint8Array): unknown {
   return (deserialize(item) as { v: unknown }).v
 }
 
-port?.on('message', (job: Job) => {
+port?.on('message', async (job: Job) => {
   const reply: Response = { id: job.id, ok: true }
   try {
     if (job.op === 'serialize') {
       reply.result = job.items.map((it) => serializeValue(unwrap(it)))
-    } else {
+    } else if (job.op === 'fields') {
       reply.result = extractFieldPaths(job.items.map(unwrap))
+    } else {
+      reply.result = await analyzeSchemaDocuments(job.items.map(unwrap))
     }
   } catch (err) {
     reply.ok = false

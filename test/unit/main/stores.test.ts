@@ -13,7 +13,8 @@ import * as electron from '../../helpers/electron-mock'
 import { queryStore } from '../../../src/main/store/queryStore'
 import { settingsStore } from '../../../src/main/store/settingsStore'
 import { connectionStore } from '../../../src/main/store/connectionStore'
-import type { ConnectionInput } from '../../../src/shared/types'
+import { schemaStore } from '../../../src/main/store/schemaStore'
+import type { ConnectionInput, SchemaAnalysis, SchemaTarget } from '../../../src/shared/types'
 
 let dir = ''
 
@@ -25,9 +26,11 @@ beforeEach(() => {
   electron.seedStoreFile('queries.json', { version: 1, queries: [], history: [] })
   electron.seedStoreFile('settings.json', { version: 1 })
   electron.seedStoreFile('connections.json', { version: 1, connections: [] })
+  electron.seedStoreFile('schemas.json', { version: 1, models: {} })
   queryStore.init()
   settingsStore.init()
   connectionStore.init()
+  schemaStore.init()
 })
 
 describe('queryStore — saved queries', () => {
@@ -97,6 +100,32 @@ describe('settingsStore', () => {
     settingsStore.update({ connectionOrder: ['b', 'a'] })
     settingsStore.init()
     expect(settingsStore.get().connectionOrder).toEqual(['b', 'a'])
+  })
+})
+
+describe('schemaStore', () => {
+  const target: SchemaTarget = { connectionId: 'c', database: 'db', collection: 'items' }
+  const analysis = (field: string, at: number): SchemaAnalysis => ({
+    analyzedAt: at,
+    sampleSize: 1,
+    fields: [],
+    generated: { bsonType: 'object', properties: { [field]: { bsonType: 'string' } } }
+  })
+
+  it('updates observations without replacing the user draft', () => {
+    schemaStore.saveAnalysis(target, analysis('old', 1))
+    schemaStore.saveDraft(target, { bsonType: 'object', description: 'manual' })
+    const updated = schemaStore.saveAnalysis(target, analysis('new', 2))
+    expect(updated.analysis.generated).toHaveProperty('properties.new')
+    expect(updated.draft.description).toBe('manual')
+  })
+
+  it('only overwrites the draft explicitly and cleans up deleted connections', () => {
+    schemaStore.saveAnalysis(target, analysis('observed', 1))
+    schemaStore.saveDraft(target, { bsonType: 'object', description: 'manual' })
+    expect(schemaStore.overwriteDraft(target).draft).toHaveProperty('properties.observed')
+    schemaStore.deleteConnection('c')
+    expect(schemaStore.get(target)).toBeNull()
   })
 })
 
