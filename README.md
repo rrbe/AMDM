@@ -12,9 +12,12 @@ A lean, performance-first MongoDB desktop GUI, powered by Electron.
 pnpm install         # uses pnpm
 pnpm dev             # launch the app with hot reload
 pnpm build           # production build into ./out
+pnpm build:web       # build the private-team Web edition
 pnpm dist:dir --arm64 # package an unpacked Apple Silicon app
 pnpm clean           # remove generated build files
 ```
+
+The Web edition requires its Node backend, reverse-proxy SSO, and a persistent volume. See [AMDM Web](./docs/WEB.md) for deployment and security requirements.
 
 ## Features
 

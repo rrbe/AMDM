@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
+import { ArrowLeft, Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -12,6 +12,7 @@ import {
 } from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
 import { matchesSettingsSearch } from '@renderer/lib/settingsSearch'
+import { IS_WEB } from '@renderer/lib/platform'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { Toaster } from '@renderer/components/common/Toaster'
@@ -23,7 +24,11 @@ import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorC
 
 type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor'
 
-export function SettingsWindow(): JSX.Element {
+interface SettingsWindowProps {
+  onClose?: () => void
+}
+
+export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
@@ -96,7 +101,9 @@ export function SettingsWindow(): JSX.Element {
       ]
     }
   ] as const
-  const visibleSections = sections.filter((section) => matchesSettingsSearch(section.keywords, searchQuery))
+  const visibleSections = sections.filter(
+    (section) => (!IS_WEB || section.id !== 'updates') && matchesSettingsSearch(section.keywords, searchQuery)
+  )
   const displayedSection = visibleSections.find((section) => section.id === activeSection) ?? visibleSections[0]
   const displayedSectionId = displayedSection?.id
 
@@ -121,8 +128,21 @@ export function SettingsWindow(): JSX.Element {
   }, [settings.theme])
 
   useEffect(() => {
+    const previousTitle = document.title
     document.title = t('settings.title')
+    return () => {
+      document.title = previousTitle
+    }
   }, [t])
+
+  useEffect(() => {
+    if (!onClose) return
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [onClose])
 
   const runUpdateCheck = async (): Promise<void> => {
     setChecking(true)
@@ -134,11 +154,20 @@ export function SettingsWindow(): JSX.Element {
   }
 
   return (
-    <div className="grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground">
+    <div
+      className={`grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground ${
+        onClose ? 'fixed inset-0 z-[4000]' : ''
+      }`}
+    >
       <nav
         className="app-drag flex flex-col gap-1 border-r border-border bg-secondary px-3 pb-4 pt-[52px]"
         aria-label={t('settings.title')}
       >
+        {onClose && (
+          <Button type="button" variant="ghost" className="mb-2 justify-start" autoFocus onClick={onClose}>
+            <ArrowLeft aria-hidden /> {t('common.back')}
+          </Button>
+        )}
         <label className="relative mb-3 block">
           <Search
             size={15}
@@ -209,7 +238,7 @@ export function SettingsWindow(): JSX.Element {
             </>
           )}
 
-          {displayedSectionId === 'updates' && (
+          {!IS_WEB && displayedSectionId === 'updates' && (
             <Field label={t('settings.checkForUpdates')} hint={t('settings.checkForUpdatesHint')}>
               <Button type="button" busy={checking} onClick={() => void runUpdateCheck()}>
                 {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}

@@ -5,6 +5,7 @@ build/sparkle/
 *.log
 .DS_Store
 .vite/
+.web-data/
 *.tsbuildinfo
 
 # Test coverage reports

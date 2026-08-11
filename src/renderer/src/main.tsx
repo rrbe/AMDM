@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import App from '@renderer/App'
 import { SettingsWindow } from '@renderer/components/settings/SettingsWindow'
@@ -13,7 +14,10 @@ import '@fontsource/jetbrains-mono/500.css'
 import '@fontsource/jetbrains-mono/600.css'
 import { setLanguage } from '@renderer/i18n'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { webApi } from '@renderer/webApi'
 import './styles/index.css'
+
+if (__WEB__) window.api = webApi
 
 // Dev-only escape hatch: expose the store so the app can be driven from the
 // devtools console / CDP (manual testing, bug repros). Stripped in production.
@@ -21,9 +25,10 @@ if (import.meta.env.DEV) {
   ;(window as unknown as Record<string, unknown>).__appStore = useAppStore
 }
 
-// macOS uses a frameless window (titleBarStyle: hiddenInset); this flag drives
-// the traffic-light clearance + window-drag CSS in styles/app-shell.css.
-if (navigator.platform.toLowerCase().includes('mac')) {
+// Desktop macOS uses a frameless window (titleBarStyle: hiddenInset); this flag
+// drives the traffic-light clearance + window-drag CSS. Web keeps the AMDM
+// brand visible because it has no native traffic lights to avoid.
+if (!__WEB__ && navigator.platform.toLowerCase().includes('mac')) {
   document.body.classList.add('is-mac')
 }
 
@@ -42,7 +47,52 @@ if (!container) {
   throw new Error('Root element #root not found')
 }
 
-const Root = window.location.hash === '#settings' ? SettingsWindow : App
+function WebRoot(): JSX.Element {
+  const [settingsOpen, setSettingsOpen] = useState(window.location.hash === '#settings')
+  const appRoot = useRef<HTMLDivElement>(null)
+  const previousFocus = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const syncRoute = (): void => {
+      const open = window.location.hash === '#settings'
+      setSettingsOpen((current) => {
+        if (open && !current) previousFocus.current = document.activeElement as HTMLElement | null
+        if (!open && current) requestAnimationFrame(() => previousFocus.current?.focus())
+        return open
+      })
+    }
+    window.addEventListener('popstate', syncRoute)
+    window.addEventListener('hashchange', syncRoute)
+    return () => {
+      window.removeEventListener('popstate', syncRoute)
+      window.removeEventListener('hashchange', syncRoute)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (appRoot.current) appRoot.current.inert = settingsOpen
+  }, [settingsOpen])
+
+  const closeSettings = (): void => {
+    if (window.history.state?.amdmRoute === 'settings') {
+      window.history.back()
+      return
+    }
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`)
+    setSettingsOpen(false)
+  }
+
+  return (
+    <>
+      <div ref={appRoot} className="h-full" aria-hidden={settingsOpen || undefined}>
+        <App />
+      </div>
+      {settingsOpen && createPortal(<SettingsWindow onClose={closeSettings} />, document.body)}
+    </>
+  )
+}
+
+const Root = __WEB__ ? WebRoot : window.location.hash === '#settings' ? SettingsWindow : App
 
 createRoot(container).render(
   <React.StrictMode>

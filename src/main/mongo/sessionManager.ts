@@ -1,9 +1,14 @@
 import { MongoClient } from 'mongodb'
 import type { ConnectionStatus, TestResult } from '../../shared/types'
-import { connectionStore } from '../store/connectionStore'
 import { SshTunnel } from '../ssh/tunnel'
 import { buildTunnelOptions } from '../ssh/tunnelCore'
 import { buildClientArgs, type DecryptedConnection } from './uri'
+
+export interface ConnectionSource {
+  getDecrypted(id: string): DecryptedConnection | null
+  recordSshHostKey?(id: string, fingerprint: string): void
+  recordSshJumpHostKey?(id: string, fingerprint: string): void
+}
 
 interface Session {
   client: MongoClient
@@ -16,10 +21,14 @@ interface PendingSession {
   tunnel?: SshTunnel
 }
 
+export const CONNECTION_TEST_TIMEOUT_MS = 30_000
+
 /** Owns all live MongoClient connections and their SSH tunnels. */
 export class SessionManager {
   private sessions = new Map<string, Session>()
   private pending = new Map<string, PendingSession>()
+
+  constructor(private readonly connections?: ConnectionSource) {}
 
   getStatus(id: string): ConnectionStatus {
     if (this.pending.has(id)) return { id, state: 'connecting' }
@@ -44,11 +53,7 @@ export class SessionManager {
       const admin = client.db('admin')
       const hello = (await admin.command({ hello: 1 })) as Record<string, unknown>
       const build = (await admin.command({ buildInfo: 1 })) as Record<string, unknown>
-      const topology = hello.setName
-        ? 'ReplicaSet'
-        : hello.msg === 'isdbgrid'
-          ? 'Sharded'
-          : 'Single'
+      const topology = hello.setName ? 'ReplicaSet' : hello.msg === 'isdbgrid' ? 'Sharded' : 'Single'
       return { topology, serverVersion: build.version as string | undefined }
     } catch {
       return {}
@@ -59,9 +64,13 @@ export class SessionManager {
     // tear down any existing session for this id first
     await this.disconnect(id)
 
-    const dec = connectionStore.getDecrypted(id)
+    const dec = this.connections?.getDecrypted(id)
     if (!dec) {
-      const status: ConnectionStatus = { id, state: 'error', error: 'Connection not found' }
+      const status: ConnectionStatus = {
+        id,
+        state: 'error',
+        error: 'Connection not found'
+      }
       return status
     }
 
@@ -104,10 +113,10 @@ export class SessionManager {
       this.sessions.set(id, { client, tunnel, status })
       // TOFU: persist the host key(s) learned on first connect so later connects verify them.
       if (tunnel?.learnedHostKey) {
-        connectionStore.recordSshHostKey(id, tunnel.learnedHostKey)
+        this.connections?.recordSshHostKey?.(id, tunnel.learnedHostKey)
       }
       if (tunnel?.learnedJumpHostKey) {
-        connectionStore.recordSshJumpHostKey(id, tunnel.learnedJumpHostKey)
+        this.connections?.recordSshJumpHostKey?.(id, tunnel.learnedJumpHostKey)
       }
       return status
     } catch (err) {
@@ -142,20 +151,55 @@ export class SessionManager {
   async test(dec: DecryptedConnection): Promise<TestResult> {
     let tunnel: SshTunnel | undefined
     let client: MongoClient | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let timedOut = false
+    const timeoutError = new Error(`Connection test timed out after ${CONNECTION_TEST_TIMEOUT_MS / 1000} seconds.`)
+    const ensureActive = (): void => {
+      if (!timedOut) return
+      tunnel?.close()
+      void client?.close().catch(() => {})
+      throw timeoutError
+    }
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true
+        reject(timeoutError)
+        tunnel?.close()
+        void client?.close().catch(() => {})
+      }, CONNECTION_TEST_TIMEOUT_MS)
+      timer.unref()
+    })
+
     try {
-      let tunnelPort: number | undefined
-      if (dec.config.ssh.enabled) {
-        tunnel = new SshTunnel()
-        tunnelPort = await tunnel.open(buildTunnelOptions(dec))
-      }
-      const { uri, options } = buildClientArgs(dec, tunnelPort)
-      client = new MongoClient(uri, options)
-      await client.connect()
-      const info = await this.probe(client)
-      return { ok: true, topology: info.topology, serverVersion: info.serverVersion }
+      return await Promise.race([
+        (async () => {
+          let tunnelPort: number | undefined
+          if (dec.config.ssh.enabled) {
+            tunnel = new SshTunnel()
+            tunnelPort = await tunnel.open(buildTunnelOptions(dec))
+            ensureActive()
+          }
+          const { uri, options } = buildClientArgs(dec, tunnelPort)
+          client = new MongoClient(uri, options)
+          await client.connect()
+          ensureActive()
+          const info = await this.probe(client)
+          ensureActive()
+          return {
+            ok: true,
+            topology: info.topology,
+            serverVersion: info.serverVersion
+          }
+        })(),
+        timeout
+      ])
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err)
+      }
     } finally {
+      if (timer) clearTimeout(timer)
       await client?.close().catch(() => {})
       tunnel?.close()
     }
@@ -166,5 +210,3 @@ export class SessionManager {
     await Promise.all([...ids].map((id) => this.disconnect(id)))
   }
 }
-
-export const sessionManager = new SessionManager()

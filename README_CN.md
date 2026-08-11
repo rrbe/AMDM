@@ -12,9 +12,12 @@
 pnpm install         # 使用 pnpm
 pnpm dev             # 启动应用并热重载
 pnpm build           # 生产构建到 ./out
+pnpm build:web       # 构建内网团队 Web 版本
 pnpm dist:dir --arm64 # 打包 Apple Silicon 免安装应用
 pnpm clean           # 清理构建产物
 ```
+
+Web 版本需要 Node 后端、反向代理 SSO 和持久卷，部署与安全要求见 [AMDM Web](./docs/WEB.md)。
 
 ## 功能
 

@@ -1,12 +1,7 @@
 import type { MongoClient } from 'mongodb'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
-import { sessionManager } from './sessionManager'
-import {
-  estimateCollectionCountOnDb,
-  listCollectionsOnDb,
-  listIndexesOnDb,
-  sampleFieldsOnDb
-} from './catalogCore'
+import type { SessionManager } from './sessionManager'
+import { estimateCollectionCountOnDb, listCollectionsOnDb, listIndexesOnDb, sampleFieldsOnDb } from './catalogCore'
 
 /**
  * True when an error is the benign result of a concurrent disconnect: a lazy
@@ -38,9 +33,9 @@ export async function guardClosed<T>(op: () => Promise<T>, fallback: T): Promise
   }
 }
 
-export async function listDatabases(connectionId: string): Promise<DatabaseInfo[]> {
+export async function listDatabases(connectionId: string, sessions: SessionManager): Promise<DatabaseInfo[]> {
   return guardClosed(async () => {
-    const client = sessionManager.getClient(connectionId)
+    const client = sessions.getClient(connectionId)
     // Two independent admin commands — fire them concurrently so the
     // Compass-parity privilege probe adds no latency on top of listDatabases.
     // authorizedDatabaseNames swallows its own errors, so Promise.all only
@@ -79,9 +74,10 @@ export async function listDatabases(connectionId: string): Promise<DatabaseInfo[
  */
 async function authorizedDatabaseNames(client: MongoClient): Promise<string[]> {
   try {
-    const status = (await client
-      .db('admin')
-      .command({ connectionStatus: 1, showPrivileges: true })) as ConnectionStatus
+    const status = (await client.db('admin').command({
+      connectionStatus: 1,
+      showPrivileges: true
+    })) as ConnectionStatus
     const privileges = status.authInfo?.authenticatedUserPrivileges ?? []
     const names = new Set<string>()
     for (const p of privileges) {
@@ -102,34 +98,28 @@ interface ConnectionStatus {
 
 export async function listCollections(
   connectionId: string,
-  database: string
+  database: string,
+  sessions: SessionManager
 ): Promise<CollectionInfo[]> {
-  return guardClosed(
-    () => listCollectionsOnDb(sessionManager.getClient(connectionId).db(database)),
-    []
-  )
+  return guardClosed(() => listCollectionsOnDb(sessions.getClient(connectionId).db(database)), [])
 }
 
 export async function estimateCollectionCount(
   connectionId: string,
   database: string,
-  collection: string
+  collection: string,
+  sessions: SessionManager
 ): Promise<number> {
-  return guardClosed(
-    () => estimateCollectionCountOnDb(sessionManager.getClient(connectionId).db(database), collection),
-    0
-  )
+  return guardClosed(() => estimateCollectionCountOnDb(sessions.getClient(connectionId).db(database), collection), 0)
 }
 
 export async function listIndexes(
   connectionId: string,
   database: string,
-  collection: string
+  collection: string,
+  sessions: SessionManager
 ): Promise<IndexInfo[]> {
-  return guardClosed(
-    () => listIndexesOnDb(sessionManager.getClient(connectionId).db(database), collection),
-    []
-  )
+  return guardClosed(() => listIndexesOnDb(sessions.getClient(connectionId).db(database), collection), [])
 }
 
 // --- field sampling for autocomplete (bounded + cached) ---
@@ -145,7 +135,8 @@ const fieldCache = new Map<string, string[]>()
 export async function sampleFields(
   connectionId: string,
   database: string,
-  collection: string
+  collection: string,
+  sessions: SessionManager
 ): Promise<string[]> {
   const cacheKey = `${connectionId}:${database}.${collection}`
   const cached = fieldCache.get(cacheKey)
@@ -153,23 +144,31 @@ export async function sampleFields(
 
   // On a disconnect race, return [] WITHOUT caching, so a later reconnect re-samples.
   return guardClosed(async () => {
-    const db = sessionManager.getClient(connectionId).db(database)
+    const db = sessions.getClient(connectionId).db(database)
     const fields = await sampleFieldsOnDb(db, collection, SAMPLE_LIMIT)
     fieldCache.set(cacheKey, fields)
     return fields
   }, [])
 }
 
-export async function listUsers(connectionId: string, database: string): Promise<UserInfo[]> {
+export async function listUsers(connectionId: string, database: string, sessions: SessionManager): Promise<UserInfo[]> {
   // Insufficient privileges / unsupported (inner catch) and disconnect races
   // (guardClosed) both surface as an empty list rather than an error.
   return guardClosed(async () => {
-    const client = sessionManager.getClient(connectionId)
+    const client = sessions.getClient(connectionId)
     try {
       const res = (await client.db(database).command({ usersInfo: 1 })) as {
-        users?: Array<{ user: string; db: string; roles: Array<{ role: string; db: string }> }>
+        users?: Array<{
+          user: string
+          db: string
+          roles: Array<{ role: string; db: string }>
+        }>
       }
-      return (res.users ?? []).map((u) => ({ user: u.user, db: u.db, roles: u.roles ?? [] }))
+      return (res.users ?? []).map((u) => ({
+        user: u.user,
+        db: u.db,
+        roles: u.roles ?? []
+      }))
     } catch (err) {
       if (isClientClosed(err)) throw err // let guardClosed handle the race
       return []

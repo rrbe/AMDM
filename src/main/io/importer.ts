@@ -4,7 +4,7 @@ import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ImportRequest } from '../../shared/types'
-import { sessionManager } from '../mongo/sessionManager'
+import { sessionManager } from '../mongo/desktopSession'
 import { decodeBsonFile } from './bsonFileCore'
 
 function errMsg(e: unknown): string {

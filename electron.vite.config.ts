@@ -64,7 +64,8 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     define: {
-      __BUILD_ID__: JSON.stringify(buildId)
+      __BUILD_ID__: JSON.stringify(buildId),
+      __WEB__: 'false'
     },
     resolve: {
       alias: {

@@ -1,5 +1,5 @@
 import type { SchemaAnalysis, SchemaTarget } from '../../shared/types'
-import { sessionManager } from './sessionManager'
+import { sessionManager } from './desktopSession'
 import { analyzeCollectionSchemaOnDb } from './schemaAnalysisCore'
 
 function validateTarget(target: SchemaTarget): void {

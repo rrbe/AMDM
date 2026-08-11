@@ -22,7 +22,7 @@ import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
 import { settingsStore } from '../store/settingsStore'
 import { schemaStore } from '../store/schemaStore'
-import { sessionManager } from '../mongo/sessionManager'
+import { sessionManager } from '../mongo/desktopSession'
 import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
 import {
@@ -161,17 +161,17 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.sessionStatus, (_e, id: string) => sessionManager.getStatus(id))
 
   // catalog
-  ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id))
-  ipcMain.handle(IPC.catalogCollections, (_e, id: string, db: string) => listCollections(id, db))
+  ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id, sessionManager))
+  ipcMain.handle(IPC.catalogCollections, (_e, id: string, db: string) => listCollections(id, db, sessionManager))
   ipcMain.handle(IPC.catalogCollectionCount, (_e, id: string, db: string, coll: string) =>
-    estimateCollectionCount(id, db, coll)
+    estimateCollectionCount(id, db, coll, sessionManager)
   )
   ipcMain.handle(IPC.catalogIndexes, (_e, id: string, db: string, coll: string) =>
-    listIndexes(id, db, coll)
+    listIndexes(id, db, coll, sessionManager)
   )
-  ipcMain.handle(IPC.catalogUsers, (_e, id: string, db: string) => listUsers(id, db))
+  ipcMain.handle(IPC.catalogUsers, (_e, id: string, db: string) => listUsers(id, db, sessionManager))
   ipcMain.handle(IPC.catalogSampleFields, (_e, id: string, db: string, coll: string) =>
-    sampleFields(id, db, coll)
+    sampleFields(id, db, coll, sessionManager)
   )
 
   // local Schema analysis + editable model
@@ -187,7 +187,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
 
   // shell — run, then record an automatic history entry
   ipcMain.handle(IPC.shellExecute, async (_e, req: ShellRequest) => {
-    const result = await executeShell(req)
+    const result = await executeShell(req, sessionManager)
     queryStore.addHistory(
       {
         code: req.code,
@@ -217,9 +217,9 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.historyClear, () => queryStore.clearHistory())
 
   // document edit/delete
-  ipcMain.handle(IPC.docUpdate, (_e, req: DocUpdateRequest) => updateDocument(req))
-  ipcMain.handle(IPC.docSetField, (_e, req: DocSetFieldRequest) => setDocumentField(req))
-  ipcMain.handle(IPC.docDelete, (_e, req: DocMutateRequest) => deleteDocument(req))
+  ipcMain.handle(IPC.docUpdate, (_e, req: DocUpdateRequest) => updateDocument(req, sessionManager))
+  ipcMain.handle(IPC.docSetField, (_e, req: DocSetFieldRequest) => setDocumentField(req, sessionManager))
+  ipcMain.handle(IPC.docDelete, (_e, req: DocMutateRequest) => deleteDocument(req, sessionManager))
 
   // import / export
   ipcMain.handle(IPC.ioExport, (_e, req: ExportRequest) =>

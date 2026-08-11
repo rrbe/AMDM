@@ -4,7 +4,7 @@ import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ExportRequest } from '../../shared/types'
-import { sessionManager } from '../mongo/sessionManager'
+import { sessionManager } from '../mongo/desktopSession'
 import { streamBsonToFile, writeChunk } from './bsonWriteCore'
 
 const EXT: Record<ExportRequest['format'], string> = {

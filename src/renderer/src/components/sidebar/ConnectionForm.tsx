@@ -19,6 +19,7 @@ import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { cn } from '@renderer/lib/utils'
+import { IS_WEB } from '@renderer/lib/platform'
 import {
   buildConnectionOptions,
   connectionMembersAreValid,
@@ -200,7 +201,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [passwordTouched, setPasswordTouched] = useState(false)
 
   // ---- SSH ----
-  const [sshEnabled, setSshEnabled] = useState(editing?.ssh.enabled ?? false)
+  const [sshEnabled, setSshEnabled] = useState(!IS_WEB && (editing?.ssh.enabled ?? false))
   const [sshHost, setSshHost] = useState(editing?.ssh.host ?? '')
   const [sshPort, setSshPort] = useState(String(editing?.ssh.port ?? 22))
   const [sshUser, setSshUser] = useState(editing?.ssh.username ?? '')
@@ -378,7 +379,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           mechanism: authType === 'scram' ? mechanism : undefined
         },
         ssh: {
-          enabled: sshEnabled,
+          enabled: !IS_WEB && sshEnabled,
           host: sshHost.trim() || undefined,
           port: Number(sshPort) || 22,
           username: sshUser.trim() || undefined,
@@ -407,9 +408,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       // Secrets: only include if the user typed (else keep stored value).
       if (authType === 'none') input.password = ''
       else if (passwordTouched) input.password = password
-      if (sshPasswordTouched) input.sshPassword = sshPassword
-      if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
-      if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
+      if (!IS_WEB && sshPasswordTouched) input.sshPassword = sshPassword
+      if (!IS_WEB && sshPassphraseTouched) input.sshPassphrase = sshPassphrase
+      if (!IS_WEB && jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
       return input
     },
     [
@@ -525,7 +526,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           items={[
             { value: 'general', label: tFn('connection.tab.general') },
             { value: 'auth', label: tFn('connection.tab.auth') },
-            { value: 'ssh', label: 'SSH' },
+            ...(!IS_WEB ? [{ value: 'ssh' as const, label: 'SSH' }] : []),
             { value: 'tls', label: 'TLS' }
           ]}
         />

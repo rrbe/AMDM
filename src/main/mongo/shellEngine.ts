@@ -1,5 +1,5 @@
 import type { ShellRequest, ShellResult } from '../../shared/types'
-import { sessionManager } from './sessionManager'
+import type { SessionManager } from './sessionManager'
 import { runShellOnDb } from './shellCore'
 
 /**
@@ -31,8 +31,8 @@ class ShellAbortError extends Error {
  * `getClient` may throw if the connection isn't open; that propagates as a
  * rejected IPC call (the renderer store surfaces it), matching prior behavior.
  */
-export async function executeShell(req: ShellRequest): Promise<ShellResult> {
-  const client = sessionManager.getClient(req.connectionId)
+export async function executeShell(req: ShellRequest, sessions: SessionManager): Promise<ShellResult> {
+  const client = sessions.getClient(req.connectionId)
   const db = client.db(req.database)
   const controller = req.execId ? new AbortController() : undefined
   if (req.execId && controller) inFlight.set(req.execId, controller)

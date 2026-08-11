@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionConfig } from '../../../src/shared/types'
 
 const fake = vi.hoisted(() => {
@@ -42,19 +42,20 @@ const config: ConnectionConfig = {
   updatedAt: 0
 }
 
-vi.mock('../../../src/main/store/connectionStore', () => ({
-  connectionStore: {
-    getDecrypted: vi.fn(() => ({ config })),
-    recordSshHostKey: vi.fn(),
-    recordSshJumpHostKey: vi.fn()
-  }
-}))
-
-import { SessionManager } from '../../../src/main/mongo/sessionManager'
+import { CONNECTION_TEST_TIMEOUT_MS, SessionManager } from '../../../src/main/mongo/sessionManager'
 
 describe('SessionManager', () => {
+  beforeEach(() => {
+    fake.clients.length = 0
+    fake.connect.mockClear()
+  })
+
+  afterEach(() => vi.useRealTimers())
+
   it('disconnects an in-flight connection attempt without publishing an error', async () => {
-    const manager = new SessionManager()
+    const manager = new SessionManager({
+      getDecrypted: vi.fn(() => ({ config }))
+    })
     const connecting = manager.connect('c1')
     await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
 
@@ -67,5 +68,19 @@ describe('SessionManager', () => {
       state: 'disconnected'
     })
     expect(manager.getStatus('c1').state).toBe('disconnected')
+  })
+
+  it('closes a connection test when its end-to-end deadline expires', async () => {
+    vi.useFakeTimers()
+    const manager = new SessionManager()
+
+    const testing = manager.test({ config })
+    await vi.advanceTimersByTimeAsync(CONNECTION_TEST_TIMEOUT_MS)
+
+    await expect(testing).resolves.toEqual({
+      ok: false,
+      error: 'Connection test timed out after 30 seconds.'
+    })
+    expect(fake.clients[0].close).toHaveBeenCalled()
   })
 })

@@ -14,6 +14,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabCollection, tabLabel } from '@renderer/lib/tabs'
+import { IS_WEB } from '@renderer/lib/platform'
 import { ShellEditor } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { ContextPanel } from './ContextPanel'
@@ -97,15 +98,17 @@ export function ShellWorkspace(): JSX.Element {
                   <Play aria-hidden /> {t('shell.runBtn')}
                 </Button>
               )}
-              <button
-                className="work-icon-btn"
-                disabled={!availableSchemaTarget}
-                onClick={() => availableSchemaTarget && setSchemaTarget(availableSchemaTarget)}
-                data-tip={t('schema.menu')}
-                aria-label={t('schema.menu')}
-              >
-                <ChartNoAxesColumnIncreasing size={15} />
-              </button>
+              {!IS_WEB && (
+                <button
+                  className="work-icon-btn"
+                  disabled={!availableSchemaTarget}
+                  onClick={() => availableSchemaTarget && setSchemaTarget(availableSchemaTarget)}
+                  data-tip={t('schema.menu')}
+                  aria-label={t('schema.menu')}
+                >
+                  <ChartNoAxesColumnIncreasing size={15} />
+                </button>
+              )}
               <button
                 className="work-icon-btn"
                 disabled={busy}
@@ -179,7 +182,7 @@ export function ShellWorkspace(): JSX.Element {
       </div>
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
-      {schemaTarget && <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />}
+      {!IS_WEB && schemaTarget && <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />}
     </div>
   )
 }

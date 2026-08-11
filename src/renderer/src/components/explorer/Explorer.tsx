@@ -45,6 +45,7 @@ import {
 import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { formatBytes } from '@renderer/lib/formatBytes'
+import { IS_WEB } from '@renderer/lib/platform'
 import {
   applyConnectionOrder,
   reorderConnectionIds,
@@ -279,6 +280,7 @@ export function Explorer({
 
     const coll = row.collection
     if (!coll) return
+    if (IS_WEB) return
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
@@ -560,7 +562,7 @@ export function Explorer({
         <ConnectionForm editing={connForm.editing} onClose={() => setConnForm({ open: false })} />
       )}
 
-      {ioModal && ioModal.mode === 'export' && (
+      {!IS_WEB && ioModal && ioModal.mode === 'export' && (
         <ExportModal
           connectionId={ioModal.connId}
           database={ioModal.db}
@@ -568,7 +570,7 @@ export function Explorer({
           onClose={() => setIoModal(null)}
         />
       )}
-      {ioModal && ioModal.mode === 'import' && (
+      {!IS_WEB && ioModal && ioModal.mode === 'import' && (
         <ImportModal
           connectionId={ioModal.connId}
           database={ioModal.db}
@@ -576,7 +578,7 @@ export function Explorer({
           onClose={() => setIoModal(null)}
         />
       )}
-      {schemaTarget && (
+      {!IS_WEB && schemaTarget && (
         <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
       )}
       {ctxMenu && (
