@@ -52,6 +52,7 @@ import {
   type QueryTab,
   type ResultTab
 } from '@renderer/lib/tabs'
+import { randomUuid } from '@renderer/lib/randomUuid'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -256,17 +257,17 @@ function errMessage(e: unknown): string {
 
 /** Opaque per-run id so a run can be cancelled via `shell.abort` (Stop). */
 function newExecId(): string {
-  return crypto.randomUUID()
+  return randomUuid()
 }
 
 /** Stable id for a new tab. */
 function newTabId(): string {
-  return crypto.randomUUID()
+  return randomUuid()
 }
 
 /** Stable id for a new result tab. */
 function newResultId(): string {
-  return crypto.randomUUID()
+  return randomUuid()
 }
 
 /** The focused tab. Always defined — the store guarantees ≥1 tab exists; the

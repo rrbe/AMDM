@@ -17,6 +17,7 @@ import {
   type EditorColorSchemeNameError,
   type EditorPalettePreviewMessage
 } from '@renderer/lib/editorColorScheme'
+import { randomUuid } from '@renderer/lib/randomUuid'
 import { useIsDark } from '@renderer/lib/useIsDark'
 import { useAppStore } from '@renderer/store/useAppStore'
 
@@ -145,7 +146,7 @@ export function EditorColorSchemeSettings(): JSX.Element {
   const create = async (): Promise<void> => {
     if (editorColorSchemeNameError(createName, customSchemes)) return
     const next: EditorColorScheme = {
-      id: crypto.randomUUID(),
+      id: randomUuid(),
       name: createName.trim(),
       light: { ...PINE_EDITOR_COLOR_SCHEME.light },
       dark: { ...PINE_EDITOR_COLOR_SCHEME.dark }
