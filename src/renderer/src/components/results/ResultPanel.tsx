@@ -11,6 +11,12 @@ import { consoleText } from '@renderer/lib/consoleOutput'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
+import {
+  hasOpenShortcutLayer,
+  isAppShortcutEnabled,
+  isMacPlatform,
+  primaryDigitIndex
+} from '@renderer/lib/keyboardShortcuts'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
 import { TableView } from './TableView'
@@ -44,6 +50,8 @@ export function ResultPanel({
   const view = useAppStore((s) => s.resultView)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const setView = useAppStore((s) => s.setResultView)
   const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
@@ -93,21 +101,27 @@ export function ResultPanel({
     })
   }
 
-  // Cmd/Ctrl+1/2/3 switch Tree/JSON/Table (and ⌘4 Console when present) — only
+  // Cmd+1/2/3 on macOS (Ctrl elsewhere) switches Tree/JSON/Table, with 4 for
+  // Console when present. macOS Ctrl+number is reserved for contextual tabs.
   // while the switcher is showing (a documents/value result, not error/explain).
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
-    if (!switchable) return
-    const keyMap: Record<string, ResultView> = { '1': 'tree', '2': 'json', '3': 'table' }
+    if (
+      !switchable ||
+      !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
+    )
+      return
+    const views: ResultView[] = ['tree', 'json', 'table']
     const onKey = (e: KeyboardEvent): void => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
-      if (e.key === '4') {
+      if (hasOpenShortcutLayer()) return
+      const index = primaryDigitIndex(e, isMacPlatform())
+      if (index === 3) {
         if (!hasOutput) return
         e.preventDefault()
         chooseConsole(true)
         return
       }
-      const target = keyMap[e.key]
+      const target = index == null ? undefined : views[index]
       if (!target) return
       e.preventDefault()
       chooseConsole(false)
@@ -115,7 +129,7 @@ export function ResultPanel({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [switchable, hasOutput, active?.id, setView])
+  }, [switchable, hasOutput, active?.id, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   useEffect(() => {
     if (!result && expanded) onExpandedChange(false)
@@ -128,7 +142,7 @@ export function ResultPanel({
 
   if (!result) {
     return (
-      <div className="result-panel">
+      <div className="result-panel" data-shortcut-region="result">
         {strip}
         <div className="result-body">
           <div className="center-msg muted">{t('result.noResults')}</div>
@@ -141,7 +155,7 @@ export function ResultPanel({
     // The output printed before the failure is often the best clue — keep it
     // visible under the error.
     return (
-      <div className="result-panel">
+      <div className="result-panel" data-shortcut-region="result">
         {strip}
         <ErrorView
           result={result}
@@ -164,7 +178,7 @@ export function ResultPanel({
   // doc actions don't apply to it.
   if (result.kind === 'explain') {
     return (
-      <div className="result-panel">
+      <div className="result-panel" data-shortcut-region="result">
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
@@ -184,7 +198,7 @@ export function ResultPanel({
   const docs = normalizeDocs(result)
 
   return (
-    <div className="result-panel">
+    <div className="result-panel" data-shortcut-region="result">
       {strip}
       <div className="result-bar">
         <div className="view-switch">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
+import { Code2, Database, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -7,6 +7,7 @@ import {
   QUERY_LIMITS,
   QUERY_TIMEOUTS_MS,
   type CollectionSort,
+  type KeyboardShortcutId,
   type Language,
   type ThemeMode
 } from '@shared/types'
@@ -20,8 +21,9 @@ import { Select } from '@renderer/components/ui/Select'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 
-type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor'
+type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor' | 'shortcuts'
 
 export function SettingsWindow(): React.JSX.Element {
   const { t } = useTranslation()
@@ -35,6 +37,7 @@ export function SettingsWindow(): React.JSX.Element {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance')
   const [searchQuery, setSearchQuery] = useState('')
   const [checking, setChecking] = useState(false)
+  const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl'
 
   const sections = [
     {
@@ -101,6 +104,22 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.editorColors.scheme'),
         t('settings.editorColors.keyword')
       ]
+    },
+    {
+      id: 'shortcuts',
+      label: t('settings.sectionShortcuts'),
+      icon: Keyboard,
+      keywords: [
+        t('settings.sectionShortcuts'),
+        t('settings.keyboardShortcutsEnabled'),
+        t('settings.shortcutNewConnection'),
+        t('settings.shortcutNewQuery'),
+        t('settings.shortcutContextualTabs'),
+        t('settings.shortcutResultView'),
+        t('settings.shortcutOpenSettings'),
+        t('settings.shortcutClear'),
+        t('settings.shortcutRestore')
+      ]
     }
   ] as const
   const visibleSections = sections.filter((section) => matchesSettingsSearch(section.keywords, searchQuery))
@@ -139,6 +158,13 @@ export function SettingsWindow(): React.JSX.Element {
     } finally {
       setChecking(false)
     }
+  }
+
+  const setShortcutEnabled = (id: KeyboardShortcutId, enabled: boolean): void => {
+    const disabledKeyboardShortcuts = enabled
+      ? settings.disabledKeyboardShortcuts.filter((shortcut) => shortcut !== id)
+      : [...new Set([...settings.disabledKeyboardShortcuts, id])]
+    void updateSettings({ disabledKeyboardShortcuts })
   }
 
   return (
@@ -354,9 +380,99 @@ export function SettingsWindow(): React.JSX.Element {
               <EditorColorSchemeSettings />
             </>
           )}
+
+          {displayedSectionId === 'shortcuts' && (
+            <>
+              <div className="mb-6 rounded-lg border border-border bg-secondary/45 p-4">
+                <Checkbox
+                  checked={settings.keyboardShortcutsEnabled}
+                  onCheckedChange={(keyboardShortcutsEnabled) =>
+                    void updateSettings({ keyboardShortcutsEnabled })
+                  }
+                  label={t('settings.keyboardShortcutsEnabled')}
+                />
+                <p className="mb-0 ml-[23px] mt-2 text-[12px] leading-5 text-muted-foreground">
+                  {t('settings.keyboardShortcutsHint')}
+                </p>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border">
+                <ShortcutRow
+                  label={t('settings.shortcutNewConnection')}
+                  keys={`${primaryKey} N`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('newConnection')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('newConnection', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutNewQuery')}
+                  keys={`${primaryKey} T`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('newQuery')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('newQuery', enabled)}
+                />
+                {isMacPlatform() && (
+                  <ShortcutRow
+                    label={t('settings.shortcutContextualTabs')}
+                    keys="⌃ 1–9"
+                    enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
+                    onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
+                  />
+                )}
+                <ShortcutRow
+                  label={t('settings.shortcutResultView')}
+                  keys={`${primaryKey} 1–4`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('resultView')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('resultView', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutOpenSettings')}
+                  keys={`${primaryKey} ,`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('openSettings')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('openSettings', enabled)}
+                />
+              </div>
+            </>
+          )}
         </div>
       </main>
       <Toaster />
+    </div>
+  )
+}
+
+function ShortcutRow({
+  label,
+  keys,
+  enabled,
+  onEnabledChange
+}: {
+  label: string
+  keys: string
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-border px-4 py-2.5 last:border-b-0">
+      <span className={enabled ? 'text-[13px] text-foreground/90' : 'text-[13px] text-muted-foreground'}>
+        {label}
+      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {enabled ? (
+          <kbd className="rounded-md border border-[var(--separator-strong)] bg-[var(--surface-control)] px-2 py-1 font-mono text-[12px] text-muted-foreground shadow-[0_1px_0_var(--separator-strong)]">
+            {keys}
+          </kbd>
+        ) : (
+          <span className="px-2 py-1 text-[12px] text-muted-foreground">{t('settings.shortcutUnassigned')}</span>
+        )}
+        <button
+          type="button"
+          className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          onClick={() => onEnabledChange(!enabled)}
+          aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
+        >
+          {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
+        </button>
+      </div>
     </div>
   )
 }

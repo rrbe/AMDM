@@ -24,6 +24,15 @@ import { Button } from '@renderer/components/common/Button'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
 import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
+import {
+  contextualTabDigitIndex,
+  hasOpenShortcutLayer,
+  isAppShortcutEnabled,
+  isMacPlatform,
+  isPrimaryShortcut,
+  shortcutRegionFromTarget,
+  type ShortcutRegion
+} from '@renderer/lib/keyboardShortcuts'
 import type { SchemaTarget } from '@shared/types'
 
 /**
@@ -50,6 +59,8 @@ export function ShellWorkspace(): React.JSX.Element {
   const stopShell = useAppStore((s) => s.stopShell)
   const runExplain = useAppStore((s) => s.runExplain)
   const editorHeight = useAppStore((s) => s.settings.editorHeight)
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [showSave, setShowSave] = useState(false)
@@ -57,6 +68,7 @@ export function ShellWorkspace(): React.JSX.Element {
   const [contextOpen, setContextOpen] = useState(false)
   const [resultsExpanded, setResultsExpanded] = useState(false)
   const selectedCode = useRef<string | undefined>(undefined)
+  const lastShortcutRegion = useRef<ShortcutRegion>('query')
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
@@ -74,12 +86,51 @@ export function ShellWorkspace(): React.JSX.Element {
     selectedCode.current = undefined
   }, [activeTabId])
 
+  useEffect(() => {
+    const rememberRegion = (event: Event): void => {
+      lastShortcutRegion.current = shortcutRegionFromTarget(event.target) ?? 'query'
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (
+        !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'contextualTabs') ||
+        hasOpenShortcutLayer()
+      )
+        return
+      const index = contextualTabDigitIndex(event, isMacPlatform())
+      if (index == null) return
+
+      const state = useAppStore.getState()
+      const region = lastShortcutRegion.current
+      if (region === 'result') {
+        const resultTab = getActiveTab(state).results[index]
+        if (!resultTab) return
+        event.preventDefault()
+        state.setActiveResultTab(resultTab.id)
+        return
+      }
+
+      const queryTab = state.tabs[index]
+      if (!queryTab) return
+      event.preventDefault()
+      state.setActiveTab(queryTab.id)
+    }
+
+    window.addEventListener('pointerdown', rememberRegion, true)
+    window.addEventListener('focusin', rememberRegion, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', rememberRegion, true)
+      window.removeEventListener('focusin', rememberRegion, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
+
   return (
     <div className="work">
       <TabBar />
       <div className="shell-body">
         <main className={resultsExpanded ? 'shell-main results-expanded' : 'shell-main'}>
-          <div className="work-header">
+          <div className="work-header" data-shortcut-region="query">
             <div className="work-breadcrumb">
               <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
               <ChevronRight size={13} aria-hidden />
@@ -143,7 +194,7 @@ export function ShellWorkspace(): React.JSX.Element {
 
           {/* Key the editor by tab id so each tab gets its own CodeMirror
               instance (isolated undo history / selection). */}
-          <div className="editor-row">
+          <div className="editor-row" data-shortcut-region="query">
             <ShellEditor
               key={activeTabId}
               value={code}
@@ -205,6 +256,8 @@ function TabBar(): React.JSX.Element {
   const closeTab = useAppStore((s) => s.closeTab)
   const newTab = useAppStore((s) => s.newTab)
   const connect = useAppStore((s) => s.connect)
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const stripRef = useRef<HTMLDivElement>(null)
   const connectionTextColor = (connectionId: string | null): string | undefined => {
     const color = connections.find((conn) => conn.id === connectionId)?.color
@@ -229,17 +282,22 @@ function TabBar(): React.JSX.Element {
   // this listener stable). ⌘W is left alone — it's Electron's window close.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 't') {
+      if (
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newQuery') &&
+        !e.repeat &&
+        !hasOpenShortcutLayer() &&
+        isPrimaryShortcut(e, 't', isMacPlatform())
+      ) {
         e.preventDefault()
         useAppStore.getState().newTab()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   return (
-    <div className="tab-bar app-drag">
+    <div className="tab-bar app-drag" data-shortcut-region="query">
       <Select
         value={activeTabId}
         onChange={setActiveTab}

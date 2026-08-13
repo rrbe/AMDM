@@ -474,6 +474,13 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
  */
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
+export type KeyboardShortcutId =
+  | 'newConnection'
+  | 'newQuery'
+  | 'contextualTabs'
+  | 'resultView'
+  | 'openSettings'
+
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
   connectionOrder: string[]
@@ -511,6 +518,10 @@ export interface AppSettings {
   exportIncludeRealPassword: boolean
   /** Latest scheduled update reminder the user opened; later versions still notify. */
   acknowledgedUpdateVersion: string | null
+  /** App-wide navigation/new-item shortcuts; editor-local key bindings are separate. */
+  keyboardShortcutsEnabled: boolean
+  /** Individually cleared app shortcut ids. */
+  disabledKeyboardShortcuts: KeyboardShortcutId[]
 }
 
 /** Runtime state of the macOS Sparkle updater. */
@@ -544,5 +555,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,
   editorColorSchemes: [],
   exportIncludeRealPassword: false,
-  acknowledgedUpdateVersion: null
+  acknowledgedUpdateVersion: null,
+  keyboardShortcutsEnabled: true,
+  disabledKeyboardShortcuts: []
 }

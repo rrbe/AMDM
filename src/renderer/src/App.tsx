@@ -13,6 +13,12 @@ import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { useIsDark } from '@renderer/lib/useIsDark'
 import {
+  hasOpenShortcutLayer,
+  isAppShortcutEnabled,
+  isMacPlatform,
+  isPrimaryShortcut
+} from '@renderer/lib/keyboardShortcuts'
+import {
   applyEditorColorPalette,
   EDITOR_PALETTE_PREVIEW_CHANNEL,
   isEditorColorPalette,
@@ -46,6 +52,8 @@ export default function App(): React.JSX.Element {
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const activeEditorColorSchemeId = useAppStore((s) => s.settings.activeEditorColorSchemeId)
   const editorColorSchemes = useAppStore((s) => s.settings.editorColorSchemes)
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const connect = useAppStore((s) => s.connect)
   const applyQuery = useAppStore((s) => s.applyQuery)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -56,6 +64,7 @@ export default function App(): React.JSX.Element {
   const [explorerOpen, setExplorerOpen] = useState(true)
   const [queryPrompt, setQueryPrompt] = useState<QueryPrompt | null>(null)
   const [palettePreview, setPalettePreview] = useState<EditorPalettePreviewMessage['palette']>(null)
+  const [newConnectionRequested, setNewConnectionRequested] = useState(false)
   const queryAttempt = useRef(0)
 
   useEffect(() => {
@@ -78,14 +87,30 @@ export default function App(): React.JSX.Element {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ',') {
+      if (hasOpenShortcutLayer()) return
+      const isMac = isMacPlatform()
+      if (
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'openSettings') &&
+        isPrimaryShortcut(e, ',', isMac)
+      ) {
         e.preventDefault()
         openSettingsWindow()
+        return
+      }
+      if (
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newConnection') &&
+        !e.repeat &&
+        isPrimaryShortcut(e, 'n', isMac)
+      ) {
+        e.preventDefault()
+        setView('connections')
+        setExplorerOpen(true)
+        setNewConnectionRequested(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   // Reflect the persisted theme onto the document root, which drives the
   // `[data-theme]` token cascade in styles/tokens.css. 'system' resolves to the OS
@@ -184,6 +209,8 @@ export default function App(): React.JSX.Element {
             onQueryLoad={requestQueryLoad}
             onCollapse={() => setExplorerOpen(false)}
             onSettings={openSettingsWindow}
+            newConnectionRequested={newConnectionRequested}
+            onNewConnectionRequestHandled={() => setNewConnectionRequested(false)}
           />
         )}
         {explorerOpen && (

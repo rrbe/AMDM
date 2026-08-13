@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
@@ -172,13 +172,17 @@ export function Explorer({
   onViewChange,
   onQueryLoad,
   onCollapse,
-  onSettings
+  onSettings,
+  newConnectionRequested,
+  onNewConnectionRequestHandled
 }: {
   view: ExplorerView
   onViewChange: (view: ExplorerView) => void
   onQueryLoad: (query: StoredQuerySelection) => void
   onCollapse: () => void
   onSettings: () => void
+  newConnectionRequested: boolean
+  onNewConnectionRequestHandled: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const connections = useAppStore((s) => s.connections)
@@ -220,6 +224,14 @@ export function Explorer({
     y: number
     items: ContextMenuEntry[]
   } | null>(null)
+
+  useEffect(() => {
+    if (!newConnectionRequested) return
+    setCtxMenu(null)
+    setConnForm({ open: true })
+    onNewConnectionRequestHandled()
+  }, [newConnectionRequested, onNewConnectionRequestHandled])
+
   const orderedConnections = useMemo(
     () => applyConnectionOrder(connections, connectionOrder),
     [connections, connectionOrder]
