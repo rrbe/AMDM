@@ -933,7 +933,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, skip })))
+      set((s) =>
+        patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now(), skip }))
+      )
     } catch (e) {
       runFailed = true
       set((s) =>
@@ -1036,7 +1038,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         execId
       })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
+      set((s) =>
+        patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() }))
+      )
     } catch (e) {
       runFailed = true
       set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })

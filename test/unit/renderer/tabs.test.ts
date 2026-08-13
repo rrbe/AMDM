@@ -214,10 +214,12 @@ function tabWithResults(n: number): ReturnType<typeof createTab> {
 
 describe('appendResult', () => {
   it('appends a focused result tab with a monotonic seq and skip 0', () => {
+    const before = Date.now()
     const tab = tabWithResults(2)
     expect(tab.results.map((r) => r.id)).toEqual(['r1', 'r2'])
     expect(tab.results.map((r) => r.seq)).toEqual([1, 2])
     expect(tab.results[1].skip).toBe(0)
+    expect(tab.results[1].executedAt).toBeGreaterThanOrEqual(before)
     expect(tab.activeResultId).toBe('r2')
     expect(tab.resultSeq).toBe(2)
   })
@@ -276,7 +278,14 @@ describe('activeResult', () => {
 })
 
 describe('resultTabLabel', () => {
-  const rt = (result: ShellResult, seq = 1): ResultTab => ({ id: 'r', seq, result, query: null, skip: 0 })
+  const rt = (result: ShellResult, seq = 1): ResultTab => ({
+    id: 'r',
+    seq,
+    result,
+    executedAt: 0,
+    query: null,
+    skip: 0
+  })
 
   it('uses the target collection plus the run sequence', () => {
     expect(resultTabLabel(rt(docsResult('orders'), 3))).toBe('orders 3')

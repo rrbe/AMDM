@@ -21,6 +21,8 @@ export interface ResultTab {
       Monotonic — eviction of old results never renumbers survivors. */
   seq: number
   result: ShellResult
+  /** Local wall-clock time when this result was received. */
+  executedAt: number
   /** Query that produced `result`; refresh/paging/doc edits re-run this. */
   query: ResultQuery | null
   /** Page offset of the current result page (0 = first page). */
@@ -179,7 +181,7 @@ export function appendResult(
   max = MAX_RESULT_TABS
 ): Partial<QueryTab> {
   const seq = tab.resultSeq + 1
-  const results = [...tab.results, { id, seq, result, query, skip: 0 }]
+  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0 }]
   return {
     results: results.length > max ? results.slice(results.length - max) : results,
     activeResultId: id,

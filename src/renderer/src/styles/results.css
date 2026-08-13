@@ -66,8 +66,20 @@
 }
 .result-meta {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   align-items: center;
+}
+.result-meta-part {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+.result-meta-separator {
+  width: 1px;
+  height: 12px;
+  flex: 0 0 1px;
+  background: var(--separator);
 }
 .result-meta .truncated {
   color: var(--warn);

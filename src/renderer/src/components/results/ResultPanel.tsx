@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
+import { formatQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
@@ -167,7 +168,7 @@ export function ResultPanel({
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
-          <ResultMeta result={result} docCount={0} />
+          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <span className="result-bar-spacer" />
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
@@ -213,7 +214,7 @@ export function ResultPanel({
             </button>
           )}
         </div>
-        <ResultMeta result={result} docCount={docs.length} />
+        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
         {result.kind === 'documents' && <PageSizeControl />}
         {result.kind === 'documents' && <ResultPager result={result} />}
@@ -343,8 +344,16 @@ function normalizeDocs(result: ShellResult): unknown[] {
   return result.data === undefined ? [] : [result.data]
 }
 
-function ResultMeta({ result, docCount }: { result: ShellResult; docCount: number }): JSX.Element {
-  const { t } = useTranslation()
+function ResultMeta({
+  result,
+  docCount,
+  executedAt
+}: {
+  result: ShellResult
+  docCount: number
+  executedAt: number
+}): JSX.Element {
+  const { t, i18n } = useTranslation()
   const parts = useMemo(() => {
     const out: { text: string; cls?: string }[] = []
     if (result.kind === 'documents') {
@@ -367,14 +376,19 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
     if (typeof result.elapsedMs === 'number') {
       out.push({ text: t('result.elapsed', { ms: result.elapsedMs }) })
     }
+    const queryTime = formatQueryTime(executedAt, i18n.resolvedLanguage)
+    if (queryTime) out.push({ text: queryTime })
     return out
-  }, [result, docCount, t])
+  }, [result, docCount, executedAt, i18n.resolvedLanguage, t])
 
   return (
     <div className="result-meta">
       {parts.map((p, i) => (
-        <span key={i} className={p.cls}>
-          {p.text}
+        <span key={i} className="result-meta-part">
+          {i > 0 && (
+            <span className="result-meta-separator" aria-hidden="true" />
+          )}
+          <span className={p.cls}>{p.text}</span>
         </span>
       ))}
     </div>
