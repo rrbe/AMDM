@@ -44,6 +44,7 @@ export const IPC = {
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
   sessionStatus: 'session:status',
+  sessionStatusChanged: 'session:statusChanged',
 
   catalogDatabases: 'catalog:databases',
   catalogCollections: 'catalog:collections',
@@ -109,6 +110,8 @@ export interface Api {
     connect(connectionId: string): Promise<ConnectionStatus>
     disconnect(connectionId: string): Promise<void>
     status(connectionId: string): Promise<ConnectionStatus>
+    /** Driver topology monitoring reports unexpected disconnects and recovery here. */
+    onStatusChanged(listener: (status: ConnectionStatus) => void): () => void
   }
   catalog: {
     databases(connectionId: string): Promise<DatabaseInfo[]>

@@ -137,6 +137,20 @@
   height: 10px;
   flex: 0 0 10px;
 }
+.document-tab-status-action {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  color: inherit;
+  cursor: pointer;
+}
+.document-tab-status-action:hover {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+}
 .document-tab-close {
   display: inline-flex;
   align-items: center;
@@ -166,6 +180,11 @@
   width: 10px;
   height: 10px;
   color: var(--accent);
+}
+.qtab-disconnected {
+  width: 11px;
+  height: 11px;
+  color: var(--err);
 }
 .qtab-error-dot {
   width: 6px;

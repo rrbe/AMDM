@@ -309,6 +309,7 @@
     "newTabTip": "New query tab (⌘T)",
     "newTabLabel": "New query tab",
     "tabListLabel": "All query tabs",
+    "reconnect": "Connection lost. Click to reconnect",
     "loadingEditor": "Loading editor…",
     "on": "On",
     "off": "Off",

@@ -97,8 +97,8 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
  * connected connection expands to reveal its database subtree, lazily loaded
  * via catalog.* and cached per-connection in the store.
  *
- * Clicking a collection runs one bounded newest-first query on first open;
- * clicking it again focuses the existing Shell tab without re-running it.
+ * Double-clicking a collection runs one bounded newest-first query on first open;
+ * double-clicking it again focuses the existing Shell tab without re-running it.
  */
 
 interface TreeRow {
@@ -123,6 +123,7 @@ interface TreeRow {
   /** Present on collection rows: enables the Export/Import hover actions. */
   collection?: { db: string; name: string; type: 'collection' | 'view' | 'timeseries' }
   onClick?: () => void
+  onDoubleClick?: () => void
   onToggle?: () => void
 }
 
@@ -148,7 +149,6 @@ interface RowActions {
     payload: NodePayload
   ) => Promise<void>
   setActiveConnection: (id: string | null) => void
-  setActiveDatabase: (db: string) => void
   browseCollection: (db: string, coll: string) => void
 }
 
@@ -186,7 +186,6 @@ export function Explorer({
   const disconnect = useAppStore((s) => s.disconnect)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const toggleConnectionExpanded = useAppStore((s) => s.toggleConnectionExpanded)
-  const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const deleteConnection = useAppStore((s) => s.deleteConnection)
   const toggleNode = useAppStore((s) => s.toggleNode)
   const loadDatabases = useAppStore((s) => s.loadDatabases)
@@ -328,7 +327,6 @@ export function Explorer({
     const actions: RowActions = {
       toggleNode,
       setActiveConnection,
-      setActiveDatabase,
       browseCollection
     }
     const out: Row[] = []
@@ -361,7 +359,6 @@ export function Explorer({
     collectionSort,
     toggleNode,
     setActiveConnection,
-    setActiveDatabase,
     browseCollection
   ])
   const visibleRows = useMemo(() => {
@@ -485,7 +482,6 @@ export function Explorer({
                     row={row}
                     isActive={selectedRowId === row.id}
                     onActivate={() => setSelectedRowId(row.id)}
-                    onSelect={() => setActiveConnection(row.id)}
                     onToggle={() => toggleConnectionExpanded(row.id)}
                     onConnect={() => void connect(row.id)}
                     onMove={moveConnection}
@@ -595,7 +591,6 @@ function ConnectionRow({
   row,
   isActive,
   onActivate,
-  onSelect,
   onToggle,
   onConnect,
   onMove,
@@ -604,7 +599,6 @@ function ConnectionRow({
   row: ConnRow
   isActive: boolean
   onActivate: () => void
-  onSelect: () => void
   onToggle: () => void
   onConnect: () => void
   onMove: (sourceId: string, targetId: string, edge: DropEdge) => void
@@ -640,7 +634,6 @@ function ConnectionRow({
       draggable
       aria-grabbed={dragging}
       onClickCapture={onActivate}
-      onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : state !== 'connecting' && onConnect())}
       onDragStart={(e: DragEvent<HTMLDivElement>) => {
         e.dataTransfer.effectAllowed = 'move'
@@ -727,8 +720,9 @@ function CatalogRow({
     <div
       className={className}
       style={{ paddingLeft: 8 + row.depth * 14 }}
-      onClickCapture={row.onClick ? onActivate : undefined}
+      onClickCapture={row.onClick || row.onDoubleClick ? onActivate : undefined}
       onClick={row.onClick}
+      onDoubleClick={row.onDoubleClick}
       onContextMenu={row.kind === 'database' || coll ? (e) => onContextMenu(e, row) : undefined}
     >
       <span
@@ -780,10 +774,8 @@ function browseCollection(a: RowActions, connId: string, db: string, coll: strin
   a.browseCollection(db, coll)
 }
 
-/** Toggle a database node and sync the work area's active connection + db. */
+/** Toggle a database node without changing the work area's active tab. */
 function openDatabase(a: RowActions, connId: string, db: string, nodeId: string): void {
-  a.setActiveConnection(connId)
-  a.setActiveDatabase(db)
   void a.toggleNode(connId, nodeId, 'database', { db })
 }
 
@@ -847,13 +839,13 @@ function flattenCatalog(
         count: coll.estimatedCount,
         approximateCount: coll.estimatedCount !== undefined,
         collection: { db: db.name, name: coll.name, type: coll.type },
-        // Toggle expands sub-folders; clicking the row seeds the editor.
+        // Toggle expands sub-folders; double-clicking the row opens the query tab.
         onToggle: () =>
           void a.toggleNode(connId, collNodeId, 'collection', {
             db: db.name,
             coll: coll.name
           }),
-        onClick: () => browseCollection(a, connId, db.name, coll.name)
+        onDoubleClick: () => browseCollection(a, connId, db.name, coll.name)
       })
 
       if (!collExpanded) continue

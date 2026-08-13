@@ -21,7 +21,14 @@ const api: Api = {
   session: {
     connect: (connectionId) => ipcRenderer.invoke(IPC.sessionConnect, connectionId),
     disconnect: (connectionId) => ipcRenderer.invoke(IPC.sessionDisconnect, connectionId),
-    status: (connectionId) => ipcRenderer.invoke(IPC.sessionStatus, connectionId)
+    status: (connectionId) => ipcRenderer.invoke(IPC.sessionStatus, connectionId),
+    onStatusChanged: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]): void => {
+        listener(status)
+      }
+      ipcRenderer.on(IPC.sessionStatusChanged, handle)
+      return () => ipcRenderer.removeListener(IPC.sessionStatusChanged, handle)
+    }
   },
   catalog: {
     databases: (connectionId) => ipcRenderer.invoke(IPC.catalogDatabases, connectionId),

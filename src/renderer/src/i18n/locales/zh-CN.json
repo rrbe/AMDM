@@ -309,6 +309,7 @@
     "newTabTip": "新建查询标签页 (⌘T)",
     "newTabLabel": "新建查询标签页",
     "tabListLabel": "全部查询标签页",
+    "reconnect": "连接已断开，点击重连",
     "loadingEditor": "编辑器加载中…",
     "on": "开",
     "off": "关",

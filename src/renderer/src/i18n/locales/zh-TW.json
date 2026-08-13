@@ -309,6 +309,7 @@
     "newTabTip": "新增查詢分頁 (⌘T)",
     "newTabLabel": "新增查詢分頁",
     "tabListLabel": "全部查詢分頁",
+    "reconnect": "連線已中斷，點擊重新連線",
     "loadingEditor": "編輯器載入中…",
     "on": "開",
     "off": "關",

@@ -1,23 +1,30 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionConfig } from '../../../src/shared/types'
 
 const fake = vi.hoisted(() => {
   let rejectConnect: (error: Error) => void = () => {}
+  let resolveConnect: () => void = () => {}
   return {
-    clients: [] as Array<{ close: ReturnType<typeof vi.fn> }>,
+    clients: [] as Array<{
+      close: ReturnType<typeof vi.fn>
+      emit: (event: string, payload: unknown) => void
+    }>,
     connect: vi.fn(
       () =>
-        new Promise<void>((_resolve, reject) => {
+        new Promise<void>((resolve, reject) => {
+          resolveConnect = resolve
           rejectConnect = reject
         })
     ),
-    cancelConnect: (): void => rejectConnect(new Error('client was closed'))
+    cancelConnect: (): void => rejectConnect(new Error('client was closed')),
+    finishConnect: (): void => resolveConnect()
   }
 })
 
 vi.mock('mongodb', () => ({
   MongoClient: class {
     close = vi.fn(async () => fake.cancelConnect())
+    private listeners = new Map<string, Set<(payload: unknown) => void>>()
 
     constructor() {
       fake.clients.push(this)
@@ -25,6 +32,22 @@ vi.mock('mongodb', () => ({
 
     connect(): Promise<void> {
       return fake.connect()
+    }
+
+    on(event: string, listener: (payload: unknown) => void): this {
+      const listeners = this.listeners.get(event) ?? new Set()
+      listeners.add(listener)
+      this.listeners.set(event, listeners)
+      return this
+    }
+
+    removeListener(event: string, listener: (payload: unknown) => void): this {
+      this.listeners.get(event)?.delete(listener)
+      return this
+    }
+
+    emit(event: string, payload: unknown): void {
+      for (const listener of this.listeners.get(event) ?? []) listener(payload)
     }
   }
 }))
@@ -53,6 +76,11 @@ vi.mock('../../../src/main/store/connectionStore', () => ({
 import { SessionManager } from '../../../src/main/mongo/sessionManager'
 
 describe('SessionManager', () => {
+  beforeEach(() => {
+    fake.clients.length = 0
+    fake.connect.mockClear()
+  })
+
   it('disconnects an in-flight connection attempt without publishing an error', async () => {
     const manager = new SessionManager()
     const connecting = manager.connect('c1')
@@ -67,5 +95,36 @@ describe('SessionManager', () => {
       state: 'disconnected'
     })
     expect(manager.getStatus('c1').state).toBe('disconnected')
+  })
+
+  it('publishes driver topology loss and recovery without discarding the client', async () => {
+    const manager = new SessionManager()
+    const statuses: Array<{ state: string; error?: string }> = []
+    manager.onStatusChanged((status) => statuses.push(status))
+
+    const connecting = manager.connect('c1')
+    await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
+    fake.finishConnect()
+    await connecting
+
+    fake.clients[0].emit('topologyDescriptionChanged', {
+      newDescription: {
+        hasKnownServers: false,
+        error: new Error('socket closed'),
+        type: 'Unknown'
+      }
+    })
+    expect(manager.getStatus('c1')).toMatchObject({ state: 'error', error: 'socket closed' })
+    expect(statuses.at(-1)).toMatchObject({ state: 'error', error: 'socket closed' })
+
+    fake.clients[0].emit('topologyDescriptionChanged', {
+      newDescription: {
+        hasKnownServers: true,
+        error: null,
+        type: 'Single'
+      }
+    })
+    expect(manager.getStatus('c1').state).toBe('connected')
+    expect(statuses.at(-1)).toMatchObject({ state: 'connected' })
   })
 })

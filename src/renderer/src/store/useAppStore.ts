@@ -151,6 +151,7 @@ interface AppState {
   // ---- actions: session ----
   connect(id: string): Promise<void>
   disconnect(id: string): Promise<void>
+  syncSessionStatus(status: ConnectionStatus): void
   setActiveConnection(id: string | null): void
   /** Expand/collapse a connection's database subtree in the explorer. */
   toggleConnectionExpanded(id: string): void
@@ -482,12 +483,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         })
         if (status.state === 'connected') {
-          get().setActiveConnection(id)
-          // Default the active tab's database to the connection's preferred db,
-          // unless that tab already has one chosen (don't clobber an explicit pick).
+          // Connecting is an explorer action: it must not create or focus a query tab.
+          // If this is a reconnect for the active tab, preserve the default-db warmup.
           const conn = get().connections.find((c) => c.id === id)
           const db = conn?.defaultDatabase
-          if (db && get().activeConnectionId === id) {
+          if (db && getActiveTab(get()).connectionId === id) {
             set((s) =>
               getActiveTab(s).activeDatabase
                 ? {}
@@ -497,7 +497,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           await get().loadDatabases(id)
           // Prefetch the active db's collection names so `db.` completion works
           // without expanding the tree (only that db; skip if already cached).
-          const activeDb = getActiveTab(get()).activeDatabase
+          const activeTab = getActiveTab(get())
+          const activeDb = activeTab.connectionId === id ? activeTab.activeDatabase : ''
           if (activeDb && get().catalogs[id]?.collections[activeDb] === undefined) {
             void get().loadCollections(id, activeDb)
           }
@@ -541,6 +542,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       set({ lastError: tr('notify.disconnectFailed', { error: errMessage(e) }) })
     }
+  },
+
+  syncSessionStatus(status) {
+    set((s) => ({ statuses: { ...s.statuses, [status.id]: status } }))
   },
 
   setActiveConnection(id) {

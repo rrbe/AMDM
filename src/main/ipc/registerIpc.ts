@@ -118,6 +118,14 @@ function buildConnectionUri(input: ConnectionInput, includePassword: boolean): s
 }
 
 export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void): void {
+  sessionManager.onStatusChanged((status) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+        window.webContents.send(IPC.sessionStatusChanged, status)
+      }
+    }
+  })
+
   // connections
   ipcMain.handle(IPC.connectionsList, () => connectionStore.listConnections())
   ipcMain.handle(IPC.connectionsSave, (_e, input: ConnectionInput) =>

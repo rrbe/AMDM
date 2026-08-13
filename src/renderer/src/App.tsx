@@ -62,6 +62,14 @@ export default function App(): JSX.Element {
     void bootstrap()
   }, [bootstrap])
 
+  useEffect(
+    () =>
+      window.api.session.onStatusChanged((status) => {
+        useAppStore.getState().syncSessionStatus(status)
+      }),
+    []
+  )
+
   // Apply the persisted language preference (resolving 'system' to a locale).
   // Mirrors the theme effect below; setLanguage handles the i18next swap.
   useEffect(() => {
@@ -112,9 +120,6 @@ export default function App(): JSX.Element {
     const saved = resolveEditorColorScheme({ activeEditorColorSchemeId, editorColorSchemes })
     applyEditorColorPalette(document.documentElement, palettePreview ?? saved[isDark ? 'dark' : 'light'])
   }, [activeEditorColorSchemeId, editorColorSchemes, isDark, palettePreview])
-
-  const activeConnected =
-    activeConnectionId !== null && statuses[activeConnectionId]?.state === 'connected'
 
   const finishQueryLoad = (query: StoredQuerySelection, connectionId: string): void => {
     applyQuery(query.code, query.database, connectionId)
@@ -194,7 +199,7 @@ export default function App(): JSX.Element {
             ariaLabel={t('app.resizeSidebar')}
           />
         )}
-        {activeConnected ? <ShellWorkspace /> : <WorkspaceEmptyState />}
+        <ShellWorkspace />
         {!explorerOpen && (
           <div className="sidebar-toggle-slot">
             <button
@@ -268,18 +273,6 @@ export default function App(): JSX.Element {
       )}
       <Toaster />
       <TooltipLayer />
-    </div>
-  )
-}
-
-function WorkspaceEmptyState(): JSX.Element {
-  const connections = useAppStore((s) => s.connections)
-  const { t } = useTranslation()
-  return (
-    <div className="work app-drag">
-      <div className="empty-state">
-        <p>{connections.length === 0 ? t('app.emptyNoConn') : t('app.emptyHasConn')}</p>
-      </div>
     </div>
   )
 }

@@ -115,9 +115,10 @@ interface ShellEditorProps {
   onStop: () => void
   /** True while a query is running — enables Stop, disables the run actions. */
   running: boolean
-  /** When true (a query is running, or the editor is empty) run/save/explain
-      keys are swallowed without acting — mirroring the disabled toolbar buttons. */
+  /** When true, run/explain keys are swallowed without acting. */
   busy: boolean
+  /** Save is local and remains available while disconnected. */
+  saveBusy: boolean
 }
 
 export function ShellEditor({
@@ -131,7 +132,8 @@ export function ShellEditor({
   onFormat,
   onStop,
   running,
-  busy
+  busy,
+  saveBusy
 }: ShellEditorProps): JSX.Element {
   const { t } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
@@ -156,8 +158,28 @@ export function ShellEditor({
   // Hold the latest callbacks in a ref so the keymap extension can stay a stable
   // reference — recreating `extensions` would reconfigure CodeMirror on every
   // keystroke. The bindings read fresh props through this ref.
-  const handlers = useRef({ onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy })
-  handlers.current = { onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy }
+  const handlers = useRef({
+    onRun,
+    onRunStatement,
+    onSave,
+    onExplain,
+    onFormat,
+    onStop,
+    running,
+    busy,
+    saveBusy
+  })
+  handlers.current = {
+    onRun,
+    onRunStatement,
+    onSave,
+    onExplain,
+    onFormat,
+    onStop,
+    running,
+    busy,
+    saveBusy
+  }
 
   const extensions = useMemo(
     () => [
@@ -286,7 +308,7 @@ export function ShellEditor({
     return true
   }
   function saveIfReady(): boolean {
-    if (!handlers.current.busy) handlers.current.onSave()
+    if (!handlers.current.saveBusy) handlers.current.onSave()
     return true
   }
   function explainIfReady(): boolean {
@@ -316,7 +338,7 @@ export function ShellEditor({
   }
 
   function buildMenu(): ContextMenuEntry[] {
-    const { busy: isBusy, running: isRunning } = handlers.current
+    const { busy: isBusy, saveBusy: isSaveBusy, running: isRunning } = handlers.current
     const hasSel = viewRef.current ? !viewRef.current.state.selection.main.empty : false
     return [
       {
@@ -347,7 +369,7 @@ export function ShellEditor({
       'separator',
       { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       'separator',
-      { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isBusy, onClick: () => saveIfReady() },
+      { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isSaveBusy, onClick: () => saveIfReady() },
       'separator',
       { label: t('shell.menu.undo'), shortcut: '⌘Z', onClick: () => withView((v) => undo(v)) },
       { label: t('shell.menu.redo'), shortcut: '⇧⌘Z', onClick: () => withView((v) => redo(v)) },

@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb'
+import { MongoClient, type TopologyDescriptionChangedEvent } from 'mongodb'
 import type { ConnectionStatus, TestResult } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { SshTunnel } from '../ssh/tunnel'
@@ -9,6 +9,7 @@ interface Session {
   client: MongoClient
   tunnel?: SshTunnel
   status: ConnectionStatus
+  stopMonitoring: () => void
 }
 
 interface PendingSession {
@@ -20,6 +21,22 @@ interface PendingSession {
 export class SessionManager {
   private sessions = new Map<string, Session>()
   private pending = new Map<string, PendingSession>()
+  private statusListeners = new Set<(status: ConnectionStatus) => void>()
+
+  onStatusChanged(listener: (status: ConnectionStatus) => void): () => void {
+    this.statusListeners.add(listener)
+    return () => this.statusListeners.delete(listener)
+  }
+
+  private publishStatus(status: ConnectionStatus): void {
+    for (const listener of this.statusListeners) {
+      try {
+        listener(status)
+      } catch (error) {
+        console.error('[session status listener]', error)
+      }
+    }
+  }
 
   getStatus(id: string): ConnectionStatus {
     if (this.pending.has(id)) return { id, state: 'connecting' }
@@ -83,13 +100,14 @@ export class SessionManager {
       }
 
       const { uri, options } = buildClientArgs(dec, tunnelPort)
-      client = new MongoClient(uri, options)
-      pending.client = client
-      await client.connect()
-      const info = await this.probe(client)
+      const connectedClient = new MongoClient(uri, options)
+      client = connectedClient
+      pending.client = connectedClient
+      await connectedClient.connect()
+      const info = await this.probe(connectedClient)
 
       if (this.pending.get(id) !== pending) {
-        await client.close().catch(() => {})
+        await connectedClient.close().catch(() => {})
         tunnel?.close()
         return { id, state: 'disconnected' }
       }
@@ -101,7 +119,31 @@ export class SessionManager {
         serverVersion: info.serverVersion
       }
       this.pending.delete(id)
-      this.sessions.set(id, { client, tunnel, status })
+      const session: Session = { client: connectedClient, tunnel, status, stopMonitoring: () => {} }
+      const onTopologyChanged = (event: TopologyDescriptionChangedEvent): void => {
+        if (this.sessions.get(id) !== session) return
+        const available = event.newDescription.hasKnownServers
+        if (available === (session.status.state === 'connected')) return
+
+        session.status = available
+          ? {
+              id,
+              state: 'connected',
+              topology: event.newDescription.type,
+              serverVersion: status.serverVersion
+            }
+          : {
+              id,
+              state: 'error',
+              error: event.newDescription.error?.message ?? 'Connection lost',
+              topology: event.newDescription.type,
+              serverVersion: status.serverVersion
+            }
+        this.publishStatus(session.status)
+      }
+      connectedClient.on('topologyDescriptionChanged', onTopologyChanged)
+      session.stopMonitoring = () => connectedClient.removeListener('topologyDescriptionChanged', onTopologyChanged)
+      this.sessions.set(id, session)
       // TOFU: persist the host key(s) learned on first connect so later connects verify them.
       if (tunnel?.learnedHostKey) {
         connectionStore.recordSshHostKey(id, tunnel.learnedHostKey)
@@ -130,6 +172,7 @@ export class SessionManager {
     this.pending.delete(id)
     const s = this.sessions.get(id)
     this.sessions.delete(id)
+    s?.stopMonitoring()
     pending?.tunnel?.close()
     s?.tunnel?.close()
     try {

@@ -11,6 +11,7 @@ interface DocumentTabProps {
   className?: string
   dataTabId?: string
   status?: ReactNode
+  statusAction?: { label: string; onClick: () => void }
   tooltip?: string
 }
 
@@ -24,6 +25,7 @@ export function DocumentTab({
   className,
   dataTabId,
   status,
+  statusAction,
   tooltip
 }: DocumentTabProps): JSX.Element {
   return (
@@ -38,9 +40,23 @@ export function DocumentTab({
         }
       }}
     >
-      <span className="document-tab-status" aria-hidden>
-        {status}
-      </span>
+      {statusAction ? (
+        <button
+          className="document-tab-status document-tab-status-action"
+          aria-label={statusAction.label}
+          data-tip={statusAction.label}
+          onClick={(event) => {
+            event.stopPropagation()
+            statusAction.onClick()
+          }}
+        >
+          {status}
+        </button>
+      ) : (
+        <span className="document-tab-status" aria-hidden>
+          {status}
+        </span>
+      )}
       <span className="document-tab-label" data-tip={tooltip}>
         {label}
       </span>

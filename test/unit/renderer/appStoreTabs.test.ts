@@ -8,7 +8,8 @@ describe('connection-bound tabs', () => {
     useAppStore.setState({
       tabs: [createTab('c1-tab', { connectionId: 'c1' })],
       activeTabId: 'c1-tab',
-      activeConnectionId: 'c1'
+      activeConnectionId: 'c1',
+      statuses: {}
     })
   })
 
@@ -88,6 +89,23 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().statuses.c2?.state).toBe('connected')
   })
 
+  it('connects in the explorer without creating or focusing a query tab', async () => {
+    const connect = vi.fn().mockResolvedValue({ id: 'c2', state: 'connected' })
+    vi.stubGlobal('window', {
+      api: {
+        session: { connect },
+        catalog: { databases: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    const tabs = useAppStore.getState().tabs
+
+    await useAppStore.getState().connect('c2')
+
+    expect(useAppStore.getState().tabs).toBe(tabs)
+    expect(useAppStore.getState().activeTabId).toBe('c1-tab')
+    expect(useAppStore.getState().activeConnectionId).toBe('c1')
+  })
+
   it('starts a fresh connection attempt after cancelling the previous one', async () => {
     const finishes: ((status: { id: string; state: 'connected' }) => void)[] = []
     const connect = vi.fn(
@@ -137,6 +155,21 @@ describe('connection-bound tabs', () => {
     await useAppStore.getState().connect('c2')
     expect(useAppStore.getState().statuses.c2).toMatchObject({ state: 'connected' })
     expect(useAppStore.getState().lastError).toBeNull()
+  })
+
+  it('syncs driver heartbeat status without clearing tab data', () => {
+    const tabs = useAppStore.getState().tabs
+    useAppStore.getState().syncSessionStatus({
+      id: 'c1',
+      state: 'error',
+      error: 'socket closed'
+    })
+
+    expect(useAppStore.getState().statuses.c1).toMatchObject({
+      state: 'error',
+      error: 'socket closed'
+    })
+    expect(useAppStore.getState().tabs).toBe(tabs)
   })
 
   it('syncs persisted settings to the other renderer window', async () => {

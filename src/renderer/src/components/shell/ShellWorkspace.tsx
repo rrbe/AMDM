@@ -4,6 +4,7 @@ import {
   ChartNoAxesColumnIncreasing,
   ChevronDown,
   ChevronRight,
+  CircleX,
   LoaderCircle,
   PanelRightClose,
   PanelRightOpen,
@@ -38,6 +39,10 @@ export function ShellWorkspace(): JSX.Element {
   const code = useAppStore((s) => getActiveTab(s).code)
   const running = useAppStore((s) => getActiveTab(s).running)
   const stopping = useAppStore((s) => getActiveTab(s).stopping)
+  const activeConnectionState = useAppStore((s) => {
+    const connectionId = getActiveTab(s).connectionId
+    return connectionId ? s.statuses[connectionId]?.state : undefined
+  })
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
   const formatCode = useAppStore((s) => s.formatCode)
@@ -56,10 +61,11 @@ export function ShellWorkspace(): JSX.Element {
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
   const availableSchemaTarget: SchemaTarget | null =
-    activeConnectionId && targetCollection
+    activeConnectionId && activeConnectionState === 'connected' && targetCollection
       ? { connectionId: activeConnectionId, database: activeDatabase || 'test', collection: targetCollection }
       : null
-  const busy = running || !code.trim()
+  const contentBusy = running || !code.trim()
+  const busy = contentBusy || activeConnectionState !== 'connected'
   const runEditor = (): void => {
     void runShell(selectedCode.current)
   }
@@ -117,7 +123,7 @@ export function ShellWorkspace(): JSX.Element {
               </button>
               <button
                 className="work-icon-btn"
-                disabled={busy}
+                disabled={contentBusy}
                 onClick={() => setShowSave(true)}
                 data-tip={t('shell.saveQueryTip')}
                 aria-label={t('shell.saveBtn')}
@@ -153,6 +159,7 @@ export function ShellWorkspace(): JSX.Element {
               onStop={() => void stopShell()}
               running={running}
               busy={busy}
+              saveBusy={contentBusy}
             />
           </div>
 
@@ -192,10 +199,12 @@ function TabBar(): JSX.Element {
   const { t } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const connections = useAppStore((s) => s.connections)
+  const statuses = useAppStore((s) => s.statuses)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
   const newTab = useAppStore((s) => s.newTab)
+  const connect = useAppStore((s) => s.connect)
   const stripRef = useRef<HTMLDivElement>(null)
   const connectionTextColor = (connectionId: string | null): string | undefined => {
     const color = connections.find((conn) => conn.id === connectionId)?.color
@@ -260,29 +269,53 @@ function TabBar(): JSX.Element {
         aria-label={t('shell.tabListLabel')}
       />
       <div ref={stripRef} className="tab-strip">
-        {tabs.map((tab, i) => (
-          <DocumentTab
-            key={tab.id}
-            active={tab.id === activeTabId}
-            className="qtab"
-            dataTabId={tab.id}
-            label={
-              <span style={{ color: connectionTextColor(tab.connectionId) }}>
-                {tabLabel(tab, i)}
-              </span>
-            }
-            closeLabel={t('shell.closeTab')}
-            onSelect={() => setActiveTab(tab.id)}
-            onClose={() => closeTab(tab.id)}
-            status={
-              tab.running ? (
-                <LoaderCircle className="qtab-spinner animate-spin" />
-              ) : tab.runFailed ? (
-                <span className="qtab-error-dot" />
-              ) : null
-            }
-          />
-        ))}
+        {tabs.map((tab, i) => {
+          const connectionStatus = tab.connectionId ? statuses[tab.connectionId] : undefined
+          const unavailable =
+            !!tab.connectionId &&
+            (connectionStatus === undefined ||
+              connectionStatus.state === 'disconnected' ||
+              connectionStatus.state === 'error')
+          const reconnectLabel = connectionStatus?.error
+            ? `${t('shell.reconnect')}: ${connectionStatus.error}`
+            : t('shell.reconnect')
+          return (
+            <DocumentTab
+              key={tab.id}
+              active={tab.id === activeTabId}
+              className="qtab"
+              dataTabId={tab.id}
+              label={
+                <span style={{ color: connectionTextColor(tab.connectionId) }}>
+                  {tabLabel(tab, i)}
+                </span>
+              }
+              closeLabel={t('shell.closeTab')}
+              onSelect={() => setActiveTab(tab.id)}
+              onClose={() => closeTab(tab.id)}
+              statusAction={
+                unavailable && tab.connectionId
+                  ? {
+                      label: reconnectLabel,
+                      onClick: () => {
+                        setActiveTab(tab.id)
+                        void connect(tab.connectionId!)
+                      }
+                    }
+                  : undefined
+              }
+              status={
+                unavailable ? (
+                  <CircleX className="qtab-disconnected" />
+                ) : connectionStatus?.state === 'connecting' || tab.running ? (
+                  <LoaderCircle className="qtab-spinner animate-spin" />
+                ) : tab.runFailed ? (
+                  <span className="qtab-error-dot" />
+                ) : null
+              }
+            />
+          )
+        })}
         <button
           className="qtab-new"
           aria-label={t('shell.newTabLabel')}
