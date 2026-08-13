@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Clock3,
+  Copy,
   Database,
   Download,
   Eye,
@@ -45,6 +46,7 @@ import {
 import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { formatBytes } from '@renderer/lib/formatBytes'
+import { copyText } from '@renderer/lib/resultCopy'
 import {
   applyConnectionOrder,
   reorderConnectionIds,
@@ -109,7 +111,7 @@ interface TreeRow {
   depth: number
   label: string
   icon: string
-  kind: NodeKind | 'leaf'
+  kind: NodeKind | 'index' | 'leaf'
   expandable: boolean
   expanded: boolean
   loading: boolean
@@ -122,6 +124,10 @@ interface TreeRow {
   approximateCount?: boolean
   /** Present on collection rows: enables the Export/Import hover actions. */
   collection?: { db: string; name: string; type: 'collection' | 'view' | 'timeseries' }
+  /** Optional tooltip override; unlike ordinary catalog labels, it is always shown. */
+  tooltip?: string
+  /** Present on index rows: enables index-specific actions. */
+  indexName?: string
   onClick?: () => void
   onDoubleClick?: () => void
   onToggle?: () => void
@@ -150,6 +156,7 @@ interface RowActions {
   ) => Promise<void>
   setActiveConnection: (id: string | null) => void
   browseCollection: (db: string, coll: string) => void
+  inspectIndex: (db: string, coll: string, indexName: string) => void
 }
 
 /** Which import/export modal (if any) is open, and for which collection. */
@@ -192,6 +199,7 @@ export function Explorer({
   const loadCollections = useAppStore((s) => s.loadCollections)
   const refreshCollection = useAppStore((s) => s.refreshCollection)
   const browseCollection = useAppStore((s) => s.browseCollection)
+  const inspectIndex = useAppStore((s) => s.inspectIndex)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [searchOpen, setSearchOpen] = useState(false)
@@ -264,6 +272,22 @@ export function Explorer({
   // remain scoped to that collection.
   const openCatalogMenu = (e: MouseEvent, row: TreeRow): void => {
     e.preventDefault()
+    const indexName = row.indexName
+    if (row.kind === 'index' && indexName !== undefined) {
+      setCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            label: t('explorer.copyIndexName'),
+            icon: <Copy size={14} />,
+            onClick: () => void copyText(indexName)
+          }
+        ]
+      })
+      return
+    }
+
     if (row.kind === 'database') {
       setCtxMenu({
         x: e.clientX,
@@ -337,7 +361,8 @@ export function Explorer({
     const actions: RowActions = {
       toggleNode,
       setActiveConnection,
-      browseCollection
+      browseCollection,
+      inspectIndex
     }
     const out: Row[] = []
     for (const conn of orderedConnections) {
@@ -369,7 +394,8 @@ export function Explorer({
     collectionSort,
     toggleNode,
     setActiveConnection,
-    browseCollection
+    browseCollection,
+    inspectIndex
   ])
   const visibleRows = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
@@ -733,7 +759,11 @@ function CatalogRow({
       onClickCapture={row.onClick || row.onDoubleClick ? onActivate : undefined}
       onClick={row.onClick}
       onDoubleClick={row.onDoubleClick}
-      onContextMenu={row.kind === 'database' || coll ? (e) => onContextMenu(e, row) : undefined}
+      onContextMenu={
+        row.kind === 'database' || row.kind === 'index' || coll
+          ? (e) => onContextMenu(e, row)
+          : undefined
+      }
     >
       <span
         className="tree-twisty"
@@ -756,9 +786,12 @@ function CatalogRow({
       <span
         className="tree-label"
         data-tip={
-          isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label
+          isNote
+            ? undefined
+            : row.tooltip ??
+              (row.empty ? `${row.label} — empty (no collections yet)` : row.label)
         }
-        data-tip-overflow={isNote || row.empty ? undefined : ''}
+        data-tip-overflow={isNote || row.empty || row.tooltip ? undefined : ''}
       >
         {row.label}
       </span>
@@ -782,6 +815,18 @@ function CatalogRow({
 function browseCollection(a: RowActions, connId: string, db: string, coll: string): void {
   a.setActiveConnection(connId)
   a.browseCollection(db, coll)
+}
+
+/** Query one index's complete definition, making its connection active first. */
+function inspectIndex(
+  a: RowActions,
+  connId: string,
+  db: string,
+  coll: string,
+  indexName: string
+): void {
+  a.setActiveConnection(connId)
+  a.inspectIndex(db, coll, indexName)
 }
 
 /** Toggle a database node without changing the work area's active tab. */
@@ -899,11 +944,14 @@ function flattenCatalog(
             connId,
             depth: 4,
             label: `${ix.name} { ${keySpec} }${ix.unique ? ' · unique' : ''}`,
+            tooltip: ix.name,
+            indexName: ix.name,
             icon: 'index',
-            kind: 'leaf',
+            kind: 'index',
             expandable: false,
             expanded: false,
-            loading: false
+            loading: false,
+            onDoubleClick: () => inspectIndex(a, connId, db.name, coll.name, ix.name)
           })
         }
         if (idxList.length === 0) {

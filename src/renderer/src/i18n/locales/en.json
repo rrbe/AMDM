@@ -263,6 +263,7 @@
     "newConnection": "New Connection",
     "collapse": "Collapse Connections",
     "expand": "Expand Connections",
+    "copyIndexName": "Copy Index Name",
     "theme": {
       "system": "Theme: System — click for Light",
       "light": "Theme: Light — click for Dark",

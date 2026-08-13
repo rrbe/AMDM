@@ -44,6 +44,7 @@ import {
   closeResult,
   createTab,
   dbCollRef,
+  indexDetailsQuery,
   isRunFailure,
   patchResult,
   patchTab,
@@ -187,6 +188,8 @@ interface AppState {
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
   browseCollection(db: string, coll: string): void
+  /** Open and run a query for one index's complete server-side definition. */
+  inspectIndex(db: string, coll: string, indexName: string): void
   /** Run the editor's script, or `codeOverride` when given (e.g. the current
       statement / selection from the right-click menu). */
   runShell(codeOverride?: string): Promise<void>
@@ -841,6 +844,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
       const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
+      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
+    if (shouldRun) void get().runShell()
+  },
+
+  inspectIndex(db, coll, indexName) {
+    const code = indexDetailsQuery(coll, indexName)
+    let shouldRun = false
+    set((s) => {
+      const connectionId = getActiveTab(s).connectionId
+      if (!connectionId) return {}
+      const { focusId, reuseId } = pickFillTarget(s.tabs, s.activeTabId, {
+        connectionId,
+        database: db,
+        code
+      })
+      if (focusId) {
+        shouldRun = s.tabs.find((tab) => tab.id === focusId)?.running !== true
+        return { activeTabId: focusId }
+      }
+      shouldRun = true
+      if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()

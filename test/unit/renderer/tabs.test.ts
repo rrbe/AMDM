@@ -10,6 +10,7 @@ import {
   closeResult,
   createTab,
   dbCollRef,
+  indexDetailsQuery,
   isRunFailure,
   patchResult,
   patchTab,
@@ -29,6 +30,20 @@ describe('dbCollRef', () => {
     for (const name of ['admin', 'collection', 'aggregate', 'getCollection', 'stats']) {
       expect(dbCollRef(name)).toBe(`db.getCollection("${name}")`)
     }
+  })
+})
+
+describe('indexDetailsQuery', () => {
+  it('queries one complete index definition by name', () => {
+    expect(indexDetailsQuery('orders', 'status_1_createdAt_-1')).toBe(
+      '(await db.orders.getIndexes()).filter((index) => index.name === "status_1_createdAt_-1")'
+    )
+  })
+
+  it('quotes unsafe collection and index names', () => {
+    expect(indexDetailsQuery('order.items', 'sku_"quoted"\n')).toBe(
+      '(await db.getCollection("order.items").getIndexes()).filter((index) => index.name === "sku_\\"quoted\\"\\n")'
+    )
   })
 })
 

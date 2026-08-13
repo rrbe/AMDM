@@ -419,6 +419,16 @@ describe('index operations', () => {
     expect(names).toContain('n_1')
   })
 
+  it('filters one complete index definition by name', async () => {
+    await db.collection('nums').createIndex({ n: 1 }, { name: 'n_detail', unique: true })
+    const r = await run(
+      '(await db.nums.getIndexes()).filter((index) => index.name === "n_detail")'
+    )
+    expect(r.kind).toBe('documents')
+    expect(r.data).toHaveLength(1)
+    expect((r.data as any[])[0]).toMatchObject({ name: 'n_detail', unique: true })
+  })
+
   it('listIndexes().toArray() and indexes() both list indexes', async () => {
     await db.collection('nums').createIndex({ g: 1 })
     expect((await run('db.nums.listIndexes().toArray()')).kind).toBe('documents')

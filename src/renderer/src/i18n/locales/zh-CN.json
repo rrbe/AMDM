@@ -263,6 +263,7 @@
     "newConnection": "新建连接",
     "collapse": "收起 Connections",
     "expand": "展开 Connections",
+    "copyIndexName": "复制索引名称",
     "theme": {
       "system": "主题：系统 — 点击切换为浅色",
       "light": "主题：浅色 — 点击切换为深色",

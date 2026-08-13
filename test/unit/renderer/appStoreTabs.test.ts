@@ -400,6 +400,44 @@ describe('connection-bound tabs', () => {
     expect(execute).toHaveBeenCalledOnce()
   })
 
+  it('runs and refreshes one index detail query without duplicating an in-flight run', async () => {
+    const finishes: ((result: ShellResult) => void)[] = []
+    const execute = vi.fn(
+      () =>
+        new Promise<ShellResult>((resolve) => {
+          finishes.push(resolve)
+        })
+    )
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+
+    useAppStore.getState().inspectIndex('shop', 'orders', 'status_1_createdAt_-1')
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        connectionId: 'c1',
+        database: 'shop',
+        code: '(await db.orders.getIndexes()).filter((index) => index.name === "status_1_createdAt_-1")',
+        skip: 0
+      })
+    )
+
+    useAppStore.getState().inspectIndex('shop', 'orders', 'status_1_createdAt_-1')
+    expect(execute).toHaveBeenCalledOnce()
+
+    finishes[0]({ kind: 'documents', data: [], count: 0, truncated: false })
+    await vi.waitFor(() => expect(useAppStore.getState().tabs[0].running).toBe(false))
+
+    useAppStore.getState().inspectIndex('shop', 'orders', 'status_1_createdAt_-1')
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+    finishes[1]({ kind: 'documents', data: [], count: 0, truncated: false })
+    await vi.waitFor(() => expect(useAppStore.getState().tabs[0].running).toBe(false))
+  })
+
   it('shows running, keeps real failures red, and clears a stopped run', async () => {
     let finish!: (result: ShellResult) => void
     const execute = vi.fn(

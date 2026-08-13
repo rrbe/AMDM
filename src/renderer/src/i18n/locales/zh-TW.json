@@ -263,6 +263,7 @@
     "newConnection": "新增連線",
     "collapse": "收起 Connections",
     "expand": "展開 Connections",
+    "copyIndexName": "複製索引名稱",
     "theme": {
       "system": "佈景：系統 — 點擊切換為亮色",
       "light": "佈景：亮色 — 點擊切換為暗色",
