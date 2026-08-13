@@ -55,7 +55,7 @@ export function SavedQueriesView({
   onLoad
 }: {
   onLoad: (query: StoredQuerySelection) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const savedQueries = useAppStore((s) => s.savedQueries)
   const connections = useAppStore((s) => s.connections)
@@ -104,7 +104,7 @@ export function HistoryView({
   onLoad
 }: {
   onLoad: (query: StoredQuerySelection) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const history = useAppStore((s) => s.history)
   const connections = useAppStore((s) => s.connections)
@@ -157,7 +157,7 @@ function SavedTab({
   onLoad: (query: SavedQuery) => void
   onDelete: (id: string) => void
   onMove: (q: SavedQuery, folder: string | undefined) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   // Collapsed folder names (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -209,7 +209,7 @@ function SavedTab({
     return items
   }
 
-  const renderRow = (q: SavedQuery): JSX.Element => (
+  const renderRow = (q: SavedQuery): React.JSX.Element => (
     <div
       key={q.id}
       className="sq-row"
@@ -282,7 +282,7 @@ function HistoryTab({
 }: {
   entries: HistoryEntry[]
   onLoad: (entry: HistoryEntry) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   if (entries.length === 0) {
     return <div className="sq-empty muted">{t('savedQueries.emptyHistory')}</div>

@@ -54,7 +54,7 @@ interface ConnectionFormProps {
 }
 
 /** Per-step ✓/✗ list for one hop's connectivity check (shared by SSH + jump). */
-function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): JSX.Element {
+function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <div className="mt-1 flex flex-col gap-1">
@@ -90,7 +90,7 @@ function DiagnoseControl({
   busy: boolean
   stages: DiagnoseStage[] | null
   onRun: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -139,7 +139,7 @@ function DiagnoseControl({
  * exports the current fields OUT as a connection string. They never share a
  * live field, so neither drives the other.
  */
-export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.Element {
+export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React.JSX.Element {
   const { t: tFn } = useTranslation()
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)

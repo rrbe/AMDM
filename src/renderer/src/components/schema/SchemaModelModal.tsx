@@ -64,7 +64,7 @@ function flattenStats(fields: SchemaFieldStat[], parent = '', depth = 0): FlatSt
   return rows
 }
 
-function AnalysisView({ model }: { model: SchemaModel }): JSX.Element {
+function AnalysisView({ model }: { model: SchemaModel }): React.JSX.Element {
   const { t } = useTranslation()
   const rows = useMemo(() => flattenStats(model.analysis.fields), [model.analysis.fields])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -129,7 +129,7 @@ function SchemaRow({
   row: FlatSchemaNode
   onChange: (change: (schema: MongoJsonSchema) => MongoJsonSchema) => void
   onError: (message: string | null) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const types = bsonTypesOf(row.schema)
   const canAddChild = types.includes('object') || types.includes('array')
@@ -234,7 +234,7 @@ function StructuredEditor({
   schema: MongoJsonSchema
   onChange: (schema: MongoJsonSchema) => void
   onError: (message: string | null) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const rows = useMemo(() => flattenSchema(schema), [schema])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -282,7 +282,7 @@ function parseDraft(text: string): MongoJsonSchema {
   return parsed
 }
 
-export function SchemaModelModal({ target, onClose }: Props): JSX.Element {
+export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element {
   const { t } = useTranslation()
   const loadSchemaModel = useAppStore((state) => state.loadSchemaModel)
   const analyzeSchema = useAppStore((state) => state.analyzeSchema)

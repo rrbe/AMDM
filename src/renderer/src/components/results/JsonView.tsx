@@ -33,7 +33,7 @@ interface JsonViewProps {
   fontSize: number
 }
 
-export function JsonView({ value, fontSize }: JsonViewProps): JSX.Element {
+export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const [allSelected, setAllSelected] = useState(false)

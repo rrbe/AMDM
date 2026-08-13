@@ -31,7 +31,7 @@ import type { SchemaTarget } from '@shared/types'
  * Run), the lazy CodeMirror editor, and the result panel below. Each tab owns
  * its own code/result/db/run state (see the store's `tabs`).
  */
-export function ShellWorkspace(): JSX.Element {
+export function ShellWorkspace(): React.JSX.Element {
   const { t } = useTranslation()
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connections = useAppStore((s) => s.connections)
@@ -56,7 +56,7 @@ export function ShellWorkspace(): JSX.Element {
   const [schemaTarget, setSchemaTarget] = useState<SchemaTarget | null>(null)
   const [contextOpen, setContextOpen] = useState(false)
   const [resultsExpanded, setResultsExpanded] = useState(false)
-  const selectedCode = useRef<string>()
+  const selectedCode = useRef<string | undefined>(undefined)
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
@@ -195,7 +195,7 @@ export function ShellWorkspace(): JSX.Element {
  * The query-tab strip: one chip per open tab (label derived from its code), a
  * fixed status slot (spinner / failure dot), a close ✕, and a trailing "+".
  */
-function TabBar(): JSX.Element {
+function TabBar(): React.JSX.Element {
   const { t } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const connections = useAppStore((s) => s.connections)

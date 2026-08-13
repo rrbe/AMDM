@@ -66,7 +66,7 @@ import {
 export type ExplorerView = 'connections' | 'savedQueries' | 'history'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
-function TreeIcon({ name }: { name: string }): JSX.Element | null {
+function TreeIcon({ name }: { name: string }): React.JSX.Element | null {
   switch (name) {
     case 'database':
       return <Database size={15} />
@@ -179,7 +179,7 @@ export function Explorer({
   onQueryLoad: (query: StoredQuerySelection) => void
   onCollapse: () => void
   onSettings: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
@@ -655,7 +655,7 @@ function ConnectionRow({
   onConnect: () => void
   onMove: (sourceId: string, targetId: string, edge: DropEdge) => void
   onContextMenu: (e: MouseEvent) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [dragging, setDragging] = useState(false)
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
@@ -760,7 +760,7 @@ function CatalogRow({
   isActive: boolean
   onActivate: () => void
   onContextMenu: (e: MouseEvent, row: TreeRow) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const coll = row.collection
   const isNote = row.kind === 'leaf'
   const className =

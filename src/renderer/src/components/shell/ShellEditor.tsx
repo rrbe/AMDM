@@ -134,7 +134,7 @@ export function ShellEditor({
   running,
   busy,
   saveBusy
-}: ShellEditorProps): JSX.Element {
+}: ShellEditorProps): React.JSX.Element {
   const { t } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).

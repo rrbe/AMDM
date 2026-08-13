@@ -18,7 +18,7 @@ interface CellInputProps {
  * text undo works because we don't intercept it. Clicks are stopped so the
  * cell's own select / double-click handlers don't fire underneath.
  */
-export function CellInput({ initial, error, onCommit, onCancel }: CellInputProps): JSX.Element {
+export function CellInput({ initial, error, onCommit, onCancel }: CellInputProps): React.JSX.Element {
   const ref = useRef<HTMLInputElement>(null)
   // Guards a stray blur (e.g. on unmount) from re-firing after Enter/Esc.
   const handled = useRef(false)

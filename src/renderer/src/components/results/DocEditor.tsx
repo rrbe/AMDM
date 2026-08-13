@@ -34,7 +34,7 @@ function toEditableText(doc: unknown): string {
     .join('\n')
 }
 
-export function DocEditor({ connectionId, database, collection, doc, id, onClose }: DocEditorProps): JSX.Element {
+export function DocEditor({ connectionId, database, collection, doc, id, onClose }: DocEditorProps): React.JSX.Element {
   const { t } = useTranslation()
   const updateDocument = useAppStore((s) => s.updateDocument)
 

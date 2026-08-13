@@ -72,7 +72,7 @@ execFileSync(
     "x86_64",
     "-mmacosx-version-min=10.13",
     "-I",
-    join(root, "node_modules", "node-addon-api", "external-napi"),
+    join(root, "node_modules", "node-api-headers", "include"),
     "-F",
     sparkleDir,
     "-bundle",

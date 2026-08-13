@@ -12,7 +12,7 @@ import { cn } from '@renderer/lib/utils'
  */
 type InputProps = ComponentPropsWithoutRef<typeof BaseInput>
 
-export function Input({ className, ...props }: InputProps): JSX.Element {
+export function Input({ className, ...props }: InputProps): React.JSX.Element {
   return (
     <BaseInput
       {...props}

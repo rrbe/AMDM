@@ -5,7 +5,7 @@ import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useA
 import { tabCollection } from '@renderer/lib/tabs'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 
-export function ContextPanel(): JSX.Element {
+export function ContextPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const tab = useAppStore(getActiveTab)
   const activeResult = useAppStore(getActiveResult)
@@ -123,7 +123,7 @@ function PropertyRow({
   label: string
   value: string
   mono?: boolean
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="grid min-h-7 grid-cols-[16px_72px_minmax(0,1fr)] items-center gap-x-2">
       <span className="text-muted-foreground [&_svg]:size-4" aria-hidden>

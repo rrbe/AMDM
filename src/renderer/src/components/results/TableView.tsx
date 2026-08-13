@@ -57,7 +57,7 @@ const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 
-export function TableView({ docs, fontSize, docCtx }: TableViewProps): JSX.Element {
+export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
@@ -421,7 +421,7 @@ function Cell({
   onCommit: (text: string) => void
   onCancel: () => void
   onContextMenu: (e: MouseEvent) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { present, value } = cellValue(doc, column)
   const cellCls = `tbl-td${selected ? ' selected' : ''}`
 

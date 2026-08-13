@@ -27,7 +27,7 @@ export function DocumentTab({
   status,
   statusAction,
   tooltip
-}: DocumentTabProps): JSX.Element {
+}: DocumentTabProps): React.JSX.Element {
   return (
     <div
       data-tab-id={dataTabId}

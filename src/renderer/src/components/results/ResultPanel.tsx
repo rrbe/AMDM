@@ -36,7 +36,7 @@ export function ResultPanel({
 }: {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
@@ -271,7 +271,7 @@ function ResultExpandButton({
 }: {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const label = t(expanded ? 'result.restoreEditor' : 'result.expandResults')
   return (
@@ -297,7 +297,7 @@ function ResultTabStrip({
 }: {
   results: ResultTab[]
   activeId: string | null
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
@@ -352,7 +352,7 @@ function ResultMeta({
   result: ShellResult
   docCount: number
   executedAt: number
-}): JSX.Element {
+}): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const parts = useMemo(() => {
     const out: { text: string; cls?: string }[] = []
@@ -400,7 +400,7 @@ function ResultMeta({
  * aggregation/script results render no pager (the page-size control is their
  * way to see more). Next is enabled only while the page is truncated.
  */
-function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
+function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | null {
   const { t } = useTranslation()
   const skip = useAppStore((s) => getActiveResult(s)?.skip ?? 0)
   const limit = useAppStore((s) => s.settings.queryLimit)
@@ -440,7 +440,7 @@ function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
 }
 
 /** Query limit control; changing it re-runs the focused result from page one. */
-function PageSizeControl(): JSX.Element {
+function PageSizeControl(): React.JSX.Element {
   const { t } = useTranslation()
   const limit = useAppStore((s) => s.settings.queryLimit)
   const setQueryLimit = useAppStore((s) => s.setQueryLimit)
@@ -475,7 +475,7 @@ function ErrorView({
   onCopy: (text: string) => void
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const name = result.errorName ?? t('result.errorName')
   const message = result.error ?? t('result.errorUnknown')

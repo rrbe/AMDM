@@ -22,6 +22,6 @@ export function ContextMenu({
   y: number
   items: ContextMenuEntry[]
   onClose: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   return <Menu open onClose={onClose} x={x} y={y} items={items} />
 }

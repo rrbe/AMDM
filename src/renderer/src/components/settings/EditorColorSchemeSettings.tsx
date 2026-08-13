@@ -39,7 +39,7 @@ function cloneScheme(scheme: EditorColorScheme): EditorColorScheme {
   return { ...scheme, light: { ...scheme.light }, dark: { ...scheme.dark } }
 }
 
-export function EditorColorSchemeSettings(): JSX.Element {
+export function EditorColorSchemeSettings(): React.JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)

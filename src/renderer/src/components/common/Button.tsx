@@ -55,7 +55,7 @@ export function Button({
   className,
   children,
   ...rest
-}: ButtonProps): JSX.Element {
+}: ButtonProps): React.JSX.Element {
   return (
     <button
       {...rest}

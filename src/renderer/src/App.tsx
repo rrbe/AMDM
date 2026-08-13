@@ -35,7 +35,7 @@ function openSettingsWindow(): void {
   void window.api.app.openSettings()
 }
 
-export default function App(): JSX.Element {
+export default function App(): React.JSX.Element {
   const bootstrap = useAppStore((s) => s.bootstrap)
   const connections = useAppStore((s) => s.connections)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)

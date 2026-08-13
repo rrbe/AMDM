@@ -34,7 +34,7 @@ export function ResizeHandle({
   onCommit,
   className,
   ariaLabel
-}: ResizeHandleProps): JSX.Element {
+}: ResizeHandleProps): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   // Active-drag bookkeeping; null when not dragging. `last` holds the latest
   // clamped px so pointer-up can commit without re-reading the DOM.

@@ -21,7 +21,7 @@ interface ConsoleViewProps {
   truncated?: boolean
 }
 
-export function ConsoleView({ output, fontSize, truncated }: ConsoleViewProps): JSX.Element {
+export function ConsoleView({ output, fontSize, truncated }: ConsoleViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
 

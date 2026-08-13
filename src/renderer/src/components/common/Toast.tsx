@@ -27,7 +27,7 @@ export function Toast({
   message: string
   onDismiss: () => void
   autoDismissMs?: number
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   useEffect(() => {
     if (!autoDismissMs) return

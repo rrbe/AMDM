@@ -34,7 +34,7 @@ const FORMATS: Array<{ value: DataFormat; label: string }> = [
   { value: 'bson', label: 'BSON' }
 ]
 
-export function ExportModal({ connectionId, database, collection, onClose }: ExportModalProps): JSX.Element {
+export function ExportModal({ connectionId, database, collection, onClose }: ExportModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const exportCollection = useAppStore((s) => s.exportCollection)
 

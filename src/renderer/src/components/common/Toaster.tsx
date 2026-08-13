@@ -6,7 +6,7 @@ import { Toast } from './Toast'
  * persists until dismissed) and the transient notice channel (`notice`,
  * success/info auto-dismiss; warnings persist).
  */
-export function Toaster(): JSX.Element | null {
+export function Toaster(): React.JSX.Element | null {
   const lastError = useAppStore((s) => s.lastError)
   const clearError = useAppStore((s) => s.clearError)
   const notice = useAppStore((s) => s.notice)

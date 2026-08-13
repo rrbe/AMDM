@@ -23,7 +23,7 @@ import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorC
 
 type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor'
 
-export function SettingsWindow(): JSX.Element {
+export function SettingsWindow(): React.JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
   const updateState = useAppStore((s) => s.updateState)

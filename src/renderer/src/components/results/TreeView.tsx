@@ -74,7 +74,7 @@ const DEFAULT_KEY_WIDTH = 280
 const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
-export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element {
+export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
@@ -448,7 +448,7 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
   ]
 }
 
-function ValueCell({ node }: { node: FlatNode }): JSX.Element {
+function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.

@@ -22,7 +22,7 @@ interface Active {
   rect: DOMRect
 }
 
-export function TooltipLayer(): JSX.Element | null {
+export function TooltipLayer(): React.JSX.Element | null {
   const [active, setActive] = useState<Active | null>(null)
   const [style, setStyle] = useState<{ top: number; left: number; visible: boolean }>({
     top: 0,

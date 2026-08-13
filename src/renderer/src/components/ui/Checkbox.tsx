@@ -30,7 +30,7 @@ export function Checkbox({
   id,
   name,
   className
-}: CheckboxProps): JSX.Element {
+}: CheckboxProps): React.JSX.Element {
   return (
     <BaseCheckbox.Root
       className={cn(

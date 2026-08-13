@@ -49,7 +49,7 @@ export function Select<T extends string | number = string>({
   popupHeader,
   popupClassName,
   'aria-label': ariaLabel
-}: SelectProps<T>): JSX.Element {
+}: SelectProps<T>): React.JSX.Element {
   return (
     <BaseSelect.Root
       items={options as ReadonlyArray<{ label: ReactNode; value: T }>}

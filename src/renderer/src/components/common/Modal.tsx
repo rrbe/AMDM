@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -69,7 +70,7 @@ export function Modal({
   backdropClassName,
   movable = false,
   lockTop = false
-}: ModalProps): JSX.Element {
+}: ModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -94,6 +95,18 @@ export function Modal({
     },
     [lockTop, movable]
   )
+
+  // React 19 can mount a controlled, already-open dialog before Base UI's
+  // initial-focus effect observes its body ref. Keep the focus trap's native
+  // behavior, but provide a next-task fallback when focus is still outside.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const popup = popupElementRef.current
+      if (!popup || popup.contains(document.activeElement)) return
+      bodyRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const startMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (
@@ -240,7 +253,7 @@ export function ResizableModal({
   className,
   bodyClassName,
   ...props
-}: ResizableModalProps): JSX.Element {
+}: ResizableModalProps): React.JSX.Element {
   return (
     <Modal
       {...props}

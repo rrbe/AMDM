@@ -43,7 +43,7 @@ interface MenuProps {
   items: MenuEntry[]
 }
 
-function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
+function MenuEntries({ items }: { items: MenuEntry[] }): React.JSX.Element {
   return (
     <>
       {items.map((item, index) => {
@@ -93,7 +93,7 @@ function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
   )
 }
 
-export function Menu({ open, onClose, x, y, items }: MenuProps): JSX.Element {
+export function Menu({ open, onClose, x, y, items }: MenuProps): React.JSX.Element {
   // Virtual anchor: a zero-size rect at the cursor. Memoised so Base UI's
   // positioner isn't re-anchored on every render.
   const anchor = useMemo(

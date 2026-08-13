@@ -29,7 +29,7 @@ function fmtNum(v: number | undefined): string {
   return v === undefined ? '—' : v.toLocaleString()
 }
 
-export function ExplainView({ plan }: ExplainViewProps): JSX.Element {
+export function ExplainView({ plan }: ExplainViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan), [plan])
@@ -76,7 +76,7 @@ export function ExplainView({ plan }: ExplainViewProps): JSX.Element {
   )
 }
 
-function SummaryStat({ label, value, mono }: { label: string; value: string; mono?: boolean }): JSX.Element {
+function SummaryStat({ label, value, mono }: { label: string; value: string; mono?: boolean }): React.JSX.Element {
   return (
     <div className="explain-stat">
       <span className="explain-stat-label">{label}</span>
@@ -86,7 +86,7 @@ function SummaryStat({ label, value, mono }: { label: string; value: string; mon
 }
 
 /** One stage box plus, recursively, its input stages as connected children. */
-function StageBranch({ node }: { node: StageTreeNode }): JSX.Element {
+function StageBranch({ node }: { node: StageTreeNode }): React.JSX.Element {
   return (
     <li>
       <StageCard node={node} />
@@ -101,7 +101,7 @@ function StageBranch({ node }: { node: StageTreeNode }): JSX.Element {
   )
 }
 
-function StageCard({ node }: { node: StageTreeNode }): JSX.Element {
+function StageCard({ node }: { node: StageTreeNode }): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <div className={`explain-card tone-${node.tone}`}>
@@ -125,7 +125,7 @@ function StageCard({ node }: { node: StageTreeNode }): JSX.Element {
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }): JSX.Element {
+function Metric({ label, value }: { label: string; value: string }): React.JSX.Element {
   return (
     <span className="explain-metric">
       <span className="explain-metric-label">{label}</span>
