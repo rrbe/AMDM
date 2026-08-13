@@ -12,7 +12,7 @@ A lean, performance-first MongoDB desktop GUI, powered by Electron.
 pnpm install         # uses pnpm
 pnpm dev             # launch the app with hot reload
 pnpm build           # production build into ./out
-pnpm dist:dir --arm64 # package an unpacked Apple Silicon app
+pnpm dist:dir --mac --arm64 # package an unpacked Apple Silicon app
 pnpm clean           # remove generated build files
 ```
 

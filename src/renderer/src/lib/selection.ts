@@ -2,8 +2,7 @@
  * Row/document multi-selection model, shared by the Table and Tree result views
  * (and previously duplicated inline in both). Pure and immutable: it never
  * mutates the incoming set, always returning a fresh `Set` — which the views
- * rely on for correct React re-renders (see CLAUDE.md: Set updates must be
- * immutable).
+ * rely on for correct React re-renders (see docs/renderer.md).
  *
  * Behavior mirrors NoSQLBooster / a file list:
  *   - plain click  → select just the clicked index, and make it the anchor.

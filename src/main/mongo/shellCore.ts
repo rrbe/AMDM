@@ -11,7 +11,7 @@
  * NoSQLBooster surface the user actually needs; gaps should surface as clear
  * errors, never silent wrong behavior.
  *
- * Shim catalog (the authoritative list CLAUDE.md points here for):
+ * Shim catalog (authoritative; keep compatibility docs at the invariant level):
  *   db layer:      getCollection, getSiblingDB, getCollectionNames,
  *                  getCollectionInfos, getName, version,
  *                  runCommand → db.command, adminCommand → db.admin().command
