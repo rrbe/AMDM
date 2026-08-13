@@ -30,6 +30,7 @@ import type {
   ShellRequest,
   ShellResult,
   TestResult,
+  UpdateState,
   UserInfo
 } from './types'
 
@@ -81,6 +82,10 @@ export const IPC = {
   appOpenSettings: 'app:openSettings',
 
   updatesCheck: 'updates:check',
+  updatesGetState: 'updates:getState',
+  updatesSetAutomaticChecks: 'updates:setAutomaticChecks',
+  updatesShowAvailable: 'updates:showAvailable',
+  updatesStateChanged: 'updates:stateChanged',
 
   dialogOpenFile: 'dialog:openFile'
 } as const
@@ -164,6 +169,11 @@ export interface Api {
   updates: {
     /** Returns false when Sparkle is unavailable in this build. */
     checkForUpdates(): Promise<boolean>
+    getState(): Promise<UpdateState>
+    setAutomaticChecks(enabled: boolean): Promise<UpdateState>
+    /** Acknowledge the current reminder and bring Sparkle's native window forward. */
+    showAvailableUpdate(): Promise<boolean>
+    onStateChanged(listener: (state: UpdateState) => void): () => void
   }
   dialog: {
     /** Native open-file picker; resolves the chosen absolute path, or null if cancelled. */

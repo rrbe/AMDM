@@ -42,9 +42,9 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "sectionUpdates": "Updates",
+    "automaticUpdateChecks": "Automatically check for updates",
     "checkForUpdates": "Check for updates",
     "checkingForUpdates": "Checking for updates…",
-    "checkForUpdatesHint": "Check for a newer AMDM release now.",
     "collectionSort": "Collection sort",
     "sortNatural": "Natural (server order)",
     "sortAlpha": "Alphabetical",
@@ -91,6 +91,9 @@
       "nameTooLong": "Use 50 characters or fewer.",
       "nameDuplicate": "A scheme with this name already exists."
     }
+  },
+  "updates": {
+    "newVersion": "New version {{version}}"
   },
   "notify": {
     "loadConnectionsFailed": "Failed to load connections: {{error}}",

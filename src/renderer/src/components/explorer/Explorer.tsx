@@ -188,6 +188,7 @@ export function Explorer({
   const connectionOrder = useAppStore((s) => s.settings.connectionOrder)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
   const theme = useAppStore((s) => s.settings.theme)
+  const availableVersion = useAppStore((s) => s.updateState.availableVersion)
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -201,6 +202,7 @@ export function Explorer({
   const browseCollection = useAppStore((s) => s.browseCollection)
   const inspectIndex = useAppStore((s) => s.inspectIndex)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const showAvailableUpdate = useAppStore((s) => s.showAvailableUpdate)
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -575,9 +577,23 @@ export function Explorer({
             <Moon size={16} />
           )}
         </button>
-        <span className="side-foot-build" title={__BUILD_ID__}>
-          {__BUILD_ID__}
-        </span>
+        {availableVersion ? (
+          <button
+            type="button"
+            className="side-foot-update"
+            title={t('updates.newVersion', { version: availableVersion })}
+            onClick={() => void showAvailableUpdate()}
+          >
+            <span className="side-foot-update-dot" aria-hidden />
+            <span className="side-foot-update-label">
+              {t('updates.newVersion', { version: availableVersion })}
+            </span>
+          </button>
+        ) : (
+          <span className="side-foot-build" title={__BUILD_ID__}>
+            {__BUILD_ID__}
+          </span>
+        )}
         <button
           className="theme-cycle"
           data-tip={t('common.settings')}

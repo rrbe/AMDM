@@ -117,6 +117,43 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.side-foot-update {
+  min-width: 0;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 5px 3px;
+  color: var(--err);
+  cursor: pointer;
+}
+.side-foot-update:hover {
+  background: var(--interaction-hover);
+}
+.side-foot-update:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-soft);
+}
+.side-foot-update-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+}
+.side-foot-update-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* App-level theme control: a single icon button cycling System → Light → Dark. */
 .theme-cycle {
   display: inline-flex;

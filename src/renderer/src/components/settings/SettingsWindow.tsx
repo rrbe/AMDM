@@ -26,7 +26,10 @@ type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor'
 export function SettingsWindow(): JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
+  const updateState = useAppStore((s) => s.updateState)
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
+  const loadUpdateState = useAppStore((s) => s.loadUpdateState)
+  const setAutomaticUpdateChecks = useAppStore((s) => s.setAutomaticUpdateChecks)
   const loadSettings = useAppStore((s) => s.loadSettings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance')
@@ -52,7 +55,11 @@ export function SettingsWindow(): JSX.Element {
       id: 'updates',
       label: t('settings.sectionUpdates'),
       icon: RefreshCw,
-      keywords: [t('settings.sectionUpdates'), t('settings.checkForUpdates'), t('settings.checkForUpdatesHint')]
+      keywords: [
+        t('settings.sectionUpdates'),
+        t('settings.automaticUpdateChecks'),
+        t('settings.checkForUpdates')
+      ]
     },
     {
       id: 'catalog',
@@ -102,7 +109,8 @@ export function SettingsWindow(): JSX.Element {
 
   useEffect(() => {
     void loadSettings()
-  }, [loadSettings])
+    void loadUpdateState()
+  }, [loadSettings, loadUpdateState])
 
   useEffect(() => {
     setLanguage(settings.language)
@@ -210,11 +218,26 @@ export function SettingsWindow(): JSX.Element {
           )}
 
           {displayedSectionId === 'updates' && (
-            <Field label={t('settings.checkForUpdates')} hint={t('settings.checkForUpdatesHint')}>
-              <Button type="button" busy={checking} onClick={() => void runUpdateCheck()}>
-                {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
-              </Button>
-            </Field>
+            <>
+              <div className="mb-3">
+                <Checkbox
+                  checked={updateState.automaticallyChecksForUpdates}
+                  disabled={!updateState.available}
+                  onCheckedChange={(enabled) => void setAutomaticUpdateChecks(enabled)}
+                  label={t('settings.automaticUpdateChecks')}
+                />
+              </div>
+              <Field label={t('settings.checkForUpdates')}>
+                <Button
+                  type="button"
+                  busy={checking}
+                  disabled={!updateState.available}
+                  onClick={() => void runUpdateCheck()}
+                >
+                  {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
+                </Button>
+              </Field>
+            </>
           )}
 
           {displayedSectionId === 'catalog' && (

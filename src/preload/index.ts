@@ -75,7 +75,17 @@ const api: Api = {
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch)
   },
   updates: {
-    checkForUpdates: () => ipcRenderer.invoke(IPC.updatesCheck)
+    checkForUpdates: () => ipcRenderer.invoke(IPC.updatesCheck),
+    getState: () => ipcRenderer.invoke(IPC.updatesGetState),
+    setAutomaticChecks: (enabled) => ipcRenderer.invoke(IPC.updatesSetAutomaticChecks, enabled),
+    showAvailableUpdate: () => ipcRenderer.invoke(IPC.updatesShowAvailable),
+    onStateChanged: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]): void => {
+        listener(state)
+      }
+      ipcRenderer.on(IPC.updatesStateChanged, handle)
+      return () => ipcRenderer.removeListener(IPC.updatesStateChanged, handle)
+    }
   },
   dialog: {
     openFile: (opts) => ipcRenderer.invoke(IPC.dialogOpenFile, opts)

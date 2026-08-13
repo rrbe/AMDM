@@ -36,6 +36,7 @@ import type {
   SchemaTarget,
   ShellResult,
   TestResult,
+  UpdateState,
   UserInfo
 } from '@shared/types'
 import {
@@ -128,6 +129,7 @@ interface AppState {
 
   // ---- preferences ----
   settings: AppSettings
+  updateState: UpdateState
 
   // ---- ui ----
   initializing: boolean
@@ -240,6 +242,9 @@ interface AppState {
 
   // ---- actions: preferences ----
   checkForUpdates(): Promise<boolean>
+  loadUpdateState(): Promise<void>
+  setAutomaticUpdateChecks(enabled: boolean): Promise<void>
+  showAvailableUpdate(): Promise<boolean>
   loadSettings(): Promise<void>
   updateSettings(patch: Partial<AppSettings>): Promise<void>
 }
@@ -310,6 +315,7 @@ const connectionAttempts = new Map<string, { promise: Promise<void>; token: obje
 // renderer windows; the main process remains the persistence authority.
 let settingsChannel: BroadcastChannel | null | undefined
 let settingsSubscribed = false
+let updatesSubscribed = false
 
 function getSettingsChannel(): BroadcastChannel | null {
   if (settingsChannel !== undefined) return settingsChannel
@@ -330,6 +336,20 @@ function subscribeToSettings(): void {
   })
 }
 
+function subscribeToUpdates(): void {
+  if (updatesSubscribed) return
+  updatesSubscribed = true
+  window.api.updates.onStateChanged((updateState) => {
+    useAppStore.setState({ updateState })
+  })
+}
+
+const EMPTY_UPDATE_STATE: UpdateState = {
+  available: false,
+  automaticallyChecksForUpdates: false,
+  availableVersion: null
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -347,6 +367,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   fieldCache: {},
 
   settings: DEFAULT_SETTINGS,
+  updateState: EMPTY_UPDATE_STATE,
 
   initializing: true,
   lastError: null,
@@ -359,7 +380,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().loadConnections(),
       get().loadQueries(),
       get().loadHistory(),
-      get().loadSettings()
+      get().loadSettings(),
+      get().loadUpdateState()
     ])
     set({ initializing: false })
   },
@@ -1327,6 +1349,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   async checkForUpdates() {
     try {
       const started = await window.api.updates.checkForUpdates()
+      if (!started) set({ lastError: tr('notify.updateCheckUnavailable') })
+      return started
+    } catch (e) {
+      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+      return false
+    }
+  },
+
+  async loadUpdateState() {
+    subscribeToUpdates()
+    try {
+      set({ updateState: await window.api.updates.getState() })
+    } catch {
+      set({ updateState: EMPTY_UPDATE_STATE })
+    }
+  },
+
+  async setAutomaticUpdateChecks(enabled) {
+    try {
+      set({ updateState: await window.api.updates.setAutomaticChecks(enabled) })
+    } catch (e) {
+      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+    }
+  },
+
+  async showAvailableUpdate() {
+    set((state) => ({
+      updateState: { ...state.updateState, availableVersion: null }
+    }))
+    try {
+      const started = await window.api.updates.showAvailableUpdate()
       if (!started) set({ lastError: tr('notify.updateCheckUnavailable') })
       return started
     } catch (e) {

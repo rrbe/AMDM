@@ -42,9 +42,9 @@
     "themeLight": "浅色",
     "themeDark": "深色",
     "sectionUpdates": "更新",
+    "automaticUpdateChecks": "自动检查更新",
     "checkForUpdates": "检查更新",
     "checkingForUpdates": "正在检查更新…",
-    "checkForUpdatesHint": "立即检查是否有新的 AMDM 版本。",
     "collectionSort": "集合排序",
     "sortNatural": "自然顺序（服务器顺序）",
     "sortAlpha": "按字母",
@@ -91,6 +91,9 @@
       "nameTooLong": "方案名称不能超过 50 个字符。",
       "nameDuplicate": "已存在同名配色方案。"
     }
+  },
+  "updates": {
+    "newVersion": "新版本 {{version}}"
   },
   "notify": {
     "loadConnectionsFailed": "加载连接失败：{{error}}",

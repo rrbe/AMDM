@@ -509,6 +509,18 @@ export interface AppSettings {
   /** Remembered "To URL" choice: inline the real password (vs `<password>`
       placeholder). Defaults off; persisted so the user's last pick sticks. */
   exportIncludeRealPassword: boolean
+  /** Latest scheduled update reminder the user opened; later versions still notify. */
+  acknowledgedUpdateVersion: string | null
+}
+
+/** Runtime state of the macOS Sparkle updater. */
+export interface UpdateState {
+  /** False outside a packaged macOS build. */
+  available: boolean
+  /** Sparkle's persisted scheduled-check preference. */
+  automaticallyChecksForUpdates: boolean
+  /** Version shown by the gentle reminder, or null when there is no reminder. */
+  availableVersion: string | null
 }
 
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
@@ -531,5 +543,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorTabSize: 2,
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,
   editorColorSchemes: [],
-  exportIncludeRealPassword: false
+  exportIncludeRealPassword: false,
+  acknowledgedUpdateVersion: null
 }

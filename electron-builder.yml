@@ -27,9 +27,8 @@ mac:
     SUFeedURL: https://github.com/rrbe/AMDM/releases/latest/download/appcast-arm64.xml
     SUPublicEDKey: yF0fhsSuotJutGHezmoAFb3+M7nA6gcOln5aEWycXp8=
     SUEnableAutomaticChecks: true
-    # Keep scheduled checks automatic, but let Sparkle show its native update
-    # prompt. `true` silently downloads and installs on quit, which makes the
-    # update appear invisible; LocalShare deliberately uses the same setting.
+    # Scheduled results are surfaced by the app's gentle reminder instead of
+    # interrupting work with Sparkle's native window. Manual checks still show it.
     SUAutomaticallyUpdate: false
     SUScheduledCheckInterval: 86400
   extraResources:

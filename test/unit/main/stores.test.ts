@@ -79,13 +79,20 @@ describe('settingsStore', () => {
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],
       sidebarWidth: 270,
-      editorHeight: 142
+      editorHeight: 142,
+      acknowledgedUpdateVersion: null
     })
   })
   it('merges + persists an update', () => {
     const next = settingsStore.update({ queryLimit: 100 })
     expect(next.queryLimit).toBe(100)
     expect(settingsStore.get().theme).toBe('system') // untouched
+  })
+
+  it('persists the acknowledged update version', () => {
+    settingsStore.update({ acknowledgedUpdateVersion: '26.8.11' })
+    settingsStore.init()
+    expect(settingsStore.get().acknowledgedUpdateVersion).toBe('26.8.11')
   })
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
