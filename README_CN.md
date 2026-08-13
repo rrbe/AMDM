@@ -28,6 +28,8 @@ pnpm clean           # 清理构建产物
 
 ## macOS 安装
 
+需要 macOS 12 Monterey 或更高版本。
+
 macOS 版本通过 Sparkle 更新,使用 ad-hoc 签名且未经 Apple 公证。首次打开时请在“隐私与安全性”中点击“仍要打开”,或执行 `xattr -dr com.apple.quarantine /Applications/AMDM.app`。
 
 ## 许可证

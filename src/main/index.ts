@@ -126,8 +126,8 @@ function createWindow(): void {
   // Dev diagnostics: surface renderer console + crashes in the terminal.
   // (Open DevTools yourself with Cmd/Ctrl+Alt+I when you need them.)
   if (process.env['ELECTRON_RENDERER_URL']) {
-    win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
-      console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`)
+    win.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+      console.log(`[renderer:${level}] ${message} (${sourceId}:${lineNumber})`)
     })
     win.webContents.on('render-process-gone', (_e, details) => {
       console.error('[renderer gone]', details)
