@@ -2,6 +2,7 @@
   "common": {
     "close": "Close",
     "dismiss": "Dismiss",
+    "refresh": "Refresh",
     "settings": "Settings"
   },
   "app": {
@@ -131,6 +132,13 @@
     "schemaOverwritten": "Draft replaced with the analysis result"
   },
   "connection": {
+    "menu": {
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Delete connection “{{name}}”?"
+    },
     "status": {
       "disconnected": "Disconnected",
       "connecting": "Connecting…",
@@ -435,8 +443,8 @@
     "deleteDoc": "Delete document"
   },
   "io": {
-    "exportCollection": "Export collection…",
-    "importCollection": "Import into collection…",
+    "exportCollection": "Export",
+    "importCollection": "Import",
     "exportTitle": "Export — {{ns}}",
     "importTitle": "Import — {{ns}}",
     "close": "Close",

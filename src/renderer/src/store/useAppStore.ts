@@ -160,6 +160,8 @@ interface AppState {
   toggleNode(connId: string, nodeId: string, kind: NodeKind, payload: NodePayload): Promise<void>
   loadDatabases(connId: string): Promise<void>
   loadCollections(connId: string, db: string): Promise<void>
+  /** Refresh one collection's estimated document count and indexes together. */
+  refreshCollection(connId: string, db: string, coll: string): Promise<void>
   loadIndexes(connId: string, db: string, coll: string): Promise<void>
   loadUsers(connId: string, db: string): Promise<void>
 
@@ -609,7 +611,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else if (kind === 'collection' && payload.db && payload.coll) {
       const db = payload.db
       const coll = payload.coll
-      const key = `${db}/${coll}`
       const collection = get().catalogs[connId]?.collections[db]?.find((item) => item.name === coll)
       if (
         collection &&
@@ -617,37 +618,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         collection.estimatedCount === undefined &&
         !get().catalogs[connId]?.loading.has(nodeId)
       ) {
-        set((s) => withLoading(s, connId, nodeId, true))
-        void Promise.all([
-          window.api.catalog.collectionCount(connId, db, coll),
-          window.api.catalog.indexes(connId, db, coll)
-        ])
-          .then(([estimatedCount, indexes]) =>
-            set((s) => {
-              const c = s.catalogs[connId]
-              const collections = c?.collections[db]
-              if (!c || !collections?.includes(collection)) return {}
-              return {
-                catalogs: {
-                  ...s.catalogs,
-                  [connId]: {
-                    ...c,
-                    collections: {
-                      ...c.collections,
-                      [db]: collections.map((item) =>
-                        item.name === coll ? { ...item, estimatedCount } : item
-                      )
-                    },
-                    indexes: { ...c.indexes, [key]: indexes }
-                  }
-                }
-              }
-            })
-          )
-          .catch(() => {})
-          .finally(() =>
-            set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : {}))
-          )
+        void get().refreshCollection(connId, db, coll)
       }
     } else if (kind === 'indexes' && payload.db && payload.coll) {
       const key = `${payload.db}/${payload.coll}`
@@ -696,6 +667,45 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ lastError: tr('notify.loadCollectionsFailed', { db, error: errMessage(e) }) })
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  async refreshCollection(connId, db, coll) {
+    const nodeId = `${connId}:coll:${db}/${coll}`
+    const catalog = get().catalogs[connId]
+    const collection = catalog?.collections[db]?.find((item) => item.name === coll)
+    if (!collection || collection.type === 'view' || catalog.loading.has(nodeId)) return
+
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      const [estimatedCount, indexes] = await Promise.all([
+        window.api.catalog.collectionCount(connId, db, coll),
+        window.api.catalog.indexes(connId, db, coll)
+      ])
+      set((s) => {
+        const c = s.catalogs[connId]
+        const collections = c?.collections[db]
+        if (!c || !collections?.includes(collection)) return {}
+        return {
+          catalogs: {
+            ...s.catalogs,
+            [connId]: {
+              ...c,
+              collections: {
+                ...c.collections,
+                [db]: collections.map((item) =>
+                  item.name === coll ? { ...item, estimatedCount } : item
+                )
+              },
+              indexes: { ...c.indexes, [`${db}/${coll}`]: indexes }
+            }
+          }
+        }
+      })
+    } catch (e) {
+      set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
+    } finally {
+      set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : {}))
     }
   },
 

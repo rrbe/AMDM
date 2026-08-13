@@ -190,6 +190,7 @@ export function Explorer({
   const toggleNode = useAppStore((s) => s.toggleNode)
   const loadDatabases = useAppStore((s) => s.loadDatabases)
   const loadCollections = useAppStore((s) => s.loadCollections)
+  const refreshCollection = useAppStore((s) => s.refreshCollection)
   const browseCollection = useAppStore((s) => s.browseCollection)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
@@ -224,33 +225,35 @@ export function Explorer({
       items: [
         disconnectable
           ? {
-              label: 'Disconnect',
+              label: t('connection.menu.disconnect'),
               icon: <Unplug size={14} />,
               onClick: () => void disconnect(row.id)
             }
           : {
-              label: 'Connect',
+              label: t('connection.menu.connect'),
               icon: <Plug size={14} />,
               onClick: () => void connect(row.id)
             },
         {
-          label: 'Refresh',
+          label: t('common.refresh'),
           icon: <RefreshCw size={14} />,
           disabled: row.state !== 'connected',
           onClick: () => void loadDatabases(row.id)
         },
         'separator',
         {
-          label: 'Edit',
+          label: t('connection.menu.edit'),
           icon: <Pencil size={14} />,
           onClick: () => setConnForm({ open: true, editing: row.conn })
         },
         {
-          label: 'Delete',
+          label: t('connection.menu.delete'),
           icon: <Trash2 size={14} />,
           danger: true,
           onClick: () => {
-            if (confirm(`Delete connection "${row.conn.name}"?`)) void deleteConnection(row.id)
+            if (confirm(t('connection.menu.deleteConfirm', { name: row.conn.name }))) {
+              void deleteConnection(row.id)
+            }
           }
         }
       ]
@@ -267,7 +270,7 @@ export function Explorer({
         y: e.clientY,
         items: [
           {
-            label: 'Refresh',
+            label: t('common.refresh'),
             icon: <RefreshCw size={14} />,
             onClick: () => void loadCollections(row.connId, row.label)
           }
@@ -282,6 +285,13 @@ export function Explorer({
       x: e.clientX,
       y: e.clientY,
       items: [
+        {
+          label: t('common.refresh'),
+          icon: <RefreshCw size={14} />,
+          disabled: coll.type === 'view' || row.loading,
+          onClick: () => void refreshCollection(row.connId, coll.db, coll.name)
+        },
+        'separator',
         {
           label: t('schema.menu'),
           icon: <ChartNoAxesColumnIncreasing size={14} />,

@@ -302,6 +302,41 @@ describe('connection-bound tabs', () => {
     expect(indexes).toHaveBeenCalledTimes(1)
   })
 
+  it('refreshes one collection estimated count and indexes together', async () => {
+    const collectionCount = vi.fn().mockResolvedValue(84)
+    const indexes = vi.fn().mockResolvedValue([
+      { name: '_id_', key: { _id: 1 } },
+      { name: 'status_1', key: { status: 1 } }
+    ])
+    vi.stubGlobal('window', { api: { catalog: { collectionCount, indexes } } })
+    const collection = { name: 'orders', type: 'collection' as const, estimatedCount: 42 }
+    const untouched = { name: 'users', type: 'collection' as const, estimatedCount: 12 }
+    const oldIndexes = [{ name: '_id_', key: { _id: 1 } }]
+    useAppStore.setState({
+      catalogs: {
+        c1: {
+          databases: [{ name: 'db1' }],
+          collections: { db1: [collection, untouched] },
+          indexes: { 'db1/orders': oldIndexes },
+          users: {},
+          expanded: new Set<string>(),
+          loading: new Set<string>()
+        }
+      }
+    })
+
+    await useAppStore.getState().refreshCollection('c1', 'db1', 'orders')
+
+    expect(collectionCount).toHaveBeenCalledWith('c1', 'db1', 'orders')
+    expect(indexes).toHaveBeenCalledWith('c1', 'db1', 'orders')
+    expect(useAppStore.getState().catalogs.c1.collections.db1).toEqual([
+      { ...collection, estimatedCount: 84 },
+      untouched
+    ])
+    expect(useAppStore.getState().catalogs.c1.indexes['db1/orders']).toHaveLength(2)
+    expect(useAppStore.getState().catalogs.c1.loading.size).toBe(0)
+  })
+
   it('refreshes only the requested connection database list', async () => {
     const databases = vi.fn().mockResolvedValue([{ name: 'fresh' }])
     vi.stubGlobal('window', { api: { catalog: { databases } } })

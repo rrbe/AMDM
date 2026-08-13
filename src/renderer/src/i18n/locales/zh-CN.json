@@ -2,6 +2,7 @@
   "common": {
     "close": "关闭",
     "dismiss": "关闭",
+    "refresh": "刷新",
     "settings": "设置"
   },
   "app": {
@@ -131,6 +132,13 @@
     "schemaOverwritten": "已用分析结果覆盖编辑稿"
   },
   "connection": {
+    "menu": {
+      "connect": "连接",
+      "disconnect": "断开连接",
+      "edit": "编辑",
+      "delete": "删除",
+      "deleteConfirm": "确定删除连接“{{name}}”吗？"
+    },
     "status": {
       "disconnected": "未连接",
       "connecting": "连接中…",
@@ -435,8 +443,8 @@
     "deleteDoc": "删除文档"
   },
   "io": {
-    "exportCollection": "导出集合…",
-    "importCollection": "导入到集合…",
+    "exportCollection": "导出",
+    "importCollection": "导入",
     "exportTitle": "导出 — {{ns}}",
     "importTitle": "导入 — {{ns}}",
     "close": "关闭",
