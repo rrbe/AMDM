@@ -301,10 +301,37 @@
   display: block;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  color: var(--t-string);
+  color: var(--editor-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sq-code .syntax-keyword,
+.sq-code .syntax-property {
+  color: var(--editor-keyword);
+}
+.sq-code .syntax-string {
+  color: var(--editor-string);
+}
+.sq-code .syntax-number,
+.sq-code .syntax-function {
+  color: var(--editor-number);
+}
+.sq-code .syntax-variable {
+  color: var(--editor-foreground);
+}
+.sq-code .syntax-punctuation {
+  color: var(--text-secondary);
+}
+.sq-code .syntax-comment {
+  color: var(--editor-comment);
+  font-style: italic;
+}
+.sq-code .syntax-type {
+  color: var(--editor-type);
+}
+.sq-code .syntax-invalid {
+  color: var(--err);
 }
 .sq-sub {
   display: flex;

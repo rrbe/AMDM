@@ -1,6 +1,8 @@
 /** Saved Queries and History views embedded in the left panel. Both only seed
  * the Shell; running remains an explicit user action. */
-import { useMemo, useState } from 'react'
+import { javascriptLanguage } from '@codemirror/lang-javascript'
+import { highlightCode, tagHighlighter, tags as syntaxTags } from '@lezer/highlight'
+import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, Trash2 } from 'lucide-react'
 import type { HistoryEntry, SavedQuery } from '@shared/types'
@@ -38,6 +40,84 @@ function codePreview(code: string): string {
   const trimmed = firstLine.trim()
   return trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed
 }
+
+const codePreviewHighlighter = tagHighlighter([
+  {
+    tag: [syntaxTags.keyword, syntaxTags.operatorKeyword, syntaxTags.modifier],
+    class: 'syntax-keyword'
+  },
+  { tag: [syntaxTags.string, syntaxTags.special(syntaxTags.string)], class: 'syntax-string' },
+  { tag: syntaxTags.number, class: 'syntax-number' },
+  { tag: [syntaxTags.bool, syntaxTags.null, syntaxTags.atom], class: 'syntax-keyword' },
+  {
+    tag: [syntaxTags.propertyName, syntaxTags.definition(syntaxTags.propertyName)],
+    class: 'syntax-property'
+  },
+  {
+    tag: [syntaxTags.function(syntaxTags.propertyName), syntaxTags.function(syntaxTags.variableName)],
+    class: 'syntax-function'
+  },
+  {
+    tag: [syntaxTags.variableName, syntaxTags.definition(syntaxTags.variableName)],
+    class: 'syntax-variable'
+  },
+  {
+    tag: [
+      syntaxTags.operator,
+      syntaxTags.punctuation,
+      syntaxTags.separator,
+      syntaxTags.bracket,
+      syntaxTags.brace,
+      syntaxTags.squareBracket,
+      syntaxTags.paren
+    ],
+    class: 'syntax-punctuation'
+  },
+  {
+    tag: [syntaxTags.comment, syntaxTags.lineComment, syntaxTags.blockComment],
+    class: 'syntax-comment'
+  },
+  {
+    tag: [syntaxTags.className, syntaxTags.typeName, syntaxTags.namespace],
+    class: 'syntax-type'
+  },
+  { tag: syntaxTags.regexp, class: 'syntax-keyword' },
+  { tag: syntaxTags.invalid, class: 'syntax-invalid' }
+])
+
+interface HighlightedCodeSegment {
+  text: string
+  className?: string
+}
+
+function highlightCodePreview(code: string): HighlightedCodeSegment[] {
+  const preview = codePreview(code)
+  const segments: HighlightedCodeSegment[] = []
+
+  highlightCode(
+    preview,
+    javascriptLanguage.parser.parse(preview),
+    codePreviewHighlighter,
+    (text, className) => segments.push({ text, className: className || undefined }),
+    () => segments.push({ text: ' ' })
+  )
+
+  return segments
+}
+
+const SyntaxCodePreview = memo(function SyntaxCodePreview({ code }: { code: string }): React.JSX.Element {
+  const segments = useMemo(() => highlightCodePreview(code), [code])
+
+  return (
+    <code className="sq-code">
+      {segments.map((segment, index) => (
+        <span key={index} className={segment.className}>
+          {segment.text}
+        </span>
+      ))}
+    </code>
+  )
+})
 
 /** Relative-ish timestamp, falling back to a locale string. */
 function formatTime(ts: number): string {
@@ -221,7 +301,7 @@ function SavedTab({
       data-tip={q.code}
     >
       <div className="sq-name">{q.name}</div>
-      <code className="sq-code">{codePreview(q.code)}</code>
+      <SyntaxCodePreview code={q.code} />
       <div className="sq-sub muted">
         {q.database ? `db: ${q.database}` : t('savedQueries.noDb')}
       </div>
@@ -291,7 +371,7 @@ function HistoryTab({
     <div className="sq-list">
       {entries.map((h) => (
         <div key={h.id} className="sq-row" onClick={() => onLoad(h)} data-tip={h.code}>
-          <code className="sq-code">{codePreview(h.code)}</code>
+          <SyntaxCodePreview code={h.code} />
           <div className="sq-sub muted">
             <span>db: {h.database}</span>
             <span>·</span>
