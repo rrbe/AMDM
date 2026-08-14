@@ -452,6 +452,9 @@
   "table": {
     "noDocuments": "無文件。",
     "selectRowTip": "點擊選取整列（Shift / ⌘ 多選）",
+    "sortAscending": "依 {{column}} 升冪排列",
+    "sortDescending": "依 {{column}} 降冪排列",
+    "clearSort": "清除 {{column}} 排序",
     "saveFailed": "儲存失敗",
     "editCell": "編輯儲存格",
     "editDoc": "編輯文件…",

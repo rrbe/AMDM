@@ -290,6 +290,7 @@ export function ResultPanel({
             {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} />}
             {view === 'table' && (
               <TableView
+                key={active?.id}
                 docs={docs}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}

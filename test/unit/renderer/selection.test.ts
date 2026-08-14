@@ -2,7 +2,7 @@
  * Row/document multi-selection model (extracted from TableView/TreeView).
  */
 import { describe, it, expect } from 'vitest'
-import { computeSelection, type SelectionMods } from '@renderer/lib/selection'
+import { computeSelection, computeVisibleSelection, type SelectionMods } from '@renderer/lib/selection'
 
 const NONE: SelectionMods = { shift: false, meta: false, ctrl: false }
 const SHIFT: SelectionMods = { shift: true, meta: false, ctrl: false }
@@ -51,5 +51,32 @@ describe('immutability', () => {
     const r = computeSelection(prev, 3, 1, META)
     expect(prev).toEqual(set(1, 2)) // unchanged
     expect(r.selection).not.toBe(prev) // new reference
+  })
+})
+
+describe('reordered visible rows', () => {
+  const order = [3, 1, 4, 0, 2]
+
+  it('returns source indexes for a plain click and modifier toggle', () => {
+    const first = computeVisibleSelection(set(), 1, null, order, NONE)
+    expect(first).toEqual({ selection: set(1), anchor: 1 })
+    expect(computeVisibleSelection(first.selection, 3, first.anchor, order, META)).toEqual({
+      selection: set(1, 0),
+      anchor: 0
+    })
+  })
+
+  it('extends Shift selection across the visible range, not the source-index range', () => {
+    expect(computeVisibleSelection(set(1), 4, 1, order, SHIFT)).toEqual({
+      selection: set(1, 4, 0, 2),
+      anchor: 1
+    })
+  })
+
+  it('drops stale source indexes that are absent from the visible result', () => {
+    expect(computeVisibleSelection(set(99, 3), 0, 3, order, META)).toEqual({
+      selection: set(),
+      anchor: 3
+    })
   })
 })
