@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
 import {
@@ -12,7 +12,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { Prec, EditorState, EditorSelection } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
-import { syntaxTree, indentUnit, getIndentUnit } from '@codemirror/language'
+import { indentUnit, getIndentUnit } from '@codemirror/language'
 import { shellCompletionSource } from '@renderer/lib/shellCompletion'
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
@@ -21,6 +21,8 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
 import { selectionCode } from '@renderer/lib/shellSelection'
+import { queryRunGutter, updateQueryRunBusy } from '@renderer/lib/queryRunGutter'
+import { shellStatementAt } from '@renderer/lib/shellStatement'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 
 /**
@@ -181,10 +183,18 @@ export function ShellEditor({
     saveBusy
   }
 
+  const runStatementLabel = t('shell.menu.runStatement')
+
   const extensions = useMemo(
     () => [
       javascript({ typescript: false }),
       shellSemanticHighlight,
+      queryRunGutter({
+        label: runStatementLabel,
+        onRun: (code) => {
+          if (!handlers.current.busy) handlers.current.onRunStatement(code)
+        }
+      }),
       EditorView.updateListener.of((update) => {
         if (update.selectionSet || update.docChanged) {
           selectionHandler.current(selectionCode(update.state))
@@ -254,8 +264,13 @@ export function ShellEditor({
     ],
     // Rebuild only when an editor preference changes (not per keystroke — the
     // run/save/explain callbacks are read through `handlers` ref).
-    [fontSize, wordWrap, tabSize]
+    [fontSize, wordWrap, tabSize, runStatementLabel]
   )
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (view) updateQueryRunBusy(view, busy)
+  }, [busy])
 
   return (
     <div
@@ -276,6 +291,7 @@ export function ShellEditor({
           onChange={onChange}
           onCreateEditor={(view) => {
             viewRef.current = view
+            updateQueryRunBusy(view, handlers.current.busy)
             selectionHandler.current(selectionCode(view.state))
             // Pre-spawn the TS-service worker so the heavy `typescript` chunk
             // loads off the critical path and the service is warm by first use.
@@ -384,25 +400,12 @@ export function ShellEditor({
 
 /**
  * The text to run for "Run Current Statement": the selection if there is one,
- * otherwise the top-level statement under the cursor — located via the JS syntax
- * tree (the direct child of the Script root containing, or just before, the
- * cursor). Falls back to the whole doc if the tree yields nothing.
+ * otherwise the valid top-level statement under the cursor. Whitespace and
+ * syntax-error recovery ranges intentionally yield no runnable statement.
  */
 function statementCode(view: EditorView): string {
   const { state } = view
   const sel = state.selection.main
   if (!sel.empty) return state.sliceDoc(sel.from, sel.to).trim()
-  const pos = sel.head
-  const root = syntaxTree(state).topNode
-  let chosen: typeof root | null = null
-  let lastBefore: typeof root | null = null
-  for (let child = root.firstChild; child; child = child.nextSibling) {
-    if (pos >= child.from && pos <= child.to) {
-      chosen = child
-      break
-    }
-    if (child.to <= pos) lastBefore = child
-  }
-  const node = chosen ?? lastBefore ?? root.firstChild
-  return (node ? state.sliceDoc(node.from, node.to) : state.doc.toString()).trim()
+  return shellStatementAt(state)?.code ?? ''
 }
