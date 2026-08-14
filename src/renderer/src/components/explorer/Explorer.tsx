@@ -128,6 +128,8 @@ interface TreeRow {
   tooltip?: string
   /** Present on index rows: enables index-specific actions. */
   indexName?: string
+  /** Present on the Indexes folder: scopes refresh to its owning collection. */
+  indexCollection?: { db: string; name: string }
   onClick?: () => void
   onDoubleClick?: () => void
   onToggle?: () => void
@@ -202,6 +204,7 @@ export function Explorer({
   const toggleNode = useAppStore((s) => s.toggleNode)
   const loadDatabases = useAppStore((s) => s.loadDatabases)
   const loadCollections = useAppStore((s) => s.loadCollections)
+  const loadIndexes = useAppStore((s) => s.loadIndexes)
   const refreshCollection = useAppStore((s) => s.refreshCollection)
   const browseCollection = useAppStore((s) => s.browseCollection)
   const inspectIndex = useAppStore((s) => s.inspectIndex)
@@ -296,6 +299,23 @@ export function Explorer({
             label: t('explorer.copyIndexName'),
             icon: <Copy size={14} />,
             onClick: () => void copyText(indexName)
+          }
+        ]
+      })
+      return
+    }
+
+    const indexCollection = row.indexCollection
+    if (row.kind === 'indexes' && indexCollection) {
+      setCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            label: t('common.refresh'),
+            icon: <RefreshCw size={14} />,
+            disabled: row.loading,
+            onClick: () => void loadIndexes(row.connId, indexCollection.db, indexCollection.name)
           }
         ]
       })
@@ -791,7 +811,7 @@ function CatalogRow({
       onClick={row.onClick}
       onDoubleClick={row.onDoubleClick}
       onContextMenu={
-        row.kind === 'database' || row.kind === 'index' || coll
+        row.kind === 'database' || row.kind === 'indexes' || row.kind === 'index' || coll
           ? (e) => onContextMenu(e, row)
           : undefined
       }
@@ -961,6 +981,7 @@ function flattenCatalog(
         expanded: idxExpanded,
         loading: cat.loading.has(idxNodeId),
         count: idxList?.length,
+        indexCollection: { db: db.name, name: coll.name },
         onToggle: () =>
           void a.toggleNode(connId, idxNodeId, 'indexes', {
             db: db.name,

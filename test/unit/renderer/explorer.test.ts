@@ -51,6 +51,7 @@ describe('explorer catalog rows', () => {
       toggleNode: vi.fn(),
       loadDatabases: vi.fn(),
       loadCollections: vi.fn(),
+      loadIndexes: vi.fn(),
       refreshCollection: vi.fn(),
       browseCollection: vi.fn(),
       inspectIndex: vi.fn(),
