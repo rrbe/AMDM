@@ -452,6 +452,9 @@
   "table": {
     "noDocuments": "No documents.",
     "selectRowTip": "Click to select row (Shift / ⌘ multi-select)",
+    "sortAscending": "Sort {{column}} ascending",
+    "sortDescending": "Sort {{column}} descending",
+    "clearSort": "Clear sorting for {{column}}",
     "saveFailed": "Save failed",
     "editCell": "Edit cell",
     "editDoc": "Edit document…",

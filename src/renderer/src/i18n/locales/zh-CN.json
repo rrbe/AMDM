@@ -452,6 +452,9 @@
   "table": {
     "noDocuments": "无文档。",
     "selectRowTip": "点击选中整行（Shift / ⌘ 多选）",
+    "sortAscending": "按 {{column}} 升序排列",
+    "sortDescending": "按 {{column}} 降序排列",
+    "clearSort": "清除 {{column}} 排序",
     "saveFailed": "保存失败",
     "editCell": "编辑单元",
     "editDoc": "编辑文档…",

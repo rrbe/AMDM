@@ -46,3 +46,43 @@ export function computeSelection(
   // Plain click selects just this index and re-anchors.
   return { selection: new Set([clicked]), anchor: clicked }
 }
+
+/**
+ * Apply the same selection rules to a reordered view while keeping the public
+ * selection and anchor expressed as source-document indexes.
+ */
+export function computeVisibleSelection(
+  prev: ReadonlySet<number>,
+  clickedVisibleIndex: number,
+  anchorSourceIndex: number | null,
+  sourceIndexesInDisplayOrder: number[],
+  mods: SelectionMods
+): SelectionState {
+  const sourceToVisible = new Map<number, number>()
+  sourceIndexesInDisplayOrder.forEach((sourceIndex, visibleIndex) => {
+    sourceToVisible.set(sourceIndex, visibleIndex)
+  })
+  const visibleSelection = new Set<number>()
+  for (const sourceIndex of prev) {
+    const visibleIndex = sourceToVisible.get(sourceIndex)
+    if (visibleIndex !== undefined) visibleSelection.add(visibleIndex)
+  }
+  const visibleAnchor = anchorSourceIndex === null ? null : (sourceToVisible.get(anchorSourceIndex) ?? null)
+  const next = computeSelection(visibleSelection, clickedVisibleIndex, visibleAnchor, mods)
+  return {
+    selection: new Set(
+      [...next.selection]
+        .map((visibleIndex) => sourceIndexesInDisplayOrder[visibleIndex])
+        .filter((sourceIndex): sourceIndex is number => sourceIndex !== undefined)
+    ),
+    anchor: next.anchor === null ? null : (sourceIndexesInDisplayOrder[next.anchor] ?? null)
+  }
+}
+
+/** Keep a selection in the view's current order (for copy/export consumers). */
+export function selectedIndexesInOrder(
+  selection: ReadonlySet<number>,
+  sourceIndexesInDisplayOrder: readonly number[]
+): number[] {
+  return sourceIndexesInDisplayOrder.filter((sourceIndex) => selection.has(sourceIndex))
+}

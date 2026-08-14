@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CollectionSort, TabularExportFormat } from '@shared/types'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
-import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
+import { cellValue, deriveColumns, isPlainObject, sortTableRows, type TableSortState } from '@renderer/lib/tableShape'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
-import { computeSelection } from '@renderer/lib/selection'
+import { computeVisibleSelection } from '@renderer/lib/selection'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
@@ -51,6 +52,7 @@ interface TableViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
+  onDocumentOrderChange: (sourceIndexes: number[]) => void
   onExport: (format: TabularExportFormat, documents: unknown[]) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
@@ -65,10 +67,11 @@ export function TableView({
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
+  onDocumentOrderChange,
   onExport,
   docCtx
 }: TableViewProps): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n: tableI18n } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
@@ -80,6 +83,7 @@ export function TableView({
   const [editError, setEditError] = useState<string | null>(null)
   // Per-column widths (column name → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
+  const [tableSort, setTableSort] = useState<TableSortState | null>(null)
   const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
 
   // Selection: a set of whole rows, plus the one "focused" cell that gets an
@@ -110,9 +114,17 @@ export function TableView({
   }
 
   const columns = useMemo<string[]>(() => deriveColumns(docs, fieldSort), [docs, fieldSort])
+  const rows = useMemo(
+    () => sortTableRows(docs, tableSort, tableI18n.resolvedLanguage ?? tableI18n.language),
+    [docs, tableSort, tableI18n.resolvedLanguage, tableI18n.language]
+  )
+
+  useEffect(() => {
+    onDocumentOrderChange(rows.map((row) => row.sourceIndex))
+  }, [onDocumentOrderChange, rows])
 
   const rowVirtualizer = useVirtualizer({
-    count: docs.length,
+    count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => fontSize + 11,
     overscan: 12
@@ -124,7 +136,7 @@ export function TableView({
   useCopyHotkey(() => {
     if (preview) return null
     if (selectedRows.size > 0) {
-      const picked = [...selectedRows].sort((a, b) => a - b).map((i) => docs[i])
+      const picked = rows.filter((row) => selectedRows.has(row.sourceIndex)).map((row) => row.doc)
       return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
     }
     if (selectedCell) {
@@ -136,24 +148,30 @@ export function TableView({
 
   // Core row-selection logic shared by cell clicks and the # handle: plain = just
   // this row, Shift = range from the anchor, ⌘/Ctrl = toggle (see selection.ts).
-  const applyRowSelection = (row: number, e: MouseEvent): void => {
-    const { selection, anchor } = computeSelection(selectedRows, row, anchorRow, {
-      shift: e.shiftKey,
-      meta: e.metaKey,
-      ctrl: e.ctrlKey
-    })
+  const applyRowSelection = (visibleRow: number, e: MouseEvent): void => {
+    const { selection, anchor } = computeVisibleSelection(
+      selectedRows,
+      visibleRow,
+      anchorRow,
+      rows.map((row) => row.sourceIndex),
+      {
+        shift: e.shiftKey,
+        meta: e.metaKey,
+        ctrl: e.ctrlKey
+      }
+    )
     onSelectedDocIndexesChange(selection)
     setAnchorRow(anchor)
   }
   // Single-click a cell: select its whole row AND focus that cell (cell overlay).
-  const clickCell = (row: number, col: string, e: MouseEvent): void => {
-    setSelectedCell({ row, col })
-    applyRowSelection(row, e)
+  const clickCell = (visibleRow: number, sourceRow: number, col: string, e: MouseEvent): void => {
+    setSelectedCell({ row: sourceRow, col })
+    applyRowSelection(visibleRow, e)
   }
   // The # column selects the row without focusing any cell.
-  const clickHandle = (row: number, e: MouseEvent): void => {
+  const clickHandle = (visibleRow: number, e: MouseEvent): void => {
     setSelectedCell(null)
-    applyRowSelection(row, e)
+    applyRowSelection(visibleRow, e)
   }
   // A cell is inline-editable when we know the collection, the row's doc has an
   // _id, the column isn't _id, and the value is a supported scalar.
@@ -201,7 +219,10 @@ export function TableView({
     e.preventDefault()
     // Right-clicking inside a multi-selection keeps it; otherwise focus this row
     // (and the cell under the cursor, if any).
-    const rows = selectedRows.has(row) ? [...selectedRows].sort((a, b) => a - b) : [row]
+    const selectedInDisplayOrder = rows
+      .filter((candidate) => selectedRows.has(candidate.sourceIndex))
+      .map((candidate) => candidate.sourceIndex)
+    const selectedIndexes = selectedRows.has(row) ? selectedInDisplayOrder : [row]
     if (!selectedRows.has(row)) {
       onSelectedDocIndexesChange(new Set([row]))
       setAnchorRow(row)
@@ -226,12 +247,12 @@ export function TableView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
-      children: tableCopyMenuItems(rows, row, col, docs, fieldSort)
+      children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
     })
     items.push({
       label: t('result.dataMenu.export'),
       children: exportMenuItems(
-        rows.map((index) => docs[index]),
+        selectedIndexes.map((index) => docs[index]),
         onExport
       )
     })
@@ -277,30 +298,70 @@ export function TableView({
             #
           </div>
           {columns.map((col) => (
-            <div key={col} className="tbl-th" style={{ width: widthOf(col) }} data-tip={col}>
-              {col}
-              <span
-                className="tbl-col-resizer"
-                onMouseDown={(e) => startColResize(col, e)}
-              />
+            <div
+              key={col}
+              className="tbl-th"
+              style={{ width: widthOf(col) }}
+              role="columnheader"
+              aria-sort={
+                tableSort?.column === col ? (tableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
+              }
+            >
+              <button
+                type="button"
+                className={`tbl-sort-trigger${tableSort?.column === col ? ' active' : ''}`}
+                data-tip={
+                  tableSort?.column !== col
+                    ? t('table.sortAscending', { column: col })
+                    : tableSort.direction === 'asc'
+                      ? t('table.sortDescending', { column: col })
+                      : t('table.clearSort', { column: col })
+                }
+                aria-label={
+                  tableSort?.column !== col
+                    ? t('table.sortAscending', { column: col })
+                    : tableSort.direction === 'asc'
+                      ? t('table.sortDescending', { column: col })
+                      : t('table.clearSort', { column: col })
+                }
+                onClick={() =>
+                  setTableSort((current) => {
+                    if (current?.column !== col) return { column: col, direction: 'asc' }
+                    if (current.direction === 'asc') return { column: col, direction: 'desc' }
+                    return null
+                  })
+                }
+              >
+                <span className="tbl-col-label">{col}</span>
+                {tableSort?.column === col ? (
+                  tableSort.direction === 'asc' ? (
+                    <ArrowUp size={13} aria-hidden="true" />
+                  ) : (
+                    <ArrowDown size={13} aria-hidden="true" />
+                  )
+                ) : (
+                  <ChevronsUpDown size={13} className="tbl-sort-idle" aria-hidden="true" />
+                )}
+              </button>
+              <span className="tbl-col-resizer" onMouseDown={(e) => startColResize(col, e)} />
             </div>
           ))}
         </div>
 
         {/* Virtualized rows */}
         {rowVirtualizer.getVirtualItems().map((vi) => {
-          const doc = docs[vi.index]
+          const { doc, sourceIndex } = rows[vi.index]
           return (
             <div
-              key={vi.index}
-              className={`tbl-row${selectedRows.has(vi.index) ? ' selected' : ''}`}
+              key={sourceIndex}
+              className={`tbl-row${selectedRows.has(sourceIndex) ? ' selected' : ''}`}
               style={{ transform: `translateY(${vi.start + fontSize + 11}px)`, width: totalWidth }}
             >
               <div
                 className="tbl-td idx idx-select"
                 style={{ width: INDEX_COL_WIDTH }}
                 onClick={(e) => clickHandle(vi.index, e)}
-                onContextMenu={(e) => openMenu(e, vi.index, null)}
+                onContextMenu={(e) => openMenu(e, sourceIndex, null)}
                 data-tip={t('table.selectRowTip')}
               >
                 {vi.index + 1}
@@ -311,17 +372,17 @@ export function TableView({
                   doc={doc}
                   column={col}
                   width={widthOf(col)}
-                  selected={selectedCell?.row === vi.index && selectedCell?.col === col}
-                  editing={editing?.row === vi.index && editing?.col === col}
+                  selected={selectedCell?.row === sourceIndex && selectedCell?.col === col}
+                  editing={editing?.row === sourceIndex && editing?.col === col}
                   editError={editError}
-                  onClick={(e) => clickCell(vi.index, col, e)}
+                  onClick={(e) => clickCell(vi.index, sourceIndex, col, e)}
                   onOpen={(value) => setPreview({ column: col, value })}
-                  onCommit={(text) => void commitCell(vi.index, col, text)}
+                  onCommit={(text) => void commitCell(sourceIndex, col, text)}
                   onCancel={() => {
                     setEditing(null)
                     setEditError(null)
                   }}
-                  onContextMenu={(e) => openMenu(e, vi.index, col)}
+                  onContextMenu={(e) => openMenu(e, sourceIndex, col)}
                 />
               ))}
             </div>
