@@ -6,7 +6,7 @@
  * objects and arrays remain single cells and open in the value-preview modal.
  */
 import type { CollectionSort } from '@shared/types'
-import { isExtended } from '@renderer/lib/ejson'
+import { formatScalar, isExtended } from '@renderer/lib/ejson'
 
 type Dict = Record<string, unknown>
 
@@ -69,71 +69,121 @@ export function sortTableRows(docs: unknown[], sort: TableSortState | null, loca
   if (!sort) return rows
 
   const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' })
-  rows.sort((left, right) => {
-    const leftCell = cellValue(left.doc, sort.column)
-    const rightCell = cellValue(right.doc, sort.column)
-    const leftEmpty = isEmptySortValue(leftCell)
-    const rightEmpty = isEmptySortValue(rightCell)
-
-    // Empty cells remain last even for descending order.
+  // Build every sort key once. In particular, container keys are shallow and
+  // bounded; Array.sort never walks/stringifies a nested value per comparison.
+  const prepared = rows.map((row) => ({ ...row, key: prepareSortKey(cellValue(row.doc, sort.column)) }))
+  prepared.sort((left, right) => {
+    const leftEmpty = left.key.kind === 'empty'
+    const rightEmpty = right.key.kind === 'empty'
     if (leftEmpty !== rightEmpty) return leftEmpty ? 1 : -1
     if (leftEmpty && rightEmpty) return left.sourceIndex - right.sourceIndex
 
-    const compared = comparePresentValues(leftCell.value, rightCell.value, collator)
+    const compared = compareSortKeys(left.key, right.key, collator)
     if (compared === 0) return left.sourceIndex - right.sourceIndex
     return sort.direction === 'asc' ? compared : -compared
   })
-  return rows
+  return prepared.map(({ doc, sourceIndex }) => ({ doc, sourceIndex }))
 }
 
-function isEmptySortValue(cell: { present: boolean; value: unknown }): boolean {
-  if (!cell.present || cell.value === null || cell.value === undefined) return true
-  return isPlainObject(cell.value) && Object.keys(cell.value).length === 1 && '$undefined' in cell.value
-}
-
-type SortKind = 'number' | 'date' | 'string' | 'objectId' | 'boolean' | 'array' | 'object' | 'other'
+type SortKind =
+  | 'empty'
+  | 'number'
+  | 'date'
+  | 'timestamp'
+  | 'string'
+  | 'objectId'
+  | 'boolean'
+  | 'array'
+  | 'object'
+  | 'other'
 
 const SORT_KIND_RANK: Record<SortKind, number> = {
-  number: 0,
-  date: 1,
-  string: 2,
-  objectId: 3,
-  boolean: 4,
-  array: 5,
-  object: 6,
-  other: 7
+  empty: 0,
+  number: 1,
+  date: 2,
+  timestamp: 3,
+  string: 4,
+  objectId: 5,
+  boolean: 6,
+  array: 7,
+  object: 8,
+  other: 9
 }
 
-function comparePresentValues(left: unknown, right: unknown, collator: Intl.Collator): number {
-  const leftKind = sortKind(left)
-  const rightKind = sortKind(right)
-  if (leftKind !== rightKind) return SORT_KIND_RANK[leftKind] - SORT_KIND_RANK[rightKind]
+type SortKey =
+  | { kind: 'empty' }
+  | { kind: 'number' | 'date'; value: NumericSortKey }
+  | { kind: 'timestamp'; time: NumericSortKey; increment: NumericSortKey }
+  | { kind: 'string' | 'objectId' | 'other'; value: string }
+  | { kind: 'boolean' | 'array' | 'object'; value: number }
 
-  switch (leftKind) {
+interface NumericSortKey {
+  text: string
+  parsed: ParsedNumber | null
+}
+
+function prepareSortKey(cell: { present: boolean; value: unknown }): SortKey {
+  if (
+    !cell.present ||
+    cell.value === null ||
+    cell.value === undefined ||
+    (isSingleMarker(cell.value, '$undefined') && cell.value['$undefined'] === true)
+  ) {
+    return { kind: 'empty' }
+  }
+
+  const value = cell.value
+  const number = numericText(value)
+  if (number !== null) return { kind: 'number', value: numericSortKey(number) }
+  const date = dateNumericText(value)
+  if (date !== null) return { kind: 'date', value: numericSortKey(date) }
+  const timestamp = timestampNumericKeys(value)
+  if (timestamp) return { kind: 'timestamp', ...timestamp }
+  if (typeof value === 'string' || isSingleMarker(value, '$symbol')) {
+    return { kind: 'string', value: stringText(value) }
+  }
+  if (isSingleMarker(value, '$oid')) {
+    return { kind: 'objectId', value: String(value['$oid']).toLowerCase() }
+  }
+  if (typeof value === 'boolean') return { kind: 'boolean', value: Number(value) }
+  if (Array.isArray(value)) return { kind: 'array', value: value.length }
+  if (isPlainObject(value) && !isExtended(value)) return { kind: 'object', value: Object.keys(value).length }
+  return { kind: 'other', value: formatScalar(value).text }
+}
+
+function compareSortKeys(left: SortKey, right: SortKey, collator: Intl.Collator): number {
+  if (left.kind !== right.kind) return SORT_KIND_RANK[left.kind] - SORT_KIND_RANK[right.kind]
+
+  switch (left.kind) {
     case 'number':
-      return compareNumericText(numericText(left)!, numericText(right)!, collator)
     case 'date':
-      return compareNumericText(dateNumericText(left)!, dateNumericText(right)!, collator)
-    case 'string':
-      return collator.compare(stringText(left), stringText(right))
+      return compareNumericSortKeys(left.value, (right as typeof left).value, collator)
+    case 'timestamp': {
+      const other = right as typeof left
+      const time = compareNumericSortKeys(left.time, other.time, collator)
+      return time === 0 ? compareNumericSortKeys(left.increment, other.increment, collator) : time
+    }
     case 'objectId':
-      return collator.compare(String((left as Dict)['$oid']), String((right as Dict)['$oid']))
+      return compareLexical(left.value, (right as typeof left).value)
     case 'boolean':
-      return Number(left) - Number(right)
-    default:
-      return collator.compare(stableValueText(left), stableValueText(right))
+    case 'array':
+    case 'object':
+      return left.value - (right as typeof left).value
+    case 'string':
+    case 'other':
+      return collator.compare(left.value, (right as typeof left).value)
+    case 'empty':
+      return 0
   }
 }
 
-function sortKind(value: unknown): SortKind {
-  if (numericText(value) !== null) return 'number'
-  if (dateNumericText(value) !== null) return 'date'
-  if (typeof value === 'string' || isSingleMarker(value, '$symbol')) return 'string'
-  if (isSingleMarker(value, '$oid')) return 'objectId'
-  if (typeof value === 'boolean') return 'boolean'
-  if (Array.isArray(value)) return 'array'
-  if (isPlainObject(value) && !isExtended(value)) return 'object'
-  return 'other'
+function numericSortKey(text: string): NumericSortKey {
+  return { text, parsed: parseNumericText(text) }
+}
+
+function compareLexical(left: string, right: string): number {
+  if (left === right) return 0
+  return left < right ? -1 : 1
 }
 
 function numericText(value: unknown): string | null {
@@ -156,6 +206,19 @@ function dateNumericText(value: unknown): string | null {
   return numericText(payload)
 }
 
+function timestampNumericKeys(
+  value: unknown
+): { time: NumericSortKey; increment: NumericSortKey } | null {
+  if (!isSingleMarker(value, '$timestamp')) return null
+  const payload = value['$timestamp']
+  if (!isPlainObject(payload)) return null
+  const time = numericText(payload['t'])
+  const increment = numericText(payload['i'])
+  return time === null || increment === null
+    ? null
+    : { time: numericSortKey(time), increment: numericSortKey(increment) }
+}
+
 function stringText(value: unknown): string {
   return typeof value === 'string' ? value : String((value as Dict)['$symbol'])
 }
@@ -168,10 +231,10 @@ type ParsedNumber =
   | { special: 'negativeInfinity' | 'positiveInfinity' | 'nan' }
   | { special: 'finite'; sign: -1 | 0 | 1; digits: string; exponent: number }
 
-function compareNumericText(left: string, right: string, collator: Intl.Collator): number {
-  const a = parseNumericText(left)
-  const b = parseNumericText(right)
-  if (!a || !b) return collator.compare(left, right)
+function compareNumericSortKeys(left: NumericSortKey, right: NumericSortKey, collator: Intl.Collator): number {
+  const a = left.parsed
+  const b = right.parsed
+  if (!a || !b) return collator.compare(left.text, right.text)
 
   const specialRank = (value: ParsedNumber): number => {
     if (value.special === 'negativeInfinity') return 0
@@ -221,17 +284,4 @@ function parseNumericText(input: string): ParsedNumber | null {
     digits,
     exponent
   }
-}
-
-function stableValueText(value: unknown): string {
-  if (value === undefined) return 'undefined'
-  if (typeof value === 'bigint') return `${value}n`
-  if (Array.isArray(value)) return `[${value.map(stableValueText).join(',')}]`
-  if (isPlainObject(value)) {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableValueText(value[key])}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value) ?? String(value)
 }

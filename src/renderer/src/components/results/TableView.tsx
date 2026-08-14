@@ -52,6 +52,7 @@ interface TableViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
+  onDocumentOrderChange: (sourceIndexes: number[]) => void
   onExport: (format: TabularExportFormat, documents: unknown[]) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
@@ -66,6 +67,7 @@ export function TableView({
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
+  onDocumentOrderChange,
   onExport,
   docCtx
 }: TableViewProps): React.JSX.Element {
@@ -116,6 +118,10 @@ export function TableView({
     () => sortTableRows(docs, tableSort, tableI18n.resolvedLanguage ?? tableI18n.language),
     [docs, tableSort, tableI18n.resolvedLanguage, tableI18n.language]
   )
+
+  useEffect(() => {
+    onDocumentOrderChange(rows.map((row) => row.sourceIndex))
+  }, [onDocumentOrderChange, rows])
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,

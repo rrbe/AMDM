@@ -78,3 +78,11 @@ export function computeVisibleSelection(
     anchor: next.anchor === null ? null : (sourceIndexesInDisplayOrder[next.anchor] ?? null)
   }
 }
+
+/** Keep a selection in the view's current order (for copy/export consumers). */
+export function selectedIndexesInOrder(
+  selection: ReadonlySet<number>,
+  sourceIndexesInDisplayOrder: readonly number[]
+): number[] {
+  return sourceIndexesInDisplayOrder.filter((sourceIndex) => selection.has(sourceIndex))
+}

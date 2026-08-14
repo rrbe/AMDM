@@ -135,6 +135,50 @@ describe('sortTableRows', () => {
     ])
   })
 
+  it('orders ObjectIds by hexadecimal value instead of numeric collation segments', () => {
+    const docs = [
+      { id: { $oid: '2fffffffffffffffffffffff' } },
+      { id: { $oid: '100000000000000000000000' } }
+    ]
+    expect(sortTableRows(docs, { column: 'id', direction: 'asc' }, 'en').map((row) => row.sourceIndex)).toEqual([
+      1, 0
+    ])
+  })
+
+  it('orders BSON Timestamps by time and then increment', () => {
+    const docs = [
+      { ts: { $timestamp: { t: 10, i: 1 } } },
+      { ts: { $timestamp: { t: 9, i: 1 } } },
+      { ts: { $timestamp: { t: 10, i: 0 } } }
+    ]
+    expect(sortTableRows(docs, { column: 'ts', direction: 'asc' }, 'en').map((row) => row.sourceIndex)).toEqual([
+      1, 2, 0
+    ])
+    expect(sortTableRows(docs, { column: 'ts', direction: 'desc' }, 'en').map((row) => row.sourceIndex)).toEqual([
+      0, 2, 1
+    ])
+  })
+
+  it('uses shallow bounded keys for nested containers', () => {
+    const deepValue = new Proxy(
+      {},
+      {
+        ownKeys: () => {
+          throw new Error('nested value was traversed')
+        }
+      }
+    )
+    const docs = [
+      { value: [deepValue, deepValue] },
+      { value: [deepValue] },
+      { value: { first: deepValue, second: deepValue } },
+      { value: { first: deepValue } }
+    ]
+    expect(sortTableRows(docs, { column: 'value', direction: 'asc' }, 'en').map((row) => row.sourceIndex)).toEqual([
+      1, 0, 3, 2
+    ])
+  })
+
   it('keeps null, undefined, canonical undefined, and missing fields last in both directions', () => {
     const docs = [{ n: null }, { n: 2 }, {}, { n: { $undefined: true } }, { n: 1 }, { n: undefined }]
     expect(sortTableRows(docs, { column: 'n', direction: 'asc' }, 'en').map((row) => row.sourceIndex)).toEqual([

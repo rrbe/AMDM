@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type ShellResult, type TabularExportFormat } from '@shared/types'
@@ -8,6 +8,7 @@ import { formatQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
+import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
@@ -58,6 +59,14 @@ export function ResultPanel({
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
   const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
+  const [tableDocumentOrder, setTableDocumentOrder] = useState<number[] | null>(null)
+  const updateTableDocumentOrder = useCallback((next: number[]) => {
+    setTableDocumentOrder((current) =>
+      current?.length === next.length && current.every((sourceIndex, index) => sourceIndex === next[index])
+        ? current
+        : next
+    )
+  }, [])
   const [exportModal, setExportModal] = useState<{
     format: TabularExportFormat
     fixedDocuments?: unknown[]
@@ -146,6 +155,10 @@ export function ResultPanel({
     setSelectedDocIndexes(new Set())
   }, [active?.id, result?.data])
 
+  useEffect(() => {
+    if (view !== 'table') setTableDocumentOrder(null)
+  }, [view])
+
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
   const strip =
@@ -207,8 +220,8 @@ export function ResultPanel({
   // Normalize to a documents array for the three views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = normalizeDocs(result)
-  const selectedDocuments = [...selectedDocIndexes]
-    .sort((a, b) => a - b)
+  const documentOrder = view === 'table' && tableDocumentOrder ? tableDocumentOrder : docs.map((_, index) => index)
+  const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
     .filter((index) => index >= 0 && index < docs.length)
     .map((index) => docs[index])
   const openSelectionExport = (format: TabularExportFormat, documents: unknown[]): void => {
@@ -295,6 +308,7 @@ export function ResultPanel({
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
+                onDocumentOrderChange={updateTableDocumentOrder}
                 onExport={openSelectionExport}
                 docCtx={docCtx}
               />

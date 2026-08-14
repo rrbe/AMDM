@@ -2,7 +2,12 @@
  * Row/document multi-selection model (extracted from TableView/TreeView).
  */
 import { describe, it, expect } from 'vitest'
-import { computeSelection, computeVisibleSelection, type SelectionMods } from '@renderer/lib/selection'
+import {
+  computeSelection,
+  computeVisibleSelection,
+  selectedIndexesInOrder,
+  type SelectionMods
+} from '@renderer/lib/selection'
 
 const NONE: SelectionMods = { shift: false, meta: false, ctrl: false }
 const SHIFT: SelectionMods = { shift: true, meta: false, ctrl: false }
@@ -78,5 +83,9 @@ describe('reordered visible rows', () => {
       selection: set(),
       anchor: 3
     })
+  })
+
+  it('exposes selected source indexes in visible order for export consumers', () => {
+    expect(selectedIndexesInOrder(set(0, 1, 3), order)).toEqual([3, 1, 0])
   })
 })
