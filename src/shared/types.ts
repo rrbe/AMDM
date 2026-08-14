@@ -399,13 +399,34 @@ export interface DocMutateResult {
 // Import / export (Phase 3)
 // ---------------------------------------------------------------------------
 
-export type DataFormat = 'json' | 'csv' | 'xlsx' | 'bson'
+export type ImportFormat = 'json' | 'csv' | 'xlsx' | 'bson'
+export type TabularExportFormat = 'csv' | 'tsv' | 'xlsx'
+export type ExportFormat = 'json' | TabularExportFormat | 'bson'
+export type TabularDelimiter = ',' | ';' | ' ' | '\t' | '/' | '-' | '.'
 
-export interface ExportRequest {
+interface ExportOptions {
+  /** Opaque id used for progress events and cancellation. */
+  taskId: string
+  format: ExportFormat
+  /** Tabular formats: include the derived field-name row. */
+  includeHeader?: boolean
+  /** CSV/TSV: prepend a UTF-8 BOM for spreadsheet compatibility. */
+  utf8Bom?: boolean
+  /** CSV/TSV line separator. */
+  lineEnding?: 'lf' | 'crlf'
+  /** CSV/TSV field separator. */
+  delimiter?: TabularDelimiter
+  /** XLSX worksheet name; sanitized again in main before writing. */
+  worksheetName?: string
+  /** Keep exported columns consistent with the Table view. */
+  fieldSort?: CollectionSort
+}
+
+export interface CollectionExportRequest extends ExportOptions {
+  source: 'collection'
   connectionId: string
   database: string
   collection: string
-  format: DataFormat
   /** Optional EJSON filter string for native formats (default {} = all). */
   query?: string
   /** Optional cap on documents exported. */
@@ -416,11 +437,32 @@ export interface ExportRequest {
   gzip?: boolean
 }
 
+export interface ResultExportRequest extends ExportOptions {
+  source: 'result'
+  format: TabularExportFormat
+  /** EJSON-canonical, structured-cloneable documents already loaded by Renderer. */
+  documents: unknown[]
+  /** Used only to suggest a file name in the native save dialog. */
+  suggestedName?: string
+}
+
+export type ExportRequest = CollectionExportRequest | ResultExportRequest
+
 export interface ImportRequest {
   connectionId: string
   database: string
   collection: string
-  format: DataFormat
+  format: ImportFormat
+}
+
+export type ExportProgressPhase = 'scanning' | 'writing' | 'finalizing'
+
+export interface ExportProgress {
+  taskId: string
+  phase: ExportProgressPhase
+  processed: number
+  /** Present for an in-memory result source; collection totals are not queried implicitly. */
+  total?: number
 }
 
 export interface DataOpResult {

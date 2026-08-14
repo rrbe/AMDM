@@ -68,6 +68,14 @@ const api: Api = {
   },
   io: {
     export: (request) => ipcRenderer.invoke(IPC.ioExport, request),
+    cancelExport: (taskId) => ipcRenderer.invoke(IPC.ioExportCancel, taskId),
+    onExportProgress: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof listener>[0]): void => {
+        listener(progress)
+      }
+      ipcRenderer.on(IPC.ioExportProgress, handle)
+      return () => ipcRenderer.removeListener(IPC.ioExportProgress, handle)
+    },
     import: (request) => ipcRenderer.invoke(IPC.ioImport, request)
   },
   settings: {

@@ -19,6 +19,7 @@ import type {
   DocSetFieldRequest,
   DocUpdateRequest,
   ExportRequest,
+  ExportProgress,
   HistoryEntry,
   ImportRequest,
   IndexInfo,
@@ -74,6 +75,8 @@ export const IPC = {
   docDelete: 'doc:delete',
 
   ioExport: 'io:export',
+  ioExportCancel: 'io:exportCancel',
+  ioExportProgress: 'io:exportProgress',
   ioImport: 'io:import',
 
   settingsGet: 'settings:get',
@@ -156,8 +159,10 @@ export interface Api {
     delete(request: DocMutateRequest): Promise<DocMutateResult>
   }
   io: {
-    /** Export a collection; opens a save dialog and returns the chosen path. */
+    /** Export a collection or bounded Renderer result; opens a native save dialog. */
     export(request: ExportRequest): Promise<DataOpResult>
+    cancelExport(taskId: string): Promise<boolean>
+    onExportProgress(listener: (progress: ExportProgress) => void): () => void
     /** Import into a collection; opens an open dialog for the source file. */
     import(request: ImportRequest): Promise<DataOpResult>
   }

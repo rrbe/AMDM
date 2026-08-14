@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { CollectionSort } from '@shared/types'
+import type { CollectionSort, TabularExportFormat } from '@shared/types'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
@@ -49,6 +49,9 @@ import { ResizableModal } from '@renderer/components/common/Modal'
 interface TableViewProps {
   docs: unknown[]
   fontSize: number
+  selectedDocIndexes: Set<number>
+  onSelectedDocIndexesChange: (selection: Set<number>) => void
+  onExport: (format: TabularExportFormat, documents: unknown[]) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -57,7 +60,14 @@ const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 
-export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX.Element {
+export function TableView({
+  docs,
+  fontSize,
+  selectedDocIndexes,
+  onSelectedDocIndexesChange,
+  onExport,
+  docCtx
+}: TableViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
@@ -78,7 +88,7 @@ export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX
   // a row without focusing a cell. Shift extends a row range, ⌘/Ctrl toggles —
   // but no modifier is needed: a plain click already selects the row.
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: string } | null>(null)
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(() => new Set())
+  const selectedRows = selectedDocIndexes
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
@@ -132,7 +142,7 @@ export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX
       meta: e.metaKey,
       ctrl: e.ctrlKey
     })
-    setSelectedRows(selection)
+    onSelectedDocIndexesChange(selection)
     setAnchorRow(anchor)
   }
   // Single-click a cell: select its whole row AND focus that cell (cell overlay).
@@ -193,7 +203,7 @@ export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX
     // (and the cell under the cursor, if any).
     const rows = selectedRows.has(row) ? [...selectedRows].sort((a, b) => a - b) : [row]
     if (!selectedRows.has(row)) {
-      setSelectedRows(new Set([row]))
+      onSelectedDocIndexesChange(new Set([row]))
       setAnchorRow(row)
     }
     setSelectedCell(col ? { row, col } : null)
@@ -217,6 +227,13 @@ export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX
     items.push({
       label: t('result.dataMenu.copy'),
       children: tableCopyMenuItems(rows, row, col, docs, fieldSort)
+    })
+    items.push({
+      label: t('result.dataMenu.export'),
+      children: exportMenuItems(
+        rows.map((index) => docs[index]),
+        onExport
+      )
     })
     if (docCtx && docHasId(doc)) {
       items.push('separator')
@@ -340,6 +357,26 @@ export function TableView({ docs, fontSize, docCtx }: TableViewProps): React.JSX
       )}
     </div>
   )
+}
+
+function exportMenuItems(
+  documents: unknown[],
+  onExport: (format: TabularExportFormat, documents: unknown[]) => void
+): ContextMenuEntry[] {
+  return [
+    {
+      label: i18n.t('result.export.csv'),
+      onClick: () => onExport('csv', documents)
+    },
+    {
+      label: i18n.t('result.export.tsv'),
+      onClick: () => onExport('tsv', documents)
+    },
+    {
+      label: i18n.t('result.export.xlsx'),
+      onClick: () => onExport('xlsx', documents)
+    }
+  ]
 }
 
 /** Right-click copy menu for a table cell / row(s). */

@@ -36,7 +36,7 @@ import {
 import { executeShell, abortShell } from '../mongo/shellEngine'
 import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { analyzeCollectionSchema } from '../mongo/schemaAnalysis'
-import { exportData } from '../io/exporter'
+import { cancelExport, exportData } from '../io/exporter'
 import { importData } from '../io/importer'
 import { registerUpdatesIpc } from './registerUpdatesIpc'
 
@@ -230,9 +230,10 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.docDelete, (_e, req: DocMutateRequest) => deleteDocument(req))
 
   // import / export
-  ipcMain.handle(IPC.ioExport, (_e, req: ExportRequest) =>
-    exportData(req, BrowserWindow.getFocusedWindow())
+  ipcMain.handle(IPC.ioExport, (event, req: ExportRequest) =>
+    exportData(req, BrowserWindow.fromWebContents(event.sender), event.sender)
   )
+  ipcMain.handle(IPC.ioExportCancel, (event, taskId: string) => cancelExport(taskId, event.sender.id))
   ipcMain.handle(IPC.ioImport, (_e, req: ImportRequest) =>
     importData(req, BrowserWindow.getFocusedWindow())
   )

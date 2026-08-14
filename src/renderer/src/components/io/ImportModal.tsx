@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { useAppStore } from '@renderer/store/useAppStore'
-import type { DataFormat, DataOpResult } from '@shared/types'
+import type { DataOpResult, ImportFormat } from '@shared/types'
 
 interface ImportModalProps {
   connectionId: string
@@ -26,7 +26,7 @@ interface ImportModalProps {
   onClose: () => void
 }
 
-const FORMATS: Array<{ value: DataFormat; label: string }> = [
+const FORMATS: Array<{ value: ImportFormat; label: string }> = [
   { value: 'json', label: 'JSON' },
   { value: 'csv', label: 'CSV' },
   { value: 'xlsx', label: 'XLSX' },
@@ -37,7 +37,7 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
   const { t } = useTranslation()
   const importCollection = useAppStore((s) => s.importCollection)
 
-  const [format, setFormat] = useState<DataFormat>('json')
+  const [format, setFormat] = useState<ImportFormat>('json')
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<DataOpResult | null>(null)
 
@@ -57,7 +57,7 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
 
   return (
     <Modal
-      title={t('io.importTitle', { ns: `${database}.${collection}` })}
+      title={t('io.importTitle', { target: `${database}.${collection}` })}
       onClose={onClose}
       footer={
         <>

@@ -622,9 +622,12 @@ export function Explorer({
 
       {ioModal && ioModal.mode === 'export' && (
         <ExportModal
-          connectionId={ioModal.connId}
-          database={ioModal.db}
-          collection={ioModal.collection}
+          source={{
+            kind: 'collection',
+            connectionId: ioModal.connId,
+            database: ioModal.db,
+            collection: ioModal.collection
+          }}
           onClose={() => setIoModal(null)}
         />
       )}

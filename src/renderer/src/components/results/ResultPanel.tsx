@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type ShellResult } from '@shared/types'
+import { QUERY_LIMITS, type ShellResult, type TabularExportFormat } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime } from '@renderer/lib/queryTime'
@@ -11,6 +11,7 @@ import { consoleText } from '@renderer/lib/consoleOutput'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
+import { ExportModal } from '@renderer/components/io/ExportModal'
 import {
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
@@ -56,9 +57,15 @@ export function ResultPanel({
   const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
+  const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
+  const [exportModal, setExportModal] = useState<{
+    format: TabularExportFormat
+    fixedDocuments?: unknown[]
+  } | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const copiedTimer = useRef<number | null>(null)
   const copyAttempt = useRef(0)
+  const copyButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(
     () => () => {
@@ -135,6 +142,10 @@ export function ResultPanel({
     if (!result && expanded) onExpandedChange(false)
   }, [result, expanded, onExpandedChange])
 
+  useEffect(() => {
+    setSelectedDocIndexes(new Set())
+  }, [active?.id, result?.data])
+
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
   const strip =
@@ -196,6 +207,17 @@ export function ResultPanel({
   // Normalize to a documents array for the three views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = normalizeDocs(result)
+  const selectedDocuments = [...selectedDocIndexes]
+    .sort((a, b) => a - b)
+    .filter((index) => index >= 0 && index < docs.length)
+    .map((index) => docs[index])
+  const openSelectionExport = (format: TabularExportFormat, documents: unknown[]): void => {
+    setExportModal({ format, fixedDocuments: documents })
+  }
+  const closeExport = (): void => {
+    setExportModal(null)
+    window.requestAnimationFrame(() => copyButtonRef.current?.focus())
+  }
 
   return (
     <div className="result-panel" data-shortcut-region="result">
@@ -233,6 +255,7 @@ export function ResultPanel({
         {result.kind === 'documents' && <PageSizeControl />}
         {result.kind === 'documents' && <ResultPager result={result} />}
         <button
+          ref={copyButtonRef}
           className="ghost result-action"
           aria-label={copied ? t('notify.copied') : t('result.copyAllTip')}
           onClick={(e) => {
@@ -254,9 +277,27 @@ export function ResultPanel({
           <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
         ) : (
           <>
-            {view === 'tree' && <TreeView docs={docs} fontSize={dataFontSize} docCtx={docCtx} />}
+            {view === 'tree' && (
+              <TreeView
+                docs={docs}
+                fontSize={dataFontSize}
+                selectedDocIndexes={selectedDocIndexes}
+                onSelectedDocIndexesChange={setSelectedDocIndexes}
+                onExport={openSelectionExport}
+                docCtx={docCtx}
+              />
+            )}
             {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} />}
-            {view === 'table' && <TableView docs={docs} fontSize={dataFontSize} docCtx={docCtx} />}
+            {view === 'table' && (
+              <TableView
+                docs={docs}
+                fontSize={dataFontSize}
+                selectedDocIndexes={selectedDocIndexes}
+                onSelectedDocIndexesChange={setSelectedDocIndexes}
+                onExport={openSelectionExport}
+                docCtx={docCtx}
+              />
+            )}
           </>
         )}
       </div>
@@ -271,8 +312,37 @@ export function ResultPanel({
             { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
             { label: t('result.copy.extendedJson'), onClick: () => copyWithFeedback(toStrictEjson(docs)) },
             { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
-            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
+            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) },
+            'separator',
+            {
+              label: t('result.export.csv'),
+              onClick: () => setExportModal({ format: 'csv' })
+            },
+            {
+              label: t('result.export.tsv'),
+              onClick: () => setExportModal({ format: 'tsv' })
+            },
+            {
+              label: t('result.export.xlsx'),
+              onClick: () => setExportModal({ format: 'xlsx' })
+            }
           ]}
+        />
+      )}
+      {exportModal && (
+        <ExportModal
+          source={{
+            kind: 'result',
+            documents: exportModal.fixedDocuments ?? docs,
+            selectedDocuments: exportModal.fixedDocuments ?? selectedDocuments,
+            fixedSelection: exportModal.fixedDocuments != null,
+            connectionId: docCtx?.connectionId ?? active?.query?.connectionId,
+            database: docCtx?.database ?? active?.query?.database,
+            collection: docCtx?.collection,
+            suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
+          }}
+          initialFormat={exportModal.format}
+          onClose={closeExport}
         />
       )}
     </div>

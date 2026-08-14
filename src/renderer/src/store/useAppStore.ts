@@ -25,6 +25,7 @@ import type {
   DocMutateResult,
   DocSetFieldRequest,
   DocUpdateRequest,
+  ExportProgress,
   ExportRequest,
   HistoryEntry,
   ImportRequest,
@@ -237,7 +238,10 @@ interface AppState {
   deleteDocument(req: DocMutateRequest): Promise<DocMutateResult>
 
   // ---- actions: import/export (Phase 3) ----
+  exportProgress: Record<string, ExportProgress | undefined>
   exportCollection(req: ExportRequest): Promise<DataOpResult>
+  cancelExport(taskId: string): Promise<boolean>
+  clearExportProgress(taskId: string): void
   importCollection(req: ImportRequest): Promise<DataOpResult>
 
   // ---- actions: preferences ----
@@ -316,6 +320,7 @@ const connectionAttempts = new Map<string, { promise: Promise<void>; token: obje
 let settingsChannel: BroadcastChannel | null | undefined
 let settingsSubscribed = false
 let updatesSubscribed = false
+let exportProgressSubscribed = false
 
 function getSettingsChannel(): BroadcastChannel | null {
   if (settingsChannel !== undefined) return settingsChannel
@@ -341,6 +346,16 @@ function subscribeToUpdates(): void {
   updatesSubscribed = true
   window.api.updates.onStateChanged((updateState) => {
     useAppStore.setState({ updateState })
+  })
+}
+
+function subscribeToExportProgress(): void {
+  if (exportProgressSubscribed) return
+  exportProgressSubscribed = true
+  window.api.io.onExportProgress((progress) => {
+    useAppStore.setState((state) => ({
+      exportProgress: { ...state.exportProgress, [progress.taskId]: progress }
+    }))
   })
 }
 
@@ -372,9 +387,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   initializing: true,
   lastError: null,
   notice: null,
+  exportProgress: {},
 
   // --------------------------------------------------------------------- boot
   async bootstrap() {
+    subscribeToExportProgress()
     set({ initializing: true })
     await Promise.all([
       get().loadConnections(),
@@ -1331,6 +1348,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ lastError: tr('notify.exportFailed', { error }) })
       return { ok: false, error }
     }
+  },
+
+  async cancelExport(taskId) {
+    try {
+      return await window.api.io.cancelExport(taskId)
+    } catch (e) {
+      set({ lastError: tr('notify.exportFailed', { error: errMessage(e) }) })
+      return false
+    }
+  },
+
+  clearExportProgress(taskId) {
+    set((state) => {
+      const { [taskId]: _removed, ...exportProgress } = state.exportProgress
+      return { exportProgress }
+    })
   },
 
   async importCollection(req) {

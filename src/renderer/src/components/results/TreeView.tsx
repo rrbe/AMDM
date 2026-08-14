@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { CollectionSort } from '@shared/types'
+import type { CollectionSort, TabularExportFormat } from '@shared/types'
 import {
   entriesOf,
   formatScalar,
@@ -66,6 +66,9 @@ interface FlatNode {
 interface TreeViewProps {
   docs: unknown[]
   fontSize: number
+  selectedDocIndexes: Set<number>
+  onSelectedDocIndexesChange: (selection: Set<number>) => void
+  onExport: (format: TabularExportFormat, documents: unknown[]) => void
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -74,7 +77,14 @@ const DEFAULT_KEY_WIDTH = 280
 const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
-export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.Element {
+export function TreeView({
+  docs,
+  fontSize,
+  selectedDocIndexes,
+  onSelectedDocIndexesChange,
+  onExport,
+  docCtx
+}: TreeViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
@@ -96,7 +106,7 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.E
   // Multi-select of TOP-LEVEL documents (depth-0 rows), mirroring the Table's
   // row multi-select: Shift = range, ⌘/Ctrl = toggle. Mutually exclusive with
   // the single-node `selectedId` — selecting one clears the other.
-  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(() => new Set())
+  const selectedDocs = selectedDocIndexes
   const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
@@ -206,11 +216,11 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.E
         meta: e.metaKey,
         ctrl: e.ctrlKey
       })
-      setSelectedDocs(selection)
+      onSelectedDocIndexesChange(selection)
       setAnchorDoc(anchor)
     } else {
       setSelectedId(node.id)
-      setSelectedDocs(new Set())
+      onSelectedDocIndexesChange(new Set())
       setAnchorDoc(null)
     }
   }
@@ -261,12 +271,12 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.E
     // right-clicking inside a multi-doc selection keeps it (for a bulk copy).
     if (!inMultiDoc) {
       if (isDocRow) {
-        setSelectedDocs(new Set([node.docIndex as number]))
+        onSelectedDocIndexesChange(new Set([node.docIndex as number]))
         setSelectedId(null)
         setAnchorDoc(node.docIndex as number)
       } else {
         setSelectedId(node.id)
-        setSelectedDocs(new Set())
+        onSelectedDocIndexesChange(new Set())
         setAnchorDoc(null)
       }
     }
@@ -291,6 +301,10 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.E
     items.push({
       label: t('result.dataMenu.copy'),
       children: treeCopyMenuItems(node, selected, fieldSort)
+    })
+    items.push({
+      label: t('result.dataMenu.export'),
+      children: exportMenuItems(selected, onExport)
     })
     if (docCtx && docHasId(rootDoc)) {
       items.push('separator')
@@ -400,6 +414,26 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): React.JSX.E
       )}
     </div>
   )
+}
+
+function exportMenuItems(
+  documents: unknown[],
+  onExport: (format: TabularExportFormat, documents: unknown[]) => void
+): ContextMenuEntry[] {
+  return [
+    {
+      label: i18n.t('result.export.csv'),
+      onClick: () => onExport('csv', documents)
+    },
+    {
+      label: i18n.t('result.export.tsv'),
+      onClick: () => onExport('tsv', documents)
+    },
+    {
+      label: i18n.t('result.export.xlsx'),
+      onClick: () => onExport('xlsx', documents)
+    }
+  ]
 }
 
 /** Right-click copy submenu for a tree field / document selection. */
