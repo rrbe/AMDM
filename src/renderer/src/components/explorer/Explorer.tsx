@@ -904,8 +904,11 @@ function flattenCatalog(
     if (!dbExpanded) continue
 
     const collsRaw = cat.collections[db.name]
-    const colls =
-      collsRaw === undefined ? [] : sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
+    // Do not render the trailing Users folder before collection loading finishes.
+    // Otherwise it appears as the database's first child, then jumps below the
+    // entire collection list when that list arrives, which looks like a re-sort.
+    if (collsRaw === undefined) continue
+    const colls = sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
 
     for (const coll of colls) {
       const collNodeId = `${connId}:coll:${db.name}/${coll.name}`
@@ -936,11 +939,16 @@ function flattenCatalog(
 
       if (!collExpanded) continue
 
+      const idxKey = `${db.name}/${coll.name}`
+      const idxList = cat.indexes[idxKey]
+      // Initial metadata loading updates the count and indexes atomically. Keep
+      // the subtree closed until both are ready so an empty Indexes folder does
+      // not flash briefly before its count appears.
+      if (cat.loading.has(collNodeId) && idxList === undefined) continue
+
       // Indexes folder
       const idxNodeId = `${connId}:idx:${db.name}/${coll.name}`
       const idxExpanded = cat.expanded.has(idxNodeId)
-      const idxKey = `${db.name}/${coll.name}`
-      const idxList = cat.indexes[idxKey]
       rows.push({
         type: 'tree',
         id: idxNodeId,
@@ -991,7 +999,7 @@ function flattenCatalog(
       }
     }
 
-    if (collsRaw !== undefined && colls.length === 0) {
+    if (colls.length === 0) {
       rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, 'no collections'))
     }
 
