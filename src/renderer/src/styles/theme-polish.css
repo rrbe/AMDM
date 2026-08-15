@@ -32,6 +32,10 @@ body {
     border-color: var(--separator-strong);
     box-shadow: 0 0 0 3px var(--focus-soft);
   }
+  input[type='checkbox']:focus,
+  input[type='checkbox']:focus-visible {
+    box-shadow: none;
+  }
 
   /* Buttons stay flat; color and border carry their state. */
   button {

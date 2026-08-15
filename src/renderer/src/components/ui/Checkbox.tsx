@@ -34,7 +34,7 @@ export function Checkbox({
   return (
     <BaseCheckbox.Root
       className={cn(
-        'group m-0 inline-flex w-auto cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left text-[13px] text-foreground/90 outline-none hover:bg-transparent disabled:cursor-default disabled:opacity-55',
+        'group m-0 inline-flex w-auto cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left text-[13px] text-foreground/90 outline-none hover:bg-transparent focus-visible:shadow-none disabled:cursor-default disabled:opacity-55',
         className
       )}
       checked={checked}
