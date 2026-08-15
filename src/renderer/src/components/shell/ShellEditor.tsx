@@ -54,9 +54,9 @@ const FONT_MIN = 10
 const FONT_MAX = 24
 const FONT_DEFAULT = 13
 
-// Editor-preference mutators (font size / word wrap / tab width). Kept at module
-// scope and reading fresh store state via getState() so the CodeMirror keymap can
-// call them without capturing stale closures; each persists to AppSettings.
+// Editor font-size mutators. Kept at module scope and reading fresh store state
+// via getState() so the CodeMirror keymap can call them without capturing stale
+// closures; each persists to AppSettings.
 function adjustFontSize(delta: number): void {
   const store = useAppStore.getState()
   const next = Math.min(FONT_MAX, Math.max(FONT_MIN, store.settings.editorFontSize + delta))
@@ -64,14 +64,6 @@ function adjustFontSize(delta: number): void {
 }
 function resetFontSize(): void {
   void useAppStore.getState().updateSettings({ editorFontSize: FONT_DEFAULT })
-}
-function toggleWordWrap(): void {
-  const store = useAppStore.getState()
-  void store.updateSettings({ editorWordWrap: !store.settings.editorWordWrap })
-}
-function cycleTabSize(): void {
-  const store = useAppStore.getState()
-  void store.updateSettings({ editorTabSize: store.settings.editorTabSize === 2 ? 4 : 2 })
 }
 
 /**
@@ -142,15 +134,15 @@ export function ShellEditor({
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).
   const isDark = useIsDark()
 
-  // Editor preferences (persisted to AppSettings; see the right-click menu and
-  // ⌘+/⌘−/⌘0). These feed the extensions memo below, so a change reconfigures
+  // Editor preferences persisted to AppSettings. Font size also supports ⌘+,
+  // ⌘−, and ⌘0. These feed the extensions memo below, so a change reconfigures
   // CodeMirror — infrequent enough that the rebuild cost is irrelevant.
   const fontSize = useAppStore((s) => s.settings.editorFontSize)
   const wordWrap = useAppStore((s) => s.settings.editorWordWrap)
   const tabSize = useAppStore((s) => s.settings.editorTabSize)
 
   // The live EditorView, captured on mount. The right-click menu needs it to
-  // drive native commands (undo/redo/select-all, toggle-comment, search) and to
+  // drive native commands (undo/redo/select-all, search) and to
   // read the selection / locate the current statement for "Run Current Statement".
   const viewRef = useRef<EditorView | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
@@ -374,14 +366,6 @@ export function ShellEditor({
       { label: t('shell.menu.stop'), disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',
       { label: t('shell.menu.format'), shortcut: '⌥⇧F', onClick: () => formatNow() },
-      { label: t('shell.menu.toggleComment'), shortcut: '⌘/', onClick: () => withView((v) => toggleComment(v)) },
-      'separator',
-      // Editor preferences (persisted): the `：值` labels show current state,
-      // since the menu closes on click (no live checkmark column).
-      { label: t('shell.menu.wordWrap', { state: wordWrap ? t('shell.on') : t('shell.off') }), onClick: () => toggleWordWrap() },
-      { label: t('shell.menu.tabSize', { size: tabSize }), onClick: () => cycleTabSize() },
-      { label: t('shell.menu.increaseFontSize'), shortcut: '⌘+', onClick: () => bumpFont(1) },
-      { label: t('shell.menu.decreaseFontSize'), shortcut: '⌘−', onClick: () => bumpFont(-1) },
       'separator',
       { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       'separator',
