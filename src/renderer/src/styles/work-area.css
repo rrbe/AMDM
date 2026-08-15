@@ -510,9 +510,9 @@
 .editor-wrap .cm-panel.cm-search .cm-button {
   box-sizing: border-box;
   height: 28px;
-  border: 1px solid var(--separator);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--surface-control);
+  background: var(--interaction-selected);
   background-image: none;
   color: var(--text-secondary);
   padding: 0 9px;
@@ -524,8 +524,8 @@
   cursor: pointer;
 }
 .editor-wrap .cm-panel.cm-search .cm-button:hover {
-  border-color: var(--separator-strong);
-  background: var(--interaction-hover);
+  border-color: transparent;
+  background: var(--interaction-pressed);
   color: var(--text-primary);
 }
 .editor-wrap .cm-panel.cm-search .cm-button:active {

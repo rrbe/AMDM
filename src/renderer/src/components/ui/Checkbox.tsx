@@ -44,7 +44,7 @@ export function Checkbox({
       name={name}
     >
       <span
-        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)] group-focus-visible:border-[var(--separator-strong)] group-focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)]"
         aria-hidden
       >
         <BaseCheckbox.Indicator className="inline-flex text-[var(--primary-foreground)]">

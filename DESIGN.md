@@ -29,9 +29,11 @@
 ## 4. 组件
 
 - `Button` 提供 `default / primary / ghost / danger` 和 `busy`;异步状态保持标签及宽度不变,忙碌时自动禁用。
+- 按钮默认优先无边框,通过填充色、文字色及 hover / pressed / focus 状态表达层级;仅在边界难以辨认或成组控件确需分隔时使用细边框。图标按钮必须显式控制 border、background 和 padding,并保持内容双轴居中。
 - `Modal` 基于 `ui/Dialog`,保留 Esc、外点关闭、焦点陷阱与 aria 关联。
 - Modal Backdrop 只做半透明压暗,不使用 `backdrop-filter` 模糊整个 App。
 - 表单控件统一使用 `ui/*`;焦点保持中性边框(`--separator-strong`) + 控件外侧软焦点环。禁止使用 Ink/黑色高对比边框或 inset shadow 形成控件内部黑色描边。
+- Checkbox 不使用额外的外侧 focus ring,聚焦不得在方框外再增加一层环绕效果。
 
 ## 5. 布局与数据视图
 

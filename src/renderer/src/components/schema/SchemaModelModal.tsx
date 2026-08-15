@@ -205,7 +205,8 @@ function SchemaRow({
       <div className="flex justify-end gap-0.5">
         {canAddChild && (
           <button
-            className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-[var(--interaction-hover)] hover:text-foreground"
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded border-0 bg-transparent p-0 text-muted-foreground outline-none hover:bg-[var(--interaction-hover)] hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
             title={t('schema.addNestedField')}
             aria-label={t('schema.addNestedField')}
             onClick={() => safeChange((schema) => addChildProperty(schema, row.path))}
@@ -214,7 +215,8 @@ function SchemaRow({
           </button>
         )}
         <button
-          className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          type="button"
+          className="inline-flex size-7 items-center justify-center rounded border-0 bg-transparent p-0 text-muted-foreground outline-none hover:bg-destructive/10 hover:text-destructive focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           title={t('schema.deleteField')}
           aria-label={t('schema.deleteField')}
           onClick={() => safeChange((schema) => deleteSchemaNode(schema, row.parentPath, row))}
