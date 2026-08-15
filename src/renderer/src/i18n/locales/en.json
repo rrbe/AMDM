@@ -336,6 +336,19 @@
     "tabListLabel": "All query tabs",
     "reconnect": "Connection lost. Click to reconnect",
     "loadingEditor": "Loading editor…",
+    "search": {
+      "find": "Find",
+      "replace": "Replace",
+      "next": "Next",
+      "previous": "Previous",
+      "all": "Select all",
+      "matchCase": "Match case",
+      "regexp": "Regular expression",
+      "wholeWord": "Whole word",
+      "replaceAction": "Replace",
+      "replaceAll": "Replace all",
+      "close": "Close search"
+    },
     "menu": {
       "runScript": "Run script",
       "runSelected": "Run selection",

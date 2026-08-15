@@ -15,7 +15,7 @@ body {
    layer, `button { background: --bg-elevated }` clobbered the cva Button's
    `bg-primary`, leaving white text on a white primary button in light mode.) */
 @layer base {
-  /* Inset form fields with a pine focus ring. */
+  /* Inset form fields keep a neutral edge and use only a soft outer focus ring. */
   input,
   select,
   textarea {
@@ -29,7 +29,7 @@ body {
   input:focus,
   select:focus,
   textarea:focus {
-    border-color: var(--primary);
+    border-color: var(--separator-strong);
     box-shadow: 0 0 0 3px var(--focus-soft);
   }
 

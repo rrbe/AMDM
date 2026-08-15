@@ -129,7 +129,7 @@ export function ShellEditor({
   busy,
   saveBusy
 }: ShellEditorProps): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).
   const isDark = useIsDark()
@@ -207,6 +207,19 @@ export function ShellEditor({
       }),
       // Provides the Find/Replace panel that ⌘F and the menu's openSearchPanel open.
       search({ top: true }),
+      EditorState.phrases.of({
+        Find: t('shell.search.find'),
+        Replace: t('shell.search.replace'),
+        next: t('shell.search.next'),
+        previous: t('shell.search.previous'),
+        all: t('shell.search.all'),
+        'match case': t('shell.search.matchCase'),
+        regexp: t('shell.search.regexp'),
+        'by word': t('shell.search.wholeWord'),
+        replace: t('shell.search.replaceAction'),
+        'replace all': t('shell.search.replaceAll'),
+        close: t('shell.search.close')
+      }),
       // Editor preferences applied as extensions: font size cascades from the
       // editor root; tab width drives both the visual tab + the spaces Tab inserts.
       EditorView.theme({ '&': { fontSize: `${fontSize}px` } }),
@@ -256,7 +269,7 @@ export function ShellEditor({
     ],
     // Rebuild only when an editor preference changes (not per keystroke — the
     // run/save/explain callbacks are read through `handlers` ref).
-    [fontSize, wordWrap, tabSize, runStatementLabel]
+    [fontSize, wordWrap, tabSize, runStatementLabel, i18n.resolvedLanguage, t]
   )
 
   useEffect(() => {

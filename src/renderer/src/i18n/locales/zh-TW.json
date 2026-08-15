@@ -336,6 +336,19 @@
     "tabListLabel": "全部查詢分頁",
     "reconnect": "連線已中斷，點擊重新連線",
     "loadingEditor": "編輯器載入中…",
+    "search": {
+      "find": "尋找",
+      "replace": "取代",
+      "next": "下一個",
+      "previous": "上一個",
+      "all": "全選比對項",
+      "matchCase": "區分大小寫",
+      "regexp": "正規表示式",
+      "wholeWord": "全詞比對",
+      "replaceAction": "取代",
+      "replaceAll": "全部取代",
+      "close": "關閉尋找"
+    },
     "menu": {
       "runScript": "執行腳本",
       "runSelected": "執行選取",

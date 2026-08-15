@@ -437,6 +437,164 @@
   color: var(--t-boolean);
 }
 
+/* ---- Find / Replace panel ----
+   CodeMirror owns this DOM, so it stays globally styled and scoped to the Shell
+   editor. Search and replace are two rows of one feature: the shared close action
+   dismisses the entire panel, while each row can still wrap in narrow workspaces. */
+.editor-wrap .cm-panels.cm-panels-top {
+  border-bottom: 0;
+  background: var(--surface-inset);
+  color: var(--text-primary);
+}
+.editor-wrap .cm-panel.cm-search {
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 3px;
+  margin: 8px 10px 6px;
+  padding: 8px 42px 8px 8px;
+  flex-wrap: wrap;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface-chrome);
+  font-family: var(--font-ui);
+}
+.editor-wrap .cm-panel.cm-search::before {
+  content: '';
+  height: 0;
+  flex: 0 0 100%;
+  order: 1;
+}
+.editor-wrap .cm-panel.cm-search > br {
+  display: none;
+}
+.editor-wrap .cm-panel.cm-search [name='replace'],
+.editor-wrap .cm-panel.cm-search [name='replaceAll'] {
+  order: 2;
+}
+.editor-wrap .cm-panel.cm-search input,
+.editor-wrap .cm-panel.cm-search button,
+.editor-wrap .cm-panel.cm-search label {
+  margin: 0;
+}
+.editor-wrap .cm-panel.cm-search .cm-textfield {
+  box-sizing: border-box;
+  width: min(360px, 100%);
+  max-width: 360px;
+  min-width: 150px;
+  height: 28px;
+  flex: 1 1 240px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 6px;
+  background: var(--surface-inset);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard);
+}
+.editor-wrap .cm-panel.cm-search .cm-textfield::placeholder {
+  color: var(--text-muted);
+}
+.editor-wrap .cm-panel.cm-search .cm-textfield:focus {
+  border-color: var(--separator-strong);
+  background: var(--surface-content);
+  box-shadow: 0 0 0 3px var(--focus-soft);
+  outline: none;
+}
+.editor-wrap .cm-panel.cm-search .cm-button {
+  box-sizing: border-box;
+  height: 28px;
+  border: 1px solid var(--separator);
+  border-radius: 6px;
+  background: var(--surface-control);
+  background-image: none;
+  color: var(--text-secondary);
+  padding: 0 9px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 26px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.editor-wrap .cm-panel.cm-search .cm-button:hover {
+  border-color: var(--separator-strong);
+  background: var(--interaction-hover);
+  color: var(--text-primary);
+}
+.editor-wrap .cm-panel.cm-search .cm-button:active {
+  background: var(--interaction-pressed);
+}
+.editor-wrap .cm-panel.cm-search .cm-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-soft);
+}
+.editor-wrap .cm-panel.cm-search label {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 5px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 28px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.editor-wrap .cm-panel.cm-search label:hover {
+  color: var(--text-primary);
+}
+.editor-wrap .cm-panel.cm-search input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.editor-wrap .cm-panel.cm-search [name='close'] {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  line-height: 1;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.editor-wrap .cm-panel.cm-search [name='close']:hover {
+  background: var(--interaction-hover);
+  color: var(--text-primary);
+}
+.editor-wrap .cm-panel.cm-search [name='close']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-soft);
+}
+.editor-wrap .cm-searchMatch {
+  border-bottom: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+}
+.editor-wrap .cm-searchMatch-selected {
+  border-bottom-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
 /* ---- Completion dropdown ----
    Use the same popover shell for the suggestion list and its documentation.
    Scope the selectors to the editor so they outrank CodeMirror's

@@ -31,7 +31,7 @@
 - `Button` 提供 `default / primary / ghost / danger` 和 `busy`;异步状态保持标签及宽度不变,忙碌时自动禁用。
 - `Modal` 基于 `ui/Dialog`,保留 Esc、外点关闭、焦点陷阱与 aria 关联。
 - Modal Backdrop 只做半透明压暗,不使用 `backdrop-filter` 模糊整个 App。
-- 表单控件统一使用 `ui/*`;焦点使用 Ink 边框和软焦点环。
+- 表单控件统一使用 `ui/*`;焦点保持中性边框(`--separator-strong`) + 控件外侧软焦点环。禁止使用 Ink/黑色高对比边框或 inset shadow 形成控件内部黑色描边。
 
 ## 5. 布局与数据视图
 

@@ -101,7 +101,7 @@
   color: var(--fg-3);
 }
 .explorer-search:focus-within {
-  border-color: var(--primary);
+  border-color: var(--separator-strong);
   box-shadow: 0 0 0 3px var(--focus-soft);
 }
 .explorer-search input {

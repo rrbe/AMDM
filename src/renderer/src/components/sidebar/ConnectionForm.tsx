@@ -1079,7 +1079,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
           </div>
         </div>
         <textarea
-          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--primary)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--separator-strong)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           autoFocus
           rows={3}
           spellCheck={false}
@@ -1127,7 +1127,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
         {/* Editable: regenerated on open / password-toggle, but the user can tweak
             it before copying. Copy uses whatever is in the box. */}
         <textarea
-          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--primary)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--separator-strong)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           rows={3}
           spellCheck={false}
           autoComplete="off"
