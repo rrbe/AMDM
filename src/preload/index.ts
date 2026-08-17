@@ -62,6 +62,8 @@ const api: Api = {
     clear: () => ipcRenderer.invoke(IPC.historyClear)
   },
   docs: {
+    read: (request) => ipcRenderer.invoke(IPC.docRead, request),
+    cancelRead: (taskId) => ipcRenderer.invoke(IPC.docReadCancel, taskId),
     update: (request) => ipcRenderer.invoke(IPC.docUpdate, request),
     setField: (request) => ipcRenderer.invoke(IPC.docSetField, request),
     delete: (request) => ipcRenderer.invoke(IPC.docDelete, request)

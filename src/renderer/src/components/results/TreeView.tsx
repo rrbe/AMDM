@@ -22,6 +22,7 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
+import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 
 /**
@@ -85,6 +86,7 @@ export function TreeView({
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   // Index of the document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<{ value: unknown; source?: JsonPreviewSource } | null>(null)
   // Inline edit: which leaf node is being edited, and whether the last commit
   // failed validation (red border).
   const [editing, setEditing] = useState<{ id: string } | null>(null)
@@ -170,6 +172,7 @@ export function TreeView({
   // Cmd/Ctrl+C copies the selected node: a leaf's value (plain), or an
   // expandable node / whole document as plain JSON.
   useCopyHotkey(() => {
+    if (previewDoc) return null
     if (selectedDocs.size > 0) {
       const picked = [...selectedDocs].sort((a, b) => a - b).map((i) => docs[i])
       return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
@@ -267,7 +270,15 @@ export function TreeView({
     const picked = [...selectedDocs].sort((a, b) => a - b)
     const rootDoc = rootDocOf(node)
     const selected = inMultiDoc && picked.length > 1 ? picked.map((index) => docs[index]) : [rootDoc]
-    const items: ContextMenuEntry[] = []
+    const source: JsonPreviewSource | undefined = docCtx
+      ? { ...docCtx, ...(docHasId(rootDoc) ? { id: rootDoc._id } : {}) }
+      : undefined
+    const items: ContextMenuEntry[] = [
+      {
+        label: t('result.dataMenu.view'),
+        onClick: () => setPreviewDoc({ value: rootDoc, source })
+      }
+    ]
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
       items.push({
@@ -387,6 +398,18 @@ export function TreeView({
           doc={editDoc}
           id={editDoc._id}
           onClose={() => setEditIndex(null)}
+        />
+      )}
+
+      {previewDoc && (
+        <JsonPreviewModal
+          title={t('result.documentPreviewTitle')}
+          value={previewDoc.value}
+          fontSize={fontSize}
+          documentView
+          source={previewDoc.source}
+          onValueChange={(value) => setPreviewDoc((current) => (current ? { ...current, value } : current))}
+          onClose={() => setPreviewDoc(null)}
         />
       )}
 

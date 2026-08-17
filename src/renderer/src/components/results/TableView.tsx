@@ -25,8 +25,7 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
-import { JsonView } from './JsonView'
-import { ResizableModal } from '@renderer/components/common/Modal'
+import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 
 /**
@@ -78,7 +77,12 @@ export function TableView({
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   // Document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
-  const [preview, setPreview] = useState<{ column: string; value: unknown } | null>(null)
+  const [preview, setPreview] = useState<{
+    title: string
+    value: unknown
+    documentView?: boolean
+    source?: JsonPreviewSource
+  } | null>(null)
   // Inline edit: which cell, and whether the last commit failed validation.
   const [editing, setEditing] = useState<{ row: number; col: string } | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
@@ -230,7 +234,15 @@ export function TableView({
     }
     setSelectedCell(col ? { row, col } : null)
     const doc = docs[row]
-    const items: ContextMenuEntry[] = []
+    const source: JsonPreviewSource | undefined = docCtx
+      ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}) }
+      : undefined
+    const items: ContextMenuEntry[] = [
+      {
+        label: t('result.dataMenu.view'),
+        onClick: () => setPreview({ title: t('result.documentPreviewTitle'), value: doc, documentView: true, source })
+      }
+    ]
     if (docCtx && docHasId(doc)) {
       items.push({
         label: t('result.dataMenu.edit'),
@@ -381,7 +393,15 @@ export function TableView({
                   editError={editError}
                   openPreviewHint={t('table.doubleClickForFullInfo')}
                   onClick={(e) => clickCell(vi.index, sourceIndex, col, e)}
-                  onOpen={(value) => setPreview({ column: col, value })}
+                  onOpen={(value) =>
+                    setPreview({
+                      title: col,
+                      value,
+                      source: docCtx
+                        ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}), field: col }
+                        : undefined
+                    })
+                  }
                   onCommit={(text) => void commitCell(sourceIndex, col, text)}
                   onCancel={() => {
                     setEditing(null)
@@ -407,15 +427,15 @@ export function TableView({
       )}
 
       {preview && (
-        <ResizableModal
-          title={preview.column}
-          backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
+        <JsonPreviewModal
+          title={preview.title}
+          value={preview.value}
+          fontSize={fontSize}
+          documentView={preview.documentView}
+          source={preview.source}
+          onValueChange={(value) => setPreview((current) => (current ? { ...current, value } : current))}
           onClose={() => setPreview(null)}
-        >
-          <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
-            <JsonView value={preview.value} fontSize={fontSize} />
-          </div>
-        </ResizableModal>
+        />
       )}
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}

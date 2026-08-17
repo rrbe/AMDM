@@ -387,6 +387,19 @@ export interface DocSetFieldRequest extends DocMutateRequest {
   valueEjson: string
 }
 
+export interface DocReadRequest extends DocMutateRequest {
+  /** Opaque owner-scoped id used to cancel this one refresh operation. */
+  taskId: string
+}
+
+export interface DocReadResult {
+  ok: boolean
+  found: boolean
+  /** EJSON-canonical document when found. */
+  document?: unknown
+  error?: string
+}
+
 export interface DocMutateResult {
   ok: boolean
   error?: string

@@ -14,6 +14,8 @@ import type {
   DiagnoseStage,
   OpenFileOptions,
   DataOpResult,
+  DocReadRequest,
+  DocReadResult,
   DocMutateRequest,
   DocMutateResult,
   DocSetFieldRequest,
@@ -73,6 +75,8 @@ export const IPC = {
   docUpdate: 'doc:update',
   docSetField: 'doc:setField',
   docDelete: 'doc:delete',
+  docRead: 'doc:read',
+  docReadCancel: 'doc:readCancel',
 
   ioExport: 'io:export',
   ioExportCancel: 'io:exportCancel',
@@ -154,6 +158,8 @@ export interface Api {
     clear(): Promise<void>
   }
   docs: {
+    read(request: DocReadRequest): Promise<DocReadResult>
+    cancelRead(taskId: string): Promise<boolean>
     update(request: DocUpdateRequest): Promise<DocMutateResult>
     setField(request: DocSetFieldRequest): Promise<DocMutateResult>
     delete(request: DocMutateRequest): Promise<DocMutateResult>

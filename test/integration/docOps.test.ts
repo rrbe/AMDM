@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ObjectId } from 'bson'
 import type { Db } from 'mongodb'
 import {
+  readDocumentOnDb,
   replaceDocumentOnDb,
   setFieldOnDb,
   deleteDocumentOnDb
@@ -31,6 +32,21 @@ beforeEach(async () => {
 })
 
 const oidEjson = (oid: ObjectId): { $oid: string } => ({ $oid: oid.toHexString() })
+
+describe('readDocumentOnDb', () => {
+  it('reads one document by its canonical EJSON ObjectId', async () => {
+    const oid = new ObjectId()
+    await db.collection('c').insertOne({ _id: oid, nested: { ok: true } })
+    await expect(readDocumentOnDb(db, 'c', oidEjson(oid), { timeoutMS: 5_000 })).resolves.toEqual({
+      _id: oid,
+      nested: { ok: true }
+    })
+  })
+
+  it('returns null when the document no longer exists', async () => {
+    await expect(readDocumentOnDb(db, 'c', 'missing', { timeoutMS: 5_000 })).resolves.toBeNull()
+  })
+})
 
 describe('replaceDocumentOnDb', () => {
   it('replaces by _id, dropping removed fields', async () => {

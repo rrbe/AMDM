@@ -21,6 +21,8 @@ import type {
   DataOpResult,
   DiagnoseScope,
   DiagnoseStage,
+  DocReadRequest,
+  DocReadResult,
   DocMutateRequest,
   DocMutateResult,
   DocSetFieldRequest,
@@ -232,7 +234,9 @@ interface AppState {
   saveSchemaDraft(target: SchemaTarget, draft: MongoJsonSchema): Promise<SchemaModel | null>
   overwriteSchemaDraft(target: SchemaTarget): Promise<SchemaModel | null>
 
-  // ---- actions: document edit/delete (Phase 2) ----
+  // ---- actions: document read/edit/delete (Phase 2) ----
+  readDocument(req: DocReadRequest): Promise<DocReadResult>
+  cancelDocumentRead(taskId: string): Promise<boolean>
   updateDocument(req: DocUpdateRequest): Promise<DocMutateResult>
   setDocumentField(req: DocSetFieldRequest): Promise<DocMutateResult>
   deleteDocument(req: DocMutateRequest): Promise<DocMutateResult>
@@ -1297,7 +1301,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // ----------------------------------------------------------- document mutations
+  // --------------------------------------------------------- document operations
+  async readDocument(req) {
+    try {
+      return await window.api.docs.read(req)
+    } catch (e) {
+      return { ok: false, found: false, error: errMessage(e) }
+    }
+  },
+
+  async cancelDocumentRead(taskId) {
+    try {
+      return await window.api.docs.cancelRead(taskId)
+    } catch {
+      return false
+    }
+  },
+
   async updateDocument(req) {
     try {
       const res = await window.api.docs.update(req)

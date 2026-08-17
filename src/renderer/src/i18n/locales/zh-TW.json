@@ -413,6 +413,7 @@
       "xlsx": "匯出為 Excel…"
     },
     "dataMenu": {
+      "view": "檢視",
       "edit": "編輯",
       "copy": "複製",
       "export": "匯出",
@@ -425,6 +426,12 @@
       "copyCsv": "複製為 CSV",
       "copyTsv": "複製為 TSV"
     },
+    "documentPreviewTitle": "文件",
+    "documentRefreshed": "文件已重新整理",
+    "documentMissing": "該文件已不存在",
+    "documentRefreshFailed": "重新整理文件失敗：{{error}}",
+    "fieldRefreshed": "欄位已重新整理",
+    "fieldMissing": "欄位「{{field}}」已不存在",
     "docCount_one": "{{count}} 筆文件",
     "docCount_other": "{{count}} 筆文件",
     "outputLines_one": "{{count}} 行輸出",

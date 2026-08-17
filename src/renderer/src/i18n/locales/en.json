@@ -413,6 +413,7 @@
       "xlsx": "Export as Excel…"
     },
     "dataMenu": {
+      "view": "View",
       "edit": "Edit",
       "copy": "Copy",
       "export": "Export",
@@ -425,6 +426,12 @@
       "copyCsv": "Copy as CSV",
       "copyTsv": "Copy as TSV"
     },
+    "documentPreviewTitle": "Document",
+    "documentRefreshed": "Document refreshed",
+    "documentMissing": "This document no longer exists",
+    "documentRefreshFailed": "Failed to refresh document: {{error}}",
+    "fieldRefreshed": "Field refreshed",
+    "fieldMissing": "Field “{{field}}” no longer exists",
     "docCount_one": "{{count}} doc",
     "docCount_other": "{{count}} docs",
     "outputLines_one": "{{count}} output line",

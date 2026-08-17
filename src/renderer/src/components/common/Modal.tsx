@@ -20,8 +20,11 @@ const FOCUSABLE =
 
 interface ModalProps {
   title: string
+  titleMeta?: ReactNode
   description?: ReactNode
   headerActions?: ReactNode
+  /** Keep the regular compact title-bar treatment when header actions are present. */
+  compactHeader?: boolean
   navigation?: ReactNode
   onClose: () => void
   children: ReactNode
@@ -57,8 +60,10 @@ interface ModalDrag {
  */
 export function Modal({
   title,
+  titleMeta,
   description,
   headerActions,
+  compactHeader = false,
   navigation,
   onClose,
   children,
@@ -78,7 +83,7 @@ export function Modal({
   const dragRef = useRef<ModalDrag | null>(null)
   const [openingHalfHeight, setOpeningHalfHeight] = useState<number | null>(null)
   const width = small ? 'sm' : (size ?? 'md')
-  const sheet = description != null || headerActions != null || navigation != null
+  const sheet = !compactHeader && (description != null || headerActions != null || navigation != null)
   const popupRef = useCallback(
     (popup: HTMLDivElement | null) => {
       popupElementRef.current = popup
@@ -192,7 +197,7 @@ export function Modal({
         onPointerUp={endMove}
         onPointerCancel={endMove}
       >
-        <div className="min-w-0 flex-1">
+        <div className={cn('min-w-0 flex-1', !sheet && titleMeta != null && 'flex items-baseline gap-2')}>
           <DialogTitle
             id={titleId}
             render={
@@ -203,6 +208,9 @@ export function Modal({
           >
             {title}
           </DialogTitle>
+          {!sheet && titleMeta != null && (
+            <span className="min-w-0 truncate text-[12px] font-normal text-muted-foreground">{titleMeta}</span>
+          )}
           {description != null && (
             <div className="mt-1.5 text-[12px] font-normal text-muted-foreground">
               {description}

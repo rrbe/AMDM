@@ -413,6 +413,7 @@
       "xlsx": "导出为 Excel…"
     },
     "dataMenu": {
+      "view": "查看",
       "edit": "编辑",
       "copy": "复制",
       "export": "导出",
@@ -425,6 +426,12 @@
       "copyCsv": "复制为 CSV",
       "copyTsv": "复制为 TSV"
     },
+    "documentPreviewTitle": "文档",
+    "documentRefreshed": "文档已刷新",
+    "documentMissing": "该文档已不存在",
+    "documentRefreshFailed": "刷新文档失败：{{error}}",
+    "fieldRefreshed": "字段已刷新",
+    "fieldMissing": "字段“{{field}}”已不存在",
     "docCount_one": "{{count}} 个文档",
     "docCount_other": "{{count}} 个文档",
     "outputLines_one": "{{count}} 行输出",

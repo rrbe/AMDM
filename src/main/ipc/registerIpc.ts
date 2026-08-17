@@ -7,6 +7,7 @@ import type {
   ConnectionConfig,
   ConnectionInput,
   DiagnoseScope,
+  DocReadRequest,
   DocMutateRequest,
   DocSetFieldRequest,
   DocUpdateRequest,
@@ -34,7 +35,7 @@ import {
   sampleFields
 } from '../mongo/catalog'
 import { executeShell, abortShell } from '../mongo/shellEngine'
-import { deleteDocument, setDocumentField, updateDocument } from '../mongo/docOps'
+import { cancelDocumentRead, deleteDocument, readDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { analyzeCollectionSchema } from '../mongo/schemaAnalysis'
 import { cancelExport, exportData } from '../io/exporter'
 import { importData } from '../io/importer'
@@ -224,7 +225,11 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   })
   ipcMain.handle(IPC.historyClear, () => queryStore.clearHistory())
 
-  // document edit/delete
+  // document read/edit/delete
+  ipcMain.handle(IPC.docRead, (event, req: DocReadRequest) =>
+    readDocument(req, settingsStore.get().queryTimeoutMS || 30_000, event.sender)
+  )
+  ipcMain.handle(IPC.docReadCancel, (event, taskId: string) => cancelDocumentRead(taskId, event.sender.id))
   ipcMain.handle(IPC.docUpdate, (_e, req: DocUpdateRequest) => updateDocument(req))
   ipcMain.handle(IPC.docSetField, (_e, req: DocSetFieldRequest) => setDocumentField(req))
   ipcMain.handle(IPC.docDelete, (_e, req: DocMutateRequest) => deleteDocument(req))

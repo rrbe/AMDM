@@ -19,6 +19,23 @@ export function deserializeId(id: unknown): unknown {
   return id // plain string/number _id
 }
 
+/** Read one document by its exact BSON _id. The caller owns timeout/cancellation. */
+export function readDocumentOnDb(
+  db: Db,
+  collection: string,
+  id: unknown,
+  options: { signal?: AbortSignal; timeoutMS?: number } = {}
+): Promise<Document | null> {
+  const _id = deserializeId(id)
+  return db.collection(collection).findOne(
+    { _id } as Document,
+    {
+      ...(options.timeoutMS ? { maxTimeMS: options.timeoutMS } : {}),
+      ...(options.signal ? { signal: options.signal } : {})
+    }
+  )
+}
+
 /**
  * Replace a document by _id. The user-edited EJSON string is parsed back to
  * BSON; any _id inside the replacement is dropped so the original _id (from the
