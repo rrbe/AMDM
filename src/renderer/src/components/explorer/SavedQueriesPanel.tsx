@@ -9,6 +9,8 @@ import type { HistoryEntry, SavedQuery } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { formatTextPreview } from '@renderer/lib/resultCopy'
 
 /** Group saved queries by folder; folders alpha, ungrouped (`''`) last. */
 function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQuery[] }[] {
@@ -131,11 +133,7 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-export function SavedQueriesView({
-  onLoad
-}: {
-  onLoad: (query: StoredQuerySelection) => void
-}): React.JSX.Element {
+export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelection) => void }): React.JSX.Element {
   const { t } = useTranslation()
   const savedQueries = useAppStore((s) => s.savedQueries)
   const connections = useAppStore((s) => s.connections)
@@ -166,9 +164,7 @@ export function SavedQueriesView({
             onLoad({
               code: query.code,
               connectionId: query.connectionId,
-              connectionName:
-                connections.find((item) => item.id === query.connectionId)?.name ??
-                query.connectionId,
+              connectionName: connections.find((item) => item.id === query.connectionId)?.name ?? query.connectionId,
               database: query.database
             })
           }
@@ -180,11 +176,7 @@ export function SavedQueriesView({
   )
 }
 
-export function HistoryView({
-  onLoad
-}: {
-  onLoad: (query: StoredQuerySelection) => void
-}): React.JSX.Element {
+export function HistoryView({ onLoad }: { onLoad: (query: StoredQuerySelection) => void }): React.JSX.Element {
   const { t } = useTranslation()
   const history = useAppStore((s) => s.history)
   const connections = useAppStore((s) => s.connections)
@@ -198,12 +190,7 @@ export function HistoryView({
         <h1>{t('savedQueries.tabHistory')}</h1>
         <span className="library-count">· {history.length}</span>
         {history.length > 0 && (
-          <Button
-            className="ml-auto"
-            variant="danger"
-            size="sm"
-            onClick={() => void clearHistory()}
-          >
+          <Button className="ml-auto" variant="danger" size="sm" onClick={() => void clearHistory()}>
             {t('savedQueries.clearHistory')}
           </Button>
         )}
@@ -215,9 +202,7 @@ export function HistoryView({
             onLoad({
               code: entry.code,
               connectionId: entry.connectionId,
-              connectionName:
-                connections.find((item) => item.id === entry.connectionId)?.name ??
-                entry.connectionId,
+              connectionName: connections.find((item) => item.id === entry.connectionId)?.name ?? entry.connectionId,
               database: entry.database
             })
           }
@@ -267,9 +252,7 @@ function SavedTab({
 
   const buildMenu = (q: SavedQuery): ContextMenuEntry[] => {
     const targets = folderNames.filter((f) => f !== (q.folder ?? ''))
-    const items: ContextMenuEntry[] = [
-      { label: t('savedQueries.menuLoad'), onClick: () => onLoad(q) }
-    ]
+    const items: ContextMenuEntry[] = [{ label: t('savedQueries.menuLoad'), onClick: () => onLoad(q) }]
     if (targets.length > 0 || q.folder) items.push('separator')
     for (const f of targets)
       items.push({
@@ -290,33 +273,32 @@ function SavedTab({
   }
 
   const renderRow = (q: SavedQuery): React.JSX.Element => (
-    <div
-      key={q.id}
-      className="sq-row"
-      onClick={() => onLoad(q)}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        setMenu({ x: e.clientX, y: e.clientY, q })
-      }}
-      data-tip={q.code}
-    >
-      <div className="sq-name">{q.name}</div>
-      <SyntaxCodePreview code={q.code} />
-      <div className="sq-sub muted">
-        {q.database ? `db: ${q.database}` : t('savedQueries.noDb')}
-      </div>
-      <button
-        className="ghost sq-del"
-        data-tip={t('savedQueries.menuDelete')}
-        aria-label={t('savedQueries.menuDelete')}
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete(q.id)
+    <Tooltip key={q.id} content={() => formatTextPreview(q.code).text} variant="code">
+      <div
+        className="sq-row"
+        onClick={() => onLoad(q)}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ x: e.clientX, y: e.clientY, q })
         }}
       >
-        <Trash2 size={13} />
-      </button>
-    </div>
+        <div className="sq-name">{q.name}</div>
+        <SyntaxCodePreview code={q.code} />
+        <div className="sq-sub muted">{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</div>
+        <Tooltip content={t('savedQueries.menuDelete')}>
+          <button
+            className="ghost sq-del"
+            aria-label={t('savedQueries.menuDelete')}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(q.id)
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
+        </Tooltip>
+      </div>
+    </Tooltip>
   )
 
   // No real folders yet → flat list (no group chrome), matching the old look.
@@ -332,10 +314,7 @@ function SavedTab({
             return (
               <div key={folder || ' ungrouped'} className="sq-folder">
                 <div className="sq-folder-head" onClick={() => toggle(folder)}>
-                  <ChevronRight
-                    size={13}
-                    className={isCollapsed ? 'twisty-icon' : 'twisty-icon open'}
-                  />
+                  <ChevronRight size={13} className={isCollapsed ? 'twisty-icon' : 'twisty-icon open'} />
                   <span className="sq-folder-name">{label}</span>
                   <span className="sq-folder-count muted">{items.length}</span>
                 </div>
@@ -344,14 +323,7 @@ function SavedTab({
             )
           })}
 
-      {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={buildMenu(menu.q)}
-          onClose={() => setMenu(null)}
-        />
-      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={buildMenu(menu.q)} onClose={() => setMenu(null)} />}
     </div>
   )
 }
@@ -370,18 +342,18 @@ function HistoryTab({
   return (
     <div className="sq-list">
       {entries.map((h) => (
-        <div key={h.id} className="sq-row" onClick={() => onLoad(h)} data-tip={h.code}>
-          <SyntaxCodePreview code={h.code} />
-          <div className="sq-sub muted">
-            <span>db: {h.database}</span>
-            <span>·</span>
-            <span>{formatTime(h.ranAt)}</span>
-            <span>·</span>
-            <span className={h.ok ? 'lib-ok' : 'lib-err'}>
-              {h.summary ?? (h.ok ? 'ok' : 'error')}
-            </span>
+        <Tooltip key={h.id} content={() => formatTextPreview(h.code).text} variant="code">
+          <div className="sq-row" onClick={() => onLoad(h)}>
+            <SyntaxCodePreview code={h.code} />
+            <div className="sq-sub muted">
+              <span>db: {h.database}</span>
+              <span>·</span>
+              <span>{formatTime(h.ranAt)}</span>
+              <span>·</span>
+              <span className={h.ok ? 'lib-ok' : 'lib-err'}>{h.summary ?? (h.ok ? 'ok' : 'error')}</span>
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ))}
     </div>
   )

@@ -38,7 +38,7 @@ function dateToIso(payload: unknown): string {
 }
 
 /** Collapse an EJSON extended-type wrapper to a plain JSON value. */
-function unwrapExtended(o: Dict): unknown {
+function unwrapExtended(o: Dict, recurse: (value: unknown) => unknown = toPlainValue): unknown {
   if ('$oid' in o) return String(o['$oid'])
   if ('$date' in o) return dateToIso(o['$date'])
   if ('$numberInt' in o) return Number(o['$numberInt'])
@@ -73,12 +73,10 @@ function unwrapExtended(o: Dict): unknown {
   if ('$undefined' in o) return null
   if ('$symbol' in o) return String(o['$symbol'])
   if ('$code' in o) {
-    return '$scope' in o
-      ? { code: String(o['$code']), scope: toPlainValue(o['$scope']) }
-      : String(o['$code'])
+    return '$scope' in o ? { code: String(o['$code']), scope: recurse(o['$scope']) } : String(o['$code'])
   }
   if ('$ref' in o && '$id' in o) {
-    const out: Dict = { $ref: String(o['$ref']), $id: toPlainValue(o['$id']) }
+    const out: Dict = { $ref: String(o['$ref']), $id: recurse(o['$id']) }
     if (o['$db'] !== undefined) out['$db'] = String(o['$db'])
     return out
   }
@@ -132,10 +130,149 @@ export function toPlainKeyValue(key: string, value: unknown): string {
   return `${JSON.stringify(key)}: ${JSON.stringify(toPlainValue(value), null, 2) ?? 'null'}`
 }
 
-/** Formatted, bounded JSON for previews such as table-cell tooltips. */
-export function compactJsonPreview(value: unknown, maxLength = 240): string {
-  const text = JSON.stringify(toPlainValue(value), null, 2) ?? String(value)
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text
+export interface BoundedPreview {
+  text: string
+  truncated: boolean
+}
+
+interface PreviewLimits {
+  maxChars?: number
+  maxDepth?: number
+  maxLines?: number
+  maxStringChars?: number
+}
+
+const DEFAULT_PREVIEW_LIMITS = {
+  maxChars: 1200,
+  maxDepth: 4,
+  maxLines: 16,
+  maxStringChars: 160
+} as const
+
+function truncateCodePoints(text: string, maxChars: number): { text: string; truncated: boolean } {
+  const chars = Array.from(text)
+  if (chars.length <= maxChars) return { text, truncated: false }
+  return { text: `${chars.slice(0, Math.max(0, maxChars - 1)).join('')}…`, truncated: true }
+}
+
+function uniqueEllipsisKey(target: Dict): string {
+  let key = '…'
+  while (Object.prototype.hasOwnProperty.call(target, key)) key += '…'
+  return key
+}
+
+function buildPreviewValue(
+  value: unknown,
+  depth: number,
+  budget: { nodes: number; truncated: boolean },
+  maxDepth: number,
+  maxStringChars: number
+): unknown {
+  if (budget.nodes <= 0) {
+    budget.truncated = true
+    return '…'
+  }
+  budget.nodes -= 1
+
+  if (typeof value === 'string') {
+    const truncated = truncateCodePoints(value, maxStringChars)
+    if (truncated.truncated) budget.truncated = true
+    return truncated.text
+  }
+  if (typeof value === 'bigint') return String(value)
+  if (value == null || typeof value === 'number' || typeof value === 'boolean') return value
+  if (value === undefined) return null
+
+  if (Array.isArray(value)) {
+    if (depth >= maxDepth) {
+      budget.truncated = true
+      return ['…']
+    }
+    const out: unknown[] = []
+    for (const item of value) {
+      if (budget.nodes <= 0) break
+      out.push(buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars))
+    }
+    if (out.length < value.length) {
+      budget.truncated = true
+      out.push('…')
+    }
+    return out
+  }
+
+  if (isObject(value)) {
+    if (isExtended(value)) {
+      const unwrapped = unwrapExtended(value, (nested) =>
+        buildPreviewValue(nested, depth + 1, budget, maxDepth, maxStringChars)
+      )
+      return buildPreviewValue(unwrapped, depth, budget, maxDepth, maxStringChars)
+    }
+    if (depth >= maxDepth) {
+      budget.truncated = true
+      return { '…': '…' }
+    }
+    const entries = Object.entries(value)
+    const out: Dict = {}
+    for (const [rawKey, item] of entries) {
+      if (budget.nodes <= 0) break
+      const key = truncateCodePoints(rawKey, maxStringChars)
+      if (key.truncated) budget.truncated = true
+      let displayKey = key.text
+      while (Object.prototype.hasOwnProperty.call(out, displayKey)) displayKey += '…'
+      out[displayKey] = buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars)
+    }
+    if (Object.keys(out).length < entries.length) {
+      budget.truncated = true
+      out[uniqueEllipsisKey(out)] = '…'
+    }
+    return out
+  }
+
+  const scalar = truncateCodePoints(String(value), maxStringChars)
+  if (scalar.truncated) budget.truncated = true
+  return scalar.text
+}
+
+/** Pretty JSON preview that never traverses or renders an unbounded value. */
+export function formatJsonPreview(value: unknown, limits: PreviewLimits = {}): BoundedPreview {
+  const { maxChars, maxDepth, maxLines, maxStringChars } = { ...DEFAULT_PREVIEW_LIMITS, ...limits }
+
+  for (let nodeLimit = 48; nodeLimit >= 1; nodeLimit -= 1) {
+    const budget = { nodes: nodeLimit, truncated: false }
+    const previewValue = buildPreviewValue(value, 0, budget, maxDepth, maxStringChars)
+    const json = JSON.stringify(previewValue, null, 2) ?? String(previewValue)
+    const text = budget.truncated ? `${json}\n…` : json
+    if (text.length <= maxChars && text.split('\n').length <= maxLines) {
+      return { text, truncated: budget.truncated }
+    }
+  }
+
+  return { text: '…', truncated: true }
+}
+
+/** Preserve code/text layout while bounding tooltip work and viewport usage. */
+export function formatTextPreview(
+  value: string,
+  { maxChars = DEFAULT_PREVIEW_LIMITS.maxChars, maxLines = DEFAULT_PREVIEW_LIMITS.maxLines }: PreviewLimits = {}
+): BoundedPreview {
+  const normalized = value.replace(/\r\n?/g, '\n')
+  const truncated = normalized.split('\n').length > maxLines || Array.from(normalized).length > maxChars
+  if (!truncated) return { text: normalized, truncated: false }
+
+  const contentLineLimit = Math.max(0, maxLines - 1)
+  const contentCharLimit = Math.max(0, maxChars - 2)
+  const lines: string[] = []
+  let usedChars = 0
+  for (const line of normalized.split('\n').slice(0, contentLineLimit)) {
+    const separatorChars = lines.length > 0 ? 1 : 0
+    const remaining = contentCharLimit - usedChars - separatorChars
+    if (remaining <= 0) break
+    const clipped = truncateCodePoints(line, remaining)
+    lines.push(clipped.text)
+    usedChars += separatorChars + Array.from(clipped.text).length
+    if (clipped.truncated) break
+  }
+  return { text: [...lines, '…'].join('\n'), truncated: true }
 }
 
 // ----------------------------------------------------------------- CSV / TSV
@@ -163,9 +300,7 @@ function cellText(doc: unknown, column: string): string {
 function toDelimited(docs: unknown[], delimiter: string, sort: CollectionSort): string {
   const cols = deriveColumns(docs, sort)
   const header = cols.map((c) => escapeField(c, delimiter)).join(delimiter)
-  const rows = docs.map((doc) =>
-    cols.map((c) => escapeField(cellText(doc, c), delimiter)).join(delimiter)
-  )
+  const rows = docs.map((doc) => cols.map((c) => escapeField(cellText(doc, c), delimiter)).join(delimiter))
   return [header, ...rows].join('\n')
 }
 

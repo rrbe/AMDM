@@ -180,30 +180,6 @@ body {
   display: block;
 }
 
-/* --------------------------------------------------------------- tooltip
-   App-wide styled tooltip (TooltipLayer) — replaces native title=. Portaled to
-   <body>, positioned via inline top/left, sits above modals/menus (z 3000). */
-.app-tooltip {
-  position: fixed;
-  z-index: 3000;
-  max-width: 360px;
-  padding: 7px 10px;
-  border: none;
-  border-radius: var(--radius-control);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: var(--shadow-popover);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  line-height: var(--lh-snug);
-  white-space: pre-wrap;
-  word-break: break-word;
-  pointer-events: auto;
-  user-select: text;
-  cursor: text;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

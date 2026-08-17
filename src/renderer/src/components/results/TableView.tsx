@@ -12,7 +12,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
   copyText,
-  compactJsonPreview,
+  formatJsonPreview,
   plainScalarText,
   toCsv,
   toPlainJson,
@@ -27,6 +27,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonView } from './JsonView'
 import { ResizableModal } from '@renderer/components/common/Modal'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 
 /**
  * Virtualized table.
@@ -287,8 +288,7 @@ export function TableView({
       tabIndex={-1}
       onMouseDown={(e) => {
         if (!e.currentTarget.contains(e.target as Node)) return
-        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
-          claimCopyFocus(parentRef.current)
+        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor')) claimCopyFocus(parentRef.current)
       }}
     >
       <div className="tbl" style={{ width: totalWidth, height: rowVirtualizer.getTotalSize() + fontSize + 11 }}>
@@ -307,42 +307,45 @@ export function TableView({
                 tableSort?.column === col ? (tableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
               }
             >
-              <button
-                type="button"
-                className={`tbl-sort-trigger${tableSort?.column === col ? ' active' : ''}`}
-                data-tip={
+              <Tooltip
+                content={
                   tableSort?.column !== col
                     ? t('table.sortAscending', { column: col })
                     : tableSort.direction === 'asc'
                       ? t('table.sortDescending', { column: col })
                       : t('table.clearSort', { column: col })
-                }
-                aria-label={
-                  tableSort?.column !== col
-                    ? t('table.sortAscending', { column: col })
-                    : tableSort.direction === 'asc'
-                      ? t('table.sortDescending', { column: col })
-                      : t('table.clearSort', { column: col })
-                }
-                onClick={() =>
-                  setTableSort((current) => {
-                    if (current?.column !== col) return { column: col, direction: 'asc' }
-                    if (current.direction === 'asc') return { column: col, direction: 'desc' }
-                    return null
-                  })
                 }
               >
-                <span className="tbl-col-label">{col}</span>
-                {tableSort?.column === col ? (
-                  tableSort.direction === 'asc' ? (
-                    <ArrowUp size={13} aria-hidden="true" />
+                <button
+                  type="button"
+                  className={`tbl-sort-trigger${tableSort?.column === col ? ' active' : ''}`}
+                  aria-label={
+                    tableSort?.column !== col
+                      ? t('table.sortAscending', { column: col })
+                      : tableSort.direction === 'asc'
+                        ? t('table.sortDescending', { column: col })
+                        : t('table.clearSort', { column: col })
+                  }
+                  onClick={() =>
+                    setTableSort((current) => {
+                      if (current?.column !== col) return { column: col, direction: 'asc' }
+                      if (current.direction === 'asc') return { column: col, direction: 'desc' }
+                      return null
+                    })
+                  }
+                >
+                  <span className="tbl-col-label">{col}</span>
+                  {tableSort?.column === col ? (
+                    tableSort.direction === 'asc' ? (
+                      <ArrowUp size={13} aria-hidden="true" />
+                    ) : (
+                      <ArrowDown size={13} aria-hidden="true" />
+                    )
                   ) : (
-                    <ArrowDown size={13} aria-hidden="true" />
-                  )
-                ) : (
-                  <ChevronsUpDown size={13} className="tbl-sort-idle" aria-hidden="true" />
-                )}
-              </button>
+                    <ChevronsUpDown size={13} className="tbl-sort-idle" aria-hidden="true" />
+                  )}
+                </button>
+              </Tooltip>
               <span className="tbl-col-resizer" onMouseDown={(e) => startColResize(col, e)} />
             </div>
           ))}
@@ -357,15 +360,16 @@ export function TableView({
               className={`tbl-row${selectedRows.has(sourceIndex) ? ' selected' : ''}`}
               style={{ transform: `translateY(${vi.start + fontSize + 11}px)`, width: totalWidth }}
             >
-              <div
-                className="tbl-td idx idx-select"
-                style={{ width: INDEX_COL_WIDTH }}
-                onClick={(e) => clickHandle(vi.index, e)}
-                onContextMenu={(e) => openMenu(e, sourceIndex, null)}
-                data-tip={t('table.selectRowTip')}
-              >
-                {vi.index + 1}
-              </div>
+              <Tooltip content={t('table.selectRowTip')}>
+                <div
+                  className="tbl-td idx idx-select"
+                  style={{ width: INDEX_COL_WIDTH }}
+                  onClick={(e) => clickHandle(vi.index, e)}
+                  onContextMenu={(e) => openMenu(e, sourceIndex, null)}
+                >
+                  {vi.index + 1}
+                </div>
+              </Tooltip>
               {columns.map((col) => (
                 <Cell
                   key={col}
@@ -375,6 +379,7 @@ export function TableView({
                   selected={selectedCell?.row === sourceIndex && selectedCell?.col === col}
                   editing={editing?.row === sourceIndex && editing?.col === col}
                   editError={editError}
+                  openPreviewHint={t('table.doubleClickForFullInfo')}
                   onClick={(e) => clickCell(vi.index, sourceIndex, col, e)}
                   onOpen={(value) => setPreview({ column: col, value })}
                   onCommit={(text) => void commitCell(sourceIndex, col, text)}
@@ -413,9 +418,7 @@ export function TableView({
         </ResizableModal>
       )}
 
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
-      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }
@@ -502,6 +505,7 @@ function Cell({
   selected,
   editing,
   editError,
+  openPreviewHint,
   onClick,
   onOpen,
   onCommit,
@@ -514,6 +518,7 @@ function Cell({
   selected: boolean
   editing: boolean
   editError: string | null
+  openPreviewHint: string
   onClick: (e: MouseEvent) => void
   onOpen: (value: unknown) => void
   onCommit: (text: string) => void
@@ -526,24 +531,14 @@ function Cell({
   if (editing) {
     return (
       <div className={cellCls} style={{ width }}>
-        <CellInput
-          initial={editableText(value) ?? ''}
-          error={editError}
-          onCommit={onCommit}
-          onCancel={onCancel}
-        />
+        <CellInput initial={editableText(value) ?? ''} error={editError} onCommit={onCommit} onCancel={onCancel} />
       </div>
     )
   }
 
   if (!present) {
     return (
-      <div
-        className={cellCls}
-        style={{ width }}
-        onClick={onClick}
-        onContextMenu={onContextMenu}
-      >
+      <div className={cellCls} style={{ width }} onClick={onClick} onContextMenu={onContextMenu}>
         <span className="empty">—</span>
       </div>
     )
@@ -559,23 +554,28 @@ function Cell({
   const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
   return (
-    <div
-      className={cellCls}
-      style={{ width, cursor: expandable ? 'pointer' : undefined }}
-      data-tip={expandable ? compactJsonPreview(value) : text}
-      role={expandable ? 'button' : undefined}
-      tabIndex={expandable ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (expandable && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault()
-          onOpen(value)
-        }
-      }}
-      onDoubleClick={expandable ? () => onOpen(value) : undefined}
-      onContextMenu={onContextMenu}
+    <Tooltip
+      content={expandable ? () => formatJsonPreview(value).text : text}
+      footer={expandable ? openPreviewHint : undefined}
+      variant={expandable ? 'code' : 'compact'}
     >
-      <span className={cls}>{text}</span>
-    </div>
+      <div
+        className={cellCls}
+        style={{ width, cursor: expandable ? 'pointer' : undefined }}
+        role={expandable ? 'button' : undefined}
+        tabIndex={expandable ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (expandable && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            onOpen(value)
+          }
+        }}
+        onDoubleClick={expandable ? () => onOpen(value) : undefined}
+        onContextMenu={onContextMenu}
+      >
+        <span className={cls}>{text}</span>
+      </div>
+    </Tooltip>
   )
 }

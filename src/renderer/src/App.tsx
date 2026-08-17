@@ -7,7 +7,7 @@ import { Explorer, type ExplorerView } from '@renderer/components/explorer/Explo
 import type { StoredQuerySelection } from '@renderer/components/explorer/SavedQueriesPanel'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
 import { Toaster } from '@renderer/components/common/Toaster'
-import { TooltipLayer } from '@renderer/components/common/TooltipLayer'
+import { TooltipLayer } from '@renderer/components/ui/Tooltip'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
@@ -231,7 +231,6 @@ export default function App(): React.JSX.Element {
           <div className="sidebar-toggle-slot">
             <button
               className="sidebar-toggle-open"
-              data-tip={t('explorer.expand')}
               aria-label={t('explorer.expand')}
               onClick={() => setExplorerOpen(true)}
             >
@@ -244,9 +243,7 @@ export default function App(): React.JSX.Element {
         <Modal
           small
           title={
-            queryPrompt.kind === 'connect'
-              ? t('queryNavigation.connectTitle')
-              : t('queryNavigation.unavailableTitle')
+            queryPrompt.kind === 'connect' ? t('queryNavigation.connectTitle') : t('queryNavigation.unavailableTitle')
           }
           onClose={closeQueryPrompt}
           footer={
@@ -254,11 +251,7 @@ export default function App(): React.JSX.Element {
               <span className="spacer" />
               <Button onClick={closeQueryPrompt}>{t('queryNavigation.cancel')}</Button>
               {queryPrompt.kind === 'connect' ? (
-                <Button
-                  variant="primary"
-                  busy={queryPrompt.connecting}
-                  onClick={() => void confirmQueryConnection()}
-                >
+                <Button variant="primary" busy={queryPrompt.connecting} onClick={() => void confirmQueryConnection()}>
                   {t('queryNavigation.connect')}
                 </Button>
               ) : (
@@ -283,9 +276,7 @@ export default function App(): React.JSX.Element {
                   name: queryPrompt.connectionName
                 })}
               </p>
-              {queryPrompt.error && (
-                <p className="mt-3 text-sm text-destructive">{queryPrompt.error}</p>
-              )}
+              {queryPrompt.error && <p className="mt-3 text-sm text-destructive">{queryPrompt.error}</p>}
             </>
           ) : (
             <p>

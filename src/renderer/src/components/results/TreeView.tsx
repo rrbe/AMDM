@@ -2,14 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CollectionSort, TabularExportFormat } from '@shared/types'
-import {
-  entriesOf,
-  formatScalar,
-  isExpandable,
-  summarize,
-  typeLabel,
-  valueType
-} from '@renderer/lib/ejson'
+import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeSelection } from '@renderer/lib/selection'
@@ -29,6 +22,7 @@ import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 
 /**
  * Two-column KEY | VALUE tree of the result documents.
@@ -97,9 +91,7 @@ export function TreeView({
   const [editError, setEditError] = useState<string | null>(null)
   // Expanded paths. Top-level docs start collapsed except the first (for
   // context); nested containers always start collapsed.
-  const [expanded, setExpanded] = useState<Set<string>>(() =>
-    docs.length > 0 ? new Set(['0']) : new Set()
-  )
+  const [expanded, setExpanded] = useState<Set<string>>(() => (docs.length > 0 ? new Set(['0']) : new Set()))
   const [keyWidth, setKeyWidth] = useState(DEFAULT_KEY_WIDTH)
   // Click-to-select: the selected node is highlighted and is what Cmd+C copies.
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -122,13 +114,7 @@ export function TreeView({
   // Flatten visible nodes. Memo keyed by docs identity + expanded set reference.
   const flat = useMemo<FlatNode[]>(() => {
     const out: FlatNode[] = []
-    const walk = (
-      key: string,
-      value: unknown,
-      depth: number,
-      path: string,
-      docIndex?: number
-    ): void => {
+    const walk = (key: string, value: unknown, depth: number, path: string, docIndex?: number): void => {
       const canExpand = isExpandable(value)
       const isOpen = canExpand && expanded.has(path)
       out.push({
@@ -200,9 +186,7 @@ export function TreeView({
   // A row is highlighted when its top-level doc is in the multi-doc selection
   // (depth-0 rows only), or when it's the single selected nested node.
   const isRowSelected = (node: FlatNode): boolean =>
-    node.depth === 0
-      ? node.docIndex !== undefined && selectedDocs.has(node.docIndex)
-      : node.id === selectedId
+    node.depth === 0 ? node.docIndex !== undefined && selectedDocs.has(node.docIndex) : node.id === selectedId
 
   // Click a row. Top-level document rows drive the multi-doc selection: plain =
   // just this doc, Shift = range from the anchor, ⌘/Ctrl = toggle. Clicking any
@@ -334,8 +318,7 @@ export function TreeView({
       // lands in the inline cell editor so editing keeps focus.
       tabIndex={-1}
       onMouseDown={(e) => {
-        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
-          claimCopyFocus(parentRef.current)
+        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor')) claimCopyFocus(parentRef.current)
       }}
     >
       <div className="virtual-inner" style={{ height: rowVirtualizer.getTotalSize() }}>
@@ -346,9 +329,7 @@ export function TreeView({
           return (
             <div
               key={node.id}
-              className={`kv-row${node.expandable ? ' expandable' : ''}${
-                isRowSelected(node) ? ' selected' : ''
-              }`}
+              className={`kv-row${node.expandable ? ' expandable' : ''}${isRowSelected(node) ? ' selected' : ''}`}
               style={{ transform: `translateY(${vi.start}px)` }}
               onClick={(e) => onRowClick(node, e)}
               onDoubleClick={() => node.expandable && toggle(node.id)}
@@ -370,9 +351,9 @@ export function TreeView({
                 {node.depth === 0 ? (
                   <span className="doc-badge">{node.keyLabel}</span>
                 ) : (
-                  <span className="kv-key-name" data-tip={node.keyLabel}>
-                    {node.keyLabel}
-                  </span>
+                  <Tooltip content={node.keyLabel}>
+                    <span className="kv-key-name">{node.keyLabel}</span>
+                  </Tooltip>
                 )}
               </div>
               <div className="kv-val">
@@ -409,9 +390,7 @@ export function TreeView({
         />
       )}
 
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
-      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }
@@ -491,8 +470,8 @@ function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
   const { text, type } = formatScalar(node.value)
   return (
-    <span className={`tree-val v-${type}`} data-tip={text}>
-      {text}
-    </span>
+    <Tooltip content={text}>
+      <span className={`tree-val v-${type}`}>{text}</span>
+    </Tooltip>
   )
 }

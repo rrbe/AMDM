@@ -18,7 +18,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border border-transparent bg-[var(--interaction-selected)] text-foreground hover:bg-[var(--interaction-pressed)]',
+        default:
+          'border border-transparent bg-[var(--interaction-selected)] text-foreground hover:bg-[var(--interaction-pressed)]',
         primary: 'border border-[var(--primary)] bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]',
         ghost: 'border border-transparent bg-transparent text-foreground hover:bg-[var(--interaction-hover)]',
         danger: 'border border-transparent bg-transparent text-destructive hover:bg-destructive/10'
@@ -36,8 +37,6 @@ export type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['var
 export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>['size']>
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Styled tooltip text (forwarded as a `data-tip` attr; see TooltipLayer). */
-  'data-tip'?: string
   variant?: ButtonVariant
   /** `default` (h-8) for dialogs/toolbars; `sm` (h-7) for compact strips. */
   size?: ButtonSize

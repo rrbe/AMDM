@@ -318,6 +318,16 @@
 .shell-main.results-expanded > .resize-handle--row {
   display: none;
 }
+.shell-main.query-expanded > .resize-handle--row,
+.shell-main.query-expanded > .result-panel {
+  display: none;
+}
+.shell-main.query-expanded .editor-row {
+  height: auto;
+  max-height: none;
+  flex: 1 1 auto;
+  margin-bottom: 14px;
+}
 .editor-wrap {
   flex: 1;
   min-width: 0;

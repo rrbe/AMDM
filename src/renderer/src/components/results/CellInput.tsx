@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 
 interface CellInputProps {
   /** Pre-filled text (auto-selected on mount). */
@@ -32,29 +33,30 @@ export function CellInput({ initial, error, onCommit, onCancel }: CellInputProps
   }, [])
 
   return (
-    <input
-      ref={ref}
-      className={error ? 'cell-edit-input invalid' : 'cell-edit-input'}
-      data-tip={error ?? undefined}
-      defaultValue={initial}
-      spellCheck={false}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          handled.current = true
-          onCommit(e.currentTarget.value)
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          handled.current = true
-          onCancel()
-        }
-      }}
-      onBlur={() => {
-        if (!handled.current) onCancel()
-      }}
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.stopPropagation()}
-    />
+    <Tooltip content={error ?? undefined}>
+      <input
+        ref={ref}
+        className={error ? 'cell-edit-input invalid' : 'cell-edit-input'}
+        defaultValue={initial}
+        spellCheck={false}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            handled.current = true
+            onCommit(e.currentTarget.value)
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            handled.current = true
+            onCancel()
+          }
+        }}
+        onBlur={() => {
+          if (!handled.current) onCancel()
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
+      />
+    </Tooltip>
   )
 }

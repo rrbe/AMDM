@@ -18,6 +18,7 @@ import { Field } from '@renderer/components/ui/Field'
 import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { cn } from '@renderer/lib/utils'
 import {
   buildConnectionOptions,
@@ -108,18 +109,19 @@ function DiagnoseControl({
             <span className="font-bold" style={{ color: allOk ? 'var(--ok)' : 'var(--err)' }}>
               {allOk ? '✓' : '✗'}
             </span>
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
-              data-tip={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
-              className={cn(
-                'inline-flex cursor-pointer items-center border-0 bg-transparent p-0',
-                open ? 'text-foreground' : 'text-[var(--fg-3)]'
-              )}
-            >
-              <MessageSquareText size={16} />
-            </button>
+            <Tooltip content={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}>
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
+                className={cn(
+                  'inline-flex cursor-pointer items-center border-0 bg-transparent p-0',
+                  open ? 'text-foreground' : 'text-[var(--fg-3)]'
+                )}
+              >
+                <MessageSquareText size={16} />
+              </button>
+            </Tooltip>
           </>
         )}
       </div>
@@ -597,21 +599,22 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
                   {tFn('connection.general.color')}
                 </label>
                 <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    className={cn(
-                      'relative size-5 shrink-0 rounded-full border-2 border-[var(--separator)] bg-[var(--surface-control)] p-0 transition-colors hover:border-[var(--separator-strong)]',
-                      color === '' && 'border-[var(--primary)]'
-                    )}
-                    data-tip={tFn('connection.general.noColor')}
-                    aria-label={tFn('connection.general.noColor')}
-                    onClick={() => setColor('')}
-                  >
-                    <span
-                      className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
-                      aria-hidden
-                    />
-                  </button>
+                  <Tooltip content={tFn('connection.general.noColor')}>
+                    <button
+                      type="button"
+                      className={cn(
+                        'relative size-5 shrink-0 rounded-full border-2 border-[var(--separator)] bg-[var(--surface-control)] p-0 transition-colors hover:border-[var(--separator-strong)]',
+                        color === '' && 'border-[var(--primary)]'
+                      )}
+                      aria-label={tFn('connection.general.noColor')}
+                      onClick={() => setColor('')}
+                    >
+                      <span
+                        className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
+                        aria-hidden
+                      />
+                    </button>
+                  </Tooltip>
                   {PRESET_COLORS.map((c) => (
                     <button
                       type="button"
@@ -698,15 +701,16 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
                             />
                           </div>
                           <div className="flex items-center justify-center">
-                            <button
-                              type="button"
-                              className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                              aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
-                              data-tip={tFn('connection.general.removeMember')}
-                              onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <Tooltip content={tFn('connection.general.removeMember')}>
+                              <button
+                                type="button"
+                                className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
+                                onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </Tooltip>
                           </div>
                         </div>
                       ))
@@ -826,15 +830,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
                           />
                         </div>
                         <div className="flex items-center justify-center">
-                          <button
-                            type="button"
-                            className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
-                            data-tip={tFn('connection.general.removeOption')}
-                            onClick={() => setCustomOptions((current) => current.filter((row) => row.id !== option.id))}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <Tooltip content={tFn('connection.general.removeOption')}>
+                            <button
+                              type="button"
+                              className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
+                              onClick={() =>
+                                setCustomOptions((current) => current.filter((row) => row.id !== option.id))
+                              }
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </Tooltip>
                         </div>
                       </div>
                     ))

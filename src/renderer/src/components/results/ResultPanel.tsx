@@ -12,6 +12,7 @@ import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import {
   hasOpenShortcutLayer,
@@ -122,11 +123,7 @@ export function ResultPanel({
   // while the switcher is showing (a documents/value result, not error/explain).
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
-    if (
-      !switchable ||
-      !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
-    )
-      return
+    if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
     const views: ResultView[] = ['tree', 'json', 'table']
     const onKey = (e: KeyboardEvent): void => {
       if (hasOpenShortcutLayer()) return
@@ -161,8 +158,7 @@ export function ResultPanel({
 
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
-  const strip =
-    results.length > 1 ? <ResultTabStrip results={results} activeId={active?.id ?? null} /> : null
+  const strip = results.length > 1 ? <ResultTabStrip results={results} activeId={active?.id ?? null} /> : null
 
   if (!result) {
     return (
@@ -254,13 +250,11 @@ export function ResultPanel({
             )
           })}
           {hasOutput && (
-            <button
-              className={showConsole ? 'active' : ''}
-              data-tip={`Console (⌘4)`}
-              onClick={() => chooseConsole(true)}
-            >
-              {t('result.view.console')}
-            </button>
+            <Tooltip content="Console (⌘4)">
+              <button className={showConsole ? 'active' : ''} onClick={() => chooseConsole(true)}>
+                {t('result.view.console')}
+              </button>
+            </Tooltip>
           )}
         </div>
         <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
@@ -390,13 +384,7 @@ function ResultExpandButton({
  * ✕ / middle-click to close. New runs always land in a fresh tab (the store
  * caps how many are kept — see lib/tabs MAX_RESULT_TABS).
  */
-function ResultTabStrip({
-  results,
-  activeId
-}: {
-  results: ResultTab[]
-  activeId: string | null
-}): React.JSX.Element {
+function ResultTabStrip({ results, activeId }: { results: ResultTab[]; activeId: string | null }): React.JSX.Element {
   const { t } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
@@ -484,9 +472,7 @@ function ResultMeta({
     <div className="result-meta">
       {parts.map((p, i) => (
         <span key={i} className="result-meta-part">
-          {i > 0 && (
-            <span className="result-meta-separator" aria-hidden="true" />
-          )}
+          {i > 0 && <span className="result-meta-separator" aria-hidden="true" />}
           <span className={p.cls}>{p.text}</span>
         </span>
       ))}
@@ -513,27 +499,29 @@ function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | n
   const to = skip + count
   return (
     <div className="result-pager">
-      <button
-        className="ghost"
-        disabled={skip === 0 || running}
-        data-tip={t('result.prevPage')}
-        aria-label={t('result.prevPage')}
-        onClick={() => void loadPage(Math.max(0, skip - limit))}
-      >
-        <ChevronLeft size={15} />
-      </button>
+      <Tooltip content={t('result.prevPage')}>
+        <button
+          className="ghost"
+          disabled={skip === 0 || running}
+          aria-label={t('result.prevPage')}
+          onClick={() => void loadPage(Math.max(0, skip - limit))}
+        >
+          <ChevronLeft size={15} />
+        </button>
+      </Tooltip>
       <span className="result-range">
         {from}–{to}
       </span>
-      <button
-        className="ghost"
-        disabled={!result.truncated || running}
-        data-tip={t('result.nextPage')}
-        aria-label={t('result.nextPage')}
-        onClick={() => void loadPage(skip + limit)}
-      >
-        <ChevronRight size={15} />
-      </button>
+      <Tooltip content={t('result.nextPage')}>
+        <button
+          className="ghost"
+          disabled={!result.truncated || running}
+          aria-label={t('result.nextPage')}
+          onClick={() => void loadPage(skip + limit)}
+        >
+          <ChevronRight size={15} />
+        </button>
+      </Tooltip>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 
 interface DocumentTabProps {
   active: boolean
@@ -41,25 +42,26 @@ export function DocumentTab({
       }}
     >
       {statusAction ? (
-        <button
-          className="document-tab-status document-tab-status-action"
-          aria-label={statusAction.label}
-          data-tip={statusAction.label}
-          onClick={(event) => {
-            event.stopPropagation()
-            statusAction.onClick()
-          }}
-        >
-          {status}
-        </button>
+        <Tooltip content={statusAction.label}>
+          <button
+            className="document-tab-status document-tab-status-action"
+            aria-label={statusAction.label}
+            onClick={(event) => {
+              event.stopPropagation()
+              statusAction.onClick()
+            }}
+          >
+            {status}
+          </button>
+        </Tooltip>
       ) : (
         <span className="document-tab-status" aria-hidden>
           {status}
         </span>
       )}
-      <span className="document-tab-label" data-tip={tooltip}>
-        {label}
-      </span>
+      <Tooltip content={tooltip}>
+        <span className="document-tab-label">{label}</span>
+      </Tooltip>
       <button
         className="document-tab-close"
         aria-label={closeLabel}

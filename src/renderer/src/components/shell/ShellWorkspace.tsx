@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
-  ChartNoAxesColumnIncreasing,
   ChevronDown,
   ChevronRight,
   CircleX,
   LoaderCircle,
+  Maximize2,
+  Minimize2,
   PanelRightClose,
   PanelRightOpen,
   Play,
@@ -23,7 +24,7 @@ import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { Select } from '@renderer/components/ui/Select'
-import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import {
   contextualTabDigitIndex,
   hasOpenShortcutLayer,
@@ -33,7 +34,6 @@ import {
   shortcutRegionFromTarget,
   type ShortcutRegion
 } from '@renderer/lib/keyboardShortcuts'
-import type { SchemaTarget } from '@shared/types'
 
 /**
  * The main work area: a tab strip, header (active connection + database +
@@ -64,18 +64,15 @@ export function ShellWorkspace(): React.JSX.Element {
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const [showSave, setShowSave] = useState(false)
-  const [schemaTarget, setSchemaTarget] = useState<SchemaTarget | null>(null)
   const [contextOpen, setContextOpen] = useState(false)
-  const [resultsExpanded, setResultsExpanded] = useState(false)
+  const [expandedRegion, setExpandedRegion] = useState<'query' | 'results' | null>(null)
   const selectedCode = useRef<string | undefined>(undefined)
   const lastShortcutRegion = useRef<ShortcutRegion>('query')
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
-  const availableSchemaTarget: SchemaTarget | null =
-    activeConnectionId && activeConnectionState === 'connected' && targetCollection
-      ? { connectionId: activeConnectionId, database: activeDatabase || 'test', collection: targetCollection }
-      : null
+  const queryExpanded = expandedRegion === 'query'
+  const resultsExpanded = expandedRegion === 'results'
   const contentBusy = running || !code.trim()
   const busy = contentBusy || activeConnectionState !== 'connected'
   const runEditor = (): void => {
@@ -129,7 +126,7 @@ export function ShellWorkspace(): React.JSX.Element {
     <div className="work">
       <TabBar />
       <div className="shell-body">
-        <main className={resultsExpanded ? 'shell-main results-expanded' : 'shell-main'}>
+        <main className={`shell-main${expandedRegion ? ` ${expandedRegion}-expanded` : ''}`}>
           <div className="work-header" data-shortcut-region="query">
             <div className="work-breadcrumb">
               <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
@@ -154,37 +151,37 @@ export function ShellWorkspace(): React.JSX.Element {
                   <Play aria-hidden /> {t('shell.runBtn')}
                 </Button>
               )}
+              <Tooltip content={t('shell.explainBtn')}>
+                <button
+                  className="work-icon-btn"
+                  disabled={busy}
+                  onClick={() => void runExplain()}
+                  aria-label={t('shell.explainBtn')}
+                >
+                  <Activity size={15} />
+                </button>
+              </Tooltip>
+              <Tooltip content={t('shell.saveQueryTip')}>
+                <button
+                  className="work-icon-btn"
+                  disabled={contentBusy}
+                  onClick={() => setShowSave(true)}
+                  aria-label={t('shell.saveBtn')}
+                >
+                  <Save size={15} />
+                </button>
+              </Tooltip>
               <button
-                className="work-icon-btn"
-                disabled={!availableSchemaTarget}
-                onClick={() => availableSchemaTarget && setSchemaTarget(availableSchemaTarget)}
-                data-tip={t('schema.menu')}
-                aria-label={t('schema.menu')}
+                className={`work-icon-btn${queryExpanded ? ' is-active' : ''}`}
+                aria-label={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}
+                aria-pressed={queryExpanded}
+                onClick={() => setExpandedRegion((current) => (current === 'query' ? null : 'query'))}
               >
-                <ChartNoAxesColumnIncreasing size={15} />
-              </button>
-              <button
-                className="work-icon-btn"
-                disabled={busy}
-                onClick={() => void runExplain()}
-                data-tip={t('shell.explainTip')}
-                aria-label={t('shell.explainBtn')}
-              >
-                <Activity size={15} />
-              </button>
-              <button
-                className="work-icon-btn"
-                disabled={contentBusy}
-                onClick={() => setShowSave(true)}
-                data-tip={t('shell.saveQueryTip')}
-                aria-label={t('shell.saveBtn')}
-              >
-                <Save size={15} />
+                {queryExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
               </button>
               <button
                 className="work-icon-btn context-toggle"
                 onClick={() => setContextOpen((open) => !open)}
-                data-tip={t(contextOpen ? 'context.close' : 'context.open')}
                 aria-label={t(contextOpen ? 'context.close' : 'context.open')}
               >
                 {contextOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
@@ -226,7 +223,10 @@ export function ShellWorkspace(): React.JSX.Element {
             ariaLabel={t('shell.resizeEditor')}
           />
 
-          <ResultPanel expanded={resultsExpanded} onExpandedChange={setResultsExpanded} />
+          <ResultPanel
+            expanded={resultsExpanded}
+            onExpandedChange={(expanded) => setExpandedRegion(expanded ? 'results' : null)}
+          />
         </main>
 
         {contextOpen && (
@@ -237,7 +237,6 @@ export function ShellWorkspace(): React.JSX.Element {
       </div>
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
-      {schemaTarget && <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />}
     </div>
   )
 }
@@ -306,13 +305,9 @@ function TabBar(): React.JSX.Element {
           label: (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                <span style={{ color: connectionTextColor(tab.connectionId) }}>
-                  {tabLabel(tab, index)}
-                </span>
+                <span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, index)}</span>
               </span>
-              <small className="shrink-0 text-[11px] text-muted-foreground">
-                {tab.activeDatabase}
-              </small>
+              <small className="shrink-0 text-[11px] text-muted-foreground">{tab.activeDatabase}</small>
             </span>
           )
         }))}
@@ -343,11 +338,7 @@ function TabBar(): React.JSX.Element {
               active={tab.id === activeTabId}
               className="qtab"
               dataTabId={tab.id}
-              label={
-                <span style={{ color: connectionTextColor(tab.connectionId) }}>
-                  {tabLabel(tab, i)}
-                </span>
-              }
+              label={<span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, i)}</span>}
               closeLabel={t('shell.closeTab')}
               onSelect={() => setActiveTab(tab.id)}
               onClose={() => closeTab(tab.id)}
@@ -374,11 +365,7 @@ function TabBar(): React.JSX.Element {
             />
           )
         })}
-        <button
-          className="qtab-new"
-          aria-label={t('shell.newTabLabel')}
-          onClick={() => newTab()}
-        >
+        <button className="qtab-new" aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
           <Plus size={14} />
         </button>
       </div>

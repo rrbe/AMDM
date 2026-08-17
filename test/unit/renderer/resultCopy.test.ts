@@ -9,7 +9,8 @@ import {
   toStrictEjson,
   plainScalarText,
   toPlainKeyValue,
-  compactJsonPreview,
+  formatJsonPreview,
+  formatTextPreview,
   toCsv,
   toTsv
 } from '@renderer/lib/resultCopy'
@@ -59,14 +60,44 @@ describe('toPlainKeyValue', () => {
   })
 })
 
-describe('compactJsonPreview', () => {
-  it('shows object content and bounds long previews', () => {
-    expect(compactJsonPreview([{ country: 'US', zipCode: '90220' }])).toBe(
-      '[\n  {\n    "country": "US",\n    "zipCode": "90220"\n  }\n]'
+describe('bounded tooltip previews', () => {
+  it('pretty-prints ordinary and extended JSON values', () => {
+    expect(formatJsonPreview([{ country: 'US', zipCode: '90220' }])).toEqual({
+      text: '[\n  {\n    "country": "US",\n    "zipCode": "90220"\n  }\n]',
+      truncated: false
+    })
+    expect(formatJsonPreview({ id: { $oid: OID }, count: { $numberInt: '3' } })).toEqual({
+      text: `{\n  "id": "${OID}",\n  "count": 3\n}`,
+      truncated: false
+    })
+  })
+
+  it('bounds JSON by lines, characters, depth, and Unicode-safe string length', () => {
+    const preview = formatJsonPreview(
+      {
+        message: '😀'.repeat(200),
+        nested: { one: { two: { three: { four: true } } } },
+        items: Array.from({ length: 80 }, (_, index) => ({ index }))
+      },
+      { maxChars: 240, maxLines: 10, maxDepth: 3, maxStringChars: 20 }
     )
-    const preview = compactJsonPreview({ message: 'a'.repeat(100) }, 24)
-    expect(preview).toHaveLength(24)
-    expect(preview.endsWith('…')).toBe(true)
+
+    expect(preview.truncated).toBe(true)
+    expect(preview.text.split('\n').length).toBeLessThanOrEqual(10)
+    expect(Array.from(preview.text).length).toBeLessThanOrEqual(240)
+    expect(preview.text.endsWith('\n…')).toBe(true)
+    expect(preview.text).not.toContain('\uFFFD')
+    expect(() => JSON.parse(preview.text.slice(0, -2))).not.toThrow()
+  })
+
+  it('preserves text indentation and tabs while bounding lines and characters', () => {
+    expect(formatTextPreview('db.items.find({\r\n\tactive: true\r\n})')).toEqual({
+      text: 'db.items.find({\n\tactive: true\n})',
+      truncated: false
+    })
+
+    const preview = formatTextPreview('line 1\nline 2\nline 3\nline 4', { maxChars: 20, maxLines: 3 })
+    expect(preview).toEqual({ text: 'line 1\nline 2\n…', truncated: true })
   })
 })
 

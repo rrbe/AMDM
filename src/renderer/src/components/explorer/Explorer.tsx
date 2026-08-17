@@ -31,32 +31,19 @@ import {
   Users as UsersIcon,
   X
 } from 'lucide-react'
-import type {
-  CollectionSort,
-  ConnectionConfig,
-  ConnectionState,
-  SchemaTarget
-} from '@shared/types'
-import {
-  useAppStore,
-  type CatalogState,
-  type NodeKind,
-  type NodePayload
-} from '@renderer/store/useAppStore'
+import type { CollectionSort, ConnectionConfig, ConnectionState, SchemaTarget } from '@shared/types'
+import { useAppStore, type CatalogState, type NodeKind, type NodePayload } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { formatBytes } from '@renderer/lib/formatBytes'
 import { copyText } from '@renderer/lib/resultCopy'
-import {
-  applyConnectionOrder,
-  reorderConnectionIds,
-  type DropEdge
-} from '@renderer/lib/connectionOrder'
+import { applyConnectionOrder, reorderConnectionIds, type DropEdge } from '@renderer/lib/connectionOrder'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
 import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import {
   HistoryView,
   SavedQueriesView,
@@ -150,12 +137,7 @@ type Row = ConnRow | TreeRow
 
 /** The store actions the catalog rows wire their click handlers to. */
 interface RowActions {
-  toggleNode: (
-    connId: string,
-    nodeId: string,
-    kind: NodeKind,
-    payload: NodePayload
-  ) => Promise<void>
+  toggleNode: (connId: string, nodeId: string, kind: NodeKind, payload: NodePayload) => Promise<void>
   setActiveConnection: (id: string | null) => void
   browseCollection: (db: string, coll: string) => void
   inspectIndex: (db: string, coll: string, indexName: string) => void
@@ -452,47 +434,45 @@ export function Explorer({
         <div className="app-brand">
           <span>AMDM</span>
         </div>
-        <button
-          className="side-head-action"
-          data-tip={t('explorer.collapse')}
-          aria-label={t('explorer.collapse')}
-          onClick={onCollapse}
-        >
+        <button className="side-head-action" aria-label={t('explorer.collapse')} onClick={onCollapse}>
           <PanelLeftClose size={16} />
         </button>
       </div>
 
       <nav className="explorer-nav" aria-label={t('navigation.title')}>
-        <button
-          className={view === 'connections' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
-          data-tip={view === 'connections' ? undefined : t('navigation.data')}
-          aria-label={t('navigation.data')}
-          aria-current={view === 'connections' ? 'page' : undefined}
-          onClick={() => onViewChange('connections')}
-        >
-          <Database size={17} />
-          {view === 'connections' && <span>{t('navigation.data')}</span>}
-        </button>
-        <button
-          className={view === 'savedQueries' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
-          data-tip={view === 'savedQueries' ? undefined : t('navigation.saved')}
-          aria-label={t('navigation.saved')}
-          aria-current={view === 'savedQueries' ? 'page' : undefined}
-          onClick={() => onViewChange('savedQueries')}
-        >
-          <Bookmark size={17} />
-          {view === 'savedQueries' && <span>{t('navigation.saved')}</span>}
-        </button>
-        <button
-          className={view === 'history' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
-          data-tip={view === 'history' ? undefined : t('navigation.history')}
-          aria-label={t('navigation.history')}
-          aria-current={view === 'history' ? 'page' : undefined}
-          onClick={() => onViewChange('history')}
-        >
-          <Clock3 size={17} />
-          {view === 'history' && <span>{t('navigation.history')}</span>}
-        </button>
+        <Tooltip content={view === 'connections' ? undefined : t('navigation.data')}>
+          <button
+            className={view === 'connections' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+            aria-label={t('navigation.data')}
+            aria-current={view === 'connections' ? 'page' : undefined}
+            onClick={() => onViewChange('connections')}
+          >
+            <Database size={17} />
+            {view === 'connections' && <span>{t('navigation.data')}</span>}
+          </button>
+        </Tooltip>
+        <Tooltip content={view === 'savedQueries' ? undefined : t('navigation.saved')}>
+          <button
+            className={view === 'savedQueries' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+            aria-label={t('navigation.saved')}
+            aria-current={view === 'savedQueries' ? 'page' : undefined}
+            onClick={() => onViewChange('savedQueries')}
+          >
+            <Bookmark size={17} />
+            {view === 'savedQueries' && <span>{t('navigation.saved')}</span>}
+          </button>
+        </Tooltip>
+        <Tooltip content={view === 'history' ? undefined : t('navigation.history')}>
+          <button
+            className={view === 'history' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+            aria-label={t('navigation.history')}
+            aria-current={view === 'history' ? 'page' : undefined}
+            onClick={() => onViewChange('history')}
+          >
+            <Clock3 size={17} />
+            {view === 'history' && <span>{t('navigation.history')}</span>}
+          </button>
+        </Tooltip>
       </nav>
 
       {view === 'connections' && searchOpen && (
@@ -506,13 +486,11 @@ export function Explorer({
             aria-label={t('explorer.search')}
           />
           {search && (
-            <button
-              onClick={() => setSearch('')}
-              aria-label={t('explorer.clearSearch')}
-              data-tip={t('explorer.clearSearch')}
-            >
-              <X size={13} />
-            </button>
+            <Tooltip content={t('explorer.clearSearch')}>
+              <button onClick={() => setSearch('')} aria-label={t('explorer.clearSearch')}>
+                <X size={13} />
+              </button>
+            </Tooltip>
           )}
         </div>
       )}
@@ -523,18 +501,19 @@ export function Explorer({
             <div className="side-section-head">
               <span className="side-section-title">Connections</span>
               <span className="library-count">· {connections.length}</span>
-              <button
-                className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
-                data-tip={t('explorer.search')}
-                aria-label={t('explorer.search')}
-                aria-pressed={searchOpen}
-                onClick={() => {
-                  if (searchOpen) setSearch('')
-                  setSearchOpen((open) => !open)
-                }}
-              >
-                <Search size={16} />
-              </button>
+              <Tooltip content={t('explorer.search')}>
+                <button
+                  className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
+                  aria-label={t('explorer.search')}
+                  aria-pressed={searchOpen}
+                  onClick={() => {
+                    if (searchOpen) setSearch('')
+                    setSearchOpen((open) => !open)
+                  }}
+                >
+                  <Search size={16} />
+                </button>
+              </Tooltip>
             </div>
             <div className="explorer-body">
               {connections.length === 0 && (
@@ -585,30 +564,27 @@ export function Explorer({
 
       {/* App-level controls stay in the quiet footer. */}
       <div className="side-foot">
-        <button
-          className="theme-cycle"
-          data-tip={
+        <Tooltip
+          content={
             theme === 'system'
               ? t('explorer.theme.system')
               : theme === 'light'
                 ? t('explorer.theme.light')
                 : t('explorer.theme.dark')
           }
-          aria-label={t('explorer.toggleTheme')}
-          onClick={() =>
-            void updateSettings({
-              theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
-            })
-          }
         >
-          {theme === 'system' ? (
-            <Monitor size={16} />
-          ) : theme === 'light' ? (
-            <Sun size={16} />
-          ) : (
-            <Moon size={16} />
-          )}
-        </button>
+          <button
+            className="theme-cycle"
+            aria-label={t('explorer.toggleTheme')}
+            onClick={() =>
+              void updateSettings({
+                theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
+              })
+            }
+          >
+            {theme === 'system' ? <Monitor size={16} /> : theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </Tooltip>
         {availableVersion ? (
           <button
             type="button"
@@ -617,28 +593,21 @@ export function Explorer({
             onClick={() => void showAvailableUpdate()}
           >
             <span className="side-foot-update-dot" aria-hidden />
-            <span className="side-foot-update-label">
-              {t('updates.newVersion', { version: availableVersion })}
-            </span>
+            <span className="side-foot-update-label">{t('updates.newVersion', { version: availableVersion })}</span>
           </button>
         ) : (
           <span className="side-foot-build" title={__BUILD_ID__}>
             {__BUILD_ID__}
           </span>
         )}
-        <button
-          className="theme-cycle"
-          data-tip={t('common.settings')}
-          aria-label={t('common.settings')}
-          onClick={onSettings}
-        >
-          <Settings size={16} />
-        </button>
+        <Tooltip content={t('common.settings')}>
+          <button className="theme-cycle" aria-label={t('common.settings')} onClick={onSettings}>
+            <Settings size={16} />
+          </button>
+        </Tooltip>
       </div>
 
-      {connForm.open && (
-        <ConnectionForm editing={connForm.editing} onClose={() => setConnForm({ open: false })} />
-      )}
+      {connForm.open && <ConnectionForm editing={connForm.editing} onClose={() => setConnForm({ open: false })} />}
 
       {ioModal && ioModal.mode === 'export' && (
         <ExportModal
@@ -659,17 +628,8 @@ export function Explorer({
           onClose={() => setIoModal(null)}
         />
       )}
-      {schemaTarget && (
-        <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
-      )}
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          items={ctxMenu.items}
-          onClose={() => setCtxMenu(null)}
-        />
-      )}
+      {schemaTarget && <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />}
+      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
     </div>
   )
 }
@@ -696,24 +656,15 @@ function ConnectionRow({
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
   const { conn, state, error, expandable, expanded } = row
   const isConnected = state === 'connected'
-  const sub =
-    conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
+  const sub = conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
 
   // The lone surviving piece of chrome: a single status signal whose color +
   // glow carry the live state. Actions stay in the right-click menu.
   const signalClass = `conn-signal conn-signal--${
-    state === 'connected'
-      ? 'on'
-      : state === 'error'
-        ? 'error'
-        : state === 'connecting'
-          ? 'connecting'
-          : 'off'
+    state === 'connected' ? 'on' : state === 'error' ? 'error' : state === 'connecting' ? 'connecting' : 'off'
   }`
   const statusLabel =
-    state === 'error' && error
-      ? `${t('connection.status.error')}: ${error}`
-      : t(`connection.status.${state}`)
+    state === 'error' && error ? `${t('connection.status.error')}: ${error}` : t(`connection.status.${state}`)
 
   return (
     <div
@@ -758,9 +709,7 @@ function ConnectionRow({
           }
         }}
       >
-        {expandable ? (
-          <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} />
-        ) : null}
+        {expandable ? <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} /> : null}
       </span>
       <div className="conn-text">
         <div
@@ -769,18 +718,15 @@ function ConnectionRow({
         >
           {conn.name}
         </div>
-        <div className="conn-sub" data-tip={sub} data-tip-overflow="">
-          {sub}
-        </div>
+        <Tooltip content={sub} overflowOnly>
+          <div className="conn-sub">{sub}</div>
+        </Tooltip>
       </div>
-      <span
-        className="conn-status"
-        role="status"
-        aria-label={statusLabel}
-        data-tip={statusLabel}
-      >
-        <span className={signalClass} />
-      </span>
+      <Tooltip content={statusLabel}>
+        <span className="conn-status" role="status" aria-label={statusLabel}>
+          <span className={signalClass} />
+        </span>
+      </Tooltip>
     </div>
   )
 }
@@ -803,6 +749,9 @@ function CatalogRow({
     (isActive ? ' active' : '') +
     (row.empty ? ' tree-node--empty' : '') +
     (isNote ? ' tree-node--note' : '')
+  const tooltipContent = isNote
+    ? undefined
+    : (row.tooltip ?? (row.empty ? `${row.label} — empty (no collections yet)` : row.label))
   return (
     <div
       className={className}
@@ -834,18 +783,9 @@ function CatalogRow({
           <TreeIcon name={row.icon} />
         </span>
       )}
-      <span
-        className="tree-label"
-        data-tip={
-          isNote
-            ? undefined
-            : row.tooltip ??
-              (row.empty ? `${row.label} — empty (no collections yet)` : row.label)
-        }
-        data-tip-overflow={isNote || row.empty || row.tooltip ? undefined : ''}
-      >
-        {row.label}
-      </span>
+      <Tooltip content={tooltipContent} overflowOnly={!isNote && !row.empty && !row.tooltip}>
+        <span className="tree-label">{row.label}</span>
+      </Tooltip>
       {typeof row.count === 'number' && (
         <span className="tree-count">
           ({row.approximateCount ? '~' : ''}
@@ -869,13 +809,7 @@ function browseCollection(a: RowActions, connId: string, db: string, coll: strin
 }
 
 /** Query one index's complete definition, making its connection active first. */
-function inspectIndex(
-  a: RowActions,
-  connId: string,
-  db: string,
-  coll: string,
-  indexName: string
-): void {
+function inspectIndex(a: RowActions, connId: string, db: string, coll: string, indexName: string): void {
   a.setActiveConnection(connId)
   a.inspectIndex(db, coll, indexName)
 }
@@ -889,12 +823,7 @@ function openDatabase(a: RowActions, connId: string, db: string, nodeId: string)
  * Flatten one connection's expanded catalog into ordered rows (depth ≥ 1).
  * Mirrors the old CatalogTree builder, offset one level under the connection.
  */
-function flattenCatalog(
-  connId: string,
-  cat: CatalogState,
-  a: RowActions,
-  sort: CollectionSort
-): TreeRow[] {
+function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: CollectionSort): TreeRow[] {
   const byName = (x: { name: string }, y: { name: string }): number => x.name.localeCompare(y.name)
   const rows: TreeRow[] = []
   const dbsRaw = cat.databases ?? []
@@ -939,8 +868,7 @@ function flattenCatalog(
         connId,
         depth: 2,
         label: coll.name,
-        icon:
-          coll.type === 'view' ? 'view' : coll.type === 'timeseries' ? 'timeseries' : 'collection',
+        icon: coll.type === 'view' ? 'view' : coll.type === 'timeseries' ? 'timeseries' : 'collection',
         kind: 'collection',
         expandable: true,
         expanded: collExpanded,
