@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { computeTooltipPosition, type TooltipPlacement } from '@renderer/lib/tooltipPosition'
 
 /**
  * A single, app-wide styled tooltip — the lightweight replacement for native
@@ -24,9 +25,15 @@ interface Active {
 
 export function TooltipLayer(): React.JSX.Element | null {
   const [active, setActive] = useState<Active | null>(null)
-  const [style, setStyle] = useState<{ top: number; left: number; visible: boolean }>({
+  const [style, setStyle] = useState<{
+    top: number
+    left: number
+    placement: TooltipPlacement
+    visible: boolean
+  }>({
     top: 0,
     left: 0,
+    placement: 'top',
     visible: false
   })
   const boxRef = useRef<HTMLDivElement | null>(null)
@@ -117,24 +124,21 @@ export function TooltipLayer(): React.JSX.Element | null {
     }
   }, [])
 
-  // Place the bubble to the right, falling back to the left at the viewport edge.
+  // Prefer vertical placement so row text stays readable, then use either
+  // horizontal side when viewport edges leave insufficient room.
   useLayoutEffect(() => {
     if (!active || !boxRef.current) {
       setStyle((s) => (s.visible ? { ...s, visible: false } : s))
       return
     }
-    const box = boxRef.current.getBoundingClientRect()
-    const { rect } = active
-    const top = Math.max(
-      MARGIN,
-      Math.min(rect.top + rect.height / 2 - box.height / 2, window.innerHeight - box.height - MARGIN)
+    const position = computeTooltipPosition(
+      active.rect,
+      boxRef.current.getBoundingClientRect(),
+      { width: window.innerWidth, height: window.innerHeight },
+      GAP,
+      MARGIN
     )
-    const right = rect.right + GAP
-    const left =
-      right + box.width <= window.innerWidth - MARGIN
-        ? right
-        : Math.max(MARGIN, rect.left - box.width - GAP)
-    setStyle({ top, left, visible: true })
+    setStyle({ ...position, visible: true })
   }, [active])
 
   if (!active) return null
@@ -143,7 +147,12 @@ export function TooltipLayer(): React.JSX.Element | null {
       ref={boxRef}
       className="app-tooltip"
       role="tooltip"
-      style={{ top: style.top, left: style.left, visibility: style.visible ? 'visible' : 'hidden' }}
+      data-placement={style.placement}
+      style={{
+        top: style.top,
+        left: style.left,
+        visibility: style.visible ? 'visible' : 'hidden'
+      }}
     >
       {active.text}
     </div>,
