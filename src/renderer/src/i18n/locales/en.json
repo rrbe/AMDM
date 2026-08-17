@@ -106,7 +106,8 @@
     }
   },
   "updates": {
-    "newVersion": "New version {{version}}"
+    "newVersion": "New version {{version}}",
+    "updateTo": "Update to {{version}}"
   },
   "notify": {
     "loadConnectionsFailed": "Failed to load connections: {{error}}",

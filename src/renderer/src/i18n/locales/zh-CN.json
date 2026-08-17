@@ -106,7 +106,8 @@
     }
   },
   "updates": {
-    "newVersion": "新版本 {{version}}"
+    "newVersion": "新版本 {{version}}",
+    "updateTo": "更新到 {{version}}"
   },
   "notify": {
     "loadConnectionsFailed": "加载连接失败：{{error}}",

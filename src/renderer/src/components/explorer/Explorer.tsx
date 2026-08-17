@@ -590,10 +590,11 @@ export function Explorer({
             type="button"
             className="side-foot-update"
             title={t('updates.newVersion', { version: availableVersion })}
+            aria-label={t('updates.updateTo', { version: availableVersion })}
             onClick={() => void showAvailableUpdate()}
           >
-            <span className="side-foot-update-dot" aria-hidden />
-            <span className="side-foot-update-label">{t('updates.newVersion', { version: availableVersion })}</span>
+            <Download size={13} aria-hidden />
+            <span className="side-foot-update-label">{t('updates.updateTo', { version: availableVersion })}</span>
           </button>
         ) : (
           <span className="side-foot-build" title={__BUILD_ID__}>

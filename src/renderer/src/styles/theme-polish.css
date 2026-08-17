@@ -127,33 +127,34 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  height: 30px;
   overflow: hidden;
-  border: 0;
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: transparent;
-  padding: 5px 3px;
-  color: var(--err);
+  background: var(--accent);
+  padding: 0 8px;
+  color: var(--accent-fg);
   cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
 }
 .side-foot-update:hover {
-  background: var(--interaction-hover);
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 .side-foot-update:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--focus-soft);
 }
-.side-foot-update-dot {
-  width: 7px;
-  height: 7px;
+.side-foot-update svg {
   flex: 0 0 auto;
-  border-radius: 999px;
-  background: currentColor;
 }
 .side-foot-update-label {
   min-width: 0;
   overflow: hidden;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;

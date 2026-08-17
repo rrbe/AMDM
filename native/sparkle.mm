@@ -55,6 +55,16 @@ static napi_ref scheduledUpdateCallback;
 
 static AMDMUpdaterDelegate *updaterDelegate;
 
+static void createUpdaterController(void) {
+  if (updaterDelegate == nil) {
+    updaterDelegate = [[AMDMUpdaterDelegate alloc] init];
+  }
+  updaterController = [[SPUStandardUpdaterController alloc]
+      initWithStartingUpdater:YES
+               updaterDelegate:nil
+              userDriverDelegate:updaterDelegate];
+}
+
 static napi_value getUndefined(napi_env env) {
   napi_value value;
   napi_get_undefined(env, &value);
@@ -69,11 +79,7 @@ static napi_value startUpdater(napi_env env, napi_callback_info) {
 
   @autoreleasepool {
     if (updaterController == nil) {
-      updaterDelegate = [[AMDMUpdaterDelegate alloc] init];
-      updaterController = [[SPUStandardUpdaterController alloc]
-          initWithStartingUpdater:YES
-                   updaterDelegate:nil
-                  userDriverDelegate:updaterDelegate];
+      createUpdaterController();
     }
   }
 
@@ -102,6 +108,24 @@ static napi_value checkForUpdates(napi_env env, napi_callback_info info) {
   if (updaterController != nil) {
     [updaterController checkForUpdates:nil];
   }
+  return getUndefined(env);
+}
+
+static napi_value recheckForUpdates(napi_env env, napi_callback_info info) {
+  if (![NSThread isMainThread]) {
+    napi_throw_error(env, "SPARKLE_THREAD_ERROR", "Sparkle must restart on the main thread");
+    return nullptr;
+  }
+
+  @autoreleasepool {
+    // A gentle scheduled reminder keeps its discovered update session alive.
+    // Discard it so this user action fetches the appcast again instead of
+    // bringing the stale update alert into focus.
+    updaterController = nil;
+    createUpdaterController();
+    [updaterController checkForUpdates:nil];
+  }
+
   return getUndefined(env);
 }
 
@@ -136,13 +160,15 @@ static napi_value initialize(napi_env env, napi_value exports) {
        nullptr},
       {"checkForUpdates", nullptr, checkForUpdates, nullptr, nullptr, nullptr, napi_default,
        nullptr},
+      {"recheckForUpdates", nullptr, recheckForUpdates, nullptr, nullptr, nullptr, napi_default,
+       nullptr},
       {"getAutomaticallyChecksForUpdates", nullptr, getAutomaticallyChecksForUpdates, nullptr,
        nullptr, nullptr, napi_default, nullptr},
       {"setAutomaticallyChecksForUpdates", nullptr, setAutomaticallyChecksForUpdates, nullptr,
        nullptr, nullptr, napi_default, nullptr},
   };
 
-  if (napi_define_properties(env, exports, 4, properties) != napi_ok) {
+  if (napi_define_properties(env, exports, 5, properties) != napi_ok) {
     napi_throw_error(env, "SPARKLE_INIT_ERROR", "Unable to expose Sparkle API");
     return nullptr;
   }

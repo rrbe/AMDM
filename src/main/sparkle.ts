@@ -8,6 +8,7 @@ import { scheduledReminderVersion } from './updatesCore'
 interface SparkleAddon {
   start(onScheduledUpdate: (version: string) => void): void
   checkForUpdates(): void
+  recheckForUpdates(): void
   getAutomaticallyChecksForUpdates(): boolean
   setAutomaticallyChecksForUpdates(enabled: boolean): void
 }
@@ -88,7 +89,7 @@ export function showAvailableSparkleUpdate(): boolean {
   if (pendingVersion) settingsStore.update({ acknowledgedUpdateVersion: pendingVersion })
   pendingVersion = null
   emitState()
-  addon.checkForUpdates()
+  addon.recheckForUpdates()
   return true
 }
 
