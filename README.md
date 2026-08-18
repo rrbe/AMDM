@@ -9,11 +9,14 @@ A lean, performance-first MongoDB desktop GUI, powered by Electron.
 ## Run
 
 ```bash
-pnpm install         # uses pnpm
-pnpm dev             # launch the app with hot reload
-pnpm build           # production build into ./out
-pnpm dist:dir --mac --arm64 # package an unpacked Apple Silicon app
-pnpm clean           # remove generated build files
+pnpm install                         # install dependencies
+pnpm dev                             # launch the app with hot reload
+pnpm typecheck                       # type-check main and renderer
+pnpm test:unit                       # unit + contract tests
+pnpm build                           # production build into ./out
+pnpm dist:dir --mac --arm64          # package an unpacked Apple Silicon app
+pnpm install:mac                     # package, replace /Applications/AMDM.app, then launch
+pnpm clean                           # remove generated build files
 ```
 
 ## Features
@@ -34,6 +37,6 @@ macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. 
 
 ## License
 
-[MIT](./LICENSE)
+[GNU GPL v3.0](./LICENSE)
 
 > AMDM is an unofficial MongoDB client and is not affiliated with MongoDB, Inc. in any way.

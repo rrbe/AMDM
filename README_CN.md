@@ -9,11 +9,14 @@
 ## 运行
 
 ```bash
-pnpm install         # 使用 pnpm
-pnpm dev             # 启动应用并热重载
-pnpm build           # 生产构建到 ./out
-pnpm dist:dir --mac --arm64 # 打包 Apple Silicon 免安装应用
-pnpm clean           # 清理构建产物
+pnpm install                         # 安装依赖
+pnpm dev                             # 启动应用并热重载
+pnpm typecheck                       # 检查主进程与渲染进程类型
+pnpm test:unit                       # 运行单元与契约测试
+pnpm build                           # 生产构建到 ./out
+pnpm dist:dir --mac --arm64          # 打包未安装的 Apple Silicon 应用
+pnpm install:mac                     # 打包、替换 /Applications/AMDM.app 并启动
+pnpm clean                           # 清理构建产物
 ```
 
 ## 功能
@@ -34,6 +37,6 @@ macOS 版本通过 Sparkle 更新,使用 ad-hoc 签名且未经 Apple 公证。�
 
 ## 许可证
 
-[MIT](./LICENSE)
+[GNU GPL v3.0](./LICENSE)
 
 > AMDM 是非官方 MongoDB 客户端,与 MongoDB, Inc. 无关。
