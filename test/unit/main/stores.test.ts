@@ -71,6 +71,7 @@ describe('queryStore — history', () => {
 describe('settingsStore', () => {
   it('returns defaults when nothing is stored', () => {
     expect(settingsStore.get()).toMatchObject({
+      defaultExportDirectory: electron.app.getPath('downloads'),
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
@@ -89,6 +90,13 @@ describe('settingsStore', () => {
     expect(settingsStore.get().theme).toBe('system') // untouched
   })
 
+  it('persists the selected default export directory', () => {
+    const directory = join(electron.app.getPath('userData'), 'exports')
+    settingsStore.update({ defaultExportDirectory: directory })
+    settingsStore.init()
+    expect(settingsStore.get().defaultExportDirectory).toBe(directory)
+  })
+
   it('persists the acknowledged update version', () => {
     settingsStore.update({ acknowledgedUpdateVersion: '26.8.11' })
     settingsStore.init()
@@ -99,6 +107,7 @@ describe('settingsStore', () => {
     settingsStore.init()
     expect(settingsStore.get()).toMatchObject({
       theme: 'dark',
+      defaultExportDirectory: electron.app.getPath('downloads'),
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,

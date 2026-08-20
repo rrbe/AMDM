@@ -1,21 +1,25 @@
+import { COPYFILE_EXCL } from 'node:constants'
+import { randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdtemp, rename, rm } from 'node:fs/promises'
+import { copyFile, link, lstat, mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { dialog, shell, type BrowserWindow, type WebContents } from 'electron'
+import { app, dialog, shell, type BrowserWindow, type MessageBoxOptions, type WebContents } from 'electron'
 import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type {
   CollectionExportRequest,
   DataOpResult,
-  ExportFormat,
+  ExportDirectorySelection,
+  ExportFileRequest,
   ExportProgress,
   ExportProgressPhase,
   ExportRequest
 } from '../../shared/types'
 import { IPC } from '../../shared/ipc'
+import { exportFileExtension, sanitizeExportBaseName } from '../../shared/exportDestination'
 import {
   collectTabularColumns,
   escapeDelimitedField,
@@ -28,20 +32,13 @@ import {
 import { sessionManager } from '../mongo/sessionManager'
 import { streamBsonToFile, writeChunk } from './bsonWriteCore'
 
-const EXT: Record<ExportFormat, string> = {
-  json: 'json',
-  csv: 'csv',
-  tsv: 'tsv',
-  xlsx: 'xlsx',
-  bson: 'bson'
-}
-
 interface ExportTask {
   ownerId: number
   controller: AbortController
 }
 
 const exportTasks = new Map<string, ExportTask>()
+const exportDirectories = new WeakMap<WebContents, ExportDirectorySelection>()
 const completedExports = new WeakMap<WebContents, { taskId: string; filePath: string }>()
 
 function errMsg(error: unknown): string {
@@ -81,8 +78,90 @@ function captureWriteErrors(stream: NodeJS.WritableStream): {
   }
 }
 
-function safeFileName(name: string): string {
-  return (name.trim() || 'export').replace(/[\\/:*?"<>|\0]/g, '-')
+function isFileSystemError(error: unknown, code: string): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === code
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await lstat(filePath)
+    return true
+  } catch (error) {
+    if (isFileSystemError(error, 'ENOENT')) return false
+    throw error
+  }
+}
+
+function directoryDialogTitle(): string {
+  const locale = app.getLocale().toLowerCase()
+  if (locale.startsWith('zh-tw') || locale.startsWith('zh-hk') || locale.startsWith('zh-mo')) {
+    return '選擇匯出目錄'
+  }
+  if (locale.startsWith('zh')) return '选择导出目录'
+  return 'Choose export directory'
+}
+
+function overwritePrompt(filePath: string): MessageBoxOptions {
+  const locale = app.getLocale().toLowerCase()
+  const fileName = basename(filePath)
+  if (locale.startsWith('zh-tw') || locale.startsWith('zh-hk') || locale.startsWith('zh-mo')) {
+    return {
+      type: 'warning',
+      title: '確認覆蓋檔案',
+      message: `「${fileName}」已存在`,
+      detail: '繼續匯出將永久覆蓋原檔案，且無法復原。確定要覆蓋嗎？',
+      buttons: ['覆蓋檔案', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    }
+  }
+  if (locale.startsWith('zh')) {
+    return {
+      type: 'warning',
+      title: '确认覆盖文件',
+      message: `“${fileName}”已存在`,
+      detail: '继续导出将永久覆盖原文件，且无法恢复。确定要覆盖吗？',
+      buttons: ['覆盖文件', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    }
+  }
+  return {
+    type: 'warning',
+    title: 'Confirm file overwrite',
+    message: `“${fileName}” already exists`,
+    detail: 'Continuing will permanently overwrite the existing file and cannot be undone.',
+    buttons: ['Overwrite file', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true
+  }
+}
+
+async function confirmOverwrite(filePath: string, win: BrowserWindow | null): Promise<boolean> {
+  const options = overwritePrompt(filePath)
+  const result = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+  return result.response === 0
+}
+
+/** Grant this Renderer an owner-scoped directory chosen through the native picker. */
+export async function chooseExportDirectory(
+  win: BrowserWindow | null,
+  owner: WebContents,
+  defaultPath: string
+): Promise<ExportDirectorySelection | null> {
+  const options: Electron.OpenDialogOptions = {
+    title: directoryDialogTitle(),
+    defaultPath,
+    properties: ['openDirectory', 'createDirectory']
+  }
+  const picked = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+  if (picked.canceled || !picked.filePaths[0]) return null
+  const selection = { selectionId: randomUUID(), path: picked.filePaths[0] }
+  exportDirectories.set(owner, selection)
+  return selection
 }
 
 type ProgressReport = (phase: ExportProgressPhase, processed: number, total?: number, force?: boolean) => void
@@ -402,12 +481,15 @@ async function exportBson(
 async function runExport(
   req: ExportRequest,
   filePath: string,
+  overwrite: boolean,
   owner: WebContents,
   signal: AbortSignal
 ): Promise<DataOpResult> {
   // Keep the completed temporary file beside the destination so the final
   // rename cannot cross filesystem/volume boundaries.
-  const tempDir = await mkdtemp(join(dirname(filePath), `.${safeFileName(basename(filePath))}.amdm-export-`))
+  const tempDir = await mkdtemp(
+    join(dirname(filePath), `.${sanitizeExportBaseName(basename(filePath))}.amdm-export-`)
+  )
   const outputPath = join(tempDir, 'output')
   const report = progressReporter(owner, req.taskId)
   try {
@@ -419,7 +501,25 @@ async function runExport(
     } else count = await exportTabularToFile(req, outputPath, signal, report)
     throwIfAborted(signal)
     report('finalizing', count, count, true)
-    await rename(outputPath, filePath)
+    if (overwrite) {
+      await rename(outputPath, filePath)
+    } else {
+      try {
+        await link(outputPath, filePath)
+      } catch (error) {
+        if (isFileSystemError(error, 'EEXIST')) {
+          throw new Error('The export file now exists. Retry and confirm overwrite.')
+        }
+        if (
+          !isFileSystemError(error, 'EPERM') &&
+          !isFileSystemError(error, 'ENOTSUP') &&
+          !isFileSystemError(error, 'EOPNOTSUPP')
+        ) {
+          throw error
+        }
+        await copyFile(outputPath, filePath, COPYFILE_EXCL)
+      }
+    }
     return { ok: true, filePath, count }
   } finally {
     await rm(tempDir, { recursive: true, force: true }).catch(() => {})
@@ -427,40 +527,40 @@ async function runExport(
 }
 
 export async function exportData(
-  req: ExportRequest,
+  req: ExportFileRequest,
   win: BrowserWindow | null,
   owner: WebContents
 ): Promise<DataOpResult> {
   if (!req.taskId || exportTasks.has(req.taskId)) return { ok: false, error: 'Invalid or duplicate export task id.' }
-  const isBson = req.format === 'bson'
-  const extension = isBson && req.source === 'collection' && req.gzip ? 'bson.gz' : EXT[req.format]
-  const suggestedName = req.source === 'collection' ? req.collection : (req.suggestedName ?? 'result')
-  const options = {
-    defaultPath: `${safeFileName(suggestedName)}.${extension}`,
-    filters: [
-      {
-        name: req.format === 'xlsx' ? 'Excel' : req.format.toUpperCase(),
-        extensions: [extension]
-      }
-    ]
+  const directory = exportDirectories.get(owner)
+  if (!directory || !req.destination || directory.selectionId !== req.destination.directorySelectionId) {
+    return { ok: false, error: 'Export directory selection is no longer available. Choose it again.' }
   }
-  const picked = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
-  if (picked.canceled || !picked.filePath) return { ok: false, cancelled: true }
+  if (typeof req.destination.fileName !== 'string' || !req.destination.fileName.trim()) {
+    return { ok: false, error: 'Export file name is required.' }
+  }
+  const gzip = req.source === 'collection' && req.format === 'bson' && Boolean(req.gzip)
+  const extension = exportFileExtension(req.format, gzip)
+  const filePath = join(directory.path, `${sanitizeExportBaseName(req.destination.fileName)}.${extension}`)
+  const exists = await pathExists(filePath)
+  if (exists && !(await confirmOverwrite(filePath, win))) {
+    return { ok: false, cancelled: true, filePath }
+  }
 
   const controller = new AbortController()
   exportTasks.set(req.taskId, { ownerId: owner.id, controller })
   const close = (): void => controller.abort(abortError())
   owner.once('destroyed', close)
   try {
-    const result = await runExport(req, picked.filePath, owner, controller.signal)
+    const result = await runExport(req, filePath, exists, owner, controller.signal)
     if (result.ok && result.filePath) {
       completedExports.set(owner, { taskId: req.taskId, filePath: result.filePath })
     }
     return result
   } catch (error) {
     return isAbort(error, controller.signal)
-      ? { ok: false, cancelled: true, filePath: picked.filePath }
-      : { ok: false, error: errMsg(error), filePath: picked.filePath }
+      ? { ok: false, cancelled: true, filePath }
+      : { ok: false, error: errMsg(error), filePath }
   } finally {
     owner.removeListener('destroyed', close)
     exportTasks.delete(req.taskId)
@@ -472,4 +572,12 @@ export async function openExportedFile(taskId: string, owner: WebContents): Prom
   const completed = completedExports.get(owner)
   if (!completed || completed.taskId !== taskId) return 'Exported file is no longer available.'
   return (await shell.openPath(completed.filePath)) || null
+}
+
+/** Reveal only the latest export completed by this Renderer in the platform file manager. */
+export function revealExportedFile(taskId: string, owner: WebContents): string | null {
+  const completed = completedExports.get(owner)
+  if (!completed || completed.taskId !== taskId) return 'Exported file is no longer available.'
+  shell.showItemInFolder(completed.filePath)
+  return null
 }

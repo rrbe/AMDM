@@ -69,6 +69,7 @@ const api: Api = {
     delete: (request) => ipcRenderer.invoke(IPC.docDelete, request)
   },
   io: {
+    chooseExportDirectory: () => ipcRenderer.invoke(IPC.ioChooseExportDirectory),
     export: (request) => ipcRenderer.invoke(IPC.ioExport, request),
     cancelExport: (taskId) => ipcRenderer.invoke(IPC.ioExportCancel, taskId),
     onExportProgress: (listener) => {
@@ -79,6 +80,7 @@ const api: Api = {
       return () => ipcRenderer.removeListener(IPC.ioExportProgress, handle)
     },
     openExportedFile: (taskId) => ipcRenderer.invoke(IPC.ioOpenExportedFile, taskId),
+    revealExportedFile: (taskId) => ipcRenderer.invoke(IPC.ioRevealExportedFile, taskId),
     import: (request) => ipcRenderer.invoke(IPC.ioImport, request)
   },
   settings: {

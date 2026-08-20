@@ -8,6 +8,19 @@ interface SettingsFile {
   settings: AppSettings
 }
 
+function defaultExportDirectory(stored: Partial<AppSettings> | undefined): string {
+  const directory = stored?.defaultExportDirectory
+  return typeof directory === 'string' && directory.trim() ? directory : app.getPath('downloads')
+}
+
+function mergeSettings(stored?: Partial<AppSettings>): AppSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    defaultExportDirectory: defaultExportDirectory(stored)
+  }
+}
+
 /** Persists UI preferences to settings.json in userData. */
 class SettingsStore {
   private filePath = ''
@@ -19,10 +32,12 @@ class SettingsStore {
       try {
         const parsed = JSON.parse(readFileSync(this.filePath, 'utf8')) as Partial<SettingsFile>
         // Merge over defaults so new settings keys get sane values on upgrade.
-        this.data = { version: 1, settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) } }
+        this.data = { version: 1, settings: mergeSettings(parsed.settings) }
       } catch {
-        this.data = { version: 1, settings: { ...DEFAULT_SETTINGS } }
+        this.data = { version: 1, settings: mergeSettings() }
       }
+    } else {
+      this.data = { version: 1, settings: mergeSettings() }
     }
   }
 

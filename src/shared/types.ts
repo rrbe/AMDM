@@ -417,6 +417,18 @@ export type TabularExportFormat = 'csv' | 'tsv' | 'xlsx'
 export type ExportFormat = 'json' | TabularExportFormat | 'bson'
 export type TabularDelimiter = ',' | ';' | ' ' | '\t' | '/' | '-' | '.'
 
+/** Owner-scoped directory capability returned by the native directory picker. */
+export interface ExportDirectorySelection {
+  selectionId: string
+  path: string
+}
+
+export interface ExportDestination {
+  directorySelectionId: string
+  /** Base file name entered in the export form; the format controls the extension. */
+  fileName: string
+}
+
 interface ExportOptions {
   /** Opaque id used for progress events and cancellation. */
   taskId: string
@@ -455,11 +467,10 @@ export interface ResultExportRequest extends ExportOptions {
   format: TabularExportFormat
   /** EJSON-canonical, structured-cloneable documents already loaded by Renderer. */
   documents: unknown[]
-  /** Used only to suggest a file name in the native save dialog. */
-  suggestedName?: string
 }
 
 export type ExportRequest = CollectionExportRequest | ResultExportRequest
+export type ExportFileRequest = ExportRequest & { destination: ExportDestination }
 
 export interface ImportRequest {
   connectionId: string
@@ -539,6 +550,8 @@ export type KeyboardShortcutId =
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
   connectionOrder: string[]
+  /** Absolute directory opened first by the native export-directory picker. */
+  defaultExportDirectory: string
   /** 'natural' = server order; 'alpha' = A→Z by name. */
   collectionSort: CollectionSort
   /** 'system' = follow OS (default); 'light' = Stone; 'dark' = Stone Night. */
@@ -595,6 +608,7 @@ export const HISTORY_LIMITS = [50, 100, 200, 500, 1000] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
   connectionOrder: [],
+  defaultExportDirectory: '',
   collectionSort: 'alpha',
   theme: 'system',
   language: 'system',

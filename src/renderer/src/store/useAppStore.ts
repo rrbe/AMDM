@@ -27,8 +27,9 @@ import type {
   DocMutateResult,
   DocSetFieldRequest,
   DocUpdateRequest,
+  ExportDirectorySelection,
+  ExportFileRequest,
   ExportProgress,
-  ExportRequest,
   HistoryEntry,
   ImportRequest,
   IndexInfo,
@@ -243,9 +244,11 @@ interface AppState {
 
   // ---- actions: import/export (Phase 3) ----
   exportProgress: Record<string, ExportProgress | undefined>
-  exportCollection(req: ExportRequest): Promise<DataOpResult>
+  chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+  exportCollection(req: ExportFileRequest): Promise<DataOpResult>
   cancelExport(taskId: string): Promise<boolean>
   openExportedFile(taskId: string): Promise<string | null>
+  revealExportedFile(taskId: string): Promise<string | null>
   clearExportProgress(taskId: string): void
   importCollection(req: ImportRequest): Promise<DataOpResult>
 
@@ -1359,6 +1362,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ------------------------------------------------------------- import/export
+  async chooseExportDirectory() {
+    try {
+      return await window.api.io.chooseExportDirectory()
+    } catch (e) {
+      set({ lastError: tr('io.chooseExportDirectoryFailed', { error: errMessage(e) }) })
+      return null
+    }
+  },
+
   async exportCollection(req) {
     try {
       const res = await window.api.io.export(req)
@@ -1388,6 +1400,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       const error = errMessage(e)
       set({ lastError: tr('io.openExportedFileFailed', { error }) })
+      return error
+    }
+  },
+
+  async revealExportedFile(taskId) {
+    try {
+      const error = await window.api.io.revealExportedFile(taskId)
+      if (error) set({ lastError: tr('io.revealExportedFileFailed', { error }) })
+      return error
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: tr('io.revealExportedFileFailed', { error }) })
       return error
     }
   },

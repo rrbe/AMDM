@@ -20,7 +20,8 @@ import type {
   DocMutateResult,
   DocSetFieldRequest,
   DocUpdateRequest,
-  ExportRequest,
+  ExportDirectorySelection,
+  ExportFileRequest,
   ExportProgress,
   HistoryEntry,
   ImportRequest,
@@ -79,9 +80,11 @@ export const IPC = {
   docReadCancel: 'doc:readCancel',
 
   ioExport: 'io:export',
+  ioChooseExportDirectory: 'io:chooseExportDirectory',
   ioExportCancel: 'io:exportCancel',
   ioExportProgress: 'io:exportProgress',
   ioOpenExportedFile: 'io:openExportedFile',
+  ioRevealExportedFile: 'io:revealExportedFile',
   ioImport: 'io:import',
 
   settingsGet: 'settings:get',
@@ -166,12 +169,16 @@ export interface Api {
     delete(request: DocMutateRequest): Promise<DocMutateResult>
   }
   io: {
-    /** Export a collection or bounded Renderer result; opens a native save dialog. */
-    export(request: ExportRequest): Promise<DataOpResult>
+    /** Let the user grant an owner-scoped directory for subsequent exports. */
+    chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+    /** Export a collection or bounded Renderer result to the granted destination. */
+    export(request: ExportFileRequest): Promise<DataOpResult>
     cancelExport(taskId: string): Promise<boolean>
     onExportProgress(listener: (progress: ExportProgress) => void): () => void
     /** Open this Renderer owner's latest completed export in its default application. */
     openExportedFile(taskId: string): Promise<string | null>
+    /** Reveal this Renderer owner's latest completed export in the platform file manager. */
+    revealExportedFile(taskId: string): Promise<string | null>
     /** Import into a collection; opens an open dialog for the source file. */
     import(request: ImportRequest): Promise<DataOpResult>
   }

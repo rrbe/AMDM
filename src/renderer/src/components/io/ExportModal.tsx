@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
-  CollectionExportRequest,
   DataOpResult,
+  ExportDirectorySelection,
+  ExportFileRequest,
   ExportFormat,
-  ResultExportRequest,
   TabularDelimiter,
   TabularExportFormat
 } from '@shared/types'
+import { exportFileExtension, sanitizeExportBaseName } from '@shared/exportDestination'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
+import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { tabularExportDefaults } from '@renderer/lib/exportDefaults'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { useAppStore } from '@renderer/store/useAppStore'
 
 export interface CollectionExportSource {
@@ -59,12 +62,20 @@ function newTaskId(): string {
   return globalThis.crypto.randomUUID()
 }
 
+function defaultExportFileName(source: ExportModalSource): string {
+  return sanitizeExportBaseName(
+    source.kind === 'collection' ? source.collection : (source.suggestedName ?? source.collection ?? 'result')
+  )
+}
+
 export function ExportModal({ source, initialFormat, onClose }: ExportModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const platformDefaults = tabularExportDefaults()
+  const chooseExportDirectory = useAppStore((state) => state.chooseExportDirectory)
   const exportCollection = useAppStore((state) => state.exportCollection)
   const cancelExport = useAppStore((state) => state.cancelExport)
   const openExportedFile = useAppStore((state) => state.openExportedFile)
+  const revealExportedFile = useAppStore((state) => state.revealExportedFile)
   const clearExportProgress = useAppStore((state) => state.clearExportProgress)
   const fieldSort = useAppStore((state) => state.settings.collectionSort)
 
@@ -86,11 +97,14 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
   const [worksheetName, setWorksheetName] = useState(
     source.kind === 'collection' ? source.collection : (source.collection ?? 'Result')
   )
+  const [directory, setDirectory] = useState<ExportDirectorySelection | null>(null)
+  const [fileName, setFileName] = useState(() => defaultExportFileName(source))
+  const [choosingDirectory, setChoosingDirectory] = useState(false)
   const [running, setRunning] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [taskId, setTaskId] = useState<string | null>(null)
   const [result, setResult] = useState<DataOpResult | null>(null)
-  const [openingFile, setOpeningFile] = useState(false)
+  const [fileAction, setFileAction] = useState<'open' | 'reveal' | null>(null)
   const closeAfterCancel = useRef(false)
   const progress = useAppStore((state) => (taskId ? state.exportProgress[taskId] : undefined))
 
@@ -152,6 +166,14 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
             },
             { label: t('io.entireCollection'), value: 'collection' as const, disabled: !collectionSource }
           ]
+  const canChooseRange = rangeOptions.filter((option) => !('disabled' in option) || !option.disabled).length > 1
+  const count = source.kind === 'collection' || scope === 'collection' ? null : resultDocuments.length
+  const scopeLabel =
+    source.kind === 'collection' || scope === 'collection'
+      ? t('io.entireCollection')
+      : t(scope === 'selection' ? 'io.selectedCount' : 'io.currentCount', {
+          count: count ?? 0
+        })
 
   const stop = async (close: boolean): Promise<void> => {
     if (!taskId || stopping) return
@@ -174,7 +196,22 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
     setFormat(nextFormat)
   }
 
+  const onChooseDirectory = async (): Promise<void> => {
+    if (choosingDirectory || running) return
+    setChoosingDirectory(true)
+    try {
+      const selection = await chooseExportDirectory()
+      if (selection) {
+        setDirectory(selection)
+        setResult(null)
+      }
+    } finally {
+      setChoosingDirectory(false)
+    }
+  }
+
   const onExport = async (): Promise<void> => {
+    if (!directory || !fileName.trim()) return
     const nextTaskId = newTaskId()
     if (taskId) clearExportProgress(taskId)
     setTaskId(nextTaskId)
@@ -191,9 +228,13 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
       lineEnding: format === 'csv' || format === 'tsv' ? lineEnding : undefined,
       delimiter: format === 'csv' || format === 'tsv' ? delimiter : undefined,
       worksheetName: format === 'xlsx' ? worksheetName : undefined,
-      fieldSort
+      fieldSort,
+      destination: {
+        directorySelectionId: directory.selectionId,
+        fileName
+      }
     }
-    let request: CollectionExportRequest | ResultExportRequest
+    let request: ExportFileRequest
     if (scope === 'collection' && collectionSource) {
       const trimmedQuery = query.trim()
       const parsedLimit = Number.parseInt(limit, 10)
@@ -216,8 +257,7 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
         ...common,
         source: 'result',
         format: format as TabularExportFormat,
-        documents: resultDocuments,
-        suggestedName: source.suggestedName ?? source.collection ?? 'result'
+        documents: resultDocuments
       }
     } else return
 
@@ -229,23 +269,39 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
   }
 
   const openResultFile = async (): Promise<void> => {
-    if (!taskId || openingFile) return
-    setOpeningFile(true)
+    if (!taskId || fileAction) return
+    setFileAction('open')
     try {
       await openExportedFile(taskId)
     } finally {
-      setOpeningFile(false)
+      setFileAction(null)
+    }
+  }
+
+  const revealResultFile = async (): Promise<void> => {
+    if (!taskId || fileAction) return
+    setFileAction('reveal')
+    try {
+      await revealExportedFile(taskId)
+    } finally {
+      setFileAction(null)
     }
   }
 
   const success = result?.ok === true
-  const count = source.kind === 'collection' || scope === 'collection' ? null : resultDocuments.length
+  const extension = exportFileExtension(
+    format,
+    source.kind === 'collection' && format === 'bson' && gzip
+  )
+  const revealFileLabel = isMacPlatform()
+    ? t('io.revealExportedFileInFinder')
+    : t('io.revealExportedFileInFileManager')
   const progressPercent =
     progress?.total && progress.total > 0 ? Math.min(100, (progress.processed / progress.total) * 100) : null
 
   return (
     <Modal
-      title={t('io.exportTitle', { target: sourceLabel })}
+      title={t('io.exportTitle')}
       description={t('io.exportDescription')}
       onClose={requestClose}
       lockTop
@@ -260,8 +316,12 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
               {t('io.stop')}
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => void onExport()}>
-              {success ? t('io.exportAgain') : t('io.exportBtn')}
+            <Button
+              variant="primary"
+              disabled={!directory || !fileName.trim() || choosingDirectory}
+              onClick={() => void onExport()}
+            >
+              {t('io.exportBtn')}
             </Button>
           )}
         </>
@@ -269,30 +329,74 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
     >
       <div className="mb-4 rounded-lg border border-[var(--separator)] bg-[var(--surface-subtle)] px-3 py-2.5">
         <div className="text-sm font-medium text-foreground">{sourceLabel}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          {source.kind === 'collection' || scope === 'collection'
-            ? t('io.entireCollection')
-            : t(scope === 'selection' ? 'io.selectedCount' : 'io.currentCount', {
-                count: count ?? 0
-              })}
+        {!canChooseRange && (
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {t('io.range')} · {scopeLabel}
+          </div>
+        )}
+      </div>
+
+      {canChooseRange && (
+        <div className="form-row">
+          <label>{t('io.range')}</label>
+          <Select value={scope} onChange={setScope} options={rangeOptions} aria-label={t('io.range')} />
         </div>
-      </div>
+      )}
 
-      <div className="form-row">
-        <label>{t('io.range')}</label>
-        <Select
-          value={scope}
-          onChange={setScope}
-          options={rangeOptions}
-          disabled={rangeOptions.length === 1}
-          aria-label={t('io.range')}
-        />
-      </div>
-
-      <div className="form-row">
-        <label>{t('io.format')}</label>
+      <section className="mb-5" aria-labelledby="export-format-heading">
+        <h3 id="export-format-heading" className="mb-2 text-xs font-medium text-muted-foreground">
+          {t('io.fileFormat')}
+        </h3>
         <Select value={format} onChange={onFormatChange} options={formats} aria-label={t('io.format')} />
-      </div>
+      </section>
+
+      <section className="mb-4" aria-labelledby="export-destination-heading">
+        <h3 id="export-destination-heading" className="mb-2 text-xs font-medium text-muted-foreground">
+          {t('io.destination')}
+        </h3>
+        <div className="form-row mb-3">
+          <label htmlFor="export-directory">{t('io.exportDirectory')}</label>
+          <div className="flex min-w-0 items-center gap-2">
+            <Input
+              id="export-directory"
+              className="min-w-0 flex-1 font-mono text-xs"
+              value={directory?.path ?? ''}
+              title={directory?.path}
+              placeholder={t('io.exportDirectoryPlaceholder')}
+              readOnly
+            />
+            <Button
+              type="button"
+              className="h-[38px] shrink-0"
+              busy={choosingDirectory}
+              disabled={running}
+              onClick={() => void onChooseDirectory()}
+            >
+              {t('io.chooseExportDirectory')}
+            </Button>
+          </div>
+        </div>
+
+        <div className="form-row mb-0">
+          <label htmlFor="export-file-name">{t('io.exportFileName')}</label>
+          <div className="flex min-w-0 items-center">
+            <Input
+              id="export-file-name"
+              className="min-w-0 flex-1 rounded-r-none"
+              value={fileName}
+              disabled={running}
+              onChange={(event) => {
+                setFileName(event.target.value.replace(/[\\/:*?"<>|\0]/g, '-'))
+                setResult(null)
+              }}
+              onBlur={() => setFileName(sanitizeExportBaseName(fileName))}
+            />
+            <span className="flex h-[38px] shrink-0 items-center rounded-r-[var(--radius-control)] border-l border-[var(--separator)] bg-[var(--surface-control)] px-3 font-mono text-xs text-muted-foreground">
+              .{extension}
+            </span>
+          </div>
+        </div>
+      </section>
 
       {isTabular && (
         <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-[var(--separator)] p-3">
@@ -421,20 +525,29 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
             count: result.count ?? 0
           })}
           {result.filePath && (
-            <>
-              {' '}
+            <div className="mt-1 flex min-w-0 items-center gap-2">
               <Tooltip content={t('io.openExportedFile')}>
                 <button
                   type="button"
-                  className="cursor-pointer border-0 bg-transparent p-0 font-[inherit] text-[inherit] underline decoration-transparent underline-offset-2 outline-none transition-[text-decoration-color] hover:decoration-current focus-visible:rounded-sm focus-visible:decoration-current focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] disabled:cursor-default disabled:opacity-60"
+                  className="min-w-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left font-[inherit] text-[inherit] underline decoration-transparent underline-offset-2 outline-none transition-[text-decoration-color] hover:decoration-current focus-visible:rounded-sm focus-visible:decoration-current focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] disabled:cursor-default disabled:opacity-60"
                   aria-label={`${t('io.openExportedFile')}: ${result.filePath}`}
-                  disabled={openingFile}
+                  disabled={fileAction !== null}
                   onClick={() => void openResultFile()}
                 >
                   {result.filePath}
                 </button>
               </Tooltip>
-            </>
+              <Button
+                type="button"
+                size="sm"
+                className="shrink-0"
+                busy={fileAction === 'reveal'}
+                disabled={fileAction !== null}
+                onClick={() => void revealResultFile()}
+              >
+                {revealFileLabel}
+              </Button>
+            </div>
           )}
         </div>
       )}

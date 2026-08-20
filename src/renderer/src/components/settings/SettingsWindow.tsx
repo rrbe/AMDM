@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Code2, Database, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
+import { Code2, Database, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -17,13 +17,14 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { Toaster } from '@renderer/components/common/Toaster'
 import { Field } from '@renderer/components/ui/Field'
+import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 
-type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor' | 'shortcuts'
+type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
 
 export function SettingsWindow(): React.JSX.Element {
   const { t } = useTranslation()
@@ -34,9 +35,11 @@ export function SettingsWindow(): React.JSX.Element {
   const setAutomaticUpdateChecks = useAppStore((s) => s.setAutomaticUpdateChecks)
   const loadSettings = useAppStore((s) => s.loadSettings)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const chooseExportDirectory = useAppStore((s) => s.chooseExportDirectory)
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance')
   const [searchQuery, setSearchQuery] = useState('')
   const [checking, setChecking] = useState(false)
+  const [choosingExportDirectory, setChoosingExportDirectory] = useState(false)
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl'
 
   const sections = [
@@ -87,6 +90,17 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.queryTimeoutHint'),
         t('settings.historyLimit'),
         t('settings.historyLimitHint')
+      ]
+    },
+    {
+      id: 'export',
+      label: t('settings.sectionExport'),
+      icon: FolderOutput,
+      keywords: [
+        t('settings.sectionExport'),
+        t('settings.defaultExportDirectory'),
+        t('settings.defaultExportDirectoryHint'),
+        t('settings.chooseExportDirectory')
       ]
     },
     {
@@ -165,6 +179,17 @@ export function SettingsWindow(): React.JSX.Element {
       ? settings.disabledKeyboardShortcuts.filter((shortcut) => shortcut !== id)
       : [...new Set([...settings.disabledKeyboardShortcuts, id])]
     void updateSettings({ disabledKeyboardShortcuts })
+  }
+
+  const selectDefaultExportDirectory = async (): Promise<void> => {
+    if (choosingExportDirectory) return
+    setChoosingExportDirectory(true)
+    try {
+      const selection = await chooseExportDirectory()
+      if (selection) await updateSettings({ defaultExportDirectory: selection.path })
+    } finally {
+      setChoosingExportDirectory(false)
+    }
   }
 
   return (
@@ -276,6 +301,27 @@ export function SettingsWindow(): React.JSX.Element {
                   { label: t('settings.sortAlpha'), value: 'alpha' }
                 ]}
               />
+            </Field>
+          )}
+
+          {displayedSectionId === 'export' && (
+            <Field label={t('settings.defaultExportDirectory')} hint={t('settings.defaultExportDirectoryHint')}>
+              <div className="flex min-w-0 items-center gap-2">
+                <Input
+                  className="min-w-0 flex-1 font-mono text-xs"
+                  value={settings.defaultExportDirectory}
+                  title={settings.defaultExportDirectory}
+                  readOnly
+                />
+                <Button
+                  type="button"
+                  className="h-[38px] shrink-0"
+                  busy={choosingExportDirectory}
+                  onClick={() => void selectDefaultExportDirectory()}
+                >
+                  {t('settings.chooseExportDirectory')}
+                </Button>
+              </div>
             </Field>
           )}
 
