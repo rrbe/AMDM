@@ -533,7 +533,9 @@
       "writing": "Writing file",
       "finalizing": "Finalizing"
     },
-    "exportSuccess": "Exported {{count}} docs → {{path}}",
+    "exportSuccess": "Exported {{count}} docs →",
+    "openExportedFile": "Open file",
+    "openExportedFileFailed": "Could not open the exported file: {{error}}",
     "importFailed": "Import failed.",
     "importSuccess": "Imported {{count}} docs"
   },

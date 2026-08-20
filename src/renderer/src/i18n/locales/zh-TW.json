@@ -533,7 +533,9 @@
       "writing": "正在寫入檔案",
       "finalizing": "正在完成匯出"
     },
-    "exportSuccess": "已匯出 {{count}} 筆文件 → {{path}}",
+    "exportSuccess": "已匯出 {{count}} 筆文件 →",
+    "openExportedFile": "開啟檔案",
+    "openExportedFileFailed": "無法開啟匯出的檔案：{{error}}",
     "importFailed": "匯入失敗。",
     "importSuccess": "已匯入 {{count}} 筆文件"
   },

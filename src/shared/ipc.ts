@@ -81,6 +81,7 @@ export const IPC = {
   ioExport: 'io:export',
   ioExportCancel: 'io:exportCancel',
   ioExportProgress: 'io:exportProgress',
+  ioOpenExportedFile: 'io:openExportedFile',
   ioImport: 'io:import',
 
   settingsGet: 'settings:get',
@@ -169,6 +170,8 @@ export interface Api {
     export(request: ExportRequest): Promise<DataOpResult>
     cancelExport(taskId: string): Promise<boolean>
     onExportProgress(listener: (progress: ExportProgress) => void): () => void
+    /** Open this Renderer owner's latest completed export in its default application. */
+    openExportedFile(taskId: string): Promise<string | null>
     /** Import into a collection; opens an open dialog for the source file. */
     import(request: ImportRequest): Promise<DataOpResult>
   }

@@ -245,6 +245,7 @@ interface AppState {
   exportProgress: Record<string, ExportProgress | undefined>
   exportCollection(req: ExportRequest): Promise<DataOpResult>
   cancelExport(taskId: string): Promise<boolean>
+  openExportedFile(taskId: string): Promise<string | null>
   clearExportProgress(taskId: string): void
   importCollection(req: ImportRequest): Promise<DataOpResult>
 
@@ -1376,6 +1377,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       set({ lastError: tr('notify.exportFailed', { error: errMessage(e) }) })
       return false
+    }
+  },
+
+  async openExportedFile(taskId) {
+    try {
+      const error = await window.api.io.openExportedFile(taskId)
+      if (error) set({ lastError: tr('io.openExportedFileFailed', { error }) })
+      return error
+    } catch (e) {
+      const error = errMessage(e)
+      set({ lastError: tr('io.openExportedFileFailed', { error }) })
+      return error
     }
   },
 

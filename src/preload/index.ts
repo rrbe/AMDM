@@ -78,6 +78,7 @@ const api: Api = {
       ipcRenderer.on(IPC.ioExportProgress, handle)
       return () => ipcRenderer.removeListener(IPC.ioExportProgress, handle)
     },
+    openExportedFile: (taskId) => ipcRenderer.invoke(IPC.ioOpenExportedFile, taskId),
     import: (request) => ipcRenderer.invoke(IPC.ioImport, request)
   },
   settings: {

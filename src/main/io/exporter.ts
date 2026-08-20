@@ -3,7 +3,7 @@ import { mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { dialog, type BrowserWindow, type WebContents } from 'electron'
+import { dialog, shell, type BrowserWindow, type WebContents } from 'electron'
 import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
@@ -42,6 +42,7 @@ interface ExportTask {
 }
 
 const exportTasks = new Map<string, ExportTask>()
+const completedExports = new WeakMap<WebContents, { taskId: string; filePath: string }>()
 
 function errMsg(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -451,7 +452,11 @@ export async function exportData(
   const close = (): void => controller.abort(abortError())
   owner.once('destroyed', close)
   try {
-    return await runExport(req, picked.filePath, owner, controller.signal)
+    const result = await runExport(req, picked.filePath, owner, controller.signal)
+    if (result.ok && result.filePath) {
+      completedExports.set(owner, { taskId: req.taskId, filePath: result.filePath })
+    }
+    return result
   } catch (error) {
     return isAbort(error, controller.signal)
       ? { ok: false, cancelled: true, filePath: picked.filePath }
@@ -460,4 +465,11 @@ export async function exportData(
     owner.removeListener('destroyed', close)
     exportTasks.delete(req.taskId)
   }
+}
+
+/** Open only the latest export completed by this Renderer; do not expose an arbitrary-path shell bridge. */
+export async function openExportedFile(taskId: string, owner: WebContents): Promise<string | null> {
+  const completed = completedExports.get(owner)
+  if (!completed || completed.taskId !== taskId) return 'Exported file is no longer available.'
+  return (await shell.openPath(completed.filePath)) || null
 }

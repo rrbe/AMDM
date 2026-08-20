@@ -11,6 +11,7 @@ import type {
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { Select } from '@renderer/components/ui/Select'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { tabularExportDefaults } from '@renderer/lib/exportDefaults'
 import { useAppStore } from '@renderer/store/useAppStore'
 
@@ -63,6 +64,7 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
   const platformDefaults = tabularExportDefaults()
   const exportCollection = useAppStore((state) => state.exportCollection)
   const cancelExport = useAppStore((state) => state.cancelExport)
+  const openExportedFile = useAppStore((state) => state.openExportedFile)
   const clearExportProgress = useAppStore((state) => state.clearExportProgress)
   const fieldSort = useAppStore((state) => state.settings.collectionSort)
 
@@ -88,6 +90,7 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
   const [stopping, setStopping] = useState(false)
   const [taskId, setTaskId] = useState<string | null>(null)
   const [result, setResult] = useState<DataOpResult | null>(null)
+  const [openingFile, setOpeningFile] = useState(false)
   const closeAfterCancel = useRef(false)
   const progress = useAppStore((state) => (taskId ? state.exportProgress[taskId] : undefined))
 
@@ -223,6 +226,16 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
     setStopping(false)
     setResult(response)
     if (closeAfterCancel.current) onClose()
+  }
+
+  const openResultFile = async (): Promise<void> => {
+    if (!taskId || openingFile) return
+    setOpeningFile(true)
+    try {
+      await openExportedFile(taskId)
+    } finally {
+      setOpeningFile(false)
+    }
   }
 
   const success = result?.ok === true
@@ -405,9 +418,24 @@ export function ExportModal({ source, initialFormat, onClose }: ExportModalProps
       {success && (
         <div className="io-result ok">
           {t('io.exportSuccess', {
-            count: result.count ?? 0,
-            path: result.filePath ?? ''
+            count: result.count ?? 0
           })}
+          {result.filePath && (
+            <>
+              {' '}
+              <Tooltip content={t('io.openExportedFile')}>
+                <button
+                  type="button"
+                  className="cursor-pointer border-0 bg-transparent p-0 font-[inherit] text-[inherit] underline decoration-transparent underline-offset-2 outline-none transition-[text-decoration-color] hover:decoration-current focus-visible:rounded-sm focus-visible:decoration-current focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] disabled:cursor-default disabled:opacity-60"
+                  aria-label={`${t('io.openExportedFile')}: ${result.filePath}`}
+                  disabled={openingFile}
+                  onClick={() => void openResultFile()}
+                >
+                  {result.filePath}
+                </button>
+              </Tooltip>
+            </>
+          )}
         </div>
       )}
     </Modal>

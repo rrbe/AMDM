@@ -533,7 +533,9 @@
       "writing": "正在写入文件",
       "finalizing": "正在完成导出"
     },
-    "exportSuccess": "已导出 {{count}} 条文档 → {{path}}",
+    "exportSuccess": "已导出 {{count}} 条文档 →",
+    "openExportedFile": "打开文件",
+    "openExportedFileFailed": "无法打开导出的文件：{{error}}",
     "importFailed": "导入失败。",
     "importSuccess": "已导入 {{count}} 条文档"
   },
