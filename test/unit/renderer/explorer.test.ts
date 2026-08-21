@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { Explorer } from '../../../src/renderer/src/components/explorer/Explorer'
+import { canDisconnectConnection, Explorer } from '../../../src/renderer/src/components/explorer/Explorer'
 import type { CatalogState } from '../../../src/renderer/src/store/useAppStore'
 
 const testStore = vi.hoisted(() => ({ state: {} as Record<string, unknown> }))
@@ -25,6 +25,13 @@ const connection = {
 }
 
 describe('explorer catalog rows', () => {
+  it('allows an errored connection to be explicitly disconnected', () => {
+    expect(canDisconnectConnection('connected')).toBe(true)
+    expect(canDisconnectConnection('connecting')).toBe(true)
+    expect(canDisconnectConnection('error')).toBe(true)
+    expect(canDisconnectConnection('disconnected')).toBe(false)
+  })
+
   it('reveals database children together after collections finish loading', () => {
     vi.stubGlobal('__BUILD_ID__', 'test')
     const databaseNodeId = 'c1:db:ezze'

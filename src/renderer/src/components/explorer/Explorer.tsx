@@ -135,6 +135,10 @@ interface ConnRow {
 
 type Row = ConnRow | TreeRow
 
+export function canDisconnectConnection(state: ConnectionState): boolean {
+  return state !== 'disconnected'
+}
+
 /** The store actions the catalog rows wire their click handlers to. */
 interface RowActions {
   toggleNode: (connId: string, nodeId: string, kind: NodeKind, payload: NodePayload) => Promise<void>
@@ -225,7 +229,7 @@ export function Explorer({
   // Right-click a connection → manage it or refresh only its database list.
   const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
     e.preventDefault()
-    const disconnectable = row.state === 'connected' || row.state === 'connecting'
+    const disconnectable = canDisconnectConnection(row.state)
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
