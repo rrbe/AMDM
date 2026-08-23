@@ -80,6 +80,7 @@ describe('isRunFailure', () => {
     expect(isRunFailure(docsResult())).toBe(false)
     expect(isRunFailure({ kind: 'error', errorName: 'MongoServerError' })).toBe(true)
     expect(isRunFailure({ kind: 'error', errorName: 'Aborted' })).toBe(false)
+    expect(isRunFailure({ kind: 'error', errorName: 'AbortError', failureKind: 'cancelled' })).toBe(false)
   })
 })
 

@@ -1,9 +1,17 @@
 import { MongoClient, type TopologyDescriptionChangedEvent } from 'mongodb'
-import type { ConnectionStatus, TestResult } from '../../shared/types'
+import type { ConnectionStatus, FailureKind, TestResult } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { SshTunnel } from '../ssh/tunnel'
-import { buildTunnelOptions } from '../ssh/tunnelCore'
+import { buildTunnelOptions, classifyConnError } from '../ssh/tunnelCore'
 import { buildClientArgs, type DecryptedConnection } from './uri'
+import { classifyOperationFailure } from './errorCore'
+
+function classifyConnectionFailure(error: unknown): FailureKind {
+  const connectionKind = classifyConnError(error).kind
+  if (connectionKind !== 'other') return connectionKind
+  const operationKind = classifyOperationFailure(error)
+  return operationKind === 'execution' ? 'unknown' : operationKind
+}
 
 interface Session {
   client: MongoClient
@@ -61,11 +69,7 @@ export class SessionManager {
       const admin = client.db('admin')
       const hello = (await admin.command({ hello: 1 })) as Record<string, unknown>
       const build = (await admin.command({ buildInfo: 1 })) as Record<string, unknown>
-      const topology = hello.setName
-        ? 'ReplicaSet'
-        : hello.msg === 'isdbgrid'
-          ? 'Sharded'
-          : 'Single'
+      const topology = hello.setName ? 'ReplicaSet' : hello.msg === 'isdbgrid' ? 'Sharded' : 'Single'
       return { topology, serverVersion: build.version as string | undefined }
     } catch {
       return {}
@@ -78,7 +82,12 @@ export class SessionManager {
 
     const dec = connectionStore.getDecrypted(id)
     if (!dec) {
-      const status: ConnectionStatus = { id, state: 'error', error: 'Connection not found' }
+      const status: ConnectionStatus = {
+        id,
+        state: 'error',
+        error: 'Connection not found',
+        failureKind: 'unknown'
+      }
       return status
     }
 
@@ -125,6 +134,7 @@ export class SessionManager {
         const available = event.newDescription.hasKnownServers
         if (available === (session.status.state === 'connected')) return
 
+        const topologyError = event.newDescription.error
         session.status = available
           ? {
               id,
@@ -135,7 +145,8 @@ export class SessionManager {
           : {
               id,
               state: 'error',
-              error: event.newDescription.error?.message ?? 'Connection lost',
+              error: topologyError?.message ?? 'Connection lost',
+              failureKind: classifyConnectionFailure(topologyError),
               topology: event.newDescription.type,
               serverVersion: status.serverVersion
             }
@@ -161,7 +172,8 @@ export class SessionManager {
       const status: ConnectionStatus = {
         id,
         state: 'error',
-        error: err instanceof Error ? err.message : String(err)
+        error: err instanceof Error ? err.message : String(err),
+        failureKind: classifyConnectionFailure(err)
       }
       return status
     }
@@ -197,7 +209,11 @@ export class SessionManager {
       const info = await this.probe(client)
       return { ok: true, topology: info.topology, serverVersion: info.serverVersion }
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        failureKind: classifyConnectionFailure(err)
+      }
     } finally {
       await client?.close().catch(() => {})
       tunnel?.close()

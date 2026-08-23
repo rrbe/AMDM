@@ -35,12 +35,39 @@ export const MAX_RESULT_TABS = 8
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 const DB_MEMBERS = new Set([
-  'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'getName', 'version',
-  'runCommand', 'adminCommand', 'aggregate', 'admin', 'collection', 'collections', 'command',
-  'createCollection', 'createIndex', 'dropCollection', 'dropDatabase', 'indexInformation',
-  'listCollections', 'profilingLevel', 'removeUser', 'renameCollection', 'setProfilingLevel',
-  'stats', 'watch', 'namespace', 'databaseName', 'options', 'readConcern', 'writeConcern',
-  'readPreference', 's', 'client'
+  'getCollection',
+  'getSiblingDB',
+  'getCollectionNames',
+  'getCollectionInfos',
+  'getName',
+  'version',
+  'runCommand',
+  'adminCommand',
+  'aggregate',
+  'admin',
+  'collection',
+  'collections',
+  'command',
+  'createCollection',
+  'createIndex',
+  'dropCollection',
+  'dropDatabase',
+  'indexInformation',
+  'listCollections',
+  'profilingLevel',
+  'removeUser',
+  'renameCollection',
+  'setProfilingLevel',
+  'stats',
+  'watch',
+  'namespace',
+  'databaseName',
+  'options',
+  'readConcern',
+  'writeConcern',
+  'readPreference',
+  's',
+  'client'
 ])
 
 /** Shell-safe collection reference for generated browse queries. */
@@ -105,7 +132,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
 
 /** Whether a completed run should leave the query tab's red failure dot on. */
 export function isRunFailure(result: ShellResult): boolean {
-  return result.kind === 'error' && result.errorName !== 'Aborted'
+  return result.kind === 'error' && result.errorName !== 'Aborted' && result.failureKind !== 'cancelled'
 }
 
 /**
@@ -123,10 +150,7 @@ export function pickFillTarget(
 ): { focusId?: string; reuseId?: string } {
   if (match) {
     const existing = tabs.find(
-      (t) =>
-        t.connectionId === match.connectionId &&
-        t.activeDatabase === match.database &&
-        t.code === match.code
+      (t) => t.connectionId === match.connectionId && t.activeDatabase === match.database && t.code === match.code
     )
     if (existing) return { focusId: existing.id }
   }
@@ -197,11 +221,7 @@ export function appendResult(
 
 /** Immutably patch one result tab by id (no-op shape when the id is absent —
     e.g. the tab was closed while its page load was in flight). */
-export function patchResult(
-  tab: QueryTab,
-  resultId: string,
-  patch: Partial<ResultTab>
-): Partial<QueryTab> {
+export function patchResult(tab: QueryTab, resultId: string, patch: Partial<ResultTab>): Partial<QueryTab> {
   return { results: tab.results.map((r) => (r.id === resultId ? { ...r, ...patch } : r)) }
 }
 
@@ -209,9 +229,7 @@ export function patchResult(
 export function closeResult(tab: QueryTab, resultId: string): Partial<QueryTab> {
   const results = tab.results.filter((r) => r.id !== resultId)
   if (results.length === tab.results.length) return {}
-  const next = tab.activeResultId
-    ? pickActiveAfterClose(tab.results, tab.activeResultId, resultId)
-    : undefined
+  const next = tab.activeResultId ? pickActiveAfterClose(tab.results, tab.activeResultId, resultId) : undefined
   return { results, activeResultId: next ?? null }
 }
 

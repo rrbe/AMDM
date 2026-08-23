@@ -17,6 +17,7 @@ const fake = vi.hoisted(() => {
         })
     ),
     cancelConnect: (): void => rejectConnect(new Error('client was closed')),
+    failConnect: (error: Error): void => rejectConnect(error),
     finishConnect: (): void => resolveConnect()
   }
 })
@@ -95,6 +96,20 @@ describe('SessionManager', () => {
       state: 'disconnected'
     })
     expect(manager.getStatus('c1').state).toBe('disconnected')
+  })
+
+  it('returns a stable timeout kind for a failed connection attempt', async () => {
+    const manager = new SessionManager()
+    const connecting = manager.connect('c1')
+    await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
+
+    fake.failConnect(new Error('Server selection timed out after 30000 ms'))
+
+    await expect(connecting).resolves.toMatchObject({
+      id: 'c1',
+      state: 'error',
+      failureKind: 'timeout'
+    })
   })
 
   it('publishes driver topology loss and recovery without discarding the client', async () => {

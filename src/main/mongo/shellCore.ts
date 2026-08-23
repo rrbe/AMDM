@@ -33,13 +33,13 @@ import { parse as parseJs } from '@babel/parser'
 // electron-vite main bundle (bare `require`, no unwrapping) — resolve the
 // class from either shape explicitly so both runtimes construct the same thing.
 const AsyncWriter =
-  (AsyncWriterModule as unknown as { default?: typeof AsyncWriterModule }).default ??
-  AsyncWriterModule
+  (AsyncWriterModule as unknown as { default?: typeof AsyncWriterModule }).default ?? AsyncWriterModule
 import { ObjectId, Long, Int32, Decimal128, Binary, Timestamp, MinKey, MaxKey, UUID } from 'bson'
 import { FindCursor, AggregationCursor, AbstractCursor } from 'mongodb'
 import type { Collection, Db, DistinctOptions, Document, FindOptions } from 'mongodb'
 import type { ShellOutputLine, ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
+import { classifyOperationFailure } from './errorCore'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
@@ -103,9 +103,7 @@ export function markSyntheticPromise<T>(value: T): T {
     Object.defineProperty(value, SYNTHETIC_PROMISE, { value: true })
     return value
   }
-  const chained = Promise.resolve(value).then((v) =>
-    Array.isArray(v) ? patchAsyncAwareArray(v) : v
-  )
+  const chained = Promise.resolve(value).then((v) => (Array.isArray(v) ? patchAsyncAwareArray(v) : v))
   Object.defineProperty(chained, SYNTHETIC_PROMISE, { value: true })
   return chained as unknown as T
 }
@@ -147,11 +145,7 @@ type ArrayCb = (value: unknown, index: number, array: unknown[]) => unknown
     first thenable result, then switches to awaiting (order preserved). Length
     is captured up front, like the native methods (a callback that pushes new
     elements doesn't extend the iteration). */
-function collectSeq(
-  arr: unknown[],
-  cb: ArrayCb,
-  thisArg?: unknown
-): unknown[] | Promise<unknown[]> {
+function collectSeq(arr: unknown[], cb: ArrayCb, thisArg?: unknown): unknown[] | Promise<unknown[]> {
   const len = arr.length
   const results = new Array(len)
   for (let i = 0; i < len; i++) {
@@ -172,12 +166,7 @@ function collectSeq(
 
 /** Index of the first element whose predicate result coerces to `stopOn`
     (early exit), or -1. Same sync-until-first-thenable strategy. */
-function findIndexSeq(
-  arr: unknown[],
-  pred: ArrayCb,
-  thisArg: unknown,
-  stopOn: boolean
-): number | Promise<number> {
+function findIndexSeq(arr: unknown[], pred: ArrayCb, thisArg: unknown, stopOn: boolean): number | Promise<number> {
   const len = arr.length
   for (let i = 0; i < len; i++) {
     const r = pred.call(thisArg, arr[i], i, arr)
@@ -222,9 +211,7 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
   define('flatMap', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const flat = (vals: unknown[]): unknown[] => patchAsyncAwareArray(vals.flat())
     const r = collectSeq(a, cb, thisArg)
-    return isThenable(r)
-      ? markSyntheticPromise((r as Promise<unknown[]>).then(flat))
-      : flat(r as unknown[])
+    return isThenable(r) ? markSyntheticPromise((r as Promise<unknown[]>).then(flat)) : flat(r as unknown[])
   })
   define('filter', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const pick = (flags: unknown[]): unknown[] => {
@@ -235,9 +222,7 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
       return patchAsyncAwareArray(out)
     }
     const flags = collectSeq(a, cb, thisArg)
-    return isThenable(flags)
-      ? markSyntheticPromise((flags as Promise<unknown[]>).then(pick))
-      : pick(flags as unknown[])
+    return isThenable(flags) ? markSyntheticPromise((flags as Promise<unknown[]>).then(pick)) : pick(flags as unknown[])
   })
   define('find', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const i = findIndexSeq(a, cb, thisArg, true)
@@ -253,15 +238,11 @@ export function patchAsyncAwareArray<T extends unknown[]>(arr: T): T {
   })
   define('some', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const i = findIndexSeq(a, cb, thisArg, true)
-    return isThenable(i)
-      ? markSyntheticPromise((i as Promise<number>).then((ix) => ix !== -1))
-      : i !== -1
+    return isThenable(i) ? markSyntheticPromise((i as Promise<number>).then((ix) => ix !== -1)) : i !== -1
   })
   define('every', (cb: ArrayCb, thisArg?: unknown): unknown => {
     const i = findIndexSeq(a, cb, thisArg, false)
-    return isThenable(i)
-      ? markSyntheticPromise((i as Promise<number>).then((ix) => ix === -1))
-      : i === -1
+    return isThenable(i) ? markSyntheticPromise((i as Promise<number>).then((ix) => ix === -1)) : i === -1
   })
   define(
     'reduce',
@@ -429,9 +410,7 @@ function patchSharedCursorMethods(proto: Record<string, unknown>): void {
   // `.itcount()` / `.size()` materialize the cursor and report the count. The
   // user asked for this explicitly (unlike a bare cursor, which stays bounded).
   if (typeof proto.itcount !== 'function') {
-    proto.itcount = async function itcount(
-      this: { toArray(): Promise<unknown[]> }
-    ): Promise<number> {
+    proto.itcount = async function itcount(this: { toArray(): Promise<unknown[]> }): Promise<number> {
       return (await this.toArray()).length
     }
   }
@@ -468,10 +447,7 @@ patchSharedCursorMethods(AggregationCursor.prototype as unknown as Record<string
 // the function itself would be hidden behind the wrapper and a re-evaluation
 // of this module would needlessly re-replace the method.
 const CURSOR_FOREACH_PATCHED = Symbol.for('amdm.cursorForEachAwaits')
-const abstractCursorProto = AbstractCursor.prototype as unknown as Record<
-  string | symbol,
-  unknown
->
+const abstractCursorProto = AbstractCursor.prototype as unknown as Record<string | symbol, unknown>
 if (!abstractCursorProto[CURSOR_FOREACH_PATCHED]) {
   Object.defineProperty(abstractCursorProto, CURSOR_FOREACH_PATCHED, { value: true })
   const origForEach = abstractCursorProto.forEach as (
@@ -598,18 +574,14 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: numbe
             target.find(filter ?? {}, buildFindOptions(projection, options, signal, timeoutMS))
         case 'findOne':
           return (filter?: Document, projection?: Document, options?: Document) =>
-            markSyntheticPromise(
-              target.findOne(filter ?? {}, buildFindOptions(projection, options, signal, timeoutMS))
-            )
+            markSyntheticPromise(target.findOne(filter ?? {}, buildFindOptions(projection, options, signal, timeoutMS)))
         // Inject the signal so a runaway aggregation can be cancelled mid-flight.
         case 'aggregate':
           return (pipeline?: Document[], options?: Document) =>
             target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
         case 'countDocuments':
           return (filter?: Document, options?: Document) =>
-            markSyntheticPromise(
-              target.countDocuments(filter ?? {}, withReadOptions(options, signal, timeoutMS))
-            )
+            markSyntheticPromise(target.countDocuments(filter ?? {}, withReadOptions(options, signal, timeoutMS)))
         case 'distinct':
           return (key: string, filter?: Document, options?: Document) => {
             const readOptions = withReadOptions(options, signal, timeoutMS)
@@ -627,8 +599,7 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: numbe
       // Pass-through methods (distinct, countDocuments, insertOne, …): tag the
       // returned promise so multi-step scripts get the value, not the Promise.
       return typeof val === 'function'
-        ? (...args: unknown[]) =>
-            markSyntheticPromise((val as (...a: unknown[]) => unknown).apply(target, args))
+        ? (...args: unknown[]) => markSyntheticPromise((val as (...a: unknown[]) => unknown).apply(target, args))
         : val
     }
   })
@@ -664,12 +635,10 @@ export function makeDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): D
             target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
         // mongosh `db.runCommand(cmd)` → driver `db.command(cmd)`.
         case 'runCommand':
-          return (cmd: Document) =>
-            markSyntheticPromise(target.command(cmd, withSignal(undefined, signal)))
+          return (cmd: Document) => markSyntheticPromise(target.command(cmd, withSignal(undefined, signal)))
         // mongosh `db.adminCommand(cmd)` → `db.admin().command(cmd)`.
         case 'adminCommand':
-          return (cmd: Document) =>
-            markSyntheticPromise(target.admin().command(cmd, withSignal(undefined, signal)))
+          return (cmd: Document) => markSyntheticPromise(target.admin().command(cmd, withSignal(undefined, signal)))
         case 'command':
           return (cmd: Document, options?: Document) =>
             markSyntheticPromise(target.command(cmd, withSignal(options, signal)))
@@ -705,8 +674,7 @@ export function makeDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): D
         // Pass-through db methods (command, stats, dropDatabase, …): tag the
         // returned promise for implicit await; sync values pass unchanged.
         return typeof val === 'function'
-          ? (...args: unknown[]) =>
-              markSyntheticPromise((val as (...a: unknown[]) => unknown).apply(target, args))
+          ? (...args: unknown[]) => markSyntheticPromise((val as (...a: unknown[]) => unknown).apply(target, args))
           : val
       }
       // Unknown property → treat as a collection name (mongosh: `db.<coll>`).
@@ -793,8 +761,7 @@ export function makeSandbox(
     NumberInt: (v: string | number) => new Int32(parseInt(String(v), 10)),
     NumberDecimal: (v: string | number) => Decimal128.fromString(String(v)),
     UUID: (s?: string) => (s ? new UUID(s) : new UUID()),
-    BinData: (subtype: number, base64: string) =>
-      new Binary(Buffer.from(base64, 'base64'), subtype),
+    BinData: (subtype: number, base64: string) => new Binary(Buffer.from(base64, 'base64'), subtype),
     // mongosh `Timestamp(t, i)` passes two numbers; bson's class wants a single
     // `{ t, i }` / Long / bigint. Bridge the two-arg form, default to (0, 0).
     Timestamp: (t?: number | Long | bigint | { t: number; i: number }, i?: number) => {
@@ -967,7 +934,10 @@ export type ReplCommand = { type: 'show'; what: string } | { type: 'use'; db: st
 
 /** Parse a whole-script REPL command, or null if it's ordinary JS. */
 export function parseReplCommand(code: string): ReplCommand | null {
-  const t = code.trim().replace(/;+\s*$/, '').trim()
+  const t = code
+    .trim()
+    .replace(/;+\s*$/, '')
+    .trim()
   const show = /^show\s+(databases|dbs|collections|tables|users|roles|profile)$/i.exec(t)
   if (show) return { type: 'show', what: show[1].toLowerCase() }
   const use = /^use\s+([A-Za-z0-9_$.\-]+)$/.exec(t)
@@ -1024,13 +994,15 @@ async function runReplCommand(
     }
     case 'profile':
       return docResult(
-        await withAbort(
-          db.collection('system.profile').find({}).sort({ ts: -1 }).limit(5).toArray(),
-          signal
-        )
+        await withAbort(db.collection('system.profile').find({}).sort({ ts: -1 }).limit(5).toArray(), signal)
       )
     default:
-      return { kind: 'error', error: `unsupported command: show ${cmd.what}`, errorName: 'ShellError' }
+      return {
+        kind: 'error',
+        error: `unsupported command: show ${cmd.what}`,
+        errorName: 'ShellError',
+        failureKind: 'execution'
+      }
   }
 }
 
@@ -1058,22 +1030,14 @@ export interface RunShellOptions {
  * awaited (async-rewriter2, see above), so mongosh-style multi-step scripts
  * run without explicit `await`; top-level `await` also works.
  */
-export async function runShellOnDb(
-  db: Db,
-  code: string,
-  options: RunShellOptions = {}
-): Promise<ShellResult> {
+export async function runShellOnDb(db: Db, code: string, options: RunShellOptions = {}): Promise<ShellResult> {
   // Everything below runs with shell semantics active: driver promises get
   // re-wrapped, resolved arrays get the async-aware helpers, and the cursor
   // forEach awaits callbacks (all scoped via activeShellRuns).
   return shellRunScope(() => runShellOnDbImpl(db, code, options))
 }
 
-async function runShellOnDbImpl(
-  db: Db,
-  code: string,
-  options: RunShellOptions
-): Promise<ShellResult> {
+async function runShellOnDbImpl(db: Db, code: string, options: RunShellOptions): Promise<ShellResult> {
   const limit = options.limit ?? DEFAULT_LIMIT
   const signal = options.signal
   const timeoutMS = options.timeoutMS
@@ -1129,6 +1093,7 @@ async function runShellOnDbImpl(
         kind: 'error',
         error: 'Explain is only supported for find()/aggregate() queries.',
         errorName: 'ExplainError',
+        failureKind: 'execution',
         collection,
         elapsedMs: Date.now() - started
       })
@@ -1190,6 +1155,7 @@ async function runShellOnDbImpl(
         kind: 'error',
         error: '执行已停止',
         errorName: 'Aborted',
+        failureKind: 'cancelled',
         collection,
         elapsedMs: Date.now() - started
       }
@@ -1199,6 +1165,7 @@ async function runShellOnDbImpl(
       kind: 'error',
       error,
       errorName,
+      failureKind: classifyOperationFailure(err),
       collection,
       elapsedMs: Date.now() - started
     })

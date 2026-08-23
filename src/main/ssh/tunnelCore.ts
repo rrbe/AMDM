@@ -73,13 +73,16 @@ export function classifyConnError(err: unknown): { kind: ConnErrorKind; message:
       message: 'connection refused — nothing is listening on that port, or a firewall rejected it'
     }
   }
-  if (code === 'ETIMEDOUT' || code === 'ETIME' || e.level === 'client-timeout') {
+  if (code === 'ETIMEDOUT' || code === 'ETIME' || e.level === 'client-timeout' || /timed? out|timeout/i.test(msg)) {
     return { kind: 'timeout', message: 'connection timed out — the host is unreachable or the port is filtered' }
   }
   if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH' || code === 'EHOSTDOWN') {
     return { kind: 'network', message: 'host or network is unreachable' }
   }
-  if (e.level === 'client-authentication' || /authentication methods failed/i.test(msg)) {
+  if (
+    e.level === 'client-authentication' ||
+    /authentication (?:methods failed|was rejected|failed|rejected)/i.test(msg)
+  ) {
     return {
       kind: 'auth',
       message:
@@ -163,9 +166,7 @@ export function buildTunnelOptions(
   }
 
   const target = buildHop(config.ssh, { password: dec.sshPassword, passphrase: dec.sshPassphrase }, readKey)
-  const jump = config.ssh.jump
-    ? buildHop(config.ssh.jump, { passphrase: dec.jumpSshPassphrase }, readKey)
-    : undefined
+  const jump = config.ssh.jump ? buildHop(config.ssh.jump, { passphrase: dec.jumpSshPassphrase }, readKey) : undefined
 
   // A tunnel forwards one socket, so keep the existing directConnection
   // behavior and target the first configured seed.
@@ -192,10 +193,7 @@ export function buildTunnelOptions(
  * The effectful runner (diagnoseConnection) executes each in turn, stopping at
  * the first failure.
  */
-export function planDiagnoseStages(
-  opts: TunnelOptions,
-  scope: DiagnoseScope
-): { key: string; target: string }[] {
+export function planDiagnoseStages(opts: TunnelOptions, scope: DiagnoseScope): { key: string; target: string }[] {
   const t = opts.target
   if (scope === 'jump') {
     if (!opts.jump) return []

@@ -109,11 +109,10 @@ export interface ConnectionConfig {
  * the main process will encrypt. Leave a secret field `undefined` on update to
  * keep the previously stored value; pass empty string to clear it.
  */
-export interface ConnectionInput
-  extends Omit<
-    ConnectionConfig,
-    'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
-  > {
+export interface ConnectionInput extends Omit<
+  ConnectionConfig,
+  'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
+> {
   password?: string
   sshPassword?: string
   sshPassphrase?: string
@@ -150,11 +149,16 @@ export interface DiagnoseStage {
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+/** Stable failure categories carried across IPC; UI copy must not parse driver messages. */
+export type FailureKind =
+  'timeout' | 'network' | 'dns' | 'auth' | 'hostkey' | 'cancelled' | 'execution' | 'ipc' | 'unknown'
+
 export interface ConnectionStatus {
   id: string
   state: ConnectionState
   /** Populated when state === 'error'. */
   error?: string
+  failureKind?: FailureKind
   /** Topology hint, e.g. "ReplicaSetWithPrimary" / "Single". */
   topology?: string
   /** Server version string, when known. */
@@ -164,6 +168,7 @@ export interface ConnectionStatus {
 export interface TestResult {
   ok: boolean
   error?: string
+  failureKind?: FailureKind
   topology?: string
   serverVersion?: string
 }
@@ -314,6 +319,7 @@ export interface ShellResult {
   /** Populated when kind === 'error'. */
   error?: string
   errorName?: string
+  failureKind?: FailureKind
   /** Set by the `use <db>` REPL command — tells the renderer to switch the
       active database for the tab (mongosh-style). */
   useDatabase?: string
@@ -540,12 +546,7 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
  */
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
-export type KeyboardShortcutId =
-  | 'newConnection'
-  | 'newQuery'
-  | 'contextualTabs'
-  | 'resultView'
-  | 'openSettings'
+export type KeyboardShortcutId = 'newConnection' | 'newQuery' | 'contextualTabs' | 'resultView' | 'openSettings'
 
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
