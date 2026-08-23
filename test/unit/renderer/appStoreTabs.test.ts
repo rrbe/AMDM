@@ -9,7 +9,8 @@ describe('connection-bound tabs', () => {
       tabs: [createTab('c1-tab', { connectionId: 'c1' })],
       activeTabId: 'c1-tab',
       activeConnectionId: 'c1',
-      statuses: {}
+      statuses: {},
+      notifications: []
     })
   })
 
@@ -146,15 +147,18 @@ describe('connection-bound tabs', () => {
         catalog: { databases: vi.fn().mockResolvedValue([]) }
       }
     })
-    useAppStore.setState({ statuses: {}, catalogs: {}, lastError: null })
+    useAppStore.setState({ statuses: {}, catalogs: {}, notifications: [] })
 
     await useAppStore.getState().connect('c2')
     expect(useAppStore.getState().statuses.c2).toMatchObject({ state: 'error' })
-    expect(useAppStore.getState().lastError).toContain('getaddrinfo ENOTFOUND db2')
+    expect(useAppStore.getState().notifications.at(-1)).toMatchObject({
+      variant: 'error',
+      detail: 'getaddrinfo ENOTFOUND db2'
+    })
 
     await useAppStore.getState().connect('c2')
     expect(useAppStore.getState().statuses.c2).toMatchObject({ state: 'connected' })
-    expect(useAppStore.getState().lastError).toBeNull()
+    expect(useAppStore.getState().notifications.at(-1)?.variant).toBe('success')
   })
 
   it('syncs driver heartbeat status without clearing tab data', () => {
@@ -168,6 +172,11 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().statuses.c1).toMatchObject({
       state: 'error',
       error: 'socket closed'
+    })
+    expect(useAppStore.getState().notifications.at(-1)).toMatchObject({
+      variant: 'error',
+      source: 'connection',
+      detail: 'socket closed'
     })
     expect(useAppStore.getState().tabs).toBe(tabs)
   })
@@ -191,18 +200,14 @@ describe('connection-bound tabs', () => {
         history: { list: listHistory },
         settings: {
           get: vi.fn().mockResolvedValue(DEFAULT_SETTINGS),
-          update: vi.fn().mockImplementation((patch) =>
-            Promise.resolve({ ...DEFAULT_SETTINGS, ...patch })
-          )
+          update: vi.fn().mockImplementation((patch) => Promise.resolve({ ...DEFAULT_SETTINGS, ...patch }))
         }
       }
     })
 
     await useAppStore.getState().loadSettings()
     await useAppStore.getState().updateSettings({ collectionSort: 'alpha' })
-    expect(channel.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ collectionSort: 'alpha' })
-    )
+    expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({ collectionSort: 'alpha' }))
 
     receive({ data: { ...DEFAULT_SETTINGS, collectionSort: 'natural' } } as MessageEvent)
     expect(useAppStore.getState().settings.collectionSort).toBe('natural')
@@ -212,9 +217,7 @@ describe('connection-bound tabs', () => {
   })
 
   it('refreshes only the requested database collections', async () => {
-    const collections = vi.fn().mockResolvedValue([
-      { name: 'fresh', type: 'collection' }
-    ])
+    const collections = vi.fn().mockResolvedValue([{ name: 'fresh', type: 'collection' }])
     vi.stubGlobal('window', { api: { catalog: { collections } } })
     const c1 = {
       databases: [{ name: 'db1' }],
@@ -246,14 +249,9 @@ describe('connection-bound tabs', () => {
   it('loads collection and index counts together after collection expansion', async () => {
     let resolveCount!: (count: number) => void
     let resolveIndexes!: (indexes: Array<{ name: string; key: Record<string, unknown> }>) => void
-    const collectionCount = vi.fn(
-      () => new Promise<number>((resolve) => (resolveCount = resolve))
-    )
+    const collectionCount = vi.fn(() => new Promise<number>((resolve) => (resolveCount = resolve)))
     const indexes = vi.fn(
-      () =>
-        new Promise<Array<{ name: string; key: Record<string, unknown> }>>(
-          (resolve) => (resolveIndexes = resolve)
-        )
+      () => new Promise<Array<{ name: string; key: Record<string, unknown> }>>((resolve) => (resolveIndexes = resolve))
     )
     vi.stubGlobal('window', { api: { catalog: { collectionCount, indexes } } })
     const collection = { name: 'orders', type: 'collection' as const }
@@ -470,9 +468,21 @@ describe('connection-bound tabs', () => {
       runFailed: false
     })
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ timeoutMS: 30_000 }))
-    finish({ kind: 'error', errorName: 'MongoServerError', error: 'boom' })
+    finish({
+      kind: 'error',
+      errorName: 'MongoServerError',
+      error: 'operation exceeded time limit',
+      failureKind: 'timeout'
+    })
     await failedRun
     expect(useAppStore.getState().tabs[0]).toMatchObject({ running: false, runFailed: true })
+    expect(useAppStore.getState().notifications.at(-1)).toMatchObject({
+      variant: 'error',
+      source: 'query',
+      detail: 'operation exceeded time limit',
+      dedupeKey: 'query:c1-tab:timeout'
+    })
+    const notificationCount = useAppStore.getState().notifications.length
 
     const stoppedRun = useAppStore.getState().runShell()
     const stopping = useAppStore.getState().stopShell()
@@ -487,5 +497,6 @@ describe('connection-bound tabs', () => {
       stopping: false,
       runFailed: false
     })
+    expect(useAppStore.getState().notifications).toHaveLength(notificationCount)
   })
 })

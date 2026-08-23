@@ -59,10 +59,7 @@ export function JsonPreviewModal({
   const copy = async (): Promise<void> => {
     if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
     const ok = await copyText(toPlainJson(value))
-    if (!ok) {
-      notify('warn', t('notify.clipboardUnavailable'))
-      return
-    }
+    if (!ok) return
     setCopied(true)
     copyTimer.current = window.setTimeout(() => {
       setCopied(false)
@@ -86,25 +83,34 @@ export function JsonPreviewModal({
     refreshTask.current = null
     setRefreshing(false)
     if (!result.ok) {
-      notify('warn', t('result.documentRefreshFailed', { error: result.error ?? t('notify.unknown') }))
+      notify({
+        variant: 'warn',
+        title: t('result.documentRefreshFailed', { error: result.error ?? t('notify.unknown') }),
+        source: 'document',
+        dedupeKey: `document:${source.connectionId}:${source.database}:${source.collection}:refresh`
+      })
       return
     }
     if (!result.found) {
-      notify('warn', t('result.documentMissing'))
+      notify({ variant: 'warn', title: t('result.documentMissing'), source: 'document' })
       return
     }
     if (source.field !== undefined) {
       const refreshed = cellValue(result.document, source.field)
       if (!refreshed.present) {
-        notify('warn', t('result.fieldMissing', { field: source.field }))
+        notify({
+          variant: 'warn',
+          title: t('result.fieldMissing', { field: source.field }),
+          source: 'document'
+        })
         return
       }
       onValueChange(refreshed.value)
-      notify('success', t('result.fieldRefreshed'))
+      notify({ variant: 'success', title: t('result.fieldRefreshed'), source: 'document' })
       return
     }
     onValueChange(result.document)
-    notify('success', t('result.documentRefreshed'))
+    notify({ variant: 'success', title: t('result.documentRefreshed'), source: 'document' })
   }
 
   const close = (): void => {

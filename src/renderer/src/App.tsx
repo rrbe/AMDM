@@ -37,10 +37,6 @@ type QueryPrompt =
     }
   | { kind: 'missing'; query: StoredQuerySelection; connectionName?: string }
 
-function openSettingsWindow(): void {
-  void window.api.app.openSettings()
-}
-
 export default function App(): React.JSX.Element {
   const bootstrap = useAppStore((s) => s.bootstrap)
   const connections = useAppStore((s) => s.connections)
@@ -56,6 +52,7 @@ export default function App(): React.JSX.Element {
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const connect = useAppStore((s) => s.connect)
   const applyQuery = useAppStore((s) => s.applyQuery)
+  const openSettings = useAppStore((s) => s.openSettings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const { t } = useTranslation()
   const isDark = useIsDark()
@@ -94,7 +91,7 @@ export default function App(): React.JSX.Element {
         isPrimaryShortcut(e, ',', isMac)
       ) {
         e.preventDefault()
-        openSettingsWindow()
+        void openSettings()
         return
       }
       if (
@@ -110,7 +107,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
+  }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled, openSettings])
 
   // Reflect the persisted theme onto the document root, which drives the
   // `[data-theme]` token cascade in styles/tokens.css. 'system' resolves to the OS
@@ -208,7 +205,7 @@ export default function App(): React.JSX.Element {
             onViewChange={setView}
             onQueryLoad={requestQueryLoad}
             onCollapse={() => setExplorerOpen(false)}
-            onSettings={openSettingsWindow}
+            onSettings={() => void openSettings()}
             newConnectionRequested={newConnectionRequested}
             onNewConnectionRequestHandled={() => setNewConnectionRequested(false)}
           />

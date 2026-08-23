@@ -50,7 +50,14 @@ export function useCopyHotkey(getText: () => string | null): void {
       // Confirm the copy with a transient toast — the keyboard path is otherwise
       // invisible, so without it a successful ⌘C reads as "nothing happened".
       void copyText(text).then((ok) => {
-        if (ok) useAppStore.getState().notify('success', i18n.t('notify.copied'))
+        if (ok) {
+          useAppStore.getState().notify({
+            variant: 'success',
+            title: i18n.t('notify.copied'),
+            source: 'system',
+            dedupeKey: 'clipboard:copied'
+          })
+        }
       })
     }
     window.addEventListener('keydown', onKey)

@@ -19,6 +19,7 @@ import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
 import {
   buildConnectionOptions,
@@ -345,12 +346,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
   }
 
   const copyToUri = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(toUriText)
-      setToCopied(true)
-    } catch {
-      /* clipboard may be unavailable */
-    }
+    if (await copyText(toUriText)) setToCopied(true)
   }
 
   // Esc / backdrop closes the open popup first, then the form itself.

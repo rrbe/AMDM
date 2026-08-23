@@ -6,8 +6,8 @@
  * code, per-tab result strips, the chosen result view, and loading/error flags.
  *
  * All backend access happens here via `window.api`; components dispatch actions
- * and read state. Every async action catches rejections and surfaces them as
- * `lastError` (or per-connection status) rather than letting the UI crash.
+ * and read state. Every async action catches rejections and surfaces relevant
+ * failures through the bounded notification queue or contextual result state.
  */
 import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/types'
@@ -58,6 +58,14 @@ import {
   type QueryTab,
   type ResultTab
 } from '@renderer/lib/tabs'
+import {
+  dismissNotification as removeNotification,
+  enqueueNotification,
+  type AppNotification,
+  type NotificationInput,
+  type NotificationSource,
+  type NotificationVariant
+} from '@renderer/lib/notifications'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -66,17 +74,6 @@ const tr = i18n.t.bind(i18n)
 export type { QueryTab, ResultTab }
 
 export type ResultView = 'tree' | 'json' | 'table'
-
-export type NoticeKind = 'success' | 'info' | 'warn'
-
-/** A transient, non-error notification shown as a toast. Errors keep using
-    `lastError` (their own channel); this carries success / info / warning. */
-export interface Notice {
-  kind: NoticeKind
-  message: string
-  /** Bumped per emit so React remounts the toast and restarts auto-dismiss. */
-  key: number
-}
 
 /** Loaded children for a catalog node, keyed by a synthetic node id. */
 export interface CatalogState {
@@ -137,8 +134,7 @@ interface AppState {
 
   // ---- ui ----
   initializing: boolean
-  lastError: string | null
-  notice: Notice | null
+  notifications: AppNotification[]
 
   // ---- actions: bootstrap ----
   bootstrap(): Promise<void>
@@ -209,10 +205,9 @@ interface AppState {
   loadPage(skip: number): Promise<void>
   /** Change the page size and re-run the current query from the first page. */
   setQueryLimit(n: number): Promise<void>
-  clearError(): void
-  /** Show a transient success/info/warning toast (errors use `lastError`). */
-  notify(kind: NoticeKind, message: string): void
-  dismissNotice(): void
+  notify(input: NotificationInput): void
+  dismissNotification(id: string): void
+  clearNotifications(): void
 
   // ---- actions: saved queries + history (Phase 2) ----
   loadQueries(): Promise<void>
@@ -257,6 +252,7 @@ interface AppState {
   loadUpdateState(): Promise<void>
   setAutomaticUpdateChecks(enabled: boolean): Promise<void>
   showAvailableUpdate(): Promise<boolean>
+  openSettings(): Promise<void>
   loadSettings(): Promise<void>
   updateSettings(patch: Partial<AppSettings>): Promise<void>
 }
@@ -275,6 +271,29 @@ function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message
   if (typeof e === 'string') return e
   return 'Unknown error'
+}
+
+function appNotice(
+  variant: NotificationVariant,
+  title: string,
+  source: NotificationSource,
+  dedupeKey?: string,
+  detail?: string
+): NotificationInput {
+  return { variant, title, source, dedupeKey, detail }
+}
+
+function shellFailureNotice(result: ShellResult, tabId: string): NotificationInput | null {
+  if (result.kind !== 'error' || result.errorName === 'Aborted' || result.failureKind === 'cancelled') {
+    return null
+  }
+  return appNotice(
+    'error',
+    result.failureKind === 'timeout' ? tr('notify.queryTimeout') : tr('notify.queryFailed'),
+    'query',
+    `query:${tabId}:${result.failureKind ?? result.errorName ?? 'unknown'}`,
+    result.error ?? tr('notify.unknown')
+  )
 }
 
 /** Opaque per-run id so a run can be cancelled via `shell.abort` (Stop). */
@@ -332,8 +351,7 @@ let exportProgressSubscribed = false
 
 function getSettingsChannel(): BroadcastChannel | null {
   if (settingsChannel !== undefined) return settingsChannel
-  settingsChannel =
-    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('amdm-settings')
+  settingsChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('amdm-settings')
   return settingsChannel
 }
 
@@ -393,8 +411,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateState: EMPTY_UPDATE_STATE,
 
   initializing: true,
-  lastError: null,
-  notice: null,
+  notifications: [],
   exportProgress: {},
 
   // --------------------------------------------------------------------- boot
@@ -416,7 +433,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const connections = await window.api.connections.list()
       set({ connections })
     } catch (e) {
-      set({ lastError: tr('notify.loadConnectionsFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadConnectionsFailed', { error: errMessage(e) }),
+          'connection',
+          'connections:load'
+        )
+      )
     }
   },
 
@@ -427,7 +451,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().loadConnections()
       return saved
     } catch (e) {
-      set({ lastError: tr('notify.saveConnectionFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.saveConnectionFailed', { error: errMessage(e) }), 'connection'))
       return null
     }
   },
@@ -440,9 +464,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { [id]: _removedStatus, ...statuses } = s.statuses
         const expandedConnections = new Set(s.expandedConnections)
         expandedConnections.delete(id)
-        const tabs = s.tabs.map((tab) =>
-          tab.connectionId === id ? { ...tab, connectionId: null } : tab
-        )
+        const tabs = s.tabs.map((tab) => (tab.connectionId === id ? { ...tab, connectionId: null } : tab))
         return {
           catalogs,
           statuses,
@@ -453,7 +475,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       await get().loadConnections()
     } catch (e) {
-      set({ lastError: tr('notify.deleteConnectionFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.deleteConnectionFailed', { error: errMessage(e) }),
+          'connection',
+          `connection:${id}:delete`
+        )
+      )
     }
   },
 
@@ -461,7 +490,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.connections.test(input)
     } catch (e) {
-      return { ok: false, error: errMessage(e) }
+      const error = errMessage(e)
+      get().notify(appNotice('error', tr('notify.testConnectionFailed'), 'connection', 'connection:test', error))
+      return { ok: false, error, failureKind: 'ipc' }
     }
   },
 
@@ -469,7 +500,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.connections.buildUri(input, opts)
     } catch (e) {
-      set({ lastError: tr('notify.buildUriFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.buildUriFailed', { error: errMessage(e) }), 'connection'))
       return null
     }
   },
@@ -477,7 +508,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   async pickFile(opts) {
     try {
       return await window.api.dialog.openFile(opts)
-    } catch {
+    } catch (e) {
+      get().notify(appNotice('error', tr('notify.pickFileFailed', { error: errMessage(e) }), 'io', 'dialog:openFile'))
       return null
     }
   },
@@ -486,7 +518,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.connections.diagnose(input, scope)
     } catch (e) {
-      set({ lastError: tr('notify.diagnoseFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.diagnoseFailed', { error: errMessage(e) }), 'connection'))
       return []
     }
   },
@@ -505,35 +537,50 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           statuses: { ...s.statuses, [id]: { id, state: 'connecting' } },
           catalogs,
-          expandedConnections,
-          lastError: null
+          expandedConnections
         }
       })
       try {
         const status = await window.api.session.connect(id)
         // A disconnect or newer retry may have won while this call was pending.
-        if (
-          connectionAttempts.get(id)?.token !== token ||
-          get().statuses[id]?.state !== 'connecting'
-        )
-          return
+        if (connectionAttempts.get(id)?.token !== token || get().statuses[id]?.state !== 'connecting') return
         set((s) => {
           // Auto-expand the connection in the explorer so its databases appear.
           const expandedConnections = new Set(s.expandedConnections)
           if (status.state === 'connected') expandedConnections.add(id)
           return {
             statuses: { ...s.statuses, [id]: status },
-            catalogs:
-              status.state === 'connected'
-                ? { ...s.catalogs, [id]: emptyCatalog() }
-                : s.catalogs,
-            expandedConnections,
-            lastError:
-              status.state === 'error'
-                ? tr('notify.connectFailed', { error: status.error ?? tr('notify.unknown') })
-                : s.lastError
+            catalogs: status.state === 'connected' ? { ...s.catalogs, [id]: emptyCatalog() } : s.catalogs,
+            expandedConnections
           }
         })
+        const statusKey = `connection:${id}:status`
+        if (status.state === 'error') {
+          get().notify(
+            appNotice(
+              'error',
+              status.failureKind === 'timeout' ? tr('notify.connectTimeout') : tr('notify.connectFailedTitle'),
+              'connection',
+              statusKey,
+              status.error ?? tr('notify.unknown')
+            )
+          )
+        } else if (
+          status.state === 'connected' &&
+          get().notifications.some(
+            (notification) => notification.dedupeKey === statusKey && notification.variant === 'error'
+          )
+        ) {
+          const connection = get().connections.find((item) => item.id === id)
+          get().notify(
+            appNotice(
+              'success',
+              tr('notify.connectionRestoredNamed', { name: connection?.name ?? id }),
+              'connection',
+              statusKey
+            )
+          )
+        }
         if (status.state === 'connected') {
           // Connecting is an explorer action: it must not create or focus a query tab.
           // If this is a reconnect for the active tab, preserve the default-db warmup.
@@ -541,9 +588,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           const db = conn?.defaultDatabase
           if (db && getActiveTab(get()).connectionId === id) {
             set((s) =>
-              getActiveTab(s).activeDatabase
-                ? {}
-                : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
+              getActiveTab(s).activeDatabase ? {} : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
             )
           }
           await get().loadDatabases(id)
@@ -556,16 +601,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         }
       } catch (e) {
-        if (
-          connectionAttempts.get(id)?.token !== token ||
-          get().statuses[id]?.state !== 'connecting'
-        )
-          return
+        if (connectionAttempts.get(id)?.token !== token || get().statuses[id]?.state !== 'connecting') return
         const error = errMessage(e)
         set((s) => ({
-          statuses: { ...s.statuses, [id]: { id, state: 'error', error } },
-          lastError: tr('notify.connectFailed', { error })
+          statuses: { ...s.statuses, [id]: { id, state: 'error', error, failureKind: 'ipc' } }
         }))
+        get().notify(
+          appNotice('error', tr('notify.connectFailedTitle'), 'connection', `connection:${id}:status`, error)
+        )
       }
     })()
 
@@ -592,12 +635,46 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await window.api.session.disconnect(id)
     } catch (e) {
-      set({ lastError: tr('notify.disconnectFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.disconnectFailed', { error: errMessage(e) }),
+          'connection',
+          `connection:${id}:disconnect`
+        )
+      )
     }
   },
 
   syncSessionStatus(status) {
+    const previous = get().statuses[status.id]
     set((s) => ({ statuses: { ...s.statuses, [status.id]: status } }))
+    if (previous?.state === status.state) return
+    const key = `connection:${status.id}:status`
+    if (status.state === 'error') {
+      const connection = get().connections.find((item) => item.id === status.id)
+      get().notify(
+        appNotice(
+          'error',
+          status.failureKind === 'timeout'
+            ? tr('notify.connectionRuntimeTimeout', { name: connection?.name ?? status.id })
+            : tr('notify.connectionLost', { name: connection?.name ?? status.id }),
+          'connection',
+          key,
+          status.error ?? tr('notify.unknown')
+        )
+      )
+    } else if (previous?.state === 'error' && status.state === 'connected') {
+      const connection = get().connections.find((item) => item.id === status.id)
+      get().notify(
+        appNotice(
+          'success',
+          tr('notify.connectionRestoredNamed', { name: connection?.name ?? status.id }),
+          'connection',
+          key
+        )
+      )
+    }
   },
 
   setActiveConnection(id) {
@@ -693,7 +770,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { catalogs: { ...s.catalogs, [connId]: { ...c, databases } } }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadDatabasesFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadDatabasesFailed', { error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:databases`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -714,7 +798,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadCollectionsFailed', { db, error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadCollectionsFailed', { db, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:collections`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -743,9 +834,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...c,
               collections: {
                 ...c.collections,
-                [db]: collections.map((item) =>
-                  item.name === coll ? { ...item, estimatedCount } : item
-                )
+                [db]: collections.map((item) => (item.name === coll ? { ...item, estimatedCount } : item))
               },
               indexes: { ...c.indexes, [`${db}/${coll}`]: indexes }
             }
@@ -753,7 +842,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.refreshFailed', { error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:${coll}:refresh`
+        )
+      )
     } finally {
       set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : {}))
     }
@@ -775,7 +871,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadIndexesFailed', { key, error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadIndexesFailed', { key, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${key}:indexes`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -793,7 +896,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadUsersFailed', { db, error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadUsersFailed', { db, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:users`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -823,8 +933,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { tabs: [fresh], activeTabId: fresh.id }
       }
       const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
-      const activeConnectionId =
-        remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
+      const activeConnectionId = remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
       return { tabs: remaining, activeTabId: nextActive, activeConnectionId }
     })
   },
@@ -849,7 +958,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
-  // surfaces as `lastError` like any other failure rather than throwing into UI.
+  // surfaces through the notification queue rather than throwing into UI.
   async formatCode() {
     const tab = getActiveTab(get())
     const code = tab.code
@@ -859,7 +968,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const formatted = await formatJs(code)
       if (formatted !== code) set((s) => ({ tabs: patchTab(s.tabs, tab.id, { code: formatted }) }))
     } catch (e) {
-      set({ lastError: tr('notify.formatFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.formatFailed', { error: errMessage(e) }), 'query', `query:${tab.id}:format`)
+      )
     }
   },
 
@@ -925,7 +1036,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabId = tab.id
     const code = codeOverride ?? tab.code
     if (!connectionId) {
-      set({ lastError: tr('notify.noActiveConnection') })
+      get().notify(appNotice('warn', tr('notify.noActiveConnection'), 'query', 'query:noConnection'))
       return
     }
     if (!code.trim()) return
@@ -938,8 +1049,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     const query = { connectionId, database, code }
     let runFailed = false
@@ -949,16 +1059,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
       runFailed = isRunFailure(result)
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      const notification = shellFailureNotice(result, tabId)
+      if (notification) get().notify(notification)
       // `use <db>` REPL command: switch the tab's active database (also warms
       // its collection names for completion via setActiveDatabase).
       if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
     } catch (e) {
       runFailed = true
-      set((s) =>
-        patchTabResults(s, tabId, (t) =>
-          appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
-        )
-      )
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      get().notify(shellFailureNotice(result, tabId)!)
     } finally {
       set((s) => ({
         tabs: patchTab(s.tabs, tabId, {
@@ -981,13 +1096,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     // races past it (the run already finished).
     try {
       await window.api.shell.abort(execId)
-    } catch {
+    } catch (e) {
       set((s) => {
         const current = s.tabs.find((t) => t.id === tab.id)
-        return current?.runningExecId === execId
-          ? { tabs: patchTab(s.tabs, tab.id, { stopping: false }) }
-          : {}
+        return current?.runningExecId === execId ? { tabs: patchTab(s.tabs, tab.id, { stopping: false }) } : {}
       })
+      get().notify(appNotice('error', tr('notify.stopQueryFailed'), 'query', `query:${tab.id}:stop`, errMessage(e)))
     }
   },
 
@@ -1009,23 +1123,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
       runFailed = isRunFailure(result)
-      set((s) =>
-        patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now(), skip }))
-      )
+      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now(), skip })))
+      const notification = shellFailureNotice(result, tabId)
+      if (notification) get().notify(notification)
     } catch (e) {
       runFailed = true
-      set((s) =>
-        patchTabResults(s, tabId, (t) =>
-          patchResult(t, resultId, { result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
-        )
-      )
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
+      get().notify(shellFailureNotice(result, tabId)!)
     } finally {
       set((s) => ({
         tabs: patchTab(s.tabs, tabId, {
@@ -1051,7 +1167,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabId = tab.id
     const code = tab.code
     if (!connectionId) {
-      set({ lastError: tr('notify.noActiveConnection') })
+      get().notify(appNotice('warn', tr('notify.noActiveConnection'), 'query', 'query:noConnection'))
       return
     }
     if (!code.trim()) return
@@ -1064,8 +1180,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     const query = { connectionId, database, code }
     let runFailed = false
@@ -1073,13 +1188,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
       set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      const notification = shellFailureNotice(result, tabId)
+      if (notification) get().notify(notification)
     } catch (e) {
       runFailed = true
-      set((s) =>
-        patchTabResults(s, tabId, (t) =>
-          appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
-        )
-      )
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      get().notify(shellFailureNotice(result, tabId)!)
     } finally {
       set((s) => ({
         tabs: patchTab(s.tabs, tabId, {
@@ -1107,8 +1227,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     let runFailed = false
     try {
@@ -1121,12 +1240,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         execId
       })
       runFailed = isRunFailure(result)
-      set((s) =>
-        patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() }))
-      )
+      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() })))
+      const notification = shellFailureNotice(result, tabId)
+      if (notification) get().notify(notification)
     } catch (e) {
       runFailed = true
-      set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() })))
+      get().notify(shellFailureNotice(result, tabId)!)
     } finally {
       set((s) => ({
         tabs: patchTab(s.tabs, tabId, {
@@ -1139,16 +1265,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  clearError() {
-    set({ lastError: null })
+  notify(input) {
+    set((state) => ({
+      notifications: enqueueNotification(state.notifications, input, {
+        id: crypto.randomUUID(),
+        now: Date.now()
+      })
+    }))
   },
 
-  notify(kind, message) {
-    set({ notice: { kind, message, key: Date.now() } })
+  dismissNotification(id) {
+    set((state) => ({ notifications: removeNotification(state.notifications, id) }))
   },
 
-  dismissNotice() {
-    set({ notice: null })
+  clearNotifications() {
+    set({ notifications: [] })
   },
 
   // ----------------------------------------------------- saved queries + history
@@ -1156,7 +1287,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ savedQueries: await window.api.queries.list() })
     } catch (e) {
-      set({ lastError: tr('notify.loadSavedQueriesFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.loadSavedQueriesFailed', { error: errMessage(e) }), 'system', 'queries:load')
+      )
     }
   },
 
@@ -1164,10 +1297,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const saved = await window.api.queries.save(input)
       await get().loadQueries()
-      get().notify('success', tr('notify.saveQuerySuccess', { name: saved.name }))
+      get().notify(appNotice('success', tr('notify.saveQuerySuccess', { name: saved.name }), 'query'))
       return saved
     } catch (e) {
-      set({ lastError: tr('notify.saveQueryFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.saveQueryFailed', { error: errMessage(e) }), 'query'))
       return null
     }
   },
@@ -1177,7 +1310,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.queries.delete(id)
       await get().loadQueries()
     } catch (e) {
-      set({ lastError: tr('notify.deleteQueryFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.deleteQueryFailed', { error: errMessage(e) }), 'query', `query:${id}:delete`)
+      )
     }
   },
 
@@ -1185,7 +1320,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ history: await window.api.history.list() })
     } catch (e) {
-      set({ lastError: tr('notify.loadHistoryFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.loadHistoryFailed', { error: errMessage(e) }), 'system', 'history:load')
+      )
     }
   },
 
@@ -1194,7 +1331,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.history.clear()
       set({ history: [] })
     } catch (e) {
-      set({ lastError: tr('notify.clearHistoryFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.clearHistoryFailed', { error: errMessage(e) }), 'system'))
     }
   },
 
@@ -1202,9 +1339,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
+    const targetConnectionId = connectionId ?? get().activeConnectionId
+    if (!targetConnectionId) {
+      get().notify(appNotice('warn', tr('notify.noActiveConnection'), 'query', 'query:noConnection'))
+      return
+    }
     set((s) => {
-      const targetConnectionId = connectionId ?? s.activeConnectionId
-      if (!targetConnectionId) return { lastError: tr('notify.noActiveConnection') }
       const active = getActiveTab(s)
       const targetTab =
         active.connectionId === targetConnectionId
@@ -1212,11 +1352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
       const activeDatabase = database || targetTab?.activeDatabase || ''
       const match = { connectionId: targetConnectionId, database: activeDatabase, code }
-      const { focusId, reuseId } = pickFillTarget(
-        s.tabs,
-        targetTab?.id ?? s.activeTabId,
-        match
-      )
+      const { focusId, reuseId } = pickFillTarget(s.tabs, targetTab?.id ?? s.activeTabId, match)
       if (focusId) {
         return { activeConnectionId: targetConnectionId, activeTabId: focusId }
       }
@@ -1267,7 +1403,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.schemas.get(target)
     } catch (e) {
-      set({ lastError: tr('notify.loadSchemaFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.loadSchemaFailed', { error: errMessage(e) }), 'document', 'schema:load')
+      )
       return null
     }
   },
@@ -1275,10 +1413,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   async analyzeSchema(target) {
     try {
       const model = await window.api.schemas.analyze(target)
-      get().notify('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }))
+      get().notify(appNotice('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }), 'document'))
       return model
     } catch (e) {
-      set({ lastError: tr('notify.analyzeSchemaFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.analyzeSchemaFailed', { error: errMessage(e) }), 'document'))
       return null
     }
   },
@@ -1286,10 +1424,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   async saveSchemaDraft(target, draft) {
     try {
       const model = await window.api.schemas.saveDraft(target, draft)
-      get().notify('success', tr('notify.schemaSaved'))
+      get().notify(appNotice('success', tr('notify.schemaSaved'), 'document'))
       return model
     } catch (e) {
-      set({ lastError: tr('notify.saveSchemaFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.saveSchemaFailed', { error: errMessage(e) }), 'document'))
       return null
     }
   },
@@ -1297,10 +1435,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   async overwriteSchemaDraft(target) {
     try {
       const model = await window.api.schemas.overwriteDraft(target)
-      get().notify('success', tr('notify.schemaOverwritten'))
+      get().notify(appNotice('success', tr('notify.schemaOverwritten'), 'document'))
       return model
     } catch (e) {
-      set({ lastError: tr('notify.overwriteSchemaFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.overwriteSchemaFailed', { error: errMessage(e) }), 'document'))
       return null
     }
   },
@@ -1326,11 +1464,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.update(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }) })
+      else {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }),
+            'document',
+            `document:${req.connectionId}:${req.database}:${req.collection}:update`
+          )
+        )
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.updateFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.updateFailed', { error }),
+          'document',
+          `document:${req.connectionId}:${req.database}:${req.collection}:update`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1339,11 +1493,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.setField(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }) })
+      else {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }),
+            'document',
+            `document:${req.connectionId}:${req.database}:${req.collection}:field:${req.path}`
+          )
+        )
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.updateFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.updateFailed', { error }),
+          'document',
+          `document:${req.connectionId}:${req.database}:${req.collection}:field:${req.path}`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1352,11 +1522,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.delete(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: tr('notify.deleteFailed', { error: res.error ?? tr('notify.unknown') }) })
+      else {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.deleteFailed', { error: res.error ?? tr('notify.unknown') }),
+            'document',
+            `document:${req.connectionId}:${req.database}:${req.collection}:delete`
+          )
+        )
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.deleteFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.deleteFailed', { error }),
+          'document',
+          `document:${req.connectionId}:${req.database}:${req.collection}:delete`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1366,7 +1552,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.io.chooseExportDirectory()
     } catch (e) {
-      set({ lastError: tr('io.chooseExportDirectoryFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('io.chooseExportDirectoryFailed', { error: errMessage(e) }),
+          'io',
+          'export:chooseDirectory'
+        )
+      )
       return null
     }
   },
@@ -1374,11 +1567,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   async exportCollection(req) {
     try {
       const res = await window.api.io.export(req)
-      if (!res.ok && !res.cancelled) set({ lastError: tr('notify.exportFailed', { error: res.error ?? tr('notify.unknown') }) })
+      if (!res.ok && !res.cancelled) {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.exportFailed', { error: res.error ?? tr('notify.unknown') }),
+            'io',
+            `export:${req.taskId}`
+          )
+        )
+      } else if (res.warning) {
+        get().notify(appNotice('warn', tr('notify.exportWarning'), 'io', `export:${req.taskId}:warning`, res.warning))
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.exportFailed', { error }) })
+      get().notify(appNotice('error', tr('notify.exportFailed', { error }), 'io', `export:${req.taskId}`))
       return { ok: false, error }
     }
   },
@@ -1387,7 +1591,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.io.cancelExport(taskId)
     } catch (e) {
-      set({ lastError: tr('notify.exportFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.cancelExportFailed'), 'io', `export:${taskId}:cancel`, errMessage(e)))
       return false
     }
   },
@@ -1395,11 +1599,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   async openExportedFile(taskId) {
     try {
       const error = await window.api.io.openExportedFile(taskId)
-      if (error) set({ lastError: tr('io.openExportedFileFailed', { error }) })
+      if (error) {
+        get().notify(appNotice('error', tr('io.openExportedFileFailed', { error }), 'io', `export:${taskId}:open`))
+      }
       return error
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('io.openExportedFileFailed', { error }) })
+      get().notify(appNotice('error', tr('io.openExportedFileFailed', { error }), 'io', `export:${taskId}:open`))
       return error
     }
   },
@@ -1407,11 +1613,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   async revealExportedFile(taskId) {
     try {
       const error = await window.api.io.revealExportedFile(taskId)
-      if (error) set({ lastError: tr('io.revealExportedFileFailed', { error }) })
+      if (error) {
+        get().notify(appNotice('error', tr('io.revealExportedFileFailed', { error }), 'io', `export:${taskId}:reveal`))
+      }
       return error
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('io.revealExportedFileFailed', { error }) })
+      get().notify(appNotice('error', tr('io.revealExportedFileFailed', { error }), 'io', `export:${taskId}:reveal`))
       return error
     }
   },
@@ -1426,11 +1634,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   async importCollection(req) {
     try {
       const res = await window.api.io.import(req)
-      if (!res.ok && !res.cancelled) set({ lastError: tr('notify.importFailed', { error: res.error ?? tr('notify.unknown') }) })
+      const key = `import:${req.connectionId}:${req.database}:${req.collection}`
+      if (!res.ok && !res.cancelled) {
+        get().notify(
+          appNotice('error', tr('notify.importFailed', { error: res.error ?? tr('notify.unknown') }), 'io', key)
+        )
+      } else if (res.warning) {
+        get().notify(appNotice('warn', tr('notify.importWarning'), 'io', `${key}:warning`, res.warning))
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.importFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.importFailed', { error }),
+          'io',
+          `import:${req.connectionId}:${req.database}:${req.collection}`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1439,10 +1661,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   async checkForUpdates() {
     try {
       const started = await window.api.updates.checkForUpdates()
-      if (!started) set({ lastError: tr('notify.updateCheckUnavailable') })
+      if (!started) {
+        get().notify(appNotice('warn', tr('notify.updateCheckUnavailable'), 'settings', 'updates:unavailable'))
+      }
       return started
     } catch (e) {
-      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.updateCheckFailed', { error: errMessage(e) }), 'settings', 'updates:check')
+      )
       return false
     }
   },
@@ -1460,7 +1686,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ updateState: await window.api.updates.setAutomaticChecks(enabled) })
     } catch (e) {
-      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.updateCheckFailed', { error: errMessage(e) }), 'settings', 'updates:automatic')
+      )
     }
   },
 
@@ -1470,11 +1698,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
     try {
       const started = await window.api.updates.showAvailableUpdate()
-      if (!started) set({ lastError: tr('notify.updateCheckUnavailable') })
+      if (!started) {
+        get().notify(appNotice('warn', tr('notify.updateCheckUnavailable'), 'settings', 'updates:unavailable'))
+      }
       return started
     } catch (e) {
-      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.updateCheckFailed', { error: errMessage(e) }), 'settings', 'updates:show')
+      )
       return false
+    }
+  },
+
+  async openSettings() {
+    try {
+      await window.api.app.openSettings()
+    } catch (e) {
+      get().notify(appNotice('error', tr('notify.openSettingsFailed'), 'system', 'settings:open', errMessage(e)))
     }
   },
 
@@ -1482,8 +1722,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     subscribeToSettings()
     try {
       set({ settings: await window.api.settings.get() })
-    } catch {
-      /* keep defaults */
+    } catch (e) {
+      get().notify(appNotice('warn', tr('notify.loadSettingsFailed'), 'settings', 'settings:load', errMessage(e)))
     }
   },
 
@@ -1495,18 +1735,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ settings: saved })
       getSettingsChannel()?.postMessage(saved)
     } catch (e) {
-      set({ lastError: tr('notify.saveSettingsFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.saveSettingsFailed', { error: errMessage(e) }), 'settings', 'settings:save')
+      )
     }
   }
 }))
 
 /** Helper to flip a node's loading flag immutably. */
-function withLoading(
-  s: AppState,
-  connId: string,
-  nodeId: string,
-  on: boolean
-): Pick<AppState, 'catalogs'> {
+function withLoading(s: AppState, connId: string, nodeId: string, on: boolean): Pick<AppState, 'catalogs'> {
   const c = s.catalogs[connId] ?? emptyCatalog()
   const loading = new Set(c.loading)
   if (on) loading.add(nodeId)

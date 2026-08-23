@@ -9,7 +9,7 @@ describe('manual updates', () => {
   }
 
   afterEach(() => {
-    useAppStore.setState({ updateState: emptyState, lastError: null })
+    useAppStore.setState({ updateState: emptyState, notifications: [] })
   })
 
   afterEach(() => {

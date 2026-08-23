@@ -1,31 +1,31 @@
 import { useAppStore } from '@renderer/store/useAppStore'
+import { visibleNotifications } from '@renderer/lib/notifications'
 import { Toast } from './Toast'
 
 /**
- * The global toast stack (bottom-right). Renders the error channel (`lastError`,
- * persists until dismissed) and the transient notice channel (`notice`,
- * success/info auto-dismiss; warnings persist).
+ * The global bottom-right notification stack. Only the newest bounded subset
+ * is mounted; dismissing one reveals the next queued notification.
  */
 export function Toaster(): React.JSX.Element | null {
-  const lastError = useAppStore((s) => s.lastError)
-  const clearError = useAppStore((s) => s.clearError)
-  const notice = useAppStore((s) => s.notice)
-  const dismissNotice = useAppStore((s) => s.dismissNotice)
+  const notifications = useAppStore((s) => s.notifications)
+  const dismissNotification = useAppStore((s) => s.dismissNotification)
+  const visible = visibleNotifications(notifications)
 
-  if (!lastError && !notice) return null
+  if (visible.length === 0) return null
 
   return (
     <div className="toast-stack">
-      {notice && (
+      {visible.map((notification) => (
         <Toast
-          key={notice.key}
-          variant={notice.kind}
-          message={notice.message}
-          onDismiss={dismissNotice}
-          autoDismissMs={notice.kind === 'warn' ? undefined : 4000}
+          key={`${notification.id}:${notification.updatedAt}:${notification.repeatCount}`}
+          variant={notification.variant}
+          title={notification.title}
+          detail={notification.detail}
+          repeatCount={notification.repeatCount}
+          onDismiss={() => dismissNotification(notification.id)}
+          autoDismissMs={notification.autoDismissMs}
         />
-      )}
-      {lastError && <Toast variant="error" message={lastError} onDismiss={clearError} />}
+      ))}
     </div>
   )
 }

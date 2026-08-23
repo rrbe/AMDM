@@ -316,15 +316,20 @@ export function toTsv(docs: unknown[], sort: CollectionSort = 'alpha'): string {
 
 /**
  * Write `text` to the clipboard. Resolves `true` on success, `false` on failure
- * (e.g. clipboard permission denied) — which also surfaces via `lastError`
- * rather than throwing. Callers that don't care about the outcome can ignore it.
+ * (e.g. clipboard permission denied) — which also surfaces through the global
+ * notification queue rather than throwing.
  */
 export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    useAppStore.setState({ lastError: i18n.t('notify.clipboardUnavailable') })
+    useAppStore.getState().notify({
+      variant: 'error',
+      title: i18n.t('notify.clipboardUnavailable'),
+      source: 'system',
+      dedupeKey: 'clipboard:write'
+    })
     return false
   }
 }

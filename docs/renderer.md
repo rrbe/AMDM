@@ -4,6 +4,8 @@
 
 `useAppStore.ts` is the single source of truth for Renderer state and backend actions. Asynchronous actions should write errors into displayable state instead of throwing them into the React render path.
 
+Global notifications use the bounded `notifications` queue in the store. Producers must report a non-cancelled, user-relevant asynchronous failure exactly once, with a stable `source` and `dedupeKey` when it can repeat. Keep contextual details in their owning result, form, or progress UI as well; the toast is the attention layer, not the only error record. Do not notify for expected cancellation, inline validation, owner cleanup, or best-effort background decoration such as autocomplete sampling. Classify timeout/network/auth failures in main and carry the stable failure kind over IPC instead of parsing localized or driver-generated messages in Renderer.
+
 Zustand selectors must return stable references:
 
 - Update `Set`, arrays, and nested records immutably.
