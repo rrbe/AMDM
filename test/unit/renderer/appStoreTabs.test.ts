@@ -499,4 +499,38 @@ describe('connection-bound tabs', () => {
     })
     expect(useAppStore.getState().notifications).toHaveLength(notificationCount)
   })
+
+  it('stores the exact executed selection on its result tab', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      kind: 'documents',
+      data: [],
+      count: 0,
+      truncated: false,
+      collection: 'audit'
+    } satisfies ShellResult)
+    vi.stubGlobal('window', { api: { shell: { execute } } })
+    const selection = `const ids = await db.orders.distinct('_id', { status: 'open' })
+
+db.audit.find({ orderId: { $in: ids } }).limit(20)`
+    const editorCode = `db.unselectedBefore.find({})
+
+${selection}
+
+db.unselectedAfter.find({})`
+    useAppStore.setState({
+      tabs: [
+        createTab('c1-tab', {
+          connectionId: 'c1',
+          activeDatabase: 'shop',
+          code: editorCode
+        })
+      ],
+      activeTabId: 'c1-tab'
+    })
+
+    await useAppStore.getState().runShell(selection)
+
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection }))
+    expect(useAppStore.getState().tabs[0].results[0].query?.code).toBe(selection)
+  })
 })

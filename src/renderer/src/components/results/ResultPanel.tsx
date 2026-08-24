@@ -399,27 +399,25 @@ function ResultTabStrip({ results, activeId }: { results: ResultTab[]; activeId:
 
   return (
     <div ref={stripRef} className="result-tabs">
-      {results.map((r) => (
-        <DocumentTab
-          key={r.id}
-          active={r.id === activeId}
-          className="rtab"
-          dataTabId={r.id}
-          label={resultTabLabel(r)}
-          tooltip={r.query ? firstLine(r.query.code) : undefined}
-          closeLabel={t('result.closeTab')}
-          onSelect={() => setActiveResultTab(r.id)}
-          onClose={() => closeResultTab(r.id)}
-        />
-      ))}
+      {results.map((r) => {
+        const query = r.query
+        return (
+          <DocumentTab
+            key={r.id}
+            active={r.id === activeId}
+            className="rtab"
+            dataTabId={r.id}
+            label={resultTabLabel(r)}
+            tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : undefined}
+            tooltipVariant="code"
+            closeLabel={t('result.closeTab')}
+            onSelect={() => setActiveResultTab(r.id)}
+            onClose={() => closeResultTab(r.id)}
+          />
+        )
+      })}
     </div>
   )
-}
-
-/** Tooltip-sized preview of the query that produced a result tab. */
-function firstLine(code: string): string {
-  const line = code.split('\n', 1)[0].trim()
-  return line.length > 80 ? `${line.slice(0, 80)}…` : line
 }
 
 /** Turn any non-error ShellResult into an array of values for the views. */

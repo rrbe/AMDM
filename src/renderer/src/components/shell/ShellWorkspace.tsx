@@ -16,7 +16,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabCollection, tabLabel } from '@renderer/lib/tabs'
-import { ShellEditor } from './ShellEditor'
+import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
@@ -66,7 +66,7 @@ export function ShellWorkspace(): React.JSX.Element {
   const [showSave, setShowSave] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
   const [expandedRegion, setExpandedRegion] = useState<'query' | 'results' | null>(null)
-  const selectedCode = useRef<string | undefined>(undefined)
+  const editorRef = useRef<ShellEditorHandle>(null)
   const lastShortcutRegion = useRef<ShortcutRegion>('query')
 
   const conn = connections.find((c) => c.id === activeConnectionId)
@@ -76,12 +76,8 @@ export function ShellWorkspace(): React.JSX.Element {
   const contentBusy = running || !code.trim()
   const busy = contentBusy || activeConnectionState !== 'connected'
   const runEditor = (): void => {
-    void runShell(selectedCode.current)
+    void runShell(editorRef.current?.getSelectedCode())
   }
-
-  useEffect(() => {
-    selectedCode.current = undefined
-  }, [activeTabId])
 
   useEffect(() => {
     const rememberRegion = (event: Event): void => {
@@ -193,12 +189,10 @@ export function ShellWorkspace(): React.JSX.Element {
               instance (isolated undo history / selection). */}
           <div className="editor-row" data-shortcut-region="query">
             <ShellEditor
+              ref={editorRef}
               key={activeTabId}
               value={code}
               onChange={setCode}
-              onSelectionChange={(selected) => {
-                selectedCode.current = selected
-              }}
               onRun={(selected) => void runShell(selected)}
               onRunStatement={(c) => void runShell(c)}
               onSave={() => setShowSave(true)}
@@ -324,6 +318,8 @@ function TabBar(): React.JSX.Element {
       <div ref={stripRef} className="tab-strip">
         {tabs.map((tab, i) => {
           const connectionStatus = tab.connectionId ? statuses[tab.connectionId] : undefined
+          const connectionName = connections.find((connection) => connection.id === tab.connectionId)?.name
+          const collection = tabCollection(tab)
           const unavailable =
             !!tab.connectionId &&
             (connectionStatus === undefined ||
@@ -339,6 +335,20 @@ function TabBar(): React.JSX.Element {
               className="qtab"
               dataTabId={tab.id}
               label={<span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, i)}</span>}
+              tooltip={() => (
+                <dl
+                  data-query-tab-tooltip=""
+                  className="m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1"
+                >
+                  <dt className="text-primary-foreground/65">{t('context.connection')}</dt>
+                  <dd className="m-0 min-w-0 break-words">{connectionName ?? tab.connectionId ?? '—'}</dd>
+                  <dt className="text-primary-foreground/65">{t('context.database')}</dt>
+                  <dd className="m-0 min-w-0 break-words">{tab.activeDatabase || '—'}</dd>
+                  <dt className="text-primary-foreground/65">{t('context.collection')}</dt>
+                  <dd className="m-0 min-w-0 break-words">{collection ?? '—'}</dd>
+                </dl>
+              )}
+              tooltipVariant="text"
               closeLabel={t('shell.closeTab')}
               onSelect={() => setActiveTab(tab.id)}
               onClose={() => closeTab(tab.id)}

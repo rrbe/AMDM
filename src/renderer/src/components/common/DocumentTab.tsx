@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
-import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { Tooltip, type TooltipContent, type TooltipVariant } from '@renderer/components/ui/Tooltip'
 
 interface DocumentTabProps {
   active: boolean
@@ -13,7 +13,8 @@ interface DocumentTabProps {
   dataTabId?: string
   status?: ReactNode
   statusAction?: { label: string; onClick: () => void }
-  tooltip?: string
+  tooltip?: TooltipContent
+  tooltipVariant?: TooltipVariant
 }
 
 /** Shared Chrome-style document tab used by Query and Result strips. */
@@ -27,7 +28,8 @@ export function DocumentTab({
   dataTabId,
   status,
   statusAction,
-  tooltip
+  tooltip,
+  tooltipVariant
 }: DocumentTabProps): React.JSX.Element {
   return (
     <div
@@ -59,7 +61,7 @@ export function DocumentTab({
           {status}
         </span>
       )}
-      <Tooltip content={tooltip}>
+      <Tooltip content={tooltip} variant={tooltipVariant}>
         <span className="document-tab-label">{label}</span>
       </Tooltip>
       <button

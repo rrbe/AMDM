@@ -4,7 +4,7 @@ import { cva } from 'class-variance-authority'
 
 export type TooltipVariant = 'compact' | 'text' | 'code'
 
-type TooltipContent = ReactNode | (() => ReactNode)
+export type TooltipContent = ReactNode | (() => ReactNode)
 
 interface TooltipPayload {
   content: TooltipContent
@@ -38,7 +38,7 @@ const popupVariants = cva(
         compact:
           'max-w-[min(360px,calc(100vw-16px))] px-[10px] py-[7px] font-sans text-[12px] font-medium leading-[1.35]',
         text: 'max-h-[min(320px,45vh)] max-w-[min(520px,calc(100vw-16px))] overflow-hidden px-3 py-2.5 font-sans text-[12px] font-normal leading-[1.45]',
-        code: 'max-h-[min(320px,45vh)] max-w-[min(520px,calc(100vw-16px))] overflow-hidden px-3 py-2.5 font-mono text-[12px] font-normal leading-[1.45] [tab-size:2]'
+        code: 'max-h-[min(320px,45vh)] max-w-[min(520px,calc(100vw-16px))] overflow-auto px-3 py-2.5 font-mono text-[12px] font-normal leading-[1.45] [tab-size:2]'
       }
     },
     defaultVariants: { variant: 'compact' }

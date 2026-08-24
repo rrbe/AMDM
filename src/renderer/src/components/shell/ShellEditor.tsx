@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, forwardRef, lazy, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
 import {
@@ -97,7 +97,6 @@ function enterKeepIndent(view: EditorView): boolean {
 interface ShellEditorProps {
   value: string
   onChange: (value: string) => void
-  onSelectionChange: (code: string | undefined) => void
   onRun: (code?: string) => void
   /** Run just the current statement / selection (right-click menu, F6). */
   onRunStatement: (code: string) => void
@@ -115,20 +114,15 @@ interface ShellEditorProps {
   saveBusy: boolean
 }
 
-export function ShellEditor({
-  value,
-  onChange,
-  onSelectionChange,
-  onRun,
-  onRunStatement,
-  onSave,
-  onExplain,
-  onFormat,
-  onStop,
-  running,
-  busy,
-  saveBusy
-}: ShellEditorProps): React.JSX.Element {
+export interface ShellEditorHandle {
+  /** Read the live CodeMirror selection when an external toolbar action runs. */
+  getSelectedCode(): string | undefined
+}
+
+export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(function ShellEditor(
+  { value, onChange, onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy, saveBusy },
+  ref
+): React.JSX.Element {
   const { t, i18n } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).
@@ -146,8 +140,8 @@ export function ShellEditor({
   // read the selection / locate the current statement for "Run Current Statement".
   const viewRef = useRef<EditorView | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const selectionHandler = useRef(onSelectionChange)
-  selectionHandler.current = onSelectionChange
+
+  useImperativeHandle(ref, () => ({ getSelectedCode: () => selectionCode(viewRef.current?.state) }), [])
 
   // Hold the latest callbacks in a ref so the keymap extension can stay a stable
   // reference — recreating `extensions` would reconfigure CodeMirror on every
@@ -185,11 +179,6 @@ export function ShellEditor({
         label: runStatementLabel,
         onRun: (code) => {
           if (!handlers.current.busy) handlers.current.onRunStatement(code)
-        }
-      }),
-      EditorView.updateListener.of((update) => {
-        if (update.selectionSet || update.docChanged) {
-          selectionHandler.current(selectionCode(update.state))
         }
       }),
       autocompletion({ override: [shellCompletionSource] }),
@@ -297,7 +286,6 @@ export function ShellEditor({
           onCreateEditor={(view) => {
             viewRef.current = view
             updateQueryRunBusy(view, handlers.current.busy)
-            selectionHandler.current(selectionCode(view.state))
             // Pre-spawn the TS-service worker so the heavy `typescript` chunk
             // loads off the critical path and the service is warm by first use.
             tsAutocomplete.warm()
@@ -393,7 +381,7 @@ export function ShellEditor({
       { label: t('shell.menu.selectAll'), shortcut: '⌘A', onClick: () => withView((v) => selectAll(v)) }
     ]
   }
-}
+})
 
 /**
  * The text to run for "Run Current Statement": the selection if there is one,
