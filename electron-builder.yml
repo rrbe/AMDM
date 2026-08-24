@@ -30,7 +30,9 @@ mac:
     # Scheduled results are surfaced by the app's gentle reminder instead of
     # interrupting work with Sparkle's native window. Manual checks still show it.
     SUAutomaticallyUpdate: false
-    SUScheduledCheckInterval: 86400
+    # Check often enough for AMDM's release cadence while leaving scheduling,
+    # wake handling, and request coalescing to Sparkle.
+    SUScheduledCheckInterval: 21600
   extraResources:
     - from: build/sparkle/native/sparkle.node
       to: native/sparkle.node

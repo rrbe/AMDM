@@ -23,8 +23,28 @@ import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { cn } from '@renderer/lib/utils'
 
 type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
+
+interface UpdateAvailableDotProps {
+  version: string
+  className?: string
+}
+
+export function UpdateAvailableDot({ version, className }: UpdateAvailableDotProps): React.JSX.Element {
+  const { t } = useTranslation()
+  const label = t('updates.newVersion', { version })
+
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      title={label}
+      className={cn('inline-block size-2 shrink-0 rounded-full bg-destructive', className)}
+    />
+  )
+}
 
 export function SettingsWindow(): React.JSX.Element {
   const { t } = useTranslation()
@@ -33,6 +53,7 @@ export function SettingsWindow(): React.JSX.Element {
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
   const loadUpdateState = useAppStore((s) => s.loadUpdateState)
   const setAutomaticUpdateChecks = useAppStore((s) => s.setAutomaticUpdateChecks)
+  const showAvailableUpdate = useAppStore((s) => s.showAvailableUpdate)
   const loadSettings = useAppStore((s) => s.loadSettings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const chooseExportDirectory = useAppStore((s) => s.chooseExportDirectory)
@@ -168,7 +189,8 @@ export function SettingsWindow(): React.JSX.Element {
   const runUpdateCheck = async (): Promise<void> => {
     setChecking(true)
     try {
-      await checkForUpdates()
+      if (updateState.availableVersion) await showAvailableUpdate()
+      else await checkForUpdates()
     } finally {
       setChecking(false)
     }
@@ -228,6 +250,9 @@ export function SettingsWindow(): React.JSX.Element {
           >
             <Icon size={16} aria-hidden />
             <span>{label}</span>
+            {id === 'updates' && updateState.availableVersion ? (
+              <UpdateAvailableDot version={updateState.availableVersion} className="ml-auto" />
+            ) : null}
           </button>
         ))}
       </nav>
@@ -279,14 +304,22 @@ export function SettingsWindow(): React.JSX.Element {
                 />
               </div>
               <Field label={t('settings.checkForUpdates')}>
-                <Button
-                  type="button"
-                  busy={checking}
-                  disabled={!updateState.available}
-                  onClick={() => void runUpdateCheck()}
-                >
-                  {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
-                </Button>
+                <div className="relative w-fit">
+                  <Button
+                    type="button"
+                    busy={checking}
+                    disabled={!updateState.available}
+                    onClick={() => void runUpdateCheck()}
+                  >
+                    {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
+                  </Button>
+                  {updateState.availableVersion ? (
+                    <UpdateAvailableDot
+                      version={updateState.availableVersion}
+                      className="pointer-events-none absolute -right-1 -top-1"
+                    />
+                  ) : null}
+                </div>
               </Field>
             </>
           )}

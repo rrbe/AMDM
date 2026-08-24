@@ -12,6 +12,10 @@ describe('Sparkle packaging configuration', () => {
     expect(config).toMatch(/^\s+SUAutomaticallyUpdate:\s+false\s*$/m)
   })
 
+  it('checks for updates every six hours', () => {
+    expect(config).toMatch(/^\s+SUScheduledCheckInterval:\s+21600\s*$/m)
+  })
+
   it('uses Sparkle gentle reminders instead of showing scheduled update windows', () => {
     expect(nativeBridge).toContain('supportsGentleScheduledUpdateReminders')
     expect(nativeBridge).toMatch(/standardUserDriverShouldHandleShowingScheduledUpdate[\s\S]*return NO;/)
