@@ -41,10 +41,12 @@ const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
  */
 export function ResultPanel({
   expanded,
-  onExpandedChange
+  onExpandedChange,
+  showTabShortcutHints
 }: {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
+  showTabShortcutHints: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const results = useAppStore((s) => getActiveTab(s).results)
@@ -158,7 +160,10 @@ export function ResultPanel({
 
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
-  const strip = results.length > 1 ? <ResultTabStrip results={results} activeId={active?.id ?? null} /> : null
+  const strip =
+    results.length > 1 ? (
+      <ResultTabStrip results={results} activeId={active?.id ?? null} showShortcutHints={showTabShortcutHints} />
+    ) : null
 
   if (!result) {
     return (
@@ -384,7 +389,15 @@ function ResultExpandButton({
  * ✕ / middle-click to close. New runs always land in a fresh tab (the store
  * caps how many are kept — see lib/tabs MAX_RESULT_TABS).
  */
-function ResultTabStrip({ results, activeId }: { results: ResultTab[]; activeId: string | null }): React.JSX.Element {
+function ResultTabStrip({
+  results,
+  activeId,
+  showShortcutHints
+}: {
+  results: ResultTab[]
+  activeId: string | null
+  showShortcutHints: boolean
+}): React.JSX.Element {
   const { t } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
@@ -399,7 +412,7 @@ function ResultTabStrip({ results, activeId }: { results: ResultTab[]; activeId:
 
   return (
     <div ref={stripRef} className="result-tabs">
-      {results.map((r) => {
+      {results.map((r, index) => {
         const query = r.query
         return (
           <DocumentTab
@@ -413,6 +426,7 @@ function ResultTabStrip({ results, activeId }: { results: ResultTab[]; activeId:
             closeLabel={t('result.closeTab')}
             onSelect={() => setActiveResultTab(r.id)}
             onClose={() => closeResultTab(r.id)}
+            shortcutNumber={showShortcutHints && index < 9 ? index + 1 : undefined}
           />
         )
       })}

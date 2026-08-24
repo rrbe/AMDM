@@ -41,6 +41,11 @@ export function contextualTabDigitIndex(event: ShortcutKeyEvent, isMac: boolean)
   return digitIndex(event)
 }
 
+/** Holding Control on macOS reveals the contextual tab-number hints. */
+export function isContextualTabHintModifier(event: ShortcutKeyEvent, isMac: boolean): boolean {
+  return isMac && event.key === 'Control' && event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+}
+
 export function shortcutRegionFromTarget(target: EventTarget | null): ShortcutRegion | null {
   if (!(target instanceof Element)) return null
   const region = target.closest<HTMLElement>('[data-shortcut-region]')?.dataset.shortcutRegion

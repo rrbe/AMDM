@@ -15,6 +15,7 @@ interface DocumentTabProps {
   statusAction?: { label: string; onClick: () => void }
   tooltip?: TooltipContent
   tooltipVariant?: TooltipVariant
+  shortcutNumber?: number
 }
 
 /** Shared Chrome-style document tab used by Query and Result strips. */
@@ -29,7 +30,8 @@ export function DocumentTab({
   status,
   statusAction,
   tooltip,
-  tooltipVariant
+  tooltipVariant,
+  shortcutNumber
 }: DocumentTabProps): React.JSX.Element {
   return (
     <div
@@ -64,16 +66,22 @@ export function DocumentTab({
       <Tooltip content={tooltip} variant={tooltipVariant}>
         <span className="document-tab-label">{label}</span>
       </Tooltip>
-      <button
-        className="document-tab-close"
-        aria-label={closeLabel}
-        onClick={(event) => {
-          event.stopPropagation()
-          onClose()
-        }}
-      >
-        <X size={12} />
-      </button>
+      {shortcutNumber == null ? (
+        <button
+          className="document-tab-close"
+          aria-label={closeLabel}
+          onClick={(event) => {
+            event.stopPropagation()
+            onClose()
+          }}
+        >
+          <X size={12} />
+        </button>
+      ) : (
+        <span className="document-tab-shortcut" data-shortcut-number={shortcutNumber} aria-hidden="true">
+          ⌃{shortcutNumber}
+        </span>
+      )}
     </div>
   )
 }

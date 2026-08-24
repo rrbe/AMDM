@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   contextualTabDigitIndex,
   isAppShortcutEnabled,
+  isContextualTabHintModifier,
   isMacPlatform,
   isPrimaryShortcut,
   primaryDigitIndex
@@ -43,6 +44,12 @@ describe('keyboard shortcuts', () => {
   it('supports number-pad digits and rejects extra modifiers', () => {
     expect(contextualTabDigitIndex(event({ code: 'Numpad8', ctrlKey: true }), true)).toBe(7)
     expect(contextualTabDigitIndex(event({ code: 'Digit1', ctrlKey: true, shiftKey: true }), true)).toBeNull()
+  })
+
+  it('recognizes a bare macOS Control hold for contextual tab hints', () => {
+    expect(isContextualTabHintModifier(event({ key: 'Control', ctrlKey: true }), true)).toBe(true)
+    expect(isContextualTabHintModifier(event({ key: 'Control', ctrlKey: true, shiftKey: true }), true)).toBe(false)
+    expect(isContextualTabHintModifier(event({ key: 'Control', ctrlKey: true }), false)).toBe(false)
   })
 
   it('preserves Ctrl+number as the primary result-view shortcut off macOS', () => {

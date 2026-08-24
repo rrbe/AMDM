@@ -29,11 +29,14 @@ import {
   contextualTabDigitIndex,
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
+  isContextualTabHintModifier,
   isMacPlatform,
   isPrimaryShortcut,
   shortcutRegionFromTarget,
   type ShortcutRegion
 } from '@renderer/lib/keyboardShortcuts'
+
+const TAB_SHORTCUT_HINT_DELAY_MS = 500
 
 /**
  * The main work area: a tab strip, header (active connection + database +
@@ -66,6 +69,7 @@ export function ShellWorkspace(): React.JSX.Element {
   const [showSave, setShowSave] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
   const [expandedRegion, setExpandedRegion] = useState<'query' | 'results' | null>(null)
+  const [shortcutHintRegion, setShortcutHintRegion] = useState<ShortcutRegion | null>(null)
   const editorRef = useRef<ShellEditorHandle>(null)
   const lastShortcutRegion = useRef<ShortcutRegion>('query')
 
@@ -80,16 +84,57 @@ export function ShellWorkspace(): React.JSX.Element {
   }
 
   useEffect(() => {
+    const contextualTabsEnabled = isAppShortcutEnabled(
+      keyboardShortcutsEnabled,
+      disabledKeyboardShortcuts,
+      'contextualTabs'
+    )
+    if (!contextualTabsEnabled) {
+      setShortcutHintRegion(null)
+      return
+    }
+
+    const isMac = isMacPlatform()
+    let hintTimer: number | null = null
+    let modifierHeld = false
+    let hintVisible = false
+
+    const cancelHintTimer = (): void => {
+      if (hintTimer === null) return
+      window.clearTimeout(hintTimer)
+      hintTimer = null
+    }
+    const hideShortcutHints = (): void => {
+      modifierHeld = false
+      hintVisible = false
+      cancelHintTimer()
+      setShortcutHintRegion(null)
+    }
     const rememberRegion = (event: Event): void => {
       lastShortcutRegion.current = shortcutRegionFromTarget(event.target) ?? 'query'
+      if (hintVisible) setShortcutHintRegion(lastShortcutRegion.current)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (
-        !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'contextualTabs') ||
-        hasOpenShortcutLayer()
-      )
+      if (hasOpenShortcutLayer()) {
+        hideShortcutHints()
         return
-      const index = contextualTabDigitIndex(event, isMacPlatform())
+      }
+
+      if (isContextualTabHintModifier(event, isMac)) {
+        modifierHeld = true
+        if (!event.repeat && hintTimer === null && !hintVisible) {
+          hintTimer = window.setTimeout(() => {
+            hintTimer = null
+            if (!modifierHeld || hasOpenShortcutLayer()) return
+            hintVisible = true
+            setShortcutHintRegion(lastShortcutRegion.current)
+          }, TAB_SHORTCUT_HINT_DELAY_MS)
+        }
+        return
+      }
+
+      if (hintTimer !== null) cancelHintTimer()
+      const index = contextualTabDigitIndex(event, isMac)
       if (index == null) return
 
       const state = useAppStore.getState()
@@ -107,20 +152,33 @@ export function ShellWorkspace(): React.JSX.Element {
       event.preventDefault()
       state.setActiveTab(queryTab.id)
     }
+    const onKeyUp = (event: KeyboardEvent): void => {
+      if (event.key === 'Control' || !event.ctrlKey) hideShortcutHints()
+    }
+    const onVisibilityChange = (): void => {
+      if (document.hidden) hideShortcutHints()
+    }
 
     window.addEventListener('pointerdown', rememberRegion, true)
     window.addEventListener('focusin', rememberRegion, true)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', hideShortcutHints)
+    document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
+      cancelHintTimer()
       window.removeEventListener('pointerdown', rememberRegion, true)
       window.removeEventListener('focusin', rememberRegion, true)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', hideShortcutHints)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   return (
     <div className="work">
-      <TabBar />
+      <TabBar showShortcutHints={shortcutHintRegion === 'query'} />
       <div className="shell-body">
         <main className={`shell-main${expandedRegion ? ` ${expandedRegion}-expanded` : ''}`}>
           <div className="work-header" data-shortcut-region="query">
@@ -220,6 +278,7 @@ export function ShellWorkspace(): React.JSX.Element {
           <ResultPanel
             expanded={resultsExpanded}
             onExpandedChange={(expanded) => setExpandedRegion(expanded ? 'results' : null)}
+            showTabShortcutHints={shortcutHintRegion === 'result'}
           />
         </main>
 
@@ -239,7 +298,7 @@ export function ShellWorkspace(): React.JSX.Element {
  * The query-tab strip: one chip per open tab (label derived from its code), a
  * fixed status slot (spinner / failure dot), a close ✕, and a trailing "+".
  */
-function TabBar(): React.JSX.Element {
+function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const connections = useAppStore((s) => s.connections)
@@ -372,6 +431,7 @@ function TabBar(): React.JSX.Element {
                   <span className="qtab-error-dot" />
                 ) : null
               }
+              shortcutNumber={showShortcutHints && i < 9 ? i + 1 : undefined}
             />
           )
         })}
