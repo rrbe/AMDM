@@ -7,6 +7,8 @@
  */
 import type { ShellResult } from '@shared/types'
 
+export type ResultView = 'tree' | 'json' | 'table'
+
 /** The query that produced a result (refresh / paging / doc-edit target). */
 export interface ResultQuery {
   connectionId: string
@@ -100,6 +102,8 @@ export interface QueryTab {
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
   activeResultId: string | null
+  /** Selected Tree/JSON/Table view for this query tab. */
+  resultView: ResultView
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
@@ -121,6 +125,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     pristine: true,
     results: [],
     activeResultId: null,
+    resultView: 'tree',
     resultSeq: 0,
     running: false,
     stopping: false,

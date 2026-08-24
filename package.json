@@ -1,6 +1,6 @@
 {
   "name": "amdm",
-  "version": "26.8.15",
+  "version": "26.8.16",
   "description": "AMDM (Another Mongo Desktop Manager) — a lean, performance-first desktop GUI for MongoDB (NoSQLBooster alternative)",
   "main": "./out/main/index.js",
   "author": "shawn",

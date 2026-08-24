@@ -33,6 +33,29 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().activeTabId).toBe(c2Tab?.id)
   })
 
+  it('keeps the result view independent for each query tab', () => {
+    useAppStore.setState({
+      tabs: [
+        createTab('c1-tab', { connectionId: 'c1' }),
+        createTab('c2-tab', { connectionId: 'c2' })
+      ],
+      activeTabId: 'c1-tab',
+      activeConnectionId: 'c1'
+    })
+
+    useAppStore.getState().setResultView('json')
+    useAppStore.getState().setActiveTab('c2-tab')
+
+    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c1-tab')?.resultView).toBe('json')
+    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('tree')
+
+    useAppStore.getState().setResultView('table')
+    useAppStore.getState().setActiveTab('c1-tab')
+
+    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c1-tab')?.resultView).toBe('json')
+    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('table')
+  })
+
   it('loads a saved query into its bound connection without running it', () => {
     const execute = vi.fn()
     vi.stubGlobal('window', { api: { shell: { execute } } })

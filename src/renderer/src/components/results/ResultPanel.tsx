@@ -52,7 +52,7 @@ export function ResultPanel({
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
-  const view = useAppStore((s) => s.resultView)
+  const view = useAppStore((s) => getActiveTab(s).resultView)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)

@@ -3,7 +3,7 @@
  *
  * Holds: connections, the active connection, per-connection status,
  * the lazily-loaded catalog tree state, the active database, the shell editor
- * code, per-tab result strips, the chosen result view, and loading/error flags.
+ * code, per-tab result strips and views, and loading/error flags.
  *
  * All backend access happens here via `window.api`; components dispatch actions
  * and read state. Every async action catches rejections and surfaces relevant
@@ -56,7 +56,8 @@ import {
   pickActiveAfterClose,
   pickFillTarget,
   type QueryTab,
-  type ResultTab
+  type ResultTab,
+  type ResultView
 } from '@renderer/lib/tabs'
 import {
   dismissNotification as removeNotification,
@@ -71,9 +72,7 @@ import i18n from '@renderer/i18n'
 /** Shorthand for translating notification / error strings in the store. */
 const tr = i18n.t.bind(i18n)
 
-export type { QueryTab, ResultTab }
-
-export type ResultView = 'tree' | 'json' | 'table'
+export type { QueryTab, ResultTab, ResultView }
 
 /** Loaded children for a catalog node, keyed by a synthetic node id. */
 export interface CatalogState {
@@ -119,8 +118,6 @@ interface AppState {
   tabs: QueryTab[]
   /** Id of the focused tab (always references an existing tab; ≥1 tab exists). */
   activeTabId: string
-  /** Result view (Tree/JSON/Table) — a global UI preference, not per-tab. */
-  resultView: ResultView
 
   // ---- saved queries + history + autocomplete (Phase 2) ----
   savedQueries: SavedQuery[]
@@ -401,7 +398,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   tabs: [INITIAL_TAB],
   activeTabId: INITIAL_TAB.id,
-  resultView: 'tree',
 
   savedQueries: [],
   history: [],
@@ -984,7 +980,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setResultView(view) {
-    set({ resultView: view })
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { resultView: view }) }))
   },
 
   browseCollection(db, coll) {
