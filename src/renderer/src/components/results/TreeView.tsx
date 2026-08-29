@@ -461,25 +461,30 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
     },
     'separator',
     {
-      label: i18n.t('result.dataMenu.copyPureJson'),
-      onClick: () => void copyText(toPlainJson(formatted))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyMongoShell'),
-      onClick: () => void copyText(toShellText(formatted))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyExtendedJson'),
-      onClick: () => void copyText(toStrictEjson(formatted))
-    },
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copyCsv'),
-      onClick: () => void copyText(toCsv(docs, fieldSort))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyTsv'),
-      onClick: () => void copyText(toTsv(docs, fieldSort))
+      label: i18n.t('result.dataMenu.copySelectedDocuments'),
+      children: [
+        {
+          label: i18n.t('result.dataMenu.copyPureJson'),
+          onClick: () => void copyText(toPlainJson(formatted))
+        },
+        {
+          label: i18n.t('result.dataMenu.copyMongoShell'),
+          onClick: () => void copyText(toShellText(formatted))
+        },
+        {
+          label: i18n.t('result.dataMenu.copyExtendedJson'),
+          onClick: () => void copyText(toStrictEjson(formatted))
+        },
+        'separator',
+        {
+          label: i18n.t('result.dataMenu.copyCsv'),
+          onClick: () => void copyText(toCsv(docs, fieldSort))
+        },
+        {
+          label: i18n.t('result.dataMenu.copyTsv'),
+          onClick: () => void copyText(toTsv(docs, fieldSort))
+        }
+      ]
     }
   ]
 }
