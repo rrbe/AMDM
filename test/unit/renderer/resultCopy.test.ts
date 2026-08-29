@@ -8,6 +8,7 @@ import {
   toShellText,
   toStrictEjson,
   plainScalarText,
+  tableCellCopyText,
   toPlainKeyValue,
   formatJsonPreview,
   formatTextPreview,
@@ -50,6 +51,19 @@ describe('plainScalarText', () => {
     expect(plainScalarText(true)).toBe('true')
     expect(plainScalarText({ $undefined: true })).toBe('null')
     expect(plainScalarText({ a: 1 })).toBe('{\n  "a": 1\n}')
+  })
+})
+
+describe('tableCellCopyText', () => {
+  const docs = [{ name: 'AMDM', count: { $numberInt: '7' } }]
+
+  it('copies only the focused cell value', () => {
+    expect(tableCellCopyText(docs, { row: 0, col: 'name' })).toBe('AMDM')
+    expect(tableCellCopyText(docs, { row: 0, col: 'count' })).toBe('7')
+  })
+
+  it('defers copy when no cell is focused', () => {
+    expect(tableCellCopyText(docs, null)).toBeNull()
   })
 })
 

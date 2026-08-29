@@ -125,6 +125,16 @@ export function plainScalarText(value: unknown): string {
   return JSON.stringify(p, null, 2)
 }
 
+/** Plain-text payload for the focused Table cell; no focus defers to native copy. */
+export function tableCellCopyText(
+  docs: unknown[],
+  selectedCell: { row: number; col: string } | null
+): string | null {
+  if (!selectedCell) return null
+  const { present, value } = cellValue(docs[selectedCell.row], selectedCell.col)
+  return present ? plainScalarText(value) : ''
+}
+
 /** Plain-JSON field fragment for a context-menu "Copy Key-Value" action. */
 export function toPlainKeyValue(key: string, value: unknown): string {
   return `${JSON.stringify(key)}: ${JSON.stringify(toPlainValue(value), null, 2) ?? 'null'}`

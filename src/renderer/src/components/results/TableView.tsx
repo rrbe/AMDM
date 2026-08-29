@@ -14,6 +14,7 @@ import {
   copyText,
   formatJsonPreview,
   plainScalarText,
+  tableCellCopyText,
   toCsv,
   toPlainJson,
   toPlainKeyValue,
@@ -137,18 +138,10 @@ export function TableView({
 
   useEffect(() => rowVirtualizer.measure(), [fontSize, rowVirtualizer])
 
-  // Cmd/Ctrl+C: selected rows → a plain-JSON array; else the selected cell.
+  // Cmd/Ctrl+C copies the focused cell. Row/document copies live in the context menu.
   useCopyHotkey(() => {
     if (preview) return null
-    if (selectedRows.size > 0) {
-      const picked = rows.filter((row) => selectedRows.has(row.sourceIndex)).map((row) => row.doc)
-      return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
-    }
-    if (selectedCell) {
-      const { present, value } = cellValue(docs[selectedCell.row], selectedCell.col)
-      return present ? plainScalarText(value) : ''
-    }
-    return null
+    return tableCellCopyText(docs, selectedCell)
   })
 
   // Core row-selection logic shared by cell clicks and the # handle: plain = just
