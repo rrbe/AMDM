@@ -420,15 +420,17 @@
     "expandResults": "Expand results",
     "restoreEditor": "Restore editor",
     "copy": {
-      "jsonArray": "Copy as JSON Array",
-      "jsonLines": "Copy as JSONL / NDJSON",
+      "plainJson": "Copy as Plain JSON",
+      "relaxedEjson": "Copy as Relaxed EJSON",
+      "canonicalEjson": "Copy as Canonical EJSON",
       "mongoShell": "Copy as MongoDB Document",
       "csv": "Copy as CSV",
       "tsv": "Copy as TSV"
     },
     "export": {
-      "jsonArray": "JSON Array",
-      "jsonLines": "JSONL / NDJSON",
+      "plainJson": "Plain JSON",
+      "relaxedEjson": "Relaxed EJSON",
+      "canonicalEjson": "Canonical EJSON",
       "bson": "BSON",
       "csv": "CSV",
       "tsv": "TSV",
@@ -525,6 +527,10 @@
       "plain": "BSON types such as ObjectId, Date, and Decimal128 become strings or numbers and are not restored automatically when imported again.",
       "relaxed": "The readable MongoDB Extended JSON mode. It preserves special types such as ObjectId and Date, while Int32, Int64, and Double become ordinary JSON numbers without their exact numeric types.",
       "canonical": "The exact MongoDB Extended JSON mode. It uses wrappers such as $oid, $date, $numberInt, and $numberLong to preserve BSON types for lossless re-import, but is more verbose."
+    },
+    "layoutHelp": {
+      "array": "Stores all documents in one JSON array, suitable for standard JSON tools that read the data at once.",
+      "jsonl": "Writes data line by line, with each line containing one complete JSON object; suitable for streaming and large datasets."
     },
     "destination": "Destination",
     "exportDirectory": "Export directory",

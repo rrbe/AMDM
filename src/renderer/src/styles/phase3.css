@@ -64,6 +64,26 @@
   font-size: 16px;
   line-height: 1;
 }
+.ctx-submenu-with-help {
+  position: relative;
+}
+.ctx-submenu-with-help:hover > .ctx-item {
+  background: var(--interaction-hover);
+}
+.ctx-item-with-help {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px 20px;
+}
+.ctx-item-with-help .ctx-label {
+  min-width: 0;
+}
+.ctx-item-with-help .ctx-submenu-arrow {
+  display: inline-flex;
+  width: 20px;
+  margin-left: 0;
+  align-items: center;
+  justify-content: center;
+}
 .ctx-item[data-popup-open] .ctx-submenu-arrow,
 .ctx-item[data-highlighted] .ctx-submenu-arrow {
   color: inherit;

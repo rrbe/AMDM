@@ -60,7 +60,7 @@ function MenuHelp({ label, description }: { label: string; description: ReactNod
     >
       <span
         ref={triggerRef}
-        className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center text-[var(--fg-3)] outline-none hover:text-inherit focus-visible:rounded-sm focus-visible:text-inherit focus-visible:shadow-[0_0_0_2px_var(--focus-soft)]"
+        className="ctx-menu-help inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center text-[var(--fg-3)] outline-none hover:text-inherit focus-visible:rounded-sm focus-visible:text-inherit focus-visible:shadow-[0_0_0_2px_var(--focus-soft)]"
         role="button"
         tabIndex={0}
         aria-label={typeof description === 'string' ? `${label}: ${description}` : label}
@@ -87,14 +87,26 @@ function MenuEntries({ items }: { items: MenuEntry[] }): React.JSX.Element {
         if ('children' in item) {
           return (
             <BaseMenu.SubmenuRoot key={index}>
-              <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
-                {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
-                <span className="ctx-label">{item.label}</span>
-                {item.description != null && <MenuHelp label={item.label} description={item.description} />}
-                <span className="ctx-submenu-arrow" aria-hidden="true">
-                  ›
-                </span>
-              </BaseMenu.SubmenuTrigger>
+              {item.description != null ? (
+                <div className="ctx-submenu-with-help">
+                  <BaseMenu.SubmenuTrigger className="ctx-item ctx-item-with-help" disabled={item.disabled} openOnHover>
+                    {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
+                    <span className="ctx-label">{item.label}</span>
+                    <MenuHelp label={item.label} description={item.description} />
+                    <span className="ctx-submenu-arrow" aria-hidden="true">
+                      ›
+                    </span>
+                  </BaseMenu.SubmenuTrigger>
+                </div>
+              ) : (
+                <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
+                  {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
+                  <span className="ctx-label">{item.label}</span>
+                  <span className="ctx-submenu-arrow" aria-hidden="true">
+                    ›
+                  </span>
+                </BaseMenu.SubmenuTrigger>
+              )}
               <BaseMenu.Portal>
                 <BaseMenu.Positioner
                   className="ui-menu-positioner"

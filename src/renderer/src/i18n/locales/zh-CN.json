@@ -420,15 +420,17 @@
     "expandResults": "展开结果区",
     "restoreEditor": "恢复编辑区",
     "copy": {
-      "jsonArray": "复制为 JSON Array",
-      "jsonLines": "复制为 JSONL / NDJSON",
+      "plainJson": "复制为 Plain JSON",
+      "relaxedEjson": "复制为 Relaxed EJSON",
+      "canonicalEjson": "复制为 Canonical EJSON",
       "mongoShell": "复制为 MongoDB 文档",
       "csv": "复制为 CSV",
       "tsv": "复制为 TSV"
     },
     "export": {
-      "jsonArray": "JSON Array",
-      "jsonLines": "JSONL / NDJSON",
+      "plainJson": "Plain JSON",
+      "relaxedEjson": "Relaxed EJSON",
+      "canonicalEjson": "Canonical EJSON",
       "bson": "BSON",
       "csv": "CSV",
       "tsv": "TSV",
@@ -525,6 +527,10 @@
       "plain": "ObjectId、Date、Decimal128 等 BSON 类型会转换为字符串或数字；重新导入时不会自动恢复原始类型。",
       "relaxed": "MongoDB Extended JSON 的易读模式。保留 ObjectId、Date 等特殊类型；Int32、Int64、Double 等数值会输出为普通 JSON 数字，不保留具体数值类型。",
       "canonical": "MongoDB Extended JSON 的精确模式。使用 $oid、$date、$numberInt、$numberLong 等类型包装器完整保留 BSON 类型，适合无损重新导入，但内容更冗长。"
+    },
+    "layoutHelp": {
+      "array": "将所有文档保存为一个 JSON 数组，适合普通 JSON 工具一次性读取。",
+      "jsonl": "逐行写入数据，每行对应一个完整的 JSON 对象，适合流式处理和大型数据集。"
     },
     "destination": "保存位置",
     "exportDirectory": "导出目录",

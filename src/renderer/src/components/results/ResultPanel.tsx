@@ -25,7 +25,7 @@ import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { jsonCopyMenuItems } from './documentFormatMenus'
 
 const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
@@ -327,11 +327,7 @@ export function ResultPanel({
             ...jsonCopyMenuItems(docs, copyWithFeedback),
             { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
             { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
-            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) },
-            'separator',
-            ...resultExportMenuItems(docs, (format, _documents, jsonEncoding) =>
-              setExportModal({ format, jsonEncoding })
-            )
+            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
         />
       )}
