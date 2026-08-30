@@ -1,7 +1,8 @@
-import { type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Select as BaseSelect } from '@base-ui/react/select'
-import { ChevronDown, Check } from 'lucide-react'
+import { ChevronDown, Check, CircleHelp } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
+import { Tooltip } from './Tooltip'
 
 /**
  * Thin wrapper over Base UI Select — replaces the raw `<select>` elements. Driven
@@ -17,6 +18,8 @@ export interface SelectOption<T> {
   label: ReactNode
   value: T
   disabled?: boolean
+  /** Optional explanation shown only beside this option in the open popup. */
+  description?: ReactNode
 }
 
 interface SelectProps<T> {
@@ -36,6 +39,37 @@ interface SelectProps<T> {
   'aria-label'?: string
 }
 
+function SelectOptionHelp({ label, description }: { label: ReactNode; description: ReactNode }): React.JSX.Element {
+  const triggerRef = useRef<HTMLSpanElement>(null)
+  return (
+    <Tooltip
+      content={description}
+      variant="text"
+      delay={100}
+      anchor={() => triggerRef.current?.closest('.amdm-select-popup') ?? null}
+      align="end"
+    >
+      <span
+        ref={triggerRef}
+        className="inline-flex h-5 w-5 cursor-help items-center justify-center text-muted-foreground outline-none hover:text-foreground focus-visible:rounded-sm focus-visible:text-foreground focus-visible:shadow-[0_0_0_2px_var(--focus-soft)]"
+        role="button"
+        tabIndex={0}
+        aria-label={
+          typeof label === 'string' && typeof description === 'string' ? `${label}: ${description}` : undefined
+        }
+        onPointerDown={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <CircleHelp size={13} />
+      </span>
+    </Tooltip>
+  )
+}
+
 export function Select<T extends string | number = string>({
   value,
   onChange,
@@ -50,6 +84,8 @@ export function Select<T extends string | number = string>({
   popupClassName,
   'aria-label': ariaLabel
 }: SelectProps<T>): React.JSX.Element {
+  const hasDescriptions = options.some((option) => option.description != null)
+
   return (
     <BaseSelect.Root
       items={options as ReadonlyArray<{ label: ReactNode; value: T }>}
@@ -88,7 +124,7 @@ export function Select<T extends string | number = string>({
         >
           <BaseSelect.Popup
             className={cn(
-              'max-h-[var(--available-height)] min-w-[var(--anchor-width)] overflow-y-auto rounded-[var(--radius-control)] border border-[var(--separator-strong)] bg-[var(--surface-elevated)] p-1 shadow-[var(--shadow-popover)]',
+              'amdm-select-popup max-h-[var(--available-height)] min-w-[var(--anchor-width)] overflow-y-auto rounded-[var(--radius-control)] border border-[var(--separator-strong)] bg-[var(--surface-elevated)] p-1 shadow-[var(--shadow-popover)]',
               popupClassName
             )}
           >
@@ -101,10 +137,25 @@ export function Select<T extends string | number = string>({
                   disabled={o.disabled}
                   className="flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[var(--interaction-hover)] data-[highlighted]:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-50"
                 >
-                  <BaseSelect.ItemText>{o.label}</BaseSelect.ItemText>
-                  <BaseSelect.ItemIndicator className="ml-auto inline-flex text-[var(--primary)]">
-                    <Check size={14} />
-                  </BaseSelect.ItemIndicator>
+                  <BaseSelect.ItemText className="min-w-0 flex-1">{o.label}</BaseSelect.ItemText>
+                  {hasDescriptions ? (
+                    <>
+                      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
+                        {o.description != null && (
+                          <SelectOptionHelp label={o.label} description={o.description} />
+                        )}
+                      </span>
+                      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
+                        <BaseSelect.ItemIndicator className="inline-flex text-[var(--primary)]">
+                          <Check size={14} />
+                        </BaseSelect.ItemIndicator>
+                      </span>
+                    </>
+                  ) : (
+                    <BaseSelect.ItemIndicator className="ml-auto inline-flex text-[var(--primary)]">
+                      <Check size={14} />
+                    </BaseSelect.ItemIndicator>
+                  )}
                 </BaseSelect.Item>
               ))}
             </BaseSelect.List>

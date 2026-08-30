@@ -12,6 +12,8 @@ import {
   toPlainKeyValue,
   formatJsonPreview,
   formatTextPreview,
+  toEncodedJsonArray,
+  toEncodedJsonLines,
   toCsv,
   toTsv
 } from '@renderer/lib/resultCopy'
@@ -125,6 +127,22 @@ describe('toPlainJson / toStrictEjson / toShellText', () => {
   })
   it('toShellText renders shell-style scalars', () => {
     expect(toShellText(doc)).toBe(`{\n  "_id": ObjectId("${OID}"),\n  "n": 5\n}`)
+  })
+})
+
+describe('JSON Array / JSONL encoding', () => {
+  const documents = [{ _id: { $oid: OID }, n: { $numberInt: '5' } }]
+
+  it('writes Plain JSON without EJSON wrappers', () => {
+    expect(toEncodedJsonArray(documents, 'plain')).toBe(`[\n  {\n    "_id": "${OID}",\n    "n": 5\n  }\n]`)
+  })
+
+  it('writes Relaxed EJSON with readable numeric values', () => {
+    expect(toEncodedJsonLines(documents, 'relaxed')).toBe(`{"_id":{"$oid":"${OID}"},"n":5}`)
+  })
+
+  it('writes Canonical EJSON with exact numeric wrappers', () => {
+    expect(toEncodedJsonLines(documents, 'canonical')).toBe(`{"_id":{"$oid":"${OID}"},"n":{"$numberInt":"5"}}`)
   })
 })
 

@@ -29,6 +29,7 @@ import {
   openExportedFile,
   revealExportedFile
 } from '../../../src/main/io/exporter'
+import { decodeBsonFile } from '../../../src/main/io/bsonFileCore'
 
 function owner(id: number): WebContents {
   return {
@@ -91,6 +92,107 @@ describe('open exported file', () => {
       'Exported file is no longer available.'
     )
     expect(electron.openPath).toHaveBeenCalledTimes(1)
+  })
+
+  it('exports result documents as a canonical JSON array', async () => {
+    const exportingOwner = owner(1)
+    const directory = await chooseExportDirectory(null, exportingOwner, outputDir)
+    const result = await exportData(
+      {
+        taskId: 'json-export',
+        source: 'result',
+        format: 'json',
+        jsonEncoding: 'canonical',
+        documents: [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '42' } }],
+        destination: {
+          directorySelectionId: directory!.selectionId,
+          fileName: 'result'
+        }
+      },
+      null,
+      exportingOwner
+    )
+
+    const filePath = join(outputDir, 'result.json')
+    expect(result).toMatchObject({ ok: true, filePath, count: 1 })
+    expect(readFileSync(filePath, 'utf8')).toBe(
+      '[\n{"_id":{"$oid":"64b7f0f0f0f0f0f0f0f0f0f0"},"count":{"$numberLong":"42"}}\n]\n'
+    )
+  })
+
+  it('exports result documents as plain JSONL', async () => {
+    const exportingOwner = owner(1)
+    const directory = await chooseExportDirectory(null, exportingOwner, outputDir)
+    const result = await exportData(
+      {
+        taskId: 'jsonl-export',
+        source: 'result',
+        format: 'jsonl',
+        jsonEncoding: 'plain',
+        documents: [
+          { _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '9007199254740993' } },
+          { name: 'Ada' }
+        ],
+        destination: {
+          directorySelectionId: directory!.selectionId,
+          fileName: 'result'
+        }
+      },
+      null,
+      exportingOwner
+    )
+
+    const filePath = join(outputDir, 'result.jsonl')
+    expect(result).toMatchObject({ ok: true, filePath, count: 2 })
+    expect(readFileSync(filePath, 'utf8')).toBe(
+      '{"_id":"64b7f0f0f0f0f0f0f0f0f0f0","count":"9007199254740993"}\n{"name":"Ada"}\n'
+    )
+  })
+
+  it('exports result documents as BSON', async () => {
+    const exportingOwner = owner(1)
+    const directory = await chooseExportDirectory(null, exportingOwner, outputDir)
+    const result = await exportData(
+      {
+        taskId: 'bson-export',
+        source: 'result',
+        format: 'bson',
+        documents: [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '42' } }],
+        destination: {
+          directorySelectionId: directory!.selectionId,
+          fileName: 'result'
+        }
+      },
+      null,
+      exportingOwner
+    )
+
+    const filePath = join(outputDir, 'result.bson')
+    expect(result).toMatchObject({ ok: true, filePath, count: 1 })
+    const [document] = decodeBsonFile(readFileSync(filePath))
+    expect(document._id.toHexString()).toBe('64b7f0f0f0f0f0f0f0f0f0f0')
+    expect(document.count.toString()).toBe('42')
+  })
+
+  it('rejects non-document values in BSON result exports', async () => {
+    const exportingOwner = owner(1)
+    const directory = await chooseExportDirectory(null, exportingOwner, outputDir)
+    const result = await exportData(
+      {
+        taskId: 'invalid-bson-export',
+        source: 'result',
+        format: 'bson',
+        documents: ['not a document'],
+        destination: {
+          directorySelectionId: directory!.selectionId,
+          fileName: 'result'
+        }
+      },
+      null,
+      exportingOwner
+    )
+
+    expect(result).toMatchObject({ ok: false, error: 'BSON export requires top-level document values.' })
   })
 
   it('reveals only the latest completed export owned by the requesting Renderer', async () => {

@@ -16,83 +16,20 @@
 import { isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
 import { cellValue, deriveColumns } from './tableShape'
-import type { CollectionSort } from '@shared/types'
+import type { CollectionSort, JsonEncoding } from '@shared/types'
+import { encodeCanonicalJson, toPlainJsonValue, unwrapEjsonWrapper } from '@shared/jsonSerialization'
 import { useAppStore } from '@renderer/store/useAppStore'
 import i18n from '@renderer/i18n'
 
 type Dict = Record<string, unknown>
 
-function isObject(v: unknown): v is Dict {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
-
-/** Render a `$date` payload (string | { $numberLong } | number) as ISO. */
-function dateToIso(payload: unknown): string {
-  if (typeof payload === 'string') return payload
-  if (isObject(payload) && '$numberLong' in payload) {
-    const ms = Number(payload['$numberLong'])
-    if (!Number.isNaN(ms)) return new Date(ms).toISOString()
-  }
-  if (typeof payload === 'number') return new Date(payload).toISOString()
-  return String(payload)
-}
-
-/** Collapse an EJSON extended-type wrapper to a plain JSON value. */
-function unwrapExtended(o: Dict, recurse: (value: unknown) => unknown = toPlainValue): unknown {
-  if ('$oid' in o) return String(o['$oid'])
-  if ('$date' in o) return dateToIso(o['$date'])
-  if ('$numberInt' in o) return Number(o['$numberInt'])
-  if ('$numberLong' in o) {
-    const s = String(o['$numberLong'])
-    const n = Number(s)
-    // Keep precision: only emit a JS number when it round-trips losslessly.
-    return Number.isSafeInteger(n) ? n : s
-  }
-  if ('$numberDouble' in o) {
-    const n = Number(o['$numberDouble'])
-    // Infinity / NaN can't be JSON numbers — keep the canonical token string.
-    return Number.isFinite(n) ? n : String(o['$numberDouble'])
-  }
-  if ('$numberDecimal' in o) return String(o['$numberDecimal']) // precision
-  if ('$binary' in o) {
-    const bin = o['$binary']
-    return isObject(bin) ? String(bin['base64'] ?? '') : String(bin) // legacy: string
-  }
-  if ('$regularExpression' in o) {
-    const re = o['$regularExpression']
-    if (isObject(re)) return `/${String(re['pattern'] ?? '')}/${String(re['options'] ?? '')}`
-    return '/regex/'
-  }
-  if ('$timestamp' in o) {
-    const ts = o['$timestamp']
-    if (isObject(ts)) return { t: Number(ts['t'] ?? 0), i: Number(ts['i'] ?? 0) }
-    return String(ts)
-  }
-  if ('$minKey' in o) return 'MinKey'
-  if ('$maxKey' in o) return 'MaxKey'
-  if ('$undefined' in o) return null
-  if ('$symbol' in o) return String(o['$symbol'])
-  if ('$code' in o) {
-    return '$scope' in o ? { code: String(o['$code']), scope: recurse(o['$scope']) } : String(o['$code'])
-  }
-  if ('$ref' in o && '$id' in o) {
-    const out: Dict = { $ref: String(o['$ref']), $id: recurse(o['$id']) }
-    if (o['$db'] !== undefined) out['$db'] = String(o['$db'])
-    return out
-  }
-  return o // unreachable for known wrappers; pass through defensively
+function isObject(value: unknown): value is Dict {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Recursively collapse an EJSON-canonical value to plain JSON-friendly data. */
 export function toPlainValue(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(toPlainValue)
-  if (isObject(v)) {
-    if (isExtended(v)) return unwrapExtended(v)
-    const out: Dict = {}
-    for (const [k, val] of Object.entries(v)) out[k] = toPlainValue(val)
-    return out
-  }
-  return v
+  return toPlainJsonValue(v)
 }
 
 /** Default copy format — extended types collapsed to ordinary JSON. */
@@ -110,6 +47,20 @@ export function toShellText(value: unknown): string {
 /** Strict canonical EJSON (the wire form as-is). */
 export function toStrictEjson(value: unknown): string {
   return JSON.stringify(value, null, 2)
+}
+
+/** JSON Array using the selected plain/relaxed/canonical representation. */
+export function toEncodedJsonArray(documents: unknown[], encoding: JsonEncoding): string {
+  return JSON.stringify(
+    documents.map((document) => encodeCanonicalJson(document, encoding)),
+    null,
+    2
+  )
+}
+
+/** JSON Lines / NDJSON using the selected representation, one compact document per line. */
+export function toEncodedJsonLines(documents: unknown[], encoding: JsonEncoding): string {
+  return documents.map((document) => JSON.stringify(encodeCanonicalJson(document, encoding))).join('\n')
 }
 
 /**
@@ -212,7 +163,7 @@ function buildPreviewValue(
 
   if (isObject(value)) {
     if (isExtended(value)) {
-      const unwrapped = unwrapExtended(value, (nested) =>
+      const unwrapped = unwrapEjsonWrapper(value, (nested) =>
         buildPreviewValue(nested, depth + 1, budget, maxDepth, maxStringChars)
       )
       return buildPreviewValue(unwrapped, depth, budget, maxDepth, maxStringChars)

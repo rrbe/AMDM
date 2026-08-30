@@ -3,9 +3,10 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { indentFor, toJsonLines, type JsonLine } from '@renderer/lib/format'
-import { ContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu'
-import { copyText, toPlainJson, toShellText, toStrictEjson } from '@renderer/lib/resultCopy'
+import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
+import { copyText, toPlainJson, toShellText } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { jsonCopyMenuItems } from './documentFormatMenus'
 
 /**
  * Pretty-printed EJSON, virtualized BY LINE.
@@ -37,7 +38,7 @@ export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element 
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const [allSelected, setAllSelected] = useState(false)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
   const lines = useMemo<JsonLine[]>(() => toJsonLines(value), [value])
@@ -78,10 +79,10 @@ export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element 
     e.preventDefault()
     const sel = window.getSelection()
     const selText = sel && !sel.isCollapsed ? sel.toString() : ''
-    const items: ContextMenuItem[] = [
-      { label: i18n.t('result.copy.pureJson'), onClick: () => void copyText(toPlainJson(value)) },
-      { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(value)) },
-      { label: i18n.t('result.copy.extendedJson'), onClick: () => void copyText(toStrictEjson(value)) }
+    const documents = Array.isArray(value) ? value : [value]
+    const items: ContextMenuEntry[] = [
+      ...jsonCopyMenuItems(documents, (text) => void copyText(text)),
+      { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(value)) }
     ]
     if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })

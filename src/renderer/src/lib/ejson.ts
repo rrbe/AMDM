@@ -22,6 +22,7 @@
  * runtime checks rather than trusting a shared type, since the shape is dynamic.
  */
 import type { CollectionSort } from '@shared/types'
+import { isEjsonWrapper } from '@shared/jsonSerialization'
 
 export type ValueType =
   | 'objectId'
@@ -69,40 +70,7 @@ function hasKey(obj: Dict, key: string): boolean {
  * though they are technically objects.
  */
 export function isExtended(value: unknown): boolean {
-  if (!isPlainObject(value)) return false
-  const keys = Object.keys(value)
-  if (keys.length === 0) return false
-
-  // Single-marker wrappers.
-  if (keys.length === 1) {
-    switch (keys[0]) {
-      case '$oid':
-      case '$date':
-      case '$numberLong':
-      case '$numberInt':
-      case '$numberDouble':
-      case '$numberDecimal':
-      case '$binary':
-      case '$regularExpression':
-      case '$timestamp':
-      case '$minKey':
-      case '$maxKey':
-      case '$undefined':
-      case '$symbol':
-      case '$code': // bare Code (no scope) — canonical EJSON is single-key
-        return true
-      default:
-        return false
-    }
-  }
-
-  // Multi-key wrappers.
-  if (hasKey(value, '$code')) return true // { $code, $scope? }
-  if (hasKey(value, '$ref') && hasKey(value, '$id')) return true // DBRef
-  // Legacy/shell binary form: { $binary, $type }
-  if (hasKey(value, '$binary')) return true
-
-  return false
+  return isEjsonWrapper(value)
 }
 
 /** Coerce an EJSON number wrapper's inner value to a string for display. */

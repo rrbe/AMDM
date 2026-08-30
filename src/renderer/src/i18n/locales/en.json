@@ -420,16 +420,19 @@
     "expandResults": "Expand results",
     "restoreEditor": "Restore editor",
     "copy": {
-      "pureJson": "Copy as JSON",
+      "jsonArray": "Copy as JSON Array",
+      "jsonLines": "Copy as JSONL / NDJSON",
       "mongoShell": "Copy as MongoDB Document",
-      "extendedJson": "Copy as Extended JSON",
       "csv": "Copy as CSV",
       "tsv": "Copy as TSV"
     },
     "export": {
-      "csv": "Export as CSV…",
-      "tsv": "Export as TSV…",
-      "xlsx": "Export as Excel…"
+      "jsonArray": "JSON Array",
+      "jsonLines": "JSONL / NDJSON",
+      "bson": "BSON",
+      "csv": "CSV",
+      "tsv": "TSV",
+      "xlsx": "Excel"
     },
     "dataMenu": {
       "view": "View",
@@ -440,9 +443,7 @@
       "copyValue": "Copy Field Value",
       "copyKeyValue": "Copy Field Name and Value",
       "copySelectedDocuments": "Copy Selected Documents",
-      "copyPureJson": "JSON",
       "copyMongoShell": "MongoDB Shell",
-      "copyExtendedJson": "MongoDB Extended JSON",
       "copyCsv": "CSV",
       "copyTsv": "TSV"
     },
@@ -508,8 +509,9 @@
     "exportCollection": "Export",
     "importCollection": "Import",
     "exportTitle": "Export",
-    "exportDescription": "Choose an export range when available, a file format, and a destination. Nested values stay in a single cell as compact JSON.",
+    "exportDescription": "Choose an export range, file format, and destination. JSON formats provide a separate BSON type encoding choice.",
     "importTitle": "Import — {{target}}",
+    "importDescription": "Choose a file to automatically detect JSON, JSONL / NDJSON, Relaxed / Canonical EJSON, CSV, TSV, Excel, or BSON.",
     "close": "Close",
     "closeAndStop": "Close and stop",
     "stop": "Stop",
@@ -518,6 +520,12 @@
     "importBtn": "Import",
     "format": "Format",
     "fileFormat": "File format",
+    "jsonEncoding": "JSON encoding",
+    "encodingHelp": {
+      "plain": "BSON types such as ObjectId, Date, and Decimal128 become strings or numbers and are not restored automatically when imported again.",
+      "relaxed": "The readable MongoDB Extended JSON mode. It preserves special types such as ObjectId and Date, while Int32, Int64, and Double become ordinary JSON numbers without their exact numeric types.",
+      "canonical": "The exact MongoDB Extended JSON mode. It uses wrappers such as $oid, $date, $numberInt, and $numberLong to preserve BSON types for lossless re-import, but is more verbose."
+    },
     "destination": "Destination",
     "exportDirectory": "Export directory",
     "exportDirectoryPlaceholder": "Choose an export directory",
@@ -546,7 +554,6 @@
     "lineEndingCrlf": "CRLF (usually Windows)",
     "lineEndingLf": "LF (usually macOS / Linux)",
     "worksheetName": "Worksheet",
-    "jsonArray": "Array (otherwise NDJSON)",
     "queryFilter": "Query filter (EJSON, optional)",
     "limitPlaceholder": "all",
     "limit": "Limit (optional)",

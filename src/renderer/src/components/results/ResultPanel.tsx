@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type ShellResult, type TabularExportFormat } from '@shared/types'
+import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
-import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
+import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
@@ -25,6 +25,7 @@ import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
+import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 
 const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
@@ -71,7 +72,8 @@ export function ResultPanel({
     )
   }, [])
   const [exportModal, setExportModal] = useState<{
-    format: TabularExportFormat
+    format: ResultExportFormat
+    jsonEncoding?: JsonEncoding
     fixedDocuments?: unknown[]
   } | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -225,8 +227,8 @@ export function ResultPanel({
   const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
     .filter((index) => index >= 0 && index < docs.length)
     .map((index) => docs[index])
-  const openSelectionExport = (format: TabularExportFormat, documents: unknown[]): void => {
-    setExportModal({ format, fixedDocuments: documents })
+  const openSelectionExport = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding): void => {
+    setExportModal({ format, jsonEncoding, fixedDocuments: documents })
   }
   const closeExport = (): void => {
     setExportModal(null)
@@ -322,24 +324,14 @@ export function ResultPanel({
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            { label: t('result.copy.pureJson'), onClick: () => copyWithFeedback(toPlainJson(docs)) },
+            ...jsonCopyMenuItems(docs, copyWithFeedback),
             { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
-            { label: t('result.copy.extendedJson'), onClick: () => copyWithFeedback(toStrictEjson(docs)) },
             { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
             { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) },
             'separator',
-            {
-              label: t('result.export.csv'),
-              onClick: () => setExportModal({ format: 'csv' })
-            },
-            {
-              label: t('result.export.tsv'),
-              onClick: () => setExportModal({ format: 'tsv' })
-            },
-            {
-              label: t('result.export.xlsx'),
-              onClick: () => setExportModal({ format: 'xlsx' })
-            }
+            ...resultExportMenuItems(docs, (format, _documents, jsonEncoding) =>
+              setExportModal({ format, jsonEncoding })
+            )
           ]}
         />
       )}
@@ -356,6 +348,7 @@ export function ResultPanel({
             suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
           }}
           initialFormat={exportModal.format}
+          initialJsonEncoding={exportModal.jsonEncoding}
           onClose={closeExport}
         />
       )}

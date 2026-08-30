@@ -420,16 +420,19 @@
     "expandResults": "展開結果區",
     "restoreEditor": "恢復編輯區",
     "copy": {
-      "pureJson": "複製為 JSON",
+      "jsonArray": "複製為 JSON Array",
+      "jsonLines": "複製為 JSONL / NDJSON",
       "mongoShell": "複製為 MongoDB 文件",
-      "extendedJson": "複製為擴展 JSON",
       "csv": "複製為 CSV",
       "tsv": "複製為 TSV"
     },
     "export": {
-      "csv": "匯出為 CSV…",
-      "tsv": "匯出為 TSV…",
-      "xlsx": "匯出為 Excel…"
+      "jsonArray": "JSON Array",
+      "jsonLines": "JSONL / NDJSON",
+      "bson": "BSON",
+      "csv": "CSV",
+      "tsv": "TSV",
+      "xlsx": "Excel"
     },
     "dataMenu": {
       "view": "檢視",
@@ -440,9 +443,7 @@
       "copyValue": "複製欄位值",
       "copyKeyValue": "複製欄位名稱和值",
       "copySelectedDocuments": "複製所選文件",
-      "copyPureJson": "JSON",
       "copyMongoShell": "MongoDB Shell",
-      "copyExtendedJson": "MongoDB Extended JSON",
       "copyCsv": "CSV",
       "copyTsv": "TSV"
     },
@@ -508,8 +509,9 @@
     "exportCollection": "匯出",
     "importCollection": "匯入",
     "exportTitle": "匯出",
-    "exportDescription": "在可選時選擇匯出範圍、檔案格式和儲存位置；巢狀值會以精簡 JSON 儲存在單一儲存格中。",
+    "exportDescription": "選擇匯出範圍、檔案格式和儲存位置；JSON 格式可另外選擇 BSON 類型編碼。",
     "importTitle": "匯入 — {{target}}",
+    "importDescription": "選擇檔案後自動辨識 JSON、JSONL / NDJSON、Relaxed / Canonical EJSON、CSV、TSV、Excel 和 BSON。",
     "close": "關閉",
     "closeAndStop": "關閉並停止",
     "stop": "停止",
@@ -518,6 +520,12 @@
     "importBtn": "匯入",
     "format": "格式",
     "fileFormat": "檔案格式",
+    "jsonEncoding": "JSON 編碼",
+    "encodingHelp": {
+      "plain": "ObjectId、Date、Decimal128 等 BSON 類型會轉換為字串或數字；重新匯入時不會自動還原原始類型。",
+      "relaxed": "MongoDB Extended JSON 的易讀模式。保留 ObjectId、Date 等特殊類型；Int32、Int64、Double 等數值會輸出為一般 JSON 數字，不保留具體數值類型。",
+      "canonical": "MongoDB Extended JSON 的精確模式。使用 $oid、$date、$numberInt、$numberLong 等類型包裝器完整保留 BSON 類型，適合無損重新匯入，但內容較冗長。"
+    },
     "destination": "儲存位置",
     "exportDirectory": "匯出目錄",
     "exportDirectoryPlaceholder": "請選擇匯出目錄",
@@ -546,7 +554,6 @@
     "lineEndingCrlf": "CRLF（通常用於 Windows）",
     "lineEndingLf": "LF（通常用於 macOS / Linux）",
     "worksheetName": "工作表名稱",
-    "jsonArray": "陣列模式（否則為 NDJSON）",
     "queryFilter": "查詢篩選器（EJSON，選填）",
     "limitPlaceholder": "全部",
     "limit": "筆數限制（選填）",

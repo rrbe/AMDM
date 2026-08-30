@@ -418,9 +418,11 @@ export interface DocMutateResult {
 // Import / export (Phase 3)
 // ---------------------------------------------------------------------------
 
-export type ImportFormat = 'json' | 'csv' | 'xlsx' | 'bson'
 export type TabularExportFormat = 'csv' | 'tsv' | 'xlsx'
-export type ExportFormat = 'json' | TabularExportFormat | 'bson'
+export type JsonExportFormat = 'json' | 'jsonl'
+export type JsonEncoding = 'plain' | 'relaxed' | 'canonical'
+export type ResultExportFormat = JsonExportFormat | TabularExportFormat | 'bson'
+export type ExportFormat = ResultExportFormat
 export type TabularDelimiter = ',' | ';' | ' ' | '\t' | '/' | '-' | '.'
 
 /** Owner-scoped directory capability returned by the native directory picker. */
@@ -449,6 +451,8 @@ interface ExportOptions {
   delimiter?: TabularDelimiter
   /** XLSX worksheet name; sanitized again in main before writing. */
   worksheetName?: string
+  /** JSON/JSONL: how canonical EJSON values are represented in the output. */
+  jsonEncoding?: JsonEncoding
   /** Keep exported columns consistent with the Table view. */
   fieldSort?: CollectionSort
 }
@@ -462,15 +466,13 @@ export interface CollectionExportRequest extends ExportOptions {
   query?: string
   /** Optional cap on documents exported. */
   limit?: number
-  /** json: true = single array, false = newline-delimited (NDJSON). */
-  jsonArray?: boolean
   /** bson: gzip the output (writes a `.bson.gz`). */
   gzip?: boolean
 }
 
 export interface ResultExportRequest extends ExportOptions {
   source: 'result'
-  format: TabularExportFormat
+  format: ResultExportFormat
   /** EJSON-canonical, structured-cloneable documents already loaded by Renderer. */
   documents: unknown[]
 }
@@ -482,7 +484,6 @@ export interface ImportRequest {
   connectionId: string
   database: string
   collection: string
-  format: ImportFormat
 }
 
 export type ExportProgressPhase = 'scanning' | 'writing' | 'finalizing'

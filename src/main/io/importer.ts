@@ -1,39 +1,22 @@
 import { readFileSync } from 'node:fs'
 import { dialog, type BrowserWindow } from 'electron'
-import { EJSON } from 'bson'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ImportRequest } from '../../shared/types'
 import { sessionManager } from '../mongo/sessionManager'
 import { decodeBsonFile } from './bsonFileCore'
+import { detectImportFileFormat, parseJsonDocuments, type ImportFileFormat } from './importCore'
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
-const OPEN_FILTERS: Record<ImportRequest['format'], { name: string; extensions: string[] }> = {
-  json: { name: 'JSON', extensions: ['json', 'ndjson'] },
-  csv: { name: 'CSV', extensions: ['csv'] },
-  xlsx: { name: 'Excel', extensions: ['xlsx'] },
-  bson: { name: 'BSON', extensions: ['bson', 'gz'] }
-}
-
-// --- parsing ---
-
-function parseJsonDocs(content: string): Document[] {
-  const trimmed = content.trim()
-  if (!trimmed) return []
-  if (trimmed.startsWith('[')) {
-    const arr = EJSON.parse(trimmed) as unknown
-    return Array.isArray(arr) ? (arr as Document[]) : []
+const OPEN_FILTERS = [
+  {
+    name: 'Supported data files',
+    extensions: ['json', 'jsonl', 'ndjson', 'csv', 'tsv', 'xlsx', 'bson', 'gz']
   }
-  // NDJSON: one document per non-empty line.
-  return trimmed
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => EJSON.parse(l) as Document)
-}
+]
 
 function normalizeCell(v: unknown): unknown {
   if (v === null || v === undefined) return undefined
@@ -114,14 +97,21 @@ async function importBson(req: ImportRequest, filePath: string): Promise<DataOpR
   }
 }
 
-async function importNative(req: ImportRequest, filePath: string): Promise<DataOpResult> {
+async function importNative(
+  req: ImportRequest,
+  filePath: string,
+  format: Exclude<ImportFileFormat, 'bson'>
+): Promise<DataOpResult> {
   let docs: Document[]
-  if (req.format === 'json') {
-    docs = parseJsonDocs(readFileSync(filePath, 'utf8'))
+  if (format === 'json') {
+    docs = parseJsonDocuments(readFileSync(filePath, 'utf8'))
   } else {
     const wb = new ExcelJS.Workbook()
-    if (req.format === 'csv') await wb.csv.readFile(filePath)
-    else await wb.xlsx.readFile(filePath)
+    if (format === 'csv' || format === 'tsv') {
+      await wb.csv.readFile(filePath, format === 'tsv' ? { parserOptions: { delimiter: '\t' } } : undefined)
+    } else {
+      await wb.xlsx.readFile(filePath)
+    }
     const ws = wb.worksheets[0]
     docs = ws ? worksheetToDocs(ws) : []
   }
@@ -141,13 +131,14 @@ export async function importData(
 ): Promise<DataOpResult> {
   const openOpts = {
     properties: ['openFile' as const],
-    filters: [OPEN_FILTERS[req.format]]
+    filters: OPEN_FILTERS
   }
   const picked = win ? await dialog.showOpenDialog(win, openOpts) : await dialog.showOpenDialog(openOpts)
   if (picked.canceled || picked.filePaths.length === 0) return { ok: false, cancelled: true }
   const filePath = picked.filePaths[0]
   try {
-    return req.format === 'bson' ? await importBson(req, filePath) : await importNative(req, filePath)
+    const format = detectImportFileFormat(filePath)
+    return format === 'bson' ? await importBson(req, filePath) : await importNative(req, filePath, format)
   } catch (e) {
     return { ok: false, error: errMsg(e), filePath }
   }

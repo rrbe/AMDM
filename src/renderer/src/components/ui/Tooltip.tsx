@@ -10,6 +10,8 @@ interface TooltipPayload {
   content: TooltipContent
   footer?: TooltipContent
   variant: TooltipVariant
+  anchor?: () => Element | null
+  align?: 'start' | 'center' | 'end'
 }
 
 interface TooltipProps {
@@ -17,6 +19,11 @@ interface TooltipProps {
   children: ReactElement
   footer?: TooltipContent
   variant?: TooltipVariant
+  /** Override the shared hover delay for small, explicit help affordances. */
+  delay?: number
+  /** Position against a containing popup instead of covering sibling options. */
+  anchor?: () => Element | null
+  align?: 'start' | 'center' | 'end'
   overflowOnly?: boolean
   disabled?: boolean
 }
@@ -63,6 +70,9 @@ export function Tooltip({
   children,
   footer,
   variant = 'compact',
+  delay = SHOW_DELAY,
+  anchor,
+  align = 'center',
   overflowOnly = false,
   disabled = false
 }: TooltipProps): React.JSX.Element {
@@ -87,8 +97,8 @@ export function Tooltip({
   return (
     <BaseTooltip.Trigger
       handle={tooltipHandle}
-      payload={{ content, footer: hasContent(footer) ? footer : undefined, variant }}
-      delay={SHOW_DELAY}
+      payload={{ content, footer: hasContent(footer) ? footer : undefined, variant, anchor, align }}
+      delay={delay}
       {...(overflowOnly ? { [OVERFLOW_ONLY_ATTR]: '' } : {})}
       render={trigger}
     />
@@ -117,8 +127,9 @@ export function TooltipLayer(): React.JSX.Element {
         <BaseTooltip.Portal>
           <BaseTooltip.Positioner
             className="z-[3000]"
+            anchor={payload?.anchor}
             side="top"
-            align="center"
+            align={payload?.align ?? 'center'}
             sideOffset={6}
             collisionPadding={8}
             collisionAvoidance={{ side: 'flip', align: 'shift', fallbackAxisSide: 'end' }}

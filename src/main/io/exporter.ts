@@ -20,6 +20,7 @@ import type {
 } from '../../shared/types'
 import { IPC } from '../../shared/ipc'
 import { exportFileExtension, sanitizeExportBaseName } from '../../shared/exportDestination'
+import { encodeCanonicalJson } from '../../shared/jsonSerialization'
 import {
   collectTabularColumns,
   escapeDelimitedField,
@@ -418,7 +419,7 @@ export async function exportTabularToFile(
 }
 
 async function exportJson(
-  req: CollectionExportRequest,
+  req: ExportRequest,
   outputPath: string,
   signal: AbortSignal,
   report: ProgressReport
@@ -429,17 +430,19 @@ async function exportJson(
     stream.destroy()
   }
   signal.addEventListener('abort', abort, { once: true })
-  const asArray = req.jsonArray !== false
+  const asArray = req.format === 'json'
+  const encoding = req.jsonEncoding ?? 'plain'
+  const total = req.source === 'result' ? req.documents.length : undefined
   let count = 0
-  report('writing', 0, undefined, true)
+  report('writing', 0, total, true)
   try {
     if (asArray) await writeChunk(stream, '[\n')
-    for await (const document of collectionDocuments(req, signal)) {
-      const serialized = EJSON.stringify(document, { relaxed: false })
+    for await (const document of canonicalDocuments(req, signal)) {
+      const serialized = JSON.stringify(encodeCanonicalJson(document, encoding))
       await writeChunk(stream, asArray ? `${count ? ',\n' : ''}${serialized}` : `${serialized}\n`)
       streamErrors.check()
       count += 1
-      report('writing', count)
+      report('writing', count, total)
     }
     throwIfAborted(signal)
     if (asArray) await writeChunk(stream, '\n]\n')
@@ -447,7 +450,7 @@ async function exportJson(
       stream.once('error', reject)
       stream.end(resolve)
     })
-    report('writing', count, undefined, true)
+    report('writing', count, total, true)
     return count
   } catch (error) {
     stream.destroy()
@@ -459,22 +462,33 @@ async function exportJson(
 }
 
 async function exportBson(
-  req: CollectionExportRequest,
+  req: ExportRequest,
   outputPath: string,
   signal: AbortSignal,
   report: ProgressReport
 ): Promise<number> {
+  const total = req.source === 'result' ? req.documents.length : undefined
   let count = 0
-  report('writing', 0, undefined, true)
+  report('writing', 0, total, true)
   async function* source(): AsyncGenerator<Document> {
-    for await (const document of collectionDocuments(req, signal)) {
+    const documents = req.source === 'collection' ? collectionDocuments(req, signal) : canonicalDocuments(req, signal)
+    for await (const document of documents) {
+      const bsonDocument =
+        req.source === 'collection' ? document : EJSON.parse(JSON.stringify(document), { relaxed: false })
+      if (typeof bsonDocument !== 'object' || bsonDocument === null || Array.isArray(bsonDocument)) {
+        throw new Error('BSON export requires top-level document values.')
+      }
+      const prototype = Object.getPrototypeOf(bsonDocument)
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new Error('BSON export requires top-level document values.')
+      }
       count += 1
-      report('writing', count)
-      yield document
+      report('writing', count, total)
+      yield bsonDocument as Document
     }
   }
-  const written = await streamBsonToFile(source(), outputPath, Boolean(req.gzip))
-  report('writing', written, undefined, true)
+  const written = await streamBsonToFile(source(), outputPath, req.source === 'collection' && Boolean(req.gzip))
+  report('writing', written, total, true)
   return written
 }
 
@@ -494,9 +508,9 @@ async function runExport(
   const report = progressReporter(owner, req.taskId)
   try {
     let count: number
-    if (req.source === 'collection' && req.format === 'json') {
+    if (req.format === 'json' || req.format === 'jsonl') {
       count = await exportJson(req, outputPath, signal, report)
-    } else if (req.source === 'collection' && req.format === 'bson') {
+    } else if (req.format === 'bson') {
       count = await exportBson(req, outputPath, signal, report)
     } else count = await exportTabularToFile(req, outputPath, signal, report)
     throwIfAborted(signal)

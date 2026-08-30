@@ -25,7 +25,7 @@ pnpm clean                           # remove generated build files
 - Inline document editing, multi-tab views
 - A `vm`-sandboxed shell that runs mongosh-style JS (`find` / `aggregate` / `runCommand` …)
 - Autocomplete, saved queries, and history
-- Native import / export for JSON / CSV / XLSX / BSON
+- Native import / export for JSON / JSONL / CSV / TSV / XLSX / BSON
 - Tree / JSON / Table result views
 - Visual explain
 

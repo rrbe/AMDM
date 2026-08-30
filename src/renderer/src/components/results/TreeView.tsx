@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { CollectionSort, TabularExportFormat } from '@shared/types'
+import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
@@ -15,7 +15,6 @@ import {
   toPlainJson,
   toPlainKeyValue,
   toShellText,
-  toStrictEjson,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -24,6 +23,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 
 /**
  * Two-column KEY | VALUE tree of the result documents.
@@ -63,7 +63,7 @@ interface TreeViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onExport: (format: TabularExportFormat, documents: unknown[]) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -420,22 +420,9 @@ export function TreeView({
 
 function exportMenuItems(
   documents: unknown[],
-  onExport: (format: TabularExportFormat, documents: unknown[]) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
 ): ContextMenuEntry[] {
-  return [
-    {
-      label: i18n.t('result.export.csv'),
-      onClick: () => onExport('csv', documents)
-    },
-    {
-      label: i18n.t('result.export.tsv'),
-      onClick: () => onExport('tsv', documents)
-    },
-    {
-      label: i18n.t('result.export.xlsx'),
-      onClick: () => onExport('xlsx', documents)
-    }
-  ]
+  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy submenu for a tree field / document selection. */
@@ -463,17 +450,10 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
     {
       label: i18n.t('result.dataMenu.copySelectedDocuments'),
       children: [
-        {
-          label: i18n.t('result.dataMenu.copyPureJson'),
-          onClick: () => void copyText(toPlainJson(formatted))
-        },
+        ...jsonCopyMenuItems(docs, (text) => void copyText(text)),
         {
           label: i18n.t('result.dataMenu.copyMongoShell'),
           onClick: () => void copyText(toShellText(formatted))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyExtendedJson'),
-          onClick: () => void copyText(toStrictEjson(formatted))
         },
         'separator',
         {

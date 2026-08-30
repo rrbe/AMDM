@@ -1,10 +1,8 @@
 /**
  * Import-into-a-collection modal.
  *
- * The user picks a source format (JSON / CSV / XLSX / BSON); the main process
- * opens an OS file picker and ingests the chosen file via `importCollection`.
- * This component only collects the request and renders the returned
- * `DataOpResult`.
+ * The main process opens an OS file picker, detects JSON / JSONL / CSV / TSV /
+ * XLSX / BSON from the selected file, and ingests it via `importCollection`.
  *
  *  - BSON is read natively (plain `.bson`, gzip auto-detected) into the chosen
  *    target collection — no external tool, no namespace surprises.
@@ -17,7 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { useAppStore } from '@renderer/store/useAppStore'
-import type { DataOpResult, ImportFormat } from '@shared/types'
+import type { DataOpResult } from '@shared/types'
 
 interface ImportModalProps {
   connectionId: string
@@ -26,25 +24,17 @@ interface ImportModalProps {
   onClose: () => void
 }
 
-const FORMATS: Array<{ value: ImportFormat; label: string }> = [
-  { value: 'json', label: 'JSON' },
-  { value: 'csv', label: 'CSV' },
-  { value: 'xlsx', label: 'XLSX' },
-  { value: 'bson', label: 'BSON' }
-]
-
 export function ImportModal({ connectionId, database, collection, onClose }: ImportModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const importCollection = useAppStore((s) => s.importCollection)
 
-  const [format, setFormat] = useState<ImportFormat>('json')
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<DataOpResult | null>(null)
 
   const onImport = async (): Promise<void> => {
     setResult(null)
     setRunning(true)
-    const res = await importCollection({ connectionId, database, collection, format })
+    const res = await importCollection({ connectionId, database, collection })
     setRunning(false)
     if (res.cancelled) {
       onClose()
@@ -58,6 +48,7 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
   return (
     <Modal
       title={t('io.importTitle', { target: `${database}.${collection}` })}
+      description={t('io.importDescription')}
       onClose={onClose}
       footer={
         <>
@@ -71,22 +62,6 @@ export function ImportModal({ connectionId, database, collection, onClose }: Imp
         </>
       }
     >
-      <div className="form-row">
-        <label>{t('io.format')}</label>
-        <div className="io-formats">
-          {FORMATS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              className={`io-format${format === f.value ? ' active' : ''}`}
-              onClick={() => setFormat(f.value)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {result && !result.ok && (
         <div className="io-result err">{result.error ?? t('io.importFailed')}</div>
       )}

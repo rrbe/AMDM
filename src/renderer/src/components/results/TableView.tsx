@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
-import type { CollectionSort, TabularExportFormat } from '@shared/types'
+import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
 import { cellValue, deriveColumns, isPlainObject, sortTableRows, type TableSortState } from '@renderer/lib/tableShape'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
@@ -19,7 +19,6 @@ import {
   toPlainJson,
   toPlainKeyValue,
   toShellText,
-  toStrictEjson,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -28,6 +27,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 
 /**
  * Virtualized table.
@@ -54,7 +54,7 @@ interface TableViewProps {
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
   onDocumentOrderChange: (sourceIndexes: number[]) => void
-  onExport: (format: TabularExportFormat, documents: unknown[]) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -438,22 +438,9 @@ export function TableView({
 
 function exportMenuItems(
   documents: unknown[],
-  onExport: (format: TabularExportFormat, documents: unknown[]) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
 ): ContextMenuEntry[] {
-  return [
-    {
-      label: i18n.t('result.export.csv'),
-      onClick: () => onExport('csv', documents)
-    },
-    {
-      label: i18n.t('result.export.tsv'),
-      onClick: () => onExport('tsv', documents)
-    },
-    {
-      label: i18n.t('result.export.xlsx'),
-      onClick: () => onExport('xlsx', documents)
-    }
-  ]
+  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy menu for a table cell / row(s). */
@@ -490,17 +477,10 @@ function tableCopyMenuItems(
     {
       label: i18n.t('result.dataMenu.copySelectedDocuments'),
       children: [
-        {
-          label: i18n.t('result.dataMenu.copyPureJson'),
-          onClick: () => void copyText(toPlainJson(formatted))
-        },
+        ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
         {
           label: i18n.t('result.dataMenu.copyMongoShell'),
           onClick: () => void copyText(toShellText(formatted))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyExtendedJson'),
-          onClick: () => void copyText(toStrictEjson(formatted))
         },
         'separator',
         {

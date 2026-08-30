@@ -4,6 +4,8 @@ import { exportFileExtension, sanitizeExportBaseName } from '../../../src/shared
 describe('export destination', () => {
   it('derives the extension from the format and BSON compression option', () => {
     expect(exportFileExtension('csv')).toBe('csv')
+    expect(exportFileExtension('json')).toBe('json')
+    expect(exportFileExtension('jsonl')).toBe('jsonl')
     expect(exportFileExtension('xlsx')).toBe('xlsx')
     expect(exportFileExtension('bson')).toBe('bson')
     expect(exportFileExtension('bson', true)).toBe('bson.gz')
