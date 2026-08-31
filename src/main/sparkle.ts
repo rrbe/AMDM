@@ -55,12 +55,20 @@ export function startSparkle(): void {
 export function getSparkleState(): UpdateState {
   const addon = loadSparkleAddon()
   if (!addon) {
-    return { available: false, automaticallyChecksForUpdates: false, availableVersion: null }
+    return {
+      available: false,
+      automaticallyChecksForUpdates: false,
+      phase: 'idle',
+      availableVersion: null,
+      downloadProgress: null
+    }
   }
   return {
     available: true,
     automaticallyChecksForUpdates: addon.getAutomaticallyChecksForUpdates(),
-    availableVersion: pendingVersion
+    phase: pendingVersion ? 'available' : 'idle',
+    availableVersion: pendingVersion,
+    downloadProgress: null
   }
 }
 

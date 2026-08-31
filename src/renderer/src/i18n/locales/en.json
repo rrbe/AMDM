@@ -111,7 +111,10 @@
   },
   "updates": {
     "newVersion": "New version {{version}}",
-    "updateTo": "Update to {{version}}"
+    "updateTo": "Update to {{version}}",
+    "downloading": "Downloading {{percent}}%",
+    "cancelDownload": "Cancel download",
+    "restartToUpdate": "Restart and update"
   },
   "notify": {
     "loadConnectionsFailed": "Failed to load connections: {{error}}",
@@ -148,6 +151,8 @@
     "openSettingsFailed": "Could not open the Settings window",
     "updateCheckUnavailable": "Manual updates are unavailable in this package.",
     "updateCheckFailed": "Failed to check for updates: {{error}}",
+    "updateDownloadFailed": "Failed to download the update: {{error}}",
+    "cancelUpdateFailed": "Failed to cancel update download: {{error}}",
     "exportFailed": "Export failed: {{error}}",
     "exportWarning": "Export completed with a warning",
     "cancelExportFailed": "Failed to cancel export",

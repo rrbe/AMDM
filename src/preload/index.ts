@@ -92,6 +92,7 @@ const api: Api = {
     getState: () => ipcRenderer.invoke(IPC.updatesGetState),
     setAutomaticChecks: (enabled) => ipcRenderer.invoke(IPC.updatesSetAutomaticChecks, enabled),
     showAvailableUpdate: () => ipcRenderer.invoke(IPC.updatesShowAvailable),
+    cancelDownload: () => ipcRenderer.invoke(IPC.updatesCancelDownload),
     onStateChanged: (listener) => {
       const handle = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]): void => {
         listener(state)

@@ -5,7 +5,9 @@ describe('manual updates', () => {
   const emptyState = {
     available: true,
     automaticallyChecksForUpdates: true,
-    availableVersion: null
+    phase: 'idle' as const,
+    availableVersion: null,
+    downloadProgress: null
   }
 
   afterEach(() => {
@@ -43,14 +45,24 @@ describe('manual updates', () => {
     expect(useAppStore.getState().updateState).toEqual(disabled)
   })
 
-  it('hides the reminder immediately when the user opens the available update', async () => {
+  it('keeps the updater-owned state while opening an available update', async () => {
     const showAvailableUpdate = vi.fn().mockResolvedValue(true)
     vi.stubGlobal('window', { api: { updates: { showAvailableUpdate } } })
-    useAppStore.setState({ updateState: { ...emptyState, availableVersion: '26.8.11' } })
+    useAppStore.setState({
+      updateState: { ...emptyState, phase: 'available', availableVersion: '26.8.11' }
+    })
 
     await expect(useAppStore.getState().showAvailableUpdate()).resolves.toBe(true)
 
-    expect(useAppStore.getState().updateState.availableVersion).toBeNull()
+    expect(useAppStore.getState().updateState.availableVersion).toBe('26.8.11')
     expect(showAvailableUpdate).toHaveBeenCalledOnce()
+  })
+
+  it('cancels an active update download', async () => {
+    const cancelDownload = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('window', { api: { updates: { cancelDownload } } })
+
+    await expect(useAppStore.getState().cancelUpdateDownload()).resolves.toBe(true)
+    expect(cancelDownload).toHaveBeenCalledOnce()
   })
 })

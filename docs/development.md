@@ -27,6 +27,16 @@ When electron-builder reconstructs the dependency tree from a pnpm lockfile, it 
 
 Do not treat packages with native bindings as pure JavaScript dependencies. Confirm their ABI, target architecture, and electron-builder collection behavior first.
 
+## Update artifacts
+
+The release workflow publishes more than the interactive installers:
+
+- macOS: arm64/x64 ZIP and DMG files, `appcast-*.xml`, and the EdDSA-signed `.delta` files referenced by each appcast.
+- Windows: the NSIS installer, `latest.yml`, and its `.blockmap`.
+- Linux: the AppImage and `latest-linux.yml`; electron-builder embeds the blockmap in the AppImage.
+
+`scripts/generate-sparkle-appcast.mjs` downloads the three most recent full ZIPs from the previous appcast before generating the next macOS feed. Historical release ZIPs must remain available. Windows/Linux update metadata is emitted because their electron-builder targets declare the public GitHub provider even when packaging uses `--publish never`; the release job uploads it later.
+
 ## Validation by change type
 
 | Change                           | Minimum validation                                       |

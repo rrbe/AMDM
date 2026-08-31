@@ -10,7 +10,7 @@ import { resolveWindowBounds } from './store/windowStateCore'
 import { sessionManager } from './mongo/sessionManager'
 import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
-import { startSparkle } from './sparkle'
+import { startUpdates } from './updater'
 import { bringWindowToFront } from './windowOpenCore'
 
 // Default geometry, also the floor on size. Saved bounds are reconciled against
@@ -168,7 +168,7 @@ app.whenReady().then(() => {
   windowStateStore.init()
   registerIpc(openSettingsWindow)
   createWindow()
-  startSparkle()
+  startUpdates()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

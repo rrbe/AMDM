@@ -6,6 +6,10 @@ describe('Sparkle packaging configuration', () => {
   const config = readFileSync(resolve(process.cwd(), 'electron-builder.yml'), 'utf8')
   const nativeBridge = readFileSync(resolve(process.cwd(), 'native/sparkle.mm'), 'utf8')
   const mainBridge = readFileSync(resolve(process.cwd(), 'src/main/sparkle.ts'), 'utf8')
+  const appcastScript = readFileSync(
+    resolve(process.cwd(), 'scripts/generate-sparkle-appcast.mjs'),
+    'utf8'
+  )
 
   it('keeps scheduled checks enabled without silently installing on quit', () => {
     expect(config).toMatch(/^\s+SUEnableAutomaticChecks:\s+true\s*$/m)
@@ -27,5 +31,19 @@ describe('Sparkle packaging configuration', () => {
       /static napi_value recheckForUpdates[\s\S]*updaterController = nil;[\s\S]*createUpdaterController\(\);[\s\S]*\[updaterController checkForUpdates:nil\]/
     )
     expect(mainBridge).toMatch(/showAvailableSparkleUpdate[\s\S]*addon\.recheckForUpdates\(\)/)
+  })
+
+  it('generates deltas from the three latest architecture-compatible archives', () => {
+    expect(appcastScript).toContain('const maximumDeltas = 3')
+    expect(appcastScript).toContain('String(maximumDeltas)')
+    expect(appcastScript).toContain('`-${arch}.delta`')
+  })
+
+  it('publishes blockmap metadata for Windows and Linux', () => {
+    expect(config).toMatch(/^\s+differentialPackage:\s+true\s*$/m)
+    expect(config).toMatch(/^\s+artifactName:\s+\$\{productName\}\.Setup\.\$\{version\}\.\$\{ext\}\s*$/m)
+    expect(config.match(/^\s+- provider:\s+github\s*$/gm)).toHaveLength(2)
+    expect(config.match(/^\s+owner:\s+rrbe\s*$/gm)).toHaveLength(2)
+    expect(config.match(/^\s+repo:\s+AMDM\s*$/gm)).toHaveLength(2)
   })
 })

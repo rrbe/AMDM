@@ -105,6 +105,22 @@ jobs:
           SPARKLE_DOWNLOAD_URL_PREFIX: https://github.com/rrbe/AMDM/releases/download/${{ github.ref_name }}/
         run: pnpm generate:sparkle-appcast dist
 
+      - name: Verify updater metadata
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            compgen -G "dist/*.delta" >/dev/null || { echo "::error::No Sparkle delta files generated"; exit 1; }
+            grep -q '<sparkle:deltas>' dist/appcast-arm64.xml
+            grep -q '<sparkle:deltas>' dist/appcast-x64.xml
+            grep -q -- '-arm64.delta' dist/appcast-arm64.xml
+            grep -q -- '-x64.delta' dist/appcast-x64.xml
+          elif [ "${{ matrix.platform }}" = "win" ]; then
+            test -f dist/latest.yml || { echo "::error::Missing latest.yml"; exit 1; }
+            compgen -G "dist/*.blockmap" >/dev/null || { echo "::error::Missing Windows blockmap"; exit 1; }
+          else
+            test -f dist/latest-linux.yml || { echo "::error::Missing latest-linux.yml"; exit 1; }
+          fi
+
       # 只上传面向用户的安装包,不传体积巨大的 unpacked 目录。
       # 每个平台只命中自己那几个 glob,未命中的 glob 自动忽略。
       - name: Upload installers
@@ -118,6 +134,10 @@ jobs:
             dist/*.exe
             dist/*.AppImage
             dist/appcast-*.xml
+            dist/*.delta
+            dist/*.exe.blockmap
+            dist/latest.yml
+            dist/latest-linux.yml
 
   release:
     needs: build

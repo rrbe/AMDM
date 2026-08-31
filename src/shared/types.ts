@@ -588,20 +588,35 @@ export interface AppSettings {
   exportIncludeRealPassword: boolean
   /** Latest scheduled update reminder the user opened; later versions still notify. */
   acknowledgedUpdateVersion: string | null
+  /** Automatic update checks on Windows/Linux; macOS persists this in Sparkle. */
+  automaticUpdateChecks: boolean
   /** App-wide navigation/new-item shortcuts; editor-local key bindings are separate. */
   keyboardShortcutsEnabled: boolean
   /** Individually cleared app shortcut ids. */
   disabledKeyboardShortcuts: KeyboardShortcutId[]
 }
 
-/** Runtime state of the macOS Sparkle updater. */
+export type UpdatePhase = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded'
+
+export interface UpdateDownloadProgress {
+  percent: number
+  transferred: number
+  total: number
+  bytesPerSecond: number
+}
+
+/** Runtime state of the platform updater. */
 export interface UpdateState {
-  /** False outside a packaged macOS build. */
+  /** False outside a packaged build supported by the platform updater. */
   available: boolean
-  /** Sparkle's persisted scheduled-check preference. */
+  /** Persisted scheduled-check preference. */
   automaticallyChecksForUpdates: boolean
-  /** Version shown by the gentle reminder, or null when there is no reminder. */
+  /** Current updater lifecycle. */
+  phase: UpdatePhase
+  /** Version shown by the reminder, or null when no update is pending. */
   availableVersion: string | null
+  /** Present only while a Windows/Linux package is downloading. */
+  downloadProgress: UpdateDownloadProgress | null
 }
 
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
@@ -627,6 +642,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorColorSchemes: [],
   exportIncludeRealPassword: false,
   acknowledgedUpdateVersion: null,
+  automaticUpdateChecks: true,
   keyboardShortcutsEnabled: true,
   disabledKeyboardShortcuts: []
 }

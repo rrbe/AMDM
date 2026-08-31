@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getState: vi.fn(),
   setAutomaticChecks: vi.fn(),
   showAvailableUpdate: vi.fn<() => boolean>(),
+  cancelDownload: vi.fn<() => boolean>(),
   subscribe: vi.fn(),
   send: vi.fn()
 }))
@@ -48,12 +49,13 @@ vi.mock('electron', () => ({
   }
 }))
 
-vi.mock('../../src/main/sparkle', () => ({
-  checkSparkleForUpdates: mocks.checkForUpdates,
-  getSparkleState: mocks.getState,
-  setSparkleAutomaticChecks: mocks.setAutomaticChecks,
-  showAvailableSparkleUpdate: mocks.showAvailableUpdate,
-  onSparkleStateChanged: mocks.subscribe
+vi.mock('../../src/main/updater', () => ({
+  checkForUpdates: mocks.checkForUpdates,
+  getUpdateState: mocks.getState,
+  setAutomaticUpdateChecks: mocks.setAutomaticChecks,
+  showAvailableUpdate: mocks.showAvailableUpdate,
+  cancelUpdateDownload: mocks.cancelDownload,
+  onUpdateStateChanged: mocks.subscribe
 }))
 
 import '../../src/preload/index'
@@ -67,6 +69,7 @@ describe('updates IPC', () => {
     mocks.getState.mockReset()
     mocks.setAutomaticChecks.mockReset()
     mocks.showAvailableUpdate.mockReset()
+    mocks.cancelDownload.mockReset()
     mocks.subscribe.mockReset()
     mocks.send.mockReset()
     registerUpdatesIpc()
@@ -76,7 +79,9 @@ describe('updates IPC', () => {
     const enabled = {
       available: true,
       automaticallyChecksForUpdates: true,
-      availableVersion: null
+      phase: 'idle' as const,
+      availableVersion: null,
+      downloadProgress: null
     }
     mocks.getState.mockReturnValue(enabled)
     mocks.setAutomaticChecks.mockReturnValue({ ...enabled, automaticallyChecksForUpdates: false })
@@ -99,7 +104,9 @@ describe('updates IPC', () => {
     const state = {
       available: true,
       automaticallyChecksForUpdates: true,
-      availableVersion: '26.8.11'
+      phase: 'available' as const,
+      availableVersion: '26.8.11',
+      downloadProgress: null
     }
     const listener = mocks.subscribe.mock.calls[0]?.[0]
     listener(state)
@@ -125,5 +132,11 @@ describe('updates IPC', () => {
     })
 
     await expect(mocks.exposedApi?.updates.checkForUpdates()).rejects.toThrow('updater failed')
+  })
+
+  it('cancels an active download through the typed bridge', async () => {
+    mocks.cancelDownload.mockReturnValue(true)
+    await expect(mocks.exposedApi?.updates.cancelDownload()).resolves.toBe(true)
+    expect(mocks.cancelDownload).toHaveBeenCalledOnce()
   })
 })

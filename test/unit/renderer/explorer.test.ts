@@ -49,7 +49,7 @@ describe('explorer catalog rows', () => {
       catalogs: { c1: catalog },
       expandedConnections: new Set(['c1']),
       settings: { connectionOrder: [], collectionSort: 'alpha', theme: 'light' },
-      updateState: { availableVersion: null },
+      updateState: { phase: 'idle', availableVersion: null, downloadProgress: null },
       connect: vi.fn(),
       disconnect: vi.fn(),
       setActiveConnection: vi.fn(),
@@ -93,6 +93,27 @@ describe('explorer catalog rows', () => {
       loadedDatabase.indexOf('addresses')
     )
     expect(loadedDatabase).toContain('>Users</span>')
+
+    testStore.state.updateState = {
+      phase: 'available',
+      availableVersion: '26.9.18',
+      downloadProgress: null
+    }
+    expect(renderExplorer()).toContain('Update to 26.9.18')
+
+    testStore.state.updateState = {
+      phase: 'downloading',
+      availableVersion: '26.9.18',
+      downloadProgress: { percent: 42.4 }
+    }
+    expect(renderExplorer()).toContain('Downloading 42%')
+
+    testStore.state.updateState = {
+      phase: 'downloaded',
+      availableVersion: '26.9.18',
+      downloadProgress: null
+    }
+    expect(renderExplorer()).toContain('Restart and update')
 
     const collectionNodeId = 'c1:coll:ezze/addresses'
     catalog.expanded.add(collectionNodeId)

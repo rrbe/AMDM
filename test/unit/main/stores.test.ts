@@ -81,7 +81,8 @@ describe('settingsStore', () => {
       editorColorSchemes: [],
       sidebarWidth: 270,
       editorHeight: 142,
-      acknowledgedUpdateVersion: null
+      acknowledgedUpdateVersion: null,
+      automaticUpdateChecks: true
     })
   })
   it('merges + persists an update', () => {
@@ -101,6 +102,12 @@ describe('settingsStore', () => {
     settingsStore.update({ acknowledgedUpdateVersion: '26.8.11' })
     settingsStore.init()
     expect(settingsStore.get().acknowledgedUpdateVersion).toBe('26.8.11')
+  })
+
+  it('persists the automatic update-check preference', () => {
+    settingsStore.update({ automaticUpdateChecks: false })
+    settingsStore.init()
+    expect(settingsStore.get().automaticUpdateChecks).toBe(false)
   })
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })

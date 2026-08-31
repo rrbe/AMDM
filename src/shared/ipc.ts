@@ -96,6 +96,7 @@ export const IPC = {
   updatesGetState: 'updates:getState',
   updatesSetAutomaticChecks: 'updates:setAutomaticChecks',
   updatesShowAvailable: 'updates:showAvailable',
+  updatesCancelDownload: 'updates:cancelDownload',
   updatesStateChanged: 'updates:stateChanged',
 
   dialogOpenFile: 'dialog:openFile'
@@ -188,12 +189,14 @@ export interface Api {
     update(patch: Partial<AppSettings>): Promise<AppSettings>
   }
   updates: {
-    /** Returns false when Sparkle is unavailable in this build. */
+    /** Returns false when updates are unavailable in this build. */
     checkForUpdates(): Promise<boolean>
     getState(): Promise<UpdateState>
     setAutomaticChecks(enabled: boolean): Promise<UpdateState>
-    /** Acknowledge the current reminder and bring Sparkle's native window forward. */
+    /** Show the native macOS updater, download an update, or restart to install it. */
     showAvailableUpdate(): Promise<boolean>
+    /** Cancel an active Windows/Linux update download. */
+    cancelDownload(): Promise<boolean>
     onStateChanged(listener: (state: UpdateState) => void): () => void
   }
   dialog: {

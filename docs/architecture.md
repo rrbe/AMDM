@@ -10,6 +10,13 @@ This document records constraints that span multiple directories and are difficu
 
 The typical call chain is: store action → `window.api` → preload → IPC handler → main service. When changing IPC, check the shared contract, preload, handler, caller, and relevant tests together; never update only one end of the chain.
 
+## Application updates
+
+- macOS uses the native Sparkle bridge with architecture-specific appcasts and EdDSA-signed delta archives. Each release keeps deltas from the three most recent compatible versions and always retains the full ZIP fallback.
+- Windows NSIS and Linux AppImage builds use `electron-updater` with GitHub release metadata. Downloads start only after an explicit user action; the main process owns progress, cancellation, and installation state.
+- Update state crosses into the Renderer only through the shared IPC contract. Windows/Linux automatically check at most every six hours when enabled; macOS scheduling remains owned by Sparkle.
+- Windows requires `latest.yml` plus the installer blockmap. Linux requires `latest-linux.yml`; its blockmap is embedded in the AppImage. These files are part of the release contract, not optional build output.
+
 ## Testability
 
 Keep transformation, validation, and planning logic in cores that do not depend on Electron or live connections. Session, IPC, file-system, and system APIs should remain thin adapters. Add unit tests for new core logic and integration tests for cross-layer write paths or handlers.

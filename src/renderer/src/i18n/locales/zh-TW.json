@@ -111,7 +111,10 @@
   },
   "updates": {
     "newVersion": "新版本 {{version}}",
-    "updateTo": "更新至 {{version}}"
+    "updateTo": "更新至 {{version}}",
+    "downloading": "正在下載 {{percent}}%",
+    "cancelDownload": "取消下載",
+    "restartToUpdate": "重新啟動並更新"
   },
   "notify": {
     "loadConnectionsFailed": "載入連線失敗：{{error}}",
@@ -148,6 +151,8 @@
     "openSettingsFailed": "無法開啟設定視窗",
     "updateCheckUnavailable": "目前安裝包不支援手動檢查更新。",
     "updateCheckFailed": "檢查更新失敗：{{error}}",
+    "updateDownloadFailed": "下載更新失敗：{{error}}",
+    "cancelUpdateFailed": "取消更新下載失敗：{{error}}",
     "exportFailed": "匯出失敗：{{error}}",
     "exportWarning": "匯出完成，但有需要注意的資訊",
     "cancelExportFailed": "取消匯出失敗",

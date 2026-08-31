@@ -180,7 +180,8 @@ export function Explorer({
   const connectionOrder = useAppStore((s) => s.settings.connectionOrder)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
   const theme = useAppStore((s) => s.settings.theme)
-  const availableVersion = useAppStore((s) => s.updateState.availableVersion)
+  const updateState = useAppStore((s) => s.updateState)
+  const availableVersion = updateState.availableVersion
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -593,12 +594,35 @@ export function Explorer({
           <button
             type="button"
             className="side-foot-update"
-            title={t('updates.newVersion', { version: availableVersion })}
-            aria-label={t('updates.updateTo', { version: availableVersion })}
+            title={
+              updateState.phase === 'downloaded'
+                ? t('updates.restartToUpdate')
+                : t('updates.newVersion', { version: availableVersion })
+            }
+            aria-label={
+              updateState.phase === 'downloaded'
+                ? t('updates.restartToUpdate')
+                : t('updates.updateTo', { version: availableVersion })
+            }
+            disabled={updateState.phase === 'downloading'}
             onClick={() => void showAvailableUpdate()}
           >
-            <Download size={13} aria-hidden />
-            <span className="side-foot-update-label">{t('updates.updateTo', { version: availableVersion })}</span>
+            {updateState.phase === 'downloading' ? (
+              <Loader2 className="animate-spin" size={13} aria-hidden />
+            ) : updateState.phase === 'downloaded' ? (
+              <RefreshCw size={13} aria-hidden />
+            ) : (
+              <Download size={13} aria-hidden />
+            )}
+            <span className="side-foot-update-label">
+              {updateState.phase === 'downloading'
+                ? t('updates.downloading', {
+                    percent: Math.round(updateState.downloadProgress?.percent ?? 0)
+                  })
+                : updateState.phase === 'downloaded'
+                  ? t('updates.restartToUpdate')
+                  : t('updates.updateTo', { version: availableVersion })}
+            </span>
           </button>
         ) : (
           <span className="side-foot-build" title={__BUILD_ID__}>

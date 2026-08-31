@@ -1,21 +1,23 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc'
 import {
-  checkSparkleForUpdates,
-  getSparkleState,
-  onSparkleStateChanged,
-  setSparkleAutomaticChecks,
-  showAvailableSparkleUpdate
-} from '../sparkle'
+  cancelUpdateDownload,
+  checkForUpdates,
+  getUpdateState,
+  onUpdateStateChanged,
+  setAutomaticUpdateChecks,
+  showAvailableUpdate
+} from '../updater'
 
 export function registerUpdatesIpc(): void {
-  ipcMain.handle(IPC.updatesCheck, () => checkSparkleForUpdates())
-  ipcMain.handle(IPC.updatesGetState, () => getSparkleState())
+  ipcMain.handle(IPC.updatesCheck, () => checkForUpdates())
+  ipcMain.handle(IPC.updatesGetState, () => getUpdateState())
   ipcMain.handle(IPC.updatesSetAutomaticChecks, (_event, enabled: boolean) =>
-    setSparkleAutomaticChecks(enabled)
+    setAutomaticUpdateChecks(enabled)
   )
-  ipcMain.handle(IPC.updatesShowAvailable, () => showAvailableSparkleUpdate())
-  onSparkleStateChanged((state) => {
+  ipcMain.handle(IPC.updatesShowAvailable, () => showAvailableUpdate())
+  ipcMain.handle(IPC.updatesCancelDownload, () => cancelUpdateDownload())
+  onUpdateStateChanged((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
         window.webContents.send(IPC.updatesStateChanged, state)

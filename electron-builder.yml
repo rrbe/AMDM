@@ -53,18 +53,28 @@ dmg:
 
 win:
   icon: build/icon.ico
+  publish:
+    - provider: github
+      owner: rrbe
+      repo: AMDM
   target:
     - target: nsis
       arch: [x64]
 
 nsis:
+  artifactName: ${productName}.Setup.${version}.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  differentialPackage: true
 
 linux:
   icon: build/icon.png
   category: Development
   maintainer: shawn
+  publish:
+    - provider: github
+      owner: rrbe
+      repo: AMDM
   target:
     - AppImage

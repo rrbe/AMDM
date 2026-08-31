@@ -6,7 +6,9 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -21,6 +23,7 @@ if (!privateKey)
   throw new Error("SPARKLE_ED_PRIVATE_KEY is required to sign the appcast");
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const maximumDeltas = 3;
 const distDir = resolve(process.argv[2] ?? join(root, "dist"));
 const sparkleDir = join(root, "build", "sparkle");
 const generateAppcast = join(sparkleDir, "bin", "generate_appcast");
@@ -70,6 +73,23 @@ for (const arch of ["arm64", "x64"]) {
       // The first release has no previous appcast.
     }
 
+    if (existsSync(previousAppcast)) {
+      const previousFeed = readFileSync(previousAppcast, "utf8");
+      const previousArchives = [...previousFeed.matchAll(/<item>[\s\S]*?<\/item>/g)]
+        .map(([item]) => item.match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1])
+        .filter((url) => url?.endsWith(`-${arch}-mac.zip`))
+        .slice(0, maximumDeltas);
+
+      for (const url of previousArchives) {
+        const archiveName = decodeURIComponent(new URL(url).pathname.split("/").at(-1));
+        execFileSync(
+          "curl",
+          ["-fL", "--retry", "3", "-o", join(workDir, archiveName), url],
+          { stdio: "inherit" },
+        );
+      }
+    }
+
     const result = spawnSync(
       generateAppcast,
       [
@@ -80,7 +100,7 @@ for (const arch of ["arm64", "x64"]) {
         "--link",
         "https://github.com/rrbe/AMDM/releases",
         "--maximum-deltas",
-        "0",
+        String(maximumDeltas),
         "-o",
         previousAppcast,
         workDir,
@@ -95,7 +115,15 @@ for (const arch of ["arm64", "x64"]) {
     if (result.status !== 0)
       throw new Error(`generate_appcast exited with ${result.status}`);
 
-    const appcast = readFileSync(previousAppcast, "utf8");
+    let appcast = readFileSync(previousAppcast, "utf8");
+    const generatedDeltas = readdirSync(workDir).filter((name) => name.endsWith(".delta"));
+    for (const delta of generatedDeltas) {
+      const architectureDelta = delta.replace(/\.delta$/, `-${arch}.delta`);
+      renameSync(join(workDir, delta), join(workDir, architectureDelta));
+      appcast = appcast.replaceAll(delta, architectureDelta);
+    }
+    writeFileSync(previousAppcast, appcast);
+
     const enclosureCount = appcast.match(/<enclosure\b/g)?.length ?? 0;
     const signatureCount = appcast.match(/sparkle:edSignature=/g)?.length ?? 0;
     if (enclosureCount === 0 || signatureCount < enclosureCount) {
@@ -105,6 +133,9 @@ for (const arch of ["arm64", "x64"]) {
     }
 
     copyFileSync(previousAppcast, join(distDir, appcastName));
+    for (const delta of generatedDeltas.map((name) => name.replace(/\.delta$/, `-${arch}.delta`))) {
+      copyFileSync(join(workDir, delta), join(distDir, delta));
+    }
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }

@@ -54,6 +54,7 @@ export function SettingsWindow(): React.JSX.Element {
   const loadUpdateState = useAppStore((s) => s.loadUpdateState)
   const setAutomaticUpdateChecks = useAppStore((s) => s.setAutomaticUpdateChecks)
   const showAvailableUpdate = useAppStore((s) => s.showAvailableUpdate)
+  const cancelUpdateDownload = useAppStore((s) => s.cancelUpdateDownload)
   const loadSettings = useAppStore((s) => s.loadSettings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const chooseExportDirectory = useAppStore((s) => s.chooseExportDirectory)
@@ -187,14 +188,24 @@ export function SettingsWindow(): React.JSX.Element {
   }, [t])
 
   const runUpdateCheck = async (): Promise<void> => {
+    if (updateState.phase === 'available' || updateState.phase === 'downloaded') {
+      await showAvailableUpdate()
+      return
+    }
     setChecking(true)
     try {
-      if (updateState.availableVersion) await showAvailableUpdate()
-      else await checkForUpdates()
+      await checkForUpdates()
     } finally {
       setChecking(false)
     }
   }
+
+  const updateActionLabel =
+    updateState.phase === 'downloaded'
+      ? t('updates.restartToUpdate')
+      : updateState.phase === 'available' && updateState.availableVersion
+        ? t('updates.updateTo', { version: updateState.availableVersion })
+        : t('settings.checkForUpdates')
 
   const setShortcutEnabled = (id: KeyboardShortcutId, enabled: boolean): void => {
     const disabledKeyboardShortcuts = enabled
@@ -304,20 +315,43 @@ export function SettingsWindow(): React.JSX.Element {
                 />
               </div>
               <Field label={t('settings.checkForUpdates')}>
-                <div className="relative w-fit">
-                  <Button
-                    type="button"
-                    busy={checking}
-                    disabled={!updateState.available}
-                    onClick={() => void runUpdateCheck()}
-                  >
-                    {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
-                  </Button>
-                  {updateState.availableVersion ? (
-                    <UpdateAvailableDot
-                      version={updateState.availableVersion}
-                      className="pointer-events-none absolute -right-1 -top-1"
-                    />
+                <div className="flex flex-col items-start gap-2">
+                  <div className="relative flex items-center gap-2">
+                    <Button
+                      type="button"
+                      busy={checking || updateState.phase === 'checking'}
+                      disabled={!updateState.available || updateState.phase === 'downloading'}
+                      onClick={() => void runUpdateCheck()}
+                    >
+                      {checking || updateState.phase === 'checking'
+                        ? t('settings.checkingForUpdates')
+                        : updateActionLabel}
+                    </Button>
+                    {updateState.phase === 'downloading' ? (
+                      <Button type="button" variant="danger" onClick={() => void cancelUpdateDownload()}>
+                        {t('updates.cancelDownload')}
+                      </Button>
+                    ) : null}
+                    {updateState.availableVersion && updateState.phase === 'available' ? (
+                      <UpdateAvailableDot
+                        version={updateState.availableVersion}
+                        className="pointer-events-none absolute -right-1 -top-1"
+                      />
+                    ) : null}
+                  </div>
+                  {updateState.phase === 'downloading' && updateState.downloadProgress ? (
+                    <div className="flex w-64 flex-col gap-1" role="status">
+                      <progress
+                        className="h-1.5 w-full accent-[var(--primary)]"
+                        max={100}
+                        value={updateState.downloadProgress.percent}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {t('updates.downloading', {
+                          percent: Math.round(updateState.downloadProgress.percent)
+                        })}
+                      </span>
+                    </div>
                   ) : null}
                 </div>
               </Field>

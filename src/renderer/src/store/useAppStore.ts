@@ -249,6 +249,7 @@ interface AppState {
   loadUpdateState(): Promise<void>
   setAutomaticUpdateChecks(enabled: boolean): Promise<void>
   showAvailableUpdate(): Promise<boolean>
+  cancelUpdateDownload(): Promise<boolean>
   openSettings(): Promise<void>
   loadSettings(): Promise<void>
   updateSettings(patch: Partial<AppSettings>): Promise<void>
@@ -385,7 +386,9 @@ function subscribeToExportProgress(): void {
 const EMPTY_UPDATE_STATE: UpdateState = {
   available: false,
   automaticallyChecksForUpdates: false,
-  availableVersion: null
+  phase: 'idle',
+  availableVersion: null,
+  downloadProgress: null
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -1689,9 +1692,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async showAvailableUpdate() {
-    set((state) => ({
-      updateState: { ...state.updateState, availableVersion: null }
-    }))
     try {
       const started = await window.api.updates.showAvailableUpdate()
       if (!started) {
@@ -1700,7 +1700,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       return started
     } catch (e) {
       get().notify(
-        appNotice('error', tr('notify.updateCheckFailed', { error: errMessage(e) }), 'settings', 'updates:show')
+        appNotice('error', tr('notify.updateDownloadFailed', { error: errMessage(e) }), 'settings', 'updates:show')
+      )
+      return false
+    }
+  },
+
+  async cancelUpdateDownload() {
+    try {
+      return await window.api.updates.cancelDownload()
+    } catch (e) {
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.cancelUpdateFailed', { error: errMessage(e) }),
+          'settings',
+          'updates:cancel'
+        )
       )
       return false
     }

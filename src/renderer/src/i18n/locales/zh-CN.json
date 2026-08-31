@@ -111,7 +111,10 @@
   },
   "updates": {
     "newVersion": "新版本 {{version}}",
-    "updateTo": "更新到 {{version}}"
+    "updateTo": "更新到 {{version}}",
+    "downloading": "正在下载 {{percent}}%",
+    "cancelDownload": "取消下载",
+    "restartToUpdate": "重启并更新"
   },
   "notify": {
     "loadConnectionsFailed": "加载连接失败：{{error}}",
@@ -148,6 +151,8 @@
     "openSettingsFailed": "无法打开设置窗口",
     "updateCheckUnavailable": "当前安装包不支持手动检查更新。",
     "updateCheckFailed": "检查更新失败：{{error}}",
+    "updateDownloadFailed": "下载更新失败：{{error}}",
+    "cancelUpdateFailed": "取消更新下载失败：{{error}}",
     "exportFailed": "导出失败：{{error}}",
     "exportWarning": "导出完成，但有需要注意的信息",
     "cancelExportFailed": "取消导出失败",
