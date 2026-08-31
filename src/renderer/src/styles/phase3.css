@@ -6,13 +6,14 @@
    `position: fixed` below). No backdrop element anymore. */
 .ctx-menu {
   position: fixed;
-  min-width: 160px;
-  /* Match the shadcn Select/Menu popup: elevated surface + token shadow. */
-  background: var(--surface-elevated);
-  border: 1px solid var(--separator-strong);
-  border-radius: var(--radius-control);
-  box-shadow: var(--shadow-popover);
-  padding: 4px;
+  min-width: 180px;
+  background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+  backdrop-filter: blur(28px) saturate(1.35);
+  -webkit-backdrop-filter: blur(28px) saturate(1.35);
+  border: 1px solid color-mix(in srgb, var(--separator-strong) 75%, transparent);
+  border-radius: 14px;
+  box-shadow: var(--shadow-context-menu);
+  padding: 5px;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -22,14 +23,17 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 5px 9px;
   border: none;
   background: transparent;
-  color: var(--fg-1);
+  color: var(--text-primary);
   outline: none;
   font-size: var(--fs);
+  font-weight: var(--fw-normal);
+  line-height: var(--lh-snug);
   text-align: left;
-  border-radius: var(--radius-sm);
+  border-radius: 9px;
   cursor: pointer;
 }
 .ctx-item:hover {
@@ -41,7 +45,7 @@
 .ctx-icon {
   display: flex;
   align-items: center;
-  color: var(--fg-3);
+  color: var(--text-primary);
 }
 .ctx-item:hover .ctx-icon {
   color: inherit;
@@ -54,13 +58,13 @@
 }
 .ctx-shortcut {
   margin-left: 16px;
-  color: var(--fg-3);
+  color: var(--text-muted);
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 .ctx-submenu-arrow {
   margin-left: 16px;
-  color: var(--fg-3);
+  color: var(--text-primary);
   font-size: 16px;
   line-height: 1;
 }

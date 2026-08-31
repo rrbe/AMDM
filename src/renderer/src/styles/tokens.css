@@ -119,6 +119,9 @@
   --shadow-popover:
     0 12px 36px rgba(24, 24, 28, 0.14),
     0 2px 8px rgba(24, 24, 28, 0.06);
+  --shadow-context-menu:
+    0 18px 46px rgba(24, 24, 28, 0.18),
+    0 4px 14px rgba(24, 24, 28, 0.08);
   --shadow-dialog:
     0 28px 80px rgba(24, 24, 28, 0.22),
     0 4px 18px rgba(24, 24, 28, 0.1);
