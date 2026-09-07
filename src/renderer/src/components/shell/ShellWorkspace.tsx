@@ -3,7 +3,6 @@ import {
   Activity,
   ChevronDown,
   ChevronRight,
-  CircleX,
   LoaderCircle,
   Maximize2,
   Minimize2,
@@ -11,7 +10,8 @@ import {
   PanelRightOpen,
   Play,
   Plus,
-  Save
+  Save,
+  Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
@@ -424,7 +424,7 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
               }
               status={
                 unavailable ? (
-                  <CircleX className="qtab-disconnected" />
+                  <Unplug className="qtab-disconnected" />
                 ) : connectionStatus?.state === 'connecting' || tab.running ? (
                   <LoaderCircle className="qtab-spinner animate-spin" />
                 ) : tab.runFailed ? (
