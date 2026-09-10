@@ -124,14 +124,16 @@ Status: **completed**
 
 ### Stage 3: timeout, cancellation, and ownership
 
-Status: **in progress**
+Status: **completed**
 
 - [x] Keep the VM timeout for non-yielding JavaScript.
 - [x] Inject execution-scoped `AbortSignal` and read `maxTimeMS` through the provider boundary.
 - [x] Connect Stop to the official interrupt flag without suspending a shared client.
 - [x] Prove that stopping one tab does not affect concurrent tabs.
-- [ ] Dispose cursors, sessions, listeners, and runtime state with their owning execution, tab, or connection.
-- [ ] Prevent late callbacks from publishing results after cancellation.
+- [x] Dispose cursors, sessions, provider listeners, and runtime state with their owning execution, tab, or connection.
+- [x] Prevent late callbacks from publishing results or notifications after their query tab closes.
+
+Each Mongosh execution now tracks and ends sessions that its script leaves open. Explicit `endSession()` remains supported and is safe to call before execution cleanup. Renderer completion handlers verify the owning `execId`, so closing a running tab invalidates its result, notification, database-switch, and spinner callbacks.
 
 ### Stage 4: compatibility suite
 
@@ -160,13 +162,15 @@ Low-cost aliases may be retained around the official API. Raw Driver access shou
 
 Status: **in progress**
 
-- [ ] Benchmark app cold startup and first/warm query latency.
+- [x] Benchmark app cold startup and first/warm query latency.
 - [ ] Benchmark 50 ordinary documents and 50 large nested documents.
 - [ ] Benchmark 1,000 Console lines.
 - [ ] Run ten concurrent query tabs and repeated query/tab-close memory tests.
 - [ ] Measure cancellation latency for slow find and aggregation operations.
 - [ ] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage. (`index.js`, `app.asar`, and a Stage-0 macOS ZIP are measured.)
 - [ ] Inspect packaged dynamic `require()` calls and native `.node` files for every target architecture.
+
+Selecting Mongosh now starts loading the runtime through a dedicated IPC call instead of waiting for Run. In a packaged Electron sample with 60 ordinary documents, main-process RSS moved from 225,408 KiB to 270,832 KiB after prewarming; the first subsequent 50-document query reported 47 ms, and a warm query reported 11 ms with 20 ms Renderer-observed wall time. Immediate selection-and-Run still includes initialization latency, so the underlying 150 ms cold-initialization gate remains open.
 
 ### Stage 6: rollout
 

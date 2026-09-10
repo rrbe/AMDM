@@ -1,6 +1,7 @@
-import type { ShellRequest, ShellResult } from '../../shared/types'
+import type { ShellRequest, ShellResult, ShellRuntime } from '../../shared/types'
 import { sessionManager } from './sessionManager'
 import { legacyShellBackend, mongoshShellBackend } from './shellBackends'
+import { prepareMongoshRuntime } from './mongoshCore'
 
 /**
  * In-flight runs keyed by `execId`, so a slow find/aggregate can be cancelled
@@ -9,6 +10,10 @@ import { legacyShellBackend, mongoshShellBackend } from './shellBackends'
  * carried an `execId`; entries are removed in `finally` regardless of outcome.
  */
 const inFlight = new Map<string, AbortController>()
+
+export function prepareShellRuntime(runtime: ShellRuntime): void {
+  if (runtime === 'mongosh') prepareMongoshRuntime()
+}
 
 /** Error used as the abort reason; the driver throws this from cancelled ops. */
 class ShellAbortError extends Error {

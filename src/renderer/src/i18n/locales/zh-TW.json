@@ -133,6 +133,7 @@
     "loadIndexesFailed": "載入索引失敗（{{key}}）：{{error}}",
     "loadUsersFailed": "載入使用者失敗（{{db}}）：{{error}}",
     "formatFailed": "格式化失敗：{{error}}",
+    "prepareRuntimeFailed": "準備查詢執行環境失敗：{{error}}",
     "noActiveConnection": "沒有作用中的連線。",
     "queryTimeout": "查詢逾時",
     "queryFailed": "查詢失敗",

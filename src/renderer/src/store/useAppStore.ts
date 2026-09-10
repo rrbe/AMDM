@@ -334,6 +334,22 @@ function patchTabResults(
   return { tabs: patchTab(s.tabs, tabId, make(tab)) }
 }
 
+/** Apply an async result only while this exact execution still owns the tab. */
+function patchCurrentExecution(
+  s: { tabs: QueryTab[] },
+  tabId: string,
+  execId: string,
+  make: (tab: QueryTab) => Partial<QueryTab>
+): { tabs: QueryTab[] } | Record<string, never> {
+  const tab = s.tabs.find((item) => item.id === tabId)
+  if (!tab || tab.runningExecId !== execId) return {}
+  return { tabs: patchTab(s.tabs, tabId, make(tab)) }
+}
+
+function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): boolean {
+  return s.tabs.some((tab) => tab.id === tabId && tab.runningExecId === execId)
+}
+
 /** The tab present at first render (so init can point activeTabId at it). */
 const INITIAL_TAB = createTab(newTabId())
 
@@ -968,6 +984,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         runFailed: false
       })
     }))
+    if (runtime === 'mongosh') {
+      void window.api.shell.prepare(runtime).catch((error) => {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.prepareRuntimeFailed', { error: errMessage(error) }),
+            'query',
+            'query:prepareRuntime'
+          )
+        )
+      })
+    }
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
@@ -1071,12 +1099,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       // earlier results stay around for side-by-side comparison.
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
-      // `use <db>` REPL command: switch the tab's active database (also warms
-      // its collection names for completion via setActiveDatabase).
-      if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
+      // `use <db>` REPL command: switch only the tab that still owns this run.
+      const nextDatabase = result.useDatabase
+      if (nextDatabase && ownsExecution(get(), tabId, execId)) {
+        set((s) => patchCurrentExecution(s, tabId, execId, () => ({ activeDatabase: nextDatabase })))
+        if (get().catalogs[connectionId]?.collections[nextDatabase] === undefined) {
+          void get().loadCollections(connectionId, nextDatabase)
+        }
+      }
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1085,17 +1118,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
     void get().loadHistory()
   },
@@ -1142,9 +1175,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now(), skip })))
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip })
+        )
+      )
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1153,17 +1190,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => patchResult(t, resultId, { result })))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
   },
 
@@ -1200,9 +1237,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1211,17 +1248,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
     void get().loadHistory()
   },
@@ -1253,9 +1290,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         execId
       })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() })))
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now() })
+        )
+      )
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1264,17 +1305,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() })))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now() })
+        )
+      )
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
   },
 

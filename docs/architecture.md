@@ -25,6 +25,8 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 `src/main/mongo/shellEngine.ts` routes each execution to the runtime selected by its query tab. `shellCore.ts` owns the Legacy compatibility layer, while `mongoshCore.ts` adapts the official evaluator, Shell API, and Node Driver provider to the same `ShellResult` contract. Runtime selection is explicit and is never used as an automatic retry or fallback after execution begins.
 
+Selecting Mongosh asks main to prepare its lazy runtime before the first Run. Each execution owns its provider listeners, cursors, and sessions; cleanup ends sessions left open by the isolated script without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
+
 Preserve these contracts when maintaining either runtime:
 
 - In Legacy, implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.

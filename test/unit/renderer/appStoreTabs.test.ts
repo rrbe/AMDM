@@ -57,6 +57,8 @@ describe('connection-bound tabs', () => {
   })
 
   it('keeps runtime per tab and clears results when it changes', () => {
+    const prepare = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', { api: { shell: { prepare } } })
     useAppStore.setState({
       tabs: [
         createTab('c1-tab', {
@@ -85,6 +87,7 @@ describe('connection-bound tabs', () => {
       activeResultId: null,
       resultSeq: 0
     })
+    expect(prepare).toHaveBeenCalledWith('mongosh')
   })
 
   it('loads a saved query into its bound connection without running it', () => {
@@ -552,6 +555,52 @@ describe('connection-bound tabs', () => {
       runFailed: false
     })
     expect(useAppStore.getState().notifications).toHaveLength(notificationCount)
+  })
+
+  it('discards late results and notifications after their query tab closes', async () => {
+    let finish!: (result: ShellResult) => void
+    const execute = vi.fn(
+      () =>
+        new Promise<ShellResult>((resolve) => {
+          finish = resolve
+        })
+    )
+    const abort = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute, abort },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    useAppStore.setState({
+      tabs: [
+        createTab('closing-tab', {
+          connectionId: 'c1',
+          activeDatabase: 'test',
+          code: 'db.items.find({})'
+        }),
+        createTab('remaining-tab', { connectionId: 'c1' })
+      ],
+      activeTabId: 'closing-tab',
+      notifications: []
+    })
+
+    const run = useAppStore.getState().runShell()
+    const execId = execute.mock.calls[0][0].execId
+    useAppStore.getState().closeTab('closing-tab')
+    expect(abort).toHaveBeenCalledWith(execId)
+
+    finish({
+      kind: 'error',
+      errorName: 'MongoServerError',
+      error: 'late failure',
+      failureKind: 'server'
+    })
+    await run
+
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ id: 'remaining-tab', results: [] })
+    expect(useAppStore.getState().notifications).toEqual([])
   })
 
   it('stores the exact executed selection on its result tab', async () => {

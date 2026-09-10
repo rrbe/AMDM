@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MongoClient, ObjectId } from "mongodb";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import type { CompassServiceProvider } from "@mongosh/service-provider-node-driver";
@@ -237,6 +237,28 @@ describe("official mongosh runtime compatibility", () => {
       database: "mongosh_spike",
     });
     expect(client.listenerCount(event)).toBe(listenersBefore);
+  });
+
+  it("ends sessions left open by an isolated execution", async () => {
+    const startSession = client.startSession.bind(client);
+    const endSession = vi.fn();
+    const startSpy = vi.spyOn(client, "startSession").mockImplementation((options) => {
+      const session = startSession(options);
+      const end = session.endSession.bind(session);
+      endSession.mockImplementation(end);
+      session.endSession = endSession;
+      return session;
+    });
+
+    try {
+      const result = await runMongoshOnClient(client, "db.getMongo().startSession(); 1", {
+        database: "mongosh_spike",
+      });
+      expect(result).toMatchObject({ kind: "value", data: { $numberInt: "1" } });
+      expect(endSession).toHaveBeenCalledOnce();
+    } finally {
+      startSpy.mockRestore();
+    }
   });
 
   it("supports common database helpers and commands", async () => {

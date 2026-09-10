@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import vm from 'node:vm'
 import { EventEmitter } from 'node:events'
-import type { MongoClient } from 'mongodb'
+import type { ClientSession, MongoClient } from 'mongodb'
 import type { CompassServiceProvider, DevtoolsConnectOptions } from '@mongosh/service-provider-node-driver'
 import type { ShellInstanceState, ShellResult as MongoshResult } from '@mongosh/shell-api'
 import type { ShellEvaluator } from '@mongosh/shell-evaluator'
@@ -34,6 +34,10 @@ function loadMongoshRuntime(): MongoshRuntime {
   return loadedRuntime
 }
 
+export function prepareMongoshRuntime(): void {
+  loadMongoshRuntime()
+}
+
 export function createMongoshServiceProvider(client: MongoClient): CompassServiceProvider {
   const { CompassServiceProvider } = loadMongoshRuntime()
   const event = 'topologyDescriptionChanged'
@@ -53,6 +57,20 @@ export function createMongoshServiceProvider(client: MongoClient): CompassServic
 function releaseMongoshServiceProvider(provider: CompassServiceProvider): void {
   providerCleanup.get(provider)?.()
   providerCleanup.delete(provider)
+}
+
+function trackExecutionSessions(provider: CompassServiceProvider): () => Promise<void> {
+  const sessions = new Set<ClientSession>()
+  const startSession = provider.startSession.bind(provider)
+  provider.startSession = ((options) => {
+    const session = startSession(options)
+    sessions.add(session)
+    return session
+  }) as CompassServiceProvider['startSession']
+  return async () => {
+    await Promise.allSettled([...sessions].map((session) => session.endSession()))
+    sessions.clear()
+  }
 }
 
 export interface MongoshEvaluationOptions {
@@ -238,8 +256,10 @@ export async function runMongoshOnClient(
   const started = Date.now()
   const output = new OutputCollector()
   let provider: CompassServiceProvider | undefined
+  let releaseSessions: (() => Promise<void>) | undefined
   try {
     provider = createMongoshServiceProvider(client)
+    releaseSessions = trackExecutionSessions(provider)
     const evaluation = await evaluateMongosh(provider, options.database, code, { ...options, output })
     try {
       return await adaptMongoshResult(evaluation, code, options, started, output)
@@ -269,6 +289,7 @@ export async function runMongoshOnClient(
       ...(await outputFields(output))
     }
   } finally {
+    await releaseSessions?.()
     if (provider) releaseMongoshServiceProvider(provider)
   }
 }

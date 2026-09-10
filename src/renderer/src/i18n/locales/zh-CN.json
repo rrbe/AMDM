@@ -133,6 +133,7 @@
     "loadIndexesFailed": "加载索引失败（{{key}}）：{{error}}",
     "loadUsersFailed": "加载用户失败（{{db}}）：{{error}}",
     "formatFailed": "格式化失败：{{error}}",
+    "prepareRuntimeFailed": "准备查询运行时失败：{{error}}",
     "noActiveConnection": "没有活动连接。",
     "queryTimeout": "查询超时",
     "queryFailed": "查询失败",

@@ -133,6 +133,7 @@
     "loadIndexesFailed": "Failed to load indexes for {{key}}: {{error}}",
     "loadUsersFailed": "Failed to load users for {{db}}: {{error}}",
     "formatFailed": "Format failed: {{error}}",
+    "prepareRuntimeFailed": "Failed to prepare query runtime: {{error}}",
     "noActiveConnection": "No active connection.",
     "queryTimeout": "Query timed out",
     "queryFailed": "Query failed",
