@@ -139,10 +139,12 @@ Status: **in progress**
 
 - [x] Run the existing Shell integration and parser regression baseline.
 - [x] Add `Mongo`, `Session`, `getMongo`, `startSession`, `getDatabase`, and `withTransaction` coverage.
-- [ ] Add representative `rs`, `sh`, admin, BSON, top-level await, async callback, and multi-statement scripts.
-- [ ] Add AI-generated mongosh examples as immutable fixtures.
-- [ ] Classify cases as identical, normalized-output difference, legacy-only, or mongosh-only.
-- [ ] Run write comparisons against isolated databases; never execute a failed write in both engines against the same state.
+- [x] Add representative `rs`, `sh`, admin, BSON, top-level await, async callback, and multi-statement scripts.
+- [x] Add an AI-style multi-collection cleanup transaction as an immutable integration case.
+- [x] Classify cases as identical, normalized-output difference, legacy-only, or mongosh-only in `docs/mongosh-compatibility.md`.
+- [x] Run write cases against reset databases; never execute a failed write in both engines against the same state.
+
+The real-replica-set suite currently contains 26 Mongosh-specific cases alongside the 100-case Legacy Shell baseline. Successful sharding operations remain environment-dependent and are tracked separately in the compatibility matrix.
 
 Known legacy extensions requiring an explicit decision:
 
@@ -150,6 +152,7 @@ Known legacy extensions requiring an explicit decision:
 - `db.collection(name)`
 - `cursor.project(...)`
 - `collection.indexes()`
+- `db.listCollections()`
 
 Low-cost aliases may be retained around the official API. Raw Driver access should move to `driverDb`.
 
