@@ -6,9 +6,19 @@ import tailwindcss from '@tailwindcss/vite'
 import { version } from './package.json'
 
 const buildId = `${version} - ${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
+const mongoshRuntimePlugin = {
+  name: 'build-mongosh-runtime',
+  closeBundle(): void {
+    execFileSync(process.execPath, [resolve('scripts/build-mongosh-runtime.mjs')], { stdio: 'inherit' })
+  }
+}
 
 export default defineConfig({
   main: {
+    // electron-vite clears out/main before both production and dev builds.
+    // Build the isolated mongosh artifact only after the main bundle has been
+    // written so Electron never starts with the companion file missing.
+    plugins: [mongoshRuntimePlugin],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')

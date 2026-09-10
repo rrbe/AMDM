@@ -8,10 +8,10 @@
   "type": "commonjs",
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "predev": "install-electron && pnpm build:mongosh-runtime",
+    "predev": "install-electron",
     "dev": "electron-vite dev --watch",
     "start": "electron-vite preview",
-    "build": "electron-vite build && pnpm build:mongosh-runtime",
+    "build": "electron-vite build",
     "build:mongosh-runtime": "node scripts/build-mongosh-runtime.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
     "pretest": "pnpm build:mongosh-runtime",
