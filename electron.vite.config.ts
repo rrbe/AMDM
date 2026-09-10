@@ -39,6 +39,16 @@ export default defineConfig({
         ]
       },
       rollupOptions: {
+        // These optional Driver integrations are present only because the
+        // official mongosh provider uses them. Keep the existing main bundle
+        // from traversing that dependency graph; the Stage-0 runtime is built
+        // separately by scripts/build-mongosh-runtime.mjs.
+        external: [
+          '@aws-sdk/credential-providers',
+          'gcp-metadata',
+          'kerberos',
+          'mongodb-client-encryption'
+        ],
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           // Emitted as out/main/serializer.worker.js; loaded by serializerPool

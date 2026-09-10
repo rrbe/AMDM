@@ -27,6 +27,8 @@ When electron-builder reconstructs the dependency tree from a pnpm lockfile, it 
 
 Do not treat packages with native bindings as pure JavaScript dependencies. Confirm their ABI, target architecture, and electron-builder collection behavior first.
 
+`pnpm build:mongosh-runtime` rebuilds the bundled official mongosh runtime in `out/main`. `pnpm build` invokes it after Electron Vite so that the latter cannot remove the generated artifact while cleaning its output directory.
+
 ## Update artifacts
 
 The release workflow publishes more than the interactive installers:
