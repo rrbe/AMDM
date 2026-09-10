@@ -208,6 +208,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
         code: req.code,
         connectionId: req.connectionId,
         database: req.database,
+        runtime: req.runtime,
         ok: result.kind !== 'error',
         summary: historySummary(result.kind, result.count, result.elapsedMs, result.errorName)
       },

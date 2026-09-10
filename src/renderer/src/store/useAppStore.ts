@@ -39,6 +39,7 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellResult,
+  ShellRuntime,
   TestResult,
   UpdateState,
   UserInfo
@@ -181,6 +182,7 @@ interface AppState {
 
   // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
+  setShellRuntime(runtime: ShellRuntime): void
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
@@ -213,7 +215,7 @@ interface AppState {
   loadHistory(): Promise<void>
   clearHistory(): Promise<void>
   /** Load a query/history snippet into its connection-bound editor (never auto-runs). */
-  applyQuery(code: string, database?: string, connectionId?: string): void
+  applyQuery(code: string, database?: string, connectionId?: string, runtime?: ShellRuntime): void
 
   // ---- actions: autocomplete (Phase 2) ----
   /** Fetch (and cache) sampled field names for a collection. */
@@ -956,6 +958,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false }) }))
   },
 
+  setShellRuntime(runtime) {
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, {
+        runtime,
+        results: [],
+        activeResultId: null,
+        resultSeq: 0,
+        runFailed: false
+      })
+    }))
+  },
+
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
   // surfaces through the notification queue rather than throwing into UI.
   async formatCode() {
@@ -1050,7 +1064,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code }
+    const query = { connectionId, database, code, runtime: tab.runtime }
     let runFailed = false
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
@@ -1181,7 +1195,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code }
+    const query = { connectionId, database, code, runtime: tab.runtime }
     let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
@@ -1334,7 +1348,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyQuery(code, database, connectionId) {
+  applyQuery(code, database, connectionId, runtime = 'legacy') {
     // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
@@ -1350,7 +1364,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? active
           : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
       const activeDatabase = database || targetTab?.activeDatabase || ''
-      const match = { connectionId: targetConnectionId, database: activeDatabase, code }
+      const match = { connectionId: targetConnectionId, database: activeDatabase, code, runtime }
       const { focusId, reuseId } = pickFillTarget(s.tabs, targetTab?.id ?? s.activeTabId, match)
       if (focusId) {
         return { activeConnectionId: targetConnectionId, activeTabId: focusId }
@@ -1362,14 +1376,16 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, reuseId, {
             connectionId: targetConnectionId,
             code,
-            activeDatabase
+            activeDatabase,
+            runtime
           })
         }
       }
       const tab = createTab(newTabId(), {
         connectionId: targetConnectionId,
         code,
-        activeDatabase
+        activeDatabase,
+        runtime
       })
       return {
         activeConnectionId: targetConnectionId,

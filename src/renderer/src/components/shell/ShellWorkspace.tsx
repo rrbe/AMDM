@@ -49,6 +49,7 @@ export function ShellWorkspace(): React.JSX.Element {
   const connections = useAppStore((s) => s.connections)
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
   const code = useAppStore((s) => getActiveTab(s).code)
+  const runtime = useAppStore((s) => getActiveTab(s).runtime)
   const running = useAppStore((s) => getActiveTab(s).running)
   const stopping = useAppStore((s) => getActiveTab(s).stopping)
   const activeConnectionState = useAppStore((s) => {
@@ -57,6 +58,7 @@ export function ShellWorkspace(): React.JSX.Element {
   })
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
+  const setShellRuntime = useAppStore((s) => s.setShellRuntime)
   const formatCode = useAppStore((s) => s.formatCode)
   const runShell = useAppStore((s) => s.runShell)
   const stopShell = useAppStore((s) => s.stopShell)
@@ -195,6 +197,25 @@ export function ShellWorkspace(): React.JSX.Element {
             </div>
 
             <div className="work-actions">
+              <Select
+                value={runtime}
+                disabled={running}
+                onChange={setShellRuntime}
+                aria-label={t('shell.runtime')}
+                className="h-7 w-[112px] px-2"
+                options={[
+                  {
+                    value: 'legacy',
+                    label: t('shell.runtimeLegacy'),
+                    description: t('shell.runtimeLegacyDescription')
+                  },
+                  {
+                    value: 'mongosh',
+                    label: t('shell.runtimeMongosh'),
+                    description: t('shell.runtimeMongoshDescription')
+                  }
+                ]}
+              />
               {running ? (
                 <Button variant="danger" disabled={stopping} onClick={() => void stopShell()}>
                   <LoaderCircle className="animate-spin" aria-hidden />

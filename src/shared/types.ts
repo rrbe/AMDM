@@ -258,10 +258,15 @@ export interface SchemaModel {
 // Shell execution
 // ---------------------------------------------------------------------------
 
+export type ShellRuntime = 'legacy' | 'mongosh'
+
 export interface ShellRequest {
   connectionId: string
   database: string
   code: string
+  /** Execution engine selected by the query tab. Missing means Legacy for
+      compatibility with callers and persisted data created before 26.8.17. */
+  runtime?: ShellRuntime
   /** Default page size applied to bare cursors so results remain bounded. */
   limit?: number
   /** Page offset injected into a `find()` cursor for prev/next paging. Only
@@ -341,6 +346,7 @@ export interface SavedQuery {
   /** Optional binding to a connection + database. */
   connectionId?: string
   database?: string
+  runtime?: ShellRuntime
   /** Optional folder name for two-level organization in the sidebar. Empty /
       undefined = ungrouped. */
   folder?: string
@@ -355,6 +361,7 @@ export interface SavedQueryInput {
   code: string
   connectionId?: string
   database?: string
+  runtime?: ShellRuntime
   folder?: string
 }
 
@@ -363,6 +370,7 @@ export interface HistoryEntry {
   code: string
   connectionId: string
   database: string
+  runtime?: ShellRuntime
   ranAt: number
   ok: boolean
   /** Short summary, e.g. "12 docs · 8ms" or an error name. */

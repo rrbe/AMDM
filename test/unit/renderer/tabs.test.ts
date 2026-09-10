@@ -59,6 +59,7 @@ describe('createTab', () => {
       id: 'a',
       connectionId: null,
       code: '',
+      runtime: 'legacy',
       activeDatabase: '',
       pristine: true,
       results: [],

@@ -23,11 +23,13 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 ## Shell compatibility layer
 
-`src/main/mongo/shellCore.ts` is authoritative for Shell behavior and the shim catalog. Preserve these contracts when maintaining it:
+`src/main/mongo/shellEngine.ts` routes each execution to the runtime selected by its query tab. `shellCore.ts` owns the Legacy compatibility layer, while `mongoshCore.ts` adapts the official evaluator, Shell API, and Node Driver provider to the same `ShellResult` contract. Runtime selection is explicit and is never used as an automatic retry or fallback after execution begins.
 
-- Implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.
-- Do not replace mongosh positional arguments, completion values, or implicit-await behavior with superficially similar Node driver APIs.
-- Preserve synthetic promise tagging across proxies and cursor patches; otherwise multi-statement scripts can observe unresolved promises.
+Preserve these contracts when maintaining either runtime:
+
+- In Legacy, implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.
+- In Mongosh, preserve official positional arguments, completion values, and implicit-await behavior rather than replacing them with superficially similar Node Driver APIs.
+- In Legacy, preserve synthetic promise tagging across proxies and cursor patches; otherwise multi-statement scripts can observe unresolved promises.
 - Errors created inside `vm` come from another realm. Extract error details structurally instead of relying on `instanceof Error`.
 - Bound results by default. Materialize a complete cursor only when the user explicitly invokes a full-result API.
 

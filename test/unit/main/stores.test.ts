@@ -47,6 +47,11 @@ describe('queryStore — saved queries', () => {
     queryStore.deleteQuery(saved.id)
     expect(queryStore.listQueries()).toEqual([])
   })
+  it('persists the selected query runtime', () => {
+    const saved = queryStore.saveQuery({ name: 'mongosh', code: 'db.getMongo()', runtime: 'mongosh' })
+    expect(saved.runtime).toBe('mongosh')
+    expect(JSON.parse(readFileSync(join(dir, 'queries.json'), 'utf8')).queries[0].runtime).toBe('mongosh')
+  })
 })
 
 describe('queryStore — history', () => {
@@ -65,6 +70,10 @@ describe('queryStore — history', () => {
     queryStore.addHistory(entry('x'), 200)
     queryStore.clearHistory()
     expect(queryStore.listHistory()).toEqual([])
+  })
+  it('persists the execution runtime in history', () => {
+    queryStore.addHistory({ ...entry('db.getMongo()'), runtime: 'mongosh' }, 200)
+    expect(queryStore.listHistory()[0].runtime).toBe('mongosh')
   })
 })
 

@@ -56,6 +56,37 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('table')
   })
 
+  it('keeps runtime per tab and clears results when it changes', () => {
+    useAppStore.setState({
+      tabs: [
+        createTab('c1-tab', {
+          connectionId: 'c1',
+          results: [
+            {
+              id: 'result-1',
+              seq: 1,
+              result: { kind: 'value', data: 1 },
+              executedAt: 1,
+              query: null,
+              skip: 0
+            }
+          ],
+          activeResultId: 'result-1',
+          resultSeq: 1
+        })
+      ]
+    })
+
+    useAppStore.getState().setShellRuntime('mongosh')
+
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      runtime: 'mongosh',
+      results: [],
+      activeResultId: null,
+      resultSeq: 0
+    })
+  })
+
   it('loads a saved query into its bound connection without running it', () => {
     const execute = vi.fn()
     vi.stubGlobal('window', { api: { shell: { execute } } })
@@ -545,7 +576,8 @@ db.unselectedAfter.find({})`
         createTab('c1-tab', {
           connectionId: 'c1',
           activeDatabase: 'shop',
-          code: editorCode
+          code: editorCode,
+          runtime: 'mongosh'
         })
       ],
       activeTabId: 'c1-tab'
@@ -553,7 +585,8 @@ db.unselectedAfter.find({})`
 
     await useAppStore.getState().runShell(selection)
 
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection }))
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection, runtime: 'mongosh' }))
     expect(useAppStore.getState().tabs[0].results[0].query?.code).toBe(selection)
+    expect(useAppStore.getState().tabs[0].results[0].query?.runtime).toBe('mongosh')
   })
 })

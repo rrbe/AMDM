@@ -354,7 +354,7 @@ const TRANSPILE_CACHE_MAX = 50
  * REPL completion-value semantics by `return`ing the last expression statement
  * — and transpile the wrapper instead (implicit await still applies inside).
  */
-function wrapTopLevelAwait(code: string): string {
+export function wrapTopLevelAwait(code: string): string {
   const ast = parseJs(code, { sourceType: 'script', allowAwaitOutsideFunction: true })
   const body = ast.program.body
   const last = body[body.length - 1]
@@ -369,6 +369,21 @@ function wrapTopLevelAwait(code: string): string {
       code.slice(last.end as number)
   }
   return `(async () => { ${inner}\n})()`
+}
+
+/** Preserve AMDM's explicit top-level-await extension before code enters an
+    evaluator that otherwise parses it as a script. This is a parse-only
+    decision: execution is never retried in another shape. */
+export function prepareTopLevelAwait(code: string): string {
+  try {
+    parseJs(code, { sourceType: 'script' })
+    return code
+  } catch (error) {
+    if (error instanceof SyntaxError && /'await' is only allowed/.test(error.message)) {
+      return wrapTopLevelAwait(code)
+    }
+    return code
+  }
 }
 
 export function transpileShellCode(code: string): string {

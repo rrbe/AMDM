@@ -83,60 +83,62 @@ Stage-0 evidence so far:
 - Real replica-set integration tests pass for a bounded cursor and the standard `db.getMongo().startSession()` / `withTransaction()` flow.
 - Directly exposing the official packages to the current Rolldown graph still panics. A separate esbuild-produced CommonJS vendor artifact succeeds and can be required without `node_modules` present.
 - The vendor artifact is 5,725,416 bytes (1,520,197 bytes gzip). The existing main bundle grows by 173,770 bytes because optional Driver integrations must remain external to Rolldown.
-- The packaged arm64 `app.asar` is 39,506,876 bytes, 5,899,799 bytes above the previous 26.8.17 artifact. The macOS ZIP is 127,690,368 bytes, 1,632,031 bytes above the previous 26.8.17 ZIP and within the 5 MB ZIP gate.
-- The unpacked application launches successfully. Executing the official runtime from the packaged application remains pending because the spike is deliberately not routed through IPC yet.
+- The current packaged arm64 `app.asar` is 39,515,985 bytes, 5,908,908 bytes above the previous 26.8.17 artifact. The Stage-0 macOS ZIP was 127,690,368 bytes, 1,632,031 bytes above the previous 26.8.17 ZIP and within the 5 MB ZIP gate.
+- The unpacked application launches successfully. Electron CDP validation against a real local replica set selected Mongosh in the rendered query tab and executed both a normal cursor query and a `db.getMongo().startSession()` / `withTransaction()` script through packaged IPC. The successful transaction-plus-query result was `2 docs · 21ms`.
+- In a fresh packaged process, the first three-document Mongosh cursor query took 215 ms and the next identical query took 13 ms. Main-process RSS rose from 225,008 KiB before loading Mongosh to a 286,688 KiB observed peak, then settled at 278,144 KiB. This is a single reference-machine sample, not a release benchmark; the 150 ms first-query gate is therefore not yet satisfied.
+- CDP also confirmed the real Renderer selector event, a 112 × 28 px computed control size, editor focus after selection, and the resulting Table/Tree/JSON-compatible document output.
 - The packaged app starts without Kerberos, Client-Side Field Level Encryption, AWS credentials, or GCP metadata packages in `app.asar`; the standalone vendor artifact also loads with no `node_modules` directory. Those integrations remain explicitly outside the current connection-mode guarantee.
 - The first packaging attempt was blocked by a Sparkle download timeout. Reusing the already verified local Sparkle 2.9.2 artifact allowed the packaging check to complete; this was an environment failure, not a runtime build failure.
 
 Exit criteria:
 
-- `pnpm build` succeeds.
-- The unpacked application launches and executes both a normal query and a transaction.
-- The macOS ZIP grows by no more than 5 MB unless the increase is explicitly accepted.
-- App cold startup regression is below 100 ms, or the runtime is lazy-loaded.
-- First-query runtime initialization is below 150 ms on the reference machine.
-- No unsupported native module is required for currently supported connection modes.
+- [x] `pnpm build` succeeds.
+- [x] The unpacked application launches and executes both a normal query and a transaction.
+- [x] The macOS ZIP grows by no more than 5 MB unless the increase is explicitly accepted.
+- [x] App cold startup regression is below 100 ms, or the runtime is lazy-loaded.
+- [ ] First-query runtime initialization is below 150 ms on the reference machine.
+- [x] No unsupported native module is required for currently supported connection modes.
 
 ### Stage 1: dual backend boundary
 
-Status: **not started**
+Status: **completed**
 
-- [ ] Keep the current implementation behavior unchanged behind `LegacyShellBackend`.
-- [ ] Add `MongoshShellBackend` without changing Renderer result components.
-- [ ] Add an explicit backend field to execution, saved-query, and history contracts.
-- [ ] Keep backend state scoped to a query tab; switching backends clears runtime-owned state.
-- [ ] Disable automatic execution fallback.
+- [x] Keep the current implementation behavior unchanged behind `LegacyShellBackend`.
+- [x] Add `MongoshShellBackend` without changing Renderer result components.
+- [x] Add an explicit backend field to execution, saved-query, and history contracts.
+- [x] Keep backend state scoped to a query tab; switching backends clears runtime-owned state.
+- [x] Disable automatic execution fallback.
 
 ### Stage 2: AMDM result parity
 
-Status: **not started**
+Status: **completed**
 
-- [ ] Map official `type`, `rawValue`, `printable`, and `source` to the existing `ShellResult`.
-- [ ] Preserve default 50-document cursor output.
-- [ ] Preserve full explicit `toArray()` output.
-- [ ] Preserve Find cursor previous/next paging.
-- [ ] Keep aggregation cursors non-pageable until reconstruction is proven correct.
-- [ ] Preserve EJSON canonical serialization and BSON fixtures.
-- [ ] Prefer official `source.namespace` over source-text collection detection.
-- [ ] Preserve Explain and output collection behavior.
+- [x] Map official `type`, `rawValue`, `printable`, and `source` to the existing `ShellResult`.
+- [x] Preserve default 50-document cursor output.
+- [x] Preserve full explicit `toArray()` output.
+- [x] Preserve Find cursor previous/next paging.
+- [x] Keep aggregation cursors non-pageable until reconstruction is proven correct.
+- [x] Preserve EJSON canonical serialization and BSON fixtures.
+- [x] Prefer official `source.namespace` over source-text collection detection.
+- [x] Preserve Explain and output collection behavior.
 
 ### Stage 3: timeout, cancellation, and ownership
 
-Status: **not started**
+Status: **in progress**
 
-- [ ] Keep the VM timeout for non-yielding JavaScript.
-- [ ] Inject execution-scoped `AbortSignal` and read `maxTimeMS` through the provider boundary.
-- [ ] Connect Stop to the official interrupt flag without suspending a shared client.
-- [ ] Prove that stopping one tab does not affect concurrent tabs.
+- [x] Keep the VM timeout for non-yielding JavaScript.
+- [x] Inject execution-scoped `AbortSignal` and read `maxTimeMS` through the provider boundary.
+- [x] Connect Stop to the official interrupt flag without suspending a shared client.
+- [x] Prove that stopping one tab does not affect concurrent tabs.
 - [ ] Dispose cursors, sessions, listeners, and runtime state with their owning execution, tab, or connection.
 - [ ] Prevent late callbacks from publishing results after cancellation.
 
 ### Stage 4: compatibility suite
 
-Status: **not started**
+Status: **in progress**
 
-- [ ] Run the existing 100 Shell integration tests, 25 helper tests, and 3 REPL parser tests as the regression baseline.
-- [ ] Add `Mongo`, `Session`, `getMongo`, `startSession`, `getDatabase`, and `withTransaction` coverage.
+- [x] Run the existing Shell integration and parser regression baseline.
+- [x] Add `Mongo`, `Session`, `getMongo`, `startSession`, `getDatabase`, and `withTransaction` coverage.
 - [ ] Add representative `rs`, `sh`, admin, BSON, top-level await, async callback, and multi-statement scripts.
 - [ ] Add AI-generated mongosh examples as immutable fixtures.
 - [ ] Classify cases as identical, normalized-output difference, legacy-only, or mongosh-only.
@@ -153,22 +155,22 @@ Low-cost aliases may be retained around the official API. Raw Driver access shou
 
 ### Stage 5: performance and release validation
 
-Status: **not started**
+Status: **in progress**
 
 - [ ] Benchmark app cold startup and first/warm query latency.
 - [ ] Benchmark 50 ordinary documents and 50 large nested documents.
 - [ ] Benchmark 1,000 Console lines.
 - [ ] Run ten concurrent query tabs and repeated query/tab-close memory tests.
 - [ ] Measure cancellation latency for slow find and aggregation operations.
-- [ ] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage.
+- [ ] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage. (`index.js`, `app.asar`, and a Stage-0 macOS ZIP are measured.)
 - [ ] Inspect packaged dynamic `require()` calls and native `.node` files for every target architecture.
 
 ### Stage 6: rollout
 
-Status: **not started**
+Status: **in progress**
 
-- [ ] Initially expose runtime selection per query tab with Legacy as the default.
-- [ ] Store the selected runtime with history and saved queries.
+- [x] Initially expose runtime selection per query tab with Legacy as the default.
+- [x] Store the selected runtime with history and saved queries.
 - [ ] Detect unambiguous legacy constructs before execution and offer a mode change; do not switch silently.
 - [ ] Make Mongosh the default only after parity, packaging, cancellation, and performance gates pass.
 - [ ] Retain Legacy for a defined transition period.
