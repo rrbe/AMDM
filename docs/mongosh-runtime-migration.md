@@ -167,8 +167,8 @@ Status: **in progress**
 - [x] Benchmark 1,000 Console lines.
 - [x] Run ten concurrent query tabs and repeated query/tab-close memory tests.
 - [x] Measure cancellation latency for slow find and aggregation operations.
-- [ ] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage. (`index.js`, `app.asar`, and a Stage-0 macOS ZIP are measured.)
-- [ ] Inspect packaged dynamic `require()` calls and native `.node` files for every target architecture.
+- [x] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage.
+- [x] Inspect packaged dynamic `require()` calls and native `.node` files for every target architecture.
 
 Selecting Mongosh now starts loading the runtime through a dedicated IPC call instead of waiting for Run. In a packaged Electron sample with 60 ordinary documents, main-process RSS moved from 225,408 KiB to 270,832 KiB after prewarming; the first subsequent 50-document query reported 47 ms, and a warm query reported 11 ms with 20 ms Renderer-observed wall time. Immediate selection-and-Run still includes initialization latency, so the underlying 150 ms cold-initialization gate remains open.
 
@@ -176,16 +176,20 @@ An isolated real-replica-set benchmark after runtime warm-up measured 50 ordinar
 
 The same process completed 600 sequential query executions. RSS rose from 313 MB to 504 MB, with the last two 100-query batches adding about 5.5 MB and 3.0 MB; forced-GC heap samples oscillated rather than growing monotonically. This shows an eventual allocation plateau, but the high transient memory cost remains a rollout concern. Renderer tests additionally start and close ten simultaneous Mongosh query tabs and prove that every execution is aborted without publishing late results or notifications.
 
+Release-target inspection produced a 127,692,587-byte macOS arm64 ZIP, 127,544,777-byte macOS arm64 DMG, 105,775,611-byte Windows x64 NSIS installer, and 136,229,646-byte Linux x64 AppImage. macOS arm64/x64, Windows x64, and Linux x64 packages all contain the same 5,725,471-byte Mongosh runtime with SHA-256 `838cc0cc574a33f80b417901c4ce0ccc831e0390acfa4e092ddc1d5078e8ca17`. No optional Kerberos, CSFLE, AWS/GCP credential package, or Mongosh-owned `.node` file is present. The only packaged native addon is the existing macOS Sparkle addon, which is a universal arm64/x86_64 binary. Both macOS apps pass strict deep signature verification; the generated Windows and Linux executables report the expected x86-64 formats.
+
 ### Stage 6: rollout
 
 Status: **in progress**
 
 - [x] Initially expose runtime selection per query tab with Legacy as the default.
 - [x] Store the selected runtime with history and saved queries.
-- [ ] Detect unambiguous legacy constructs before execution and offer a mode change; do not switch silently.
+- [x] Detect unambiguous runtime-specific constructs before execution and offer a mode change; do not switch silently.
 - [ ] Make Mongosh the default only after parity, packaging, cancellation, and performance gates pass.
 - [ ] Retain Legacy for a defined transition period.
 - [ ] Replace remaining raw Driver use with an explicit `driverDb` escape hatch, then reassess removing Legacy.
+
+Before execution, the Renderer uses its existing JavaScript syntax parser to recognize only structurally unambiguous calls. `db.getMongo()` offers Mongosh; `db.collection()`, `db.listCollections()`, collection `indexes()`, and find-cursor `project()` offer Legacy. Comments, strings, and similarly named methods on other objects are ignored. The user must confirm the switch; cancelling preserves the current runtime and does not execute the query, and execution failures are never retried in another runtime.
 
 ## Validation commands
 

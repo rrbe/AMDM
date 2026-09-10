@@ -68,6 +68,7 @@ import {
   type NotificationSource,
   type NotificationVariant
 } from '@renderer/lib/notifications'
+import { suggestShellRuntime } from '@renderer/lib/shellRuntimeSuggestion'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -183,6 +184,8 @@ interface AppState {
   // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
   setShellRuntime(runtime: ShellRuntime): void
+  dismissShellRuntimeSuggestion(): void
+  acceptShellRuntimeSuggestion(): Promise<void>
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
@@ -971,13 +974,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCode(code) {
     // Only real user edits reach here (the editor skips external value syncs),
     // so typing permanently marks the tab as holding user work.
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false }) }))
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false, runtimeSuggestion: null })
+    }))
   },
 
   setShellRuntime(runtime) {
     set((s) => ({
       tabs: patchTab(s.tabs, s.activeTabId, {
         runtime,
+        runtimeSuggestion: null,
         results: [],
         activeResultId: null,
         resultSeq: 0,
@@ -996,6 +1002,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         )
       })
     }
+  },
+
+  dismissShellRuntimeSuggestion() {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { runtimeSuggestion: null }) }))
+  },
+
+  async acceptShellRuntimeSuggestion() {
+    const suggestion = getActiveTab(get()).runtimeSuggestion
+    if (!suggestion) return
+    get().setShellRuntime(suggestion.runtime)
+    await get().runShell(suggestion.code)
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
@@ -1081,6 +1098,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (!code.trim()) return
+    const runtimeSuggestion = suggestShellRuntime(code, tab.runtime)
+    if (runtimeSuggestion) {
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, { runtimeSuggestion: { ...runtimeSuggestion, code } })
+      }))
+      return
+    }
     const database = tab.activeDatabase || 'test'
     const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
     const execId = newExecId()

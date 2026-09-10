@@ -1,6 +1,7 @@
 {
   "common": {
     "close": "关闭",
+    "cancel": "取消",
     "dismiss": "关闭",
     "refresh": "刷新",
     "settings": "设置"
@@ -359,6 +360,9 @@
     "runtimeLegacyDescription": "现有 AMDM 兼容引擎",
     "runtimeMongosh": "Mongosh",
     "runtimeMongoshDescription": "官方 mongosh 语法引擎（测试中）",
+    "runtimeSuggestionTitle": "切换查询运行时？",
+    "runtimeSuggestion": "检测到 {{construct}} 仅受 {{runtime}} 运行时支持。切换运行时后可执行此查询。",
+    "switchRuntime": "切换到 {{runtime}} 并运行",
     "resizeEditor": "调整编辑器大小",
     "expandQuery": "展开 Query 区",
     "restoreQuery": "恢复 Query 区",

@@ -31,6 +31,8 @@ The compatibility suite also executes an AI-style four-collection cleanup transa
 
 The runtime router never retries a failed script in the other engine. These differences therefore surface as explicit errors instead of risking a duplicate write.
 
+For the unambiguous constructs in this table, AMDM offers to switch runtime before execution. The prompt requires explicit confirmation; cancelling keeps the current runtime and does not execute the query. Detection uses the JavaScript syntax tree, so matching text in comments, strings, or methods on unrelated objects does not trigger it.
+
 ## Environment-dependent coverage
 
 - `rs.status()` is verified against a replica set.

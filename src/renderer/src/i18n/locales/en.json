@@ -1,6 +1,7 @@
 {
   "common": {
     "close": "Close",
+    "cancel": "Cancel",
     "dismiss": "Dismiss",
     "refresh": "Refresh",
     "settings": "Settings"
@@ -359,6 +360,9 @@
     "runtimeLegacyDescription": "Current AMDM compatibility engine",
     "runtimeMongosh": "Mongosh",
     "runtimeMongoshDescription": "Official mongosh language engine (Preview)",
+    "runtimeSuggestionTitle": "Switch query runtime?",
+    "runtimeSuggestion": "{{construct}} is supported only by the {{runtime}} runtime. Switch runtimes to run this query.",
+    "switchRuntime": "Switch to {{runtime}} and Run",
     "resizeEditor": "Resize editor",
     "expandQuery": "Expand query editor",
     "restoreQuery": "Restore query editor",

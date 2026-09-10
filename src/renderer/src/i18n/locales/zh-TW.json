@@ -1,6 +1,7 @@
 {
   "common": {
     "close": "關閉",
+    "cancel": "取消",
     "dismiss": "關閉",
     "refresh": "重新整理",
     "settings": "設定"
@@ -359,6 +360,9 @@
     "runtimeLegacyDescription": "現有 AMDM 相容引擎",
     "runtimeMongosh": "Mongosh",
     "runtimeMongoshDescription": "官方 mongosh 語法引擎（測試中）",
+    "runtimeSuggestionTitle": "切換查詢執行環境？",
+    "runtimeSuggestion": "偵測到 {{construct}} 僅受 {{runtime}} 執行環境支援。切換執行環境後可執行此查詢。",
+    "switchRuntime": "切換到 {{runtime}} 並執行",
     "resizeEditor": "調整編輯器大小",
     "expandQuery": "展開 Query 區",
     "restoreQuery": "恢復 Query 區",

@@ -693,4 +693,49 @@ db.unselectedAfter.find({})`
     expect(useAppStore.getState().tabs[0].results[0].query?.code).toBe(selection)
     expect(useAppStore.getState().tabs[0].results[0].query?.runtime).toBe('mongosh')
   })
+
+  it('asks before switching to the runtime required by an unambiguous construct', async () => {
+    const execute = vi.fn().mockResolvedValue({ kind: 'value', data: null } satisfies ShellResult)
+    const prepare = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute, prepare },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    useAppStore.setState({
+      tabs: [
+        createTab('runtime-tab', {
+          connectionId: 'c1',
+          activeDatabase: 'test',
+          code: 'db.getMongo().startSession()',
+          runtime: 'legacy'
+        })
+      ],
+      activeTabId: 'runtime-tab'
+    })
+
+    await useAppStore.getState().runShell()
+
+    expect(execute).not.toHaveBeenCalled()
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      runtime: 'legacy',
+      runtimeSuggestion: {
+        runtime: 'mongosh',
+        construct: 'db.getMongo()',
+        code: 'db.getMongo().startSession()'
+      }
+    })
+
+    useAppStore.getState().dismissShellRuntimeSuggestion()
+    expect(useAppStore.getState().tabs[0].runtimeSuggestion).toBeNull()
+    expect(execute).not.toHaveBeenCalled()
+
+    await useAppStore.getState().runShell()
+    await useAppStore.getState().acceptShellRuntimeSuggestion()
+
+    expect(useAppStore.getState().tabs[0].runtime).toBe('mongosh')
+    expect(prepare).toHaveBeenCalledWith('mongosh')
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'mongosh' }))
+  })
 })

@@ -27,6 +27,8 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 Selecting Mongosh asks main to prepare its lazy runtime before the first Run. Each execution owns its provider listeners, cursors, and sessions; cleanup ends sessions left open by the isolated script without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
 
+Before execution, `shellRuntimeSuggestion.ts` uses the Renderer JavaScript syntax tree to identify only unambiguous runtime-specific calls. A mismatch blocks execution and presents an explicit switch-and-run confirmation; dismissing it leaves both the selected runtime and database untouched. This check is advisory routing before execution, never an error-triggered fallback.
+
 Preserve these contracts when maintaining either runtime:
 
 - In Legacy, implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.

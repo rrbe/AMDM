@@ -95,6 +95,8 @@ export interface QueryTab {
   code: string
   /** Query language/runtime selected for this tab. */
   runtime: ShellRuntime
+  /** An execution-blocking suggestion for code owned by the other runtime. */
+  runtimeSuggestion: { runtime: ShellRuntime; construct: string; code: string } | null
   /** True while `code` is blank or a programmatic fill (browse seed, loaded
       query) the user hasn't edited. Only pristine tabs may be refilled in
       place; anything the user typed gets a tab of its own. Cleared by the
@@ -126,6 +128,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     activeDatabase: '',
     code: '',
     runtime: 'legacy',
+    runtimeSuggestion: null,
     pristine: true,
     results: [],
     activeResultId: null,
