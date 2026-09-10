@@ -146,7 +146,7 @@ Status: **in progress**
 - [x] Classify cases as identical, normalized-output difference, legacy-only, or mongosh-only in `docs/mongosh-compatibility.md`.
 - [x] Run write cases against reset databases; never execute a failed write in both engines against the same state.
 
-The real-replica-set suite currently contains 26 Mongosh-specific cases alongside the 100-case Legacy Shell baseline. Successful sharding operations remain environment-dependent and are tracked separately in the compatibility matrix.
+The real-replica-set suite currently contains 27 Mongosh-specific cases alongside the 100-case Legacy Shell baseline. Successful sharding operations remain environment-dependent and are tracked separately in the compatibility matrix.
 
 Known legacy extensions requiring an explicit decision:
 
@@ -163,14 +163,18 @@ Low-cost aliases may be retained around the official API. Raw Driver access shou
 Status: **in progress**
 
 - [x] Benchmark app cold startup and first/warm query latency.
-- [ ] Benchmark 50 ordinary documents and 50 large nested documents.
-- [ ] Benchmark 1,000 Console lines.
-- [ ] Run ten concurrent query tabs and repeated query/tab-close memory tests.
-- [ ] Measure cancellation latency for slow find and aggregation operations.
+- [x] Benchmark 50 ordinary documents and 50 large nested documents.
+- [x] Benchmark 1,000 Console lines.
+- [x] Run ten concurrent query tabs and repeated query/tab-close memory tests.
+- [x] Measure cancellation latency for slow find and aggregation operations.
 - [ ] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage. (`index.js`, `app.asar`, and a Stage-0 macOS ZIP are measured.)
 - [ ] Inspect packaged dynamic `require()` calls and native `.node` files for every target architecture.
 
 Selecting Mongosh now starts loading the runtime through a dedicated IPC call instead of waiting for Run. In a packaged Electron sample with 60 ordinary documents, main-process RSS moved from 225,408 KiB to 270,832 KiB after prewarming; the first subsequent 50-document query reported 47 ms, and a warm query reported 11 ms with 20 ms Renderer-observed wall time. Immediate selection-and-Run still includes initialization latency, so the underlying 150 ms cold-initialization gate remains open.
+
+An isolated real-replica-set benchmark after runtime warm-up measured 50 ordinary documents at 14 ms, 50 documents containing a 128 KiB nested payload at 47 ms, 1,000 Console lines at 9 ms, and ten concurrent `findOne()` executions at 71 ms total. Slow find and `$function` aggregation operations both returned the cancelled result within 1 ms of the abort signal (about 105–109 ms total including the intentional 100 ms delay before cancellation). These are single reference-machine samples and exclude Renderer painting time.
+
+The same process completed 600 sequential query executions. RSS rose from 313 MB to 504 MB, with the last two 100-query batches adding about 5.5 MB and 3.0 MB; forced-GC heap samples oscillated rather than growing monotonically. This shows an eventual allocation plateau, but the high transient memory cost remains a rollout concern. Renderer tests additionally start and close ten simultaneous Mongosh query tabs and prove that every execution is aborted without publishing late results or notifications.
 
 ### Stage 6: rollout
 

@@ -603,6 +603,61 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().notifications).toEqual([])
   })
 
+  it('isolates ten concurrent query tabs when they are closed before completion', async () => {
+    const finishes: ((result: ShellResult) => void)[] = []
+    const execute = vi.fn(
+      () =>
+        new Promise<ShellResult>((resolve) => {
+          finishes.push(resolve)
+        })
+    )
+    const abort = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute, abort },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+
+    const queryTabs = Array.from({ length: 10 }, (_, index) =>
+      createTab(`query-${index}`, {
+        connectionId: 'c1',
+        activeDatabase: 'test',
+        code: `db.items.findOne({ index: ${index} })`,
+        runtime: 'mongosh'
+      })
+    )
+    useAppStore.setState({
+      tabs: [...queryTabs, createTab('remaining-tab', { connectionId: 'c1' })],
+      activeTabId: 'query-0',
+      notifications: []
+    })
+
+    const runs = queryTabs.map((tab) => {
+      useAppStore.setState({ activeTabId: tab.id })
+      return useAppStore.getState().runShell()
+    })
+    expect(execute).toHaveBeenCalledTimes(10)
+
+    for (const tab of queryTabs) useAppStore.getState().closeTab(tab.id)
+    expect(abort).toHaveBeenCalledTimes(10)
+
+    for (const finish of finishes) {
+      finish({
+        kind: 'error',
+        errorName: 'MongoServerError',
+        error: 'late failure',
+        failureKind: 'server'
+      })
+    }
+    await Promise.all(runs)
+
+    expect(useAppStore.getState().tabs).toEqual([
+      expect.objectContaining({ id: 'remaining-tab', results: [], running: false })
+    ])
+    expect(useAppStore.getState().notifications).toEqual([])
+  })
+
   it('stores the exact executed selection on its result tab', async () => {
     const execute = vi.fn().mockResolvedValue({
       kind: 'documents',
