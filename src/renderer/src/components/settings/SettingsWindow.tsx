@@ -9,6 +9,7 @@ import {
   type CollectionSort,
   type KeyboardShortcutId,
   type Language,
+  type ShellRuntime,
   type ThemeMode
 } from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
@@ -106,6 +107,10 @@ export function SettingsWindow(): React.JSX.Element {
       icon: Search,
       keywords: [
         t('settings.sectionQuery'),
+        t('settings.defaultShellRuntime'),
+        t('settings.defaultShellRuntimeHint'),
+        t('shell.runtimeMongosh'),
+        t('shell.runtimeAmdmDriver'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
         t('settings.queryTimeout'),
@@ -394,6 +399,17 @@ export function SettingsWindow(): React.JSX.Element {
 
           {displayedSectionId === 'query' && (
             <>
+              <Field label={t('settings.defaultShellRuntime')} hint={t('settings.defaultShellRuntimeHint')}>
+                <Select<ShellRuntime>
+                  value={settings.defaultShellRuntime}
+                  onChange={(defaultShellRuntime) => void updateSettings({ defaultShellRuntime })}
+                  options={[
+                    { label: t('shell.runtimeMongosh'), value: 'mongosh' },
+                    { label: t('shell.runtimeAmdmDriver'), value: 'legacy' }
+                  ]}
+                  aria-label={t('settings.defaultShellRuntime')}
+                />
+              </Field>
               <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
                 <Select<number>
                   value={settings.queryLimit}

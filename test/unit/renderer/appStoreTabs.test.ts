@@ -90,6 +90,14 @@ describe('connection-bound tabs', () => {
     expect(prepare).toHaveBeenCalledWith('mongosh')
   })
 
+  it('uses the configured runtime for new query tabs', () => {
+    useAppStore.setState({ settings: { ...DEFAULT_SETTINGS, defaultShellRuntime: 'legacy' } })
+
+    useAppStore.getState().newTab()
+
+    expect(useAppStore.getState().tabs.at(-1)?.runtime).toBe('legacy')
+  })
+
   it('loads a saved query into its bound connection without running it', () => {
     const execute = vi.fn()
     vi.stubGlobal('window', { api: { shell: { execute } } })

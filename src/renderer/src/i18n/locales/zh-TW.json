@@ -56,6 +56,8 @@
     "chooseExportDirectory": "選擇目錄…",
     "queryLimit": "每頁結果數",
     "queryLimitHint": "每頁查詢擷取的文件數量。",
+    "defaultShellRuntime": "預設查詢執行環境",
+    "defaultShellRuntimeHint": "用於新建的查詢分頁。",
     "queryTimeout": "查詢逾時",
     "queryTimeoutHint": "讀取操作的預設 maxTimeMS；語句中明確設定的值優先。",
     "queryTimeoutOff": "不限制",

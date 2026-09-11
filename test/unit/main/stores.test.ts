@@ -84,6 +84,7 @@ describe('settingsStore', () => {
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
+      defaultShellRuntime: 'mongosh',
       dataFontSize: 13,
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
@@ -117,6 +118,12 @@ describe('settingsStore', () => {
     settingsStore.update({ automaticUpdateChecks: false })
     settingsStore.init()
     expect(settingsStore.get().automaticUpdateChecks).toBe(false)
+  })
+
+  it('persists the default shell runtime', () => {
+    settingsStore.update({ defaultShellRuntime: 'legacy' })
+    settingsStore.init()
+    expect(settingsStore.get().defaultShellRuntime).toBe('legacy')
   })
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })

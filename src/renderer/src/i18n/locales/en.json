@@ -56,6 +56,8 @@
     "chooseExportDirectory": "Choose directory…",
     "queryLimit": "Results per page",
     "queryLimitHint": "How many documents a query fetches per page.",
+    "defaultShellRuntime": "Default query runtime",
+    "defaultShellRuntimeHint": "Used for newly created query tabs.",
     "queryTimeout": "Query timeout",
     "queryTimeoutHint": "Default maxTimeMS for reads; an explicit query value takes precedence.",
     "queryTimeoutOff": "No limit",

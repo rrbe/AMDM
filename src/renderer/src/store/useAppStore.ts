@@ -354,7 +354,15 @@ function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): 
 }
 
 /** The tab present at first render (so init can point activeTabId at it). */
-const INITIAL_TAB = createTab(newTabId())
+const INITIAL_TAB = createTab(newTabId(), { runtime: DEFAULT_SETTINGS.defaultShellRuntime })
+
+function createDefaultTab(
+  id: string,
+  settings: AppSettings,
+  init: Partial<QueryTab> = {}
+): QueryTab {
+  return createTab(id, { runtime: settings.defaultShellRuntime, ...init })
+}
 
 /** Concurrent callers share one session attempt instead of opening duplicate
     clients/tunnels for the same Connection. */
@@ -713,7 +721,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, active.id, { connectionId: id })
         }
       }
-      const tab = createTab(newTabId(), { connectionId: id })
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: id })
       return { activeConnectionId: id, tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
   },
@@ -931,8 +939,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---------------------------------------------------------------------- tabs
   newTab() {
-    const tab = createTab(newTabId(), { connectionId: get().activeConnectionId })
-    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+    set((s) => {
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
+      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
   },
 
   setActiveTab(id) {
@@ -949,7 +959,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id)
       if (remaining.length === 0) {
-        const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
+        const fresh = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id }
       }
       const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
@@ -1059,7 +1069,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (focusId) return { activeTabId: focusId }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
-      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code: seed })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1082,7 +1092,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
-      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1818,7 +1828,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   async loadSettings() {
     subscribeToSettings()
     try {
-      set({ settings: await window.api.settings.get() })
+      const settings = await window.api.settings.get()
+      set((s) => ({
+        settings,
+        tabs: s.tabs.map((tab) =>
+          tab.pristine && !tab.code && tab.results.length === 0
+            ? { ...tab, runtime: settings.defaultShellRuntime }
+            : tab
+        )
+      }))
     } catch (e) {
       get().notify(appNotice('warn', tr('notify.loadSettingsFailed'), 'settings', 'settings:load', errMessage(e)))
     }

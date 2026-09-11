@@ -579,6 +579,8 @@ export interface AppSettings {
   queryTimeoutMS: number
   /** Maximum number of executed queries retained in History. */
   historyLimit: number
+  /** Runtime selected for newly created query tabs. */
+  defaultShellRuntime: ShellRuntime
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number
   /** Data result views font size in px (Tree / JSON / Table / Console). */
@@ -642,6 +644,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   queryLimit: 50,
   queryTimeoutMS: 30_000,
   historyLimit: 200,
+  defaultShellRuntime: 'mongosh',
   editorFontSize: 13,
   dataFontSize: 13,
   editorWordWrap: false,

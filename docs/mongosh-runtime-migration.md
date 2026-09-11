@@ -195,7 +195,7 @@ Status: **completed**
 
 Before execution, the Renderer uses its existing JavaScript syntax parser to recognize only structurally unambiguous calls. `db.getMongo()` offers Mongosh; `db.collection()`, `db.listCollections()`, collection `indexes()`, and find-cursor `project()` offer AMDM driver. Comments, strings, and similarly named methods on other objects are ignored. The user must confirm the switch; cancelling preserves the current runtime and does not execute the query, and execution failures are never retried in another runtime.
 
-New query tabs now default to Mongosh. AMDM driver remains selectable for at least one stable release, and saved queries or history entries created before runtime persistence continue to open with AMDM driver. Mongosh exposes `driverDb` as the explicit raw Node Driver escape hatch on the selected connection and database. AMDM driver removal was reassessed and deferred until after that transition release and until usage no longer shows a meaningful compatibility need.
+New query tabs now default to Mongosh, and Settings can change that default to AMDM driver without changing existing tabs. AMDM driver remains selectable for at least one stable release, and saved queries or history entries created before runtime persistence continue to open with AMDM driver. Mongosh exposes `driverDb` as the explicit raw Node Driver escape hatch on the selected connection and database. AMDM driver removal was reassessed and deferred until after that transition release and until usage no longer shows a meaningful compatibility need.
 
 ## Validation commands
 
