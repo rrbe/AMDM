@@ -39,6 +39,7 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellResult,
+  ShellRuntime,
   TestResult,
   UpdateState,
   UserInfo
@@ -67,6 +68,7 @@ import {
   type NotificationSource,
   type NotificationVariant
 } from '@renderer/lib/notifications'
+import { suggestShellRuntime } from '@renderer/lib/shellRuntimeSuggestion'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -181,6 +183,9 @@ interface AppState {
 
   // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
+  setShellRuntime(runtime: ShellRuntime): void
+  dismissShellRuntimeSuggestion(): void
+  acceptShellRuntimeSuggestion(): Promise<void>
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
@@ -213,7 +218,7 @@ interface AppState {
   loadHistory(): Promise<void>
   clearHistory(): Promise<void>
   /** Load a query/history snippet into its connection-bound editor (never auto-runs). */
-  applyQuery(code: string, database?: string, connectionId?: string): void
+  applyQuery(code: string, database?: string, connectionId?: string, runtime?: ShellRuntime): void
 
   // ---- actions: autocomplete (Phase 2) ----
   /** Fetch (and cache) sampled field names for a collection. */
@@ -332,8 +337,32 @@ function patchTabResults(
   return { tabs: patchTab(s.tabs, tabId, make(tab)) }
 }
 
+/** Apply an async result only while this exact execution still owns the tab. */
+function patchCurrentExecution(
+  s: { tabs: QueryTab[] },
+  tabId: string,
+  execId: string,
+  make: (tab: QueryTab) => Partial<QueryTab>
+): { tabs: QueryTab[] } | Record<string, never> {
+  const tab = s.tabs.find((item) => item.id === tabId)
+  if (!tab || tab.runningExecId !== execId) return {}
+  return { tabs: patchTab(s.tabs, tabId, make(tab)) }
+}
+
+function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): boolean {
+  return s.tabs.some((tab) => tab.id === tabId && tab.runningExecId === execId)
+}
+
 /** The tab present at first render (so init can point activeTabId at it). */
-const INITIAL_TAB = createTab(newTabId())
+const INITIAL_TAB = createTab(newTabId(), { runtime: DEFAULT_SETTINGS.defaultShellRuntime })
+
+function createDefaultTab(
+  id: string,
+  settings: AppSettings,
+  init: Partial<QueryTab> = {}
+): QueryTab {
+  return createTab(id, { runtime: settings.defaultShellRuntime, ...init })
+}
 
 /** Concurrent callers share one session attempt instead of opening duplicate
     clients/tunnels for the same Connection. */
@@ -692,7 +721,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, active.id, { connectionId: id })
         }
       }
-      const tab = createTab(newTabId(), { connectionId: id })
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: id })
       return { activeConnectionId: id, tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
   },
@@ -910,8 +939,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---------------------------------------------------------------------- tabs
   newTab() {
-    const tab = createTab(newTabId(), { connectionId: get().activeConnectionId })
-    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+    set((s) => {
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
+      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
   },
 
   setActiveTab(id) {
@@ -928,7 +959,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id)
       if (remaining.length === 0) {
-        const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
+        const fresh = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id }
       }
       const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
@@ -953,7 +984,45 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCode(code) {
     // Only real user edits reach here (the editor skips external value syncs),
     // so typing permanently marks the tab as holding user work.
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false }) }))
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false, runtimeSuggestion: null })
+    }))
+  },
+
+  setShellRuntime(runtime) {
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, {
+        runtime,
+        runtimeSuggestion: null,
+        results: [],
+        activeResultId: null,
+        resultSeq: 0,
+        runFailed: false
+      })
+    }))
+    if (runtime === 'mongosh') {
+      void window.api.shell.prepare(runtime).catch((error) => {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.prepareRuntimeFailed', { error: errMessage(error) }),
+            'query',
+            'query:prepareRuntime'
+          )
+        )
+      })
+    }
+  },
+
+  dismissShellRuntimeSuggestion() {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { runtimeSuggestion: null }) }))
+  },
+
+  async acceptShellRuntimeSuggestion() {
+    const suggestion = getActiveTab(get()).runtimeSuggestion
+    if (!suggestion) return
+    get().setShellRuntime(suggestion.runtime)
+    await get().runShell(suggestion.code)
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
@@ -1000,7 +1069,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (focusId) return { activeTabId: focusId }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
-      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code: seed })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1023,7 +1092,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
-      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1039,6 +1108,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (!code.trim()) return
+    const runtimeSuggestion = suggestShellRuntime(code, tab.runtime)
+    if (runtimeSuggestion) {
+      set((s) => ({
+        tabs: patchTab(s.tabs, tabId, { runtimeSuggestion: { ...runtimeSuggestion, code } })
+      }))
+      return
+    }
     const database = tab.activeDatabase || 'test'
     const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
     const execId = newExecId()
@@ -1050,19 +1126,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code }
+    const query = { connectionId, database, code, runtime: tab.runtime }
     let runFailed = false
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
       // earlier results stay around for side-by-side comparison.
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
-      // `use <db>` REPL command: switch the tab's active database (also warms
-      // its collection names for completion via setActiveDatabase).
-      if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
+      // `use <db>` REPL command: switch only the tab that still owns this run.
+      const nextDatabase = result.useDatabase
+      if (nextDatabase && ownsExecution(get(), tabId, execId)) {
+        set((s) => patchCurrentExecution(s, tabId, execId, () => ({ activeDatabase: nextDatabase })))
+        if (get().catalogs[connectionId]?.collections[nextDatabase] === undefined) {
+          void get().loadCollections(connectionId, nextDatabase)
+        }
+      }
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1071,17 +1152,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
     void get().loadHistory()
   },
@@ -1128,9 +1209,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now(), skip })))
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip })
+        )
+      )
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1139,17 +1224,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => patchResult(t, resultId, { result })))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
   },
 
@@ -1181,14 +1266,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code }
+    const query = { connectionId, database, code, runtime: tab.runtime }
     let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1197,17 +1282,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
     void get().loadHistory()
   },
@@ -1239,9 +1324,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         execId
       })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() })))
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now() })
+        )
+      )
       const notification = shellFailureNotice(result, tabId)
-      if (notification) get().notify(notification)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
       const result: ShellResult = {
@@ -1250,17 +1339,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, executedAt: Date.now() })))
-      get().notify(shellFailureNotice(result, tabId)!)
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now() })
+        )
+      )
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
   },
 
@@ -1334,7 +1427,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyQuery(code, database, connectionId) {
+  applyQuery(code, database, connectionId, runtime = 'legacy') {
     // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
@@ -1350,7 +1443,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? active
           : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
       const activeDatabase = database || targetTab?.activeDatabase || ''
-      const match = { connectionId: targetConnectionId, database: activeDatabase, code }
+      const match = { connectionId: targetConnectionId, database: activeDatabase, code, runtime }
       const { focusId, reuseId } = pickFillTarget(s.tabs, targetTab?.id ?? s.activeTabId, match)
       if (focusId) {
         return { activeConnectionId: targetConnectionId, activeTabId: focusId }
@@ -1362,14 +1455,16 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, reuseId, {
             connectionId: targetConnectionId,
             code,
-            activeDatabase
+            activeDatabase,
+            runtime
           })
         }
       }
       const tab = createTab(newTabId(), {
         connectionId: targetConnectionId,
         code,
-        activeDatabase
+        activeDatabase,
+        runtime
       })
       return {
         activeConnectionId: targetConnectionId,
@@ -1733,7 +1828,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   async loadSettings() {
     subscribeToSettings()
     try {
-      set({ settings: await window.api.settings.get() })
+      const settings = await window.api.settings.get()
+      set((s) => ({
+        settings,
+        tabs: s.tabs.map((tab) =>
+          tab.pristine && !tab.code && tab.results.length === 0
+            ? { ...tab, runtime: settings.defaultShellRuntime }
+            : tab
+        )
+      }))
     } catch (e) {
       get().notify(appNotice('warn', tr('notify.loadSettingsFailed'), 'settings', 'settings:load', errMessage(e)))
     }

@@ -27,6 +27,8 @@ When electron-builder reconstructs the dependency tree from a pnpm lockfile, it 
 
 Do not treat packages with native bindings as pure JavaScript dependencies. Confirm their ABI, target architecture, and electron-builder collection behavior first.
 
+`pnpm build:mongosh-runtime` manually rebuilds the bundled official mongosh runtime in `out/main`. Because the official Compass provider rejects explicit new connections such as `new Mongo(uri)`, the build excludes its unreachable connection/OIDC/SSH stack. The main Electron Vite build invokes the same script from its `closeBundle` hook after writing `out/main`; this ordering applies to production and development builds and prevents Electron Vite's output cleanup from removing the companion artifact. Integration tests build it from their pre-script before importing the runtime.
+
 ## Update artifacts
 
 The release workflow publishes more than the interactive installers:

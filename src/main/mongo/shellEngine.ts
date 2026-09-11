@@ -1,6 +1,7 @@
-import type { ShellRequest, ShellResult } from '../../shared/types'
+import type { ShellRequest, ShellResult, ShellRuntime } from '../../shared/types'
 import { sessionManager } from './sessionManager'
-import { runShellOnDb } from './shellCore'
+import { amdmDriverShellBackend, mongoshShellBackend } from './shellBackends'
+import { prepareMongoshRuntime } from './mongoshCore'
 
 /**
  * In-flight runs keyed by `execId`, so a slow find/aggregate can be cancelled
@@ -9,6 +10,10 @@ import { runShellOnDb } from './shellCore'
  * carried an `execId`; entries are removed in `finally` regardless of outcome.
  */
 const inFlight = new Map<string, AbortController>()
+
+export function prepareShellRuntime(runtime: ShellRuntime): void {
+  if (runtime === 'mongosh') prepareMongoshRuntime()
+}
 
 /** Error used as the abort reason; the driver throws this from cancelled ops. */
 class ShellAbortError extends Error {
@@ -19,10 +24,9 @@ class ShellAbortError extends Error {
 }
 
 /**
- * Resolve the live MongoClient for this connection and run the user's shell
- * snippet against the chosen database. All the shell-on-driver logic lives in
- * {@link runShellOnDb} (shellCore.ts), which has no Electron/session deps so it
- * stays unit-testable against a real `Db`.
+ * Resolve the live MongoClient for this connection and route the user's shell
+ * snippet to the runtime selected by the query tab. Backend implementations
+ * have no Electron/session dependencies and remain independently testable.
  *
  * When `req.execId` is set we register an AbortController for the run so
  * {@link abortShell} can cancel it; the controller's signal is threaded into the
@@ -33,17 +37,11 @@ class ShellAbortError extends Error {
  */
 export async function executeShell(req: ShellRequest): Promise<ShellResult> {
   const client = sessionManager.getClient(req.connectionId)
-  const db = client.db(req.database)
   const controller = req.execId ? new AbortController() : undefined
   if (req.execId && controller) inFlight.set(req.execId, controller)
   try {
-    return await runShellOnDb(db, req.code, {
-      limit: req.limit,
-      skip: req.skip,
-      explain: req.explain,
-      timeoutMS: req.timeoutMS,
-      signal: controller?.signal
-    })
+    const backend = req.runtime === 'mongosh' ? mongoshShellBackend : amdmDriverShellBackend
+    return await backend.execute(client, req, controller?.signal)
   } finally {
     if (req.execId) inFlight.delete(req.execId)
   }

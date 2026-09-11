@@ -354,7 +354,7 @@ const TRANSPILE_CACHE_MAX = 50
  * REPL completion-value semantics by `return`ing the last expression statement
  * — and transpile the wrapper instead (implicit await still applies inside).
  */
-function wrapTopLevelAwait(code: string): string {
+export function wrapTopLevelAwait(code: string): string {
   const ast = parseJs(code, { sourceType: 'script', allowAwaitOutsideFunction: true })
   const body = ast.program.body
   const last = body[body.length - 1]
@@ -369,6 +369,21 @@ function wrapTopLevelAwait(code: string): string {
       code.slice(last.end as number)
   }
   return `(async () => { ${inner}\n})()`
+}
+
+/** Preserve AMDM's explicit top-level-await extension before code enters an
+    evaluator that otherwise parses it as a script. This is a parse-only
+    decision: execution is never retried in another shape. */
+export function prepareTopLevelAwait(code: string): string {
+  try {
+    parseJs(code, { sourceType: 'script' })
+    return code
+  } catch (error) {
+    if (error instanceof SyntaxError && /'await' is only allowed/.test(error.message)) {
+      return wrapTopLevelAwait(code)
+    }
+    return code
+  }
 }
 
 export function transpileShellCode(code: string): string {
@@ -605,6 +620,37 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: numbe
   })
 }
 
+/** Raw Node Driver collection signatures for the explicit `driverDb` escape
+    hatch, with AMDM's execution signal and read timeout still applied. */
+function makeDriverCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: number): Collection {
+  return new Proxy(coll, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
+      switch (prop) {
+        case 'find':
+          return (filter?: Document, options?: Document) =>
+            target.find(filter ?? {}, withReadOptions(options, signal, timeoutMS) as FindOptions)
+        case 'findOne':
+          return (filter?: Document, options?: Document) =>
+            target.findOne(filter ?? {}, withReadOptions(options, signal, timeoutMS) as FindOptions)
+        case 'aggregate':
+          return (pipeline?: Document[], options?: Document) =>
+            target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
+        case 'countDocuments':
+          return (filter?: Document, options?: Document) =>
+            target.countDocuments(filter ?? {}, withReadOptions(options, signal, timeoutMS))
+        case 'distinct':
+          return (key: string, filter?: Document, options?: Document) =>
+            target.distinct(key, filter ?? {}, withReadOptions(options, signal, timeoutMS) as DistinctOptions)
+        case 'indexes':
+          return (options?: Document) => target.indexes(withReadOptions(options, signal, timeoutMS))
+      }
+      const value = (target as unknown as Record<string, unknown>)[prop]
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value
+    }
+  })
+}
+
 // ---------------------------------------------------------------------------
 // db proxy
 // ---------------------------------------------------------------------------
@@ -679,6 +725,31 @@ export function makeDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): D
       }
       // Unknown property → treat as a collection name (mongosh: `db.<coll>`).
       return makeCollProxy(target.collection(prop), signal, timeoutMS)
+    }
+  })
+}
+
+/** Preserve Node Driver method signatures behind `driverDb` while retaining
+    the execution-scoped cancellation and read-timeout contract. */
+export function makeDriverDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): Db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
+      switch (prop) {
+        case 'collection':
+          return (name: string) => makeDriverCollProxy(target.collection(name), signal, timeoutMS)
+        case 'aggregate':
+          return (pipeline?: Document[], options?: Document) =>
+            target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
+        case 'command':
+          return (command: Document, options?: Document) =>
+            target.command(command, withReadOptions(options, signal, timeoutMS))
+        case 'listCollections':
+          return (filter?: Document, options?: Document) =>
+            target.listCollections(filter ?? {}, withReadOptions(options, signal, timeoutMS))
+      }
+      const value = (target as unknown as Record<string, unknown>)[prop]
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value
     }
   })
 }

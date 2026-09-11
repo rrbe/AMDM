@@ -5,7 +5,7 @@ import { highlightCode, tagHighlighter, tags as syntaxTags } from '@lezer/highli
 import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, Trash2 } from 'lucide-react'
-import type { HistoryEntry, SavedQuery } from '@shared/types'
+import type { HistoryEntry, SavedQuery, ShellRuntime } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
@@ -34,6 +34,7 @@ export interface StoredQuerySelection {
   connectionId?: string
   connectionName?: string
   database?: string
+  runtime?: ShellRuntime
 }
 
 /** One-line preview of a (possibly multi-line) code snippet. */
@@ -147,6 +148,7 @@ export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelect
       code: q.code,
       connectionId: q.connectionId,
       database: q.database,
+      runtime: q.runtime,
       folder
     })
   }
@@ -165,7 +167,8 @@ export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelect
               code: query.code,
               connectionId: query.connectionId,
               connectionName: connections.find((item) => item.id === query.connectionId)?.name ?? query.connectionId,
-              database: query.database
+              database: query.database,
+              runtime: query.runtime
             })
           }
           onDelete={(id) => void deleteQuery(id)}
@@ -203,7 +206,8 @@ export function HistoryView({ onLoad }: { onLoad: (query: StoredQuerySelection) 
               code: entry.code,
               connectionId: entry.connectionId,
               connectionName: connections.find((item) => item.id === entry.connectionId)?.name ?? entry.connectionId,
-              database: entry.database
+              database: entry.database,
+              runtime: entry.runtime
             })
           }
         />

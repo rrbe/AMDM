@@ -169,6 +169,34 @@ interface Database {
 
 declare const db: Database;
 
+// Explicit Node Driver escape hatch available in the Mongosh runtime.
+interface DriverCursor {
+  sort(spec: Document | string): DriverCursor;
+  limit(value: number): DriverCursor;
+  skip(value: number): DriverCursor;
+  project(spec: Document): DriverCursor;
+  toArray(): Promise<Document[]>;
+  forEach(fn: (doc: Document) => void): Promise<void>;
+  hasNext(): Promise<boolean>;
+  next(): Promise<Document | null>;
+}
+interface DriverCollection {
+  find(query?: Document, options?: Document): DriverCursor;
+  findOne(query?: Document, options?: Document): Promise<Document | null>;
+  aggregate(pipeline?: Document[], options?: Document): DriverCursor;
+  countDocuments(query?: Document, options?: Document): Promise<number>;
+  distinct(field: string, query?: Document, options?: Document): Promise<any[]>;
+  indexes(options?: Document): Promise<Document[]>;
+}
+interface DriverDatabase {
+  readonly client: any;
+  collection(name: string): DriverCollection;
+  listCollections(filter?: Document, options?: Document): DriverCursor;
+  command(command: Document, options?: Document): Promise<Document>;
+  aggregate(pipeline?: Document[], options?: Document): DriverCursor;
+}
+declare const driverDb: DriverDatabase;
+
 // ---- EJSON constructors (shellCore sandbox) ----
 declare function ObjectId(id?: string): any;
 declare function ISODate(s?: string): Date;

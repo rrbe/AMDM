@@ -3,7 +3,7 @@
  * (The base d.ts string and the worker/service are exercised manually in-app.)
  */
 import { describe, it, expect } from 'vitest'
-import { buildCollectionDecls } from '@renderer/lib/tsAutocomplete/mongoBaseDts'
+import { buildCollectionDecls, MONGO_BASE_DTS } from '@renderer/lib/tsAutocomplete/mongoBaseDts'
 
 describe('buildCollectionDecls', () => {
   it('types identifier collections as Collection members of Database', () => {
@@ -25,5 +25,11 @@ describe('buildCollectionDecls', () => {
   it('returns empty string when nothing qualifies (no empty interface to reparse)', () => {
     expect(buildCollectionDecls([])).toBe('')
     expect(buildCollectionDecls(['a.b', 'getName'])).toBe('')
+  })
+})
+
+describe('MONGO_BASE_DTS', () => {
+  it('declares the explicit Node Driver escape hatch', () => {
+    expect(MONGO_BASE_DTS).toContain('declare const driverDb: DriverDatabase;')
   })
 })

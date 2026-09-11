@@ -5,7 +5,7 @@
  * outcomes can be compared side by side.
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
-import type { ShellResult } from '@shared/types'
+import type { ShellResult, ShellRuntime } from '@shared/types'
 
 export type ResultView = 'tree' | 'json' | 'table'
 
@@ -14,6 +14,7 @@ export interface ResultQuery {
   connectionId: string
   database: string
   code: string
+  runtime: ShellRuntime
 }
 
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
@@ -92,6 +93,10 @@ export interface QueryTab {
   /** Per-tab active database shown in the workspace breadcrumb. */
   activeDatabase: string
   code: string
+  /** Query language/runtime selected for this tab. */
+  runtime: ShellRuntime
+  /** An execution-blocking suggestion for code owned by the other runtime. */
+  runtimeSuggestion: { runtime: ShellRuntime; construct: string; code: string } | null
   /** True while `code` is blank or a programmatic fill (browse seed, loaded
       query) the user hasn't edited. Only pristine tabs may be refilled in
       place; anything the user typed gets a tab of its own. Cleared by the
@@ -122,6 +127,8 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     connectionId: null,
     activeDatabase: '',
     code: '',
+    runtime: 'mongosh',
+    runtimeSuggestion: null,
     pristine: true,
     results: [],
     activeResultId: null,
@@ -151,11 +158,15 @@ export function isRunFailure(result: ShellResult): boolean {
 export function pickFillTarget(
   tabs: QueryTab[],
   activeTabId: string,
-  match?: { connectionId: string; database: string; code: string }
+  match?: { connectionId: string; database: string; code: string; runtime?: ShellRuntime }
 ): { focusId?: string; reuseId?: string } {
   if (match) {
     const existing = tabs.find(
-      (t) => t.connectionId === match.connectionId && t.activeDatabase === match.database && t.code === match.code
+      (t) =>
+        t.connectionId === match.connectionId &&
+        t.activeDatabase === match.database &&
+        t.code === match.code &&
+        t.runtime === (match.runtime ?? 'mongosh')
     )
     if (existing) return { focusId: existing.id }
   }

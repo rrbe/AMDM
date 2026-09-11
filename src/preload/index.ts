@@ -49,6 +49,7 @@ const api: Api = {
     overwriteDraft: (target) => ipcRenderer.invoke(IPC.schemasOverwriteDraft, target)
   },
   shell: {
+    prepare: (runtime) => ipcRenderer.invoke(IPC.shellPrepare, runtime),
     execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request),
     abort: (execId) => ipcRenderer.invoke(IPC.shellAbort, execId)
   },

@@ -47,6 +47,11 @@ describe('queryStore — saved queries', () => {
     queryStore.deleteQuery(saved.id)
     expect(queryStore.listQueries()).toEqual([])
   })
+  it('persists the selected query runtime', () => {
+    const saved = queryStore.saveQuery({ name: 'mongosh', code: 'db.getMongo()', runtime: 'mongosh' })
+    expect(saved.runtime).toBe('mongosh')
+    expect(JSON.parse(readFileSync(join(dir, 'queries.json'), 'utf8')).queries[0].runtime).toBe('mongosh')
+  })
 })
 
 describe('queryStore — history', () => {
@@ -66,6 +71,10 @@ describe('queryStore — history', () => {
     queryStore.clearHistory()
     expect(queryStore.listHistory()).toEqual([])
   })
+  it('persists the execution runtime in history', () => {
+    queryStore.addHistory({ ...entry('db.getMongo()'), runtime: 'mongosh' }, 200)
+    expect(queryStore.listHistory()[0].runtime).toBe('mongosh')
+  })
 })
 
 describe('settingsStore', () => {
@@ -75,6 +84,7 @@ describe('settingsStore', () => {
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
+      defaultShellRuntime: 'mongosh',
       dataFontSize: 13,
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
@@ -108,6 +118,12 @@ describe('settingsStore', () => {
     settingsStore.update({ automaticUpdateChecks: false })
     settingsStore.init()
     expect(settingsStore.get().automaticUpdateChecks).toBe(false)
+  })
+
+  it('persists the default shell runtime', () => {
+    settingsStore.update({ defaultShellRuntime: 'legacy' })
+    settingsStore.init()
+    expect(settingsStore.get().defaultShellRuntime).toBe('legacy')
   })
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })

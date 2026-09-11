@@ -56,6 +56,48 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('table')
   })
 
+  it('keeps runtime per tab and clears results when it changes', () => {
+    const prepare = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', { api: { shell: { prepare } } })
+    useAppStore.setState({
+      tabs: [
+        createTab('c1-tab', {
+          connectionId: 'c1',
+          results: [
+            {
+              id: 'result-1',
+              seq: 1,
+              result: { kind: 'value', data: 1 },
+              executedAt: 1,
+              query: null,
+              skip: 0
+            }
+          ],
+          activeResultId: 'result-1',
+          resultSeq: 1
+        })
+      ]
+    })
+
+    useAppStore.getState().setShellRuntime('mongosh')
+
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      runtime: 'mongosh',
+      results: [],
+      activeResultId: null,
+      resultSeq: 0
+    })
+    expect(prepare).toHaveBeenCalledWith('mongosh')
+  })
+
+  it('uses the configured runtime for new query tabs', () => {
+    useAppStore.setState({ settings: { ...DEFAULT_SETTINGS, defaultShellRuntime: 'legacy' } })
+
+    useAppStore.getState().newTab()
+
+    expect(useAppStore.getState().tabs.at(-1)?.runtime).toBe('legacy')
+  })
+
   it('loads a saved query into its bound connection without running it', () => {
     const execute = vi.fn()
     vi.stubGlobal('window', { api: { shell: { execute } } })
@@ -523,6 +565,107 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().notifications).toHaveLength(notificationCount)
   })
 
+  it('discards late results and notifications after their query tab closes', async () => {
+    let finish!: (result: ShellResult) => void
+    const execute = vi.fn(
+      () =>
+        new Promise<ShellResult>((resolve) => {
+          finish = resolve
+        })
+    )
+    const abort = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute, abort },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    useAppStore.setState({
+      tabs: [
+        createTab('closing-tab', {
+          connectionId: 'c1',
+          activeDatabase: 'test',
+          code: 'db.items.find({})'
+        }),
+        createTab('remaining-tab', { connectionId: 'c1' })
+      ],
+      activeTabId: 'closing-tab',
+      notifications: []
+    })
+
+    const run = useAppStore.getState().runShell()
+    const execId = execute.mock.calls[0][0].execId
+    useAppStore.getState().closeTab('closing-tab')
+    expect(abort).toHaveBeenCalledWith(execId)
+
+    finish({
+      kind: 'error',
+      errorName: 'MongoServerError',
+      error: 'late failure',
+      failureKind: 'server'
+    })
+    await run
+
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ id: 'remaining-tab', results: [] })
+    expect(useAppStore.getState().notifications).toEqual([])
+  })
+
+  it('isolates ten concurrent query tabs when they are closed before completion', async () => {
+    const finishes: ((result: ShellResult) => void)[] = []
+    const execute = vi.fn(
+      () =>
+        new Promise<ShellResult>((resolve) => {
+          finishes.push(resolve)
+        })
+    )
+    const abort = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute, abort },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+
+    const queryTabs = Array.from({ length: 10 }, (_, index) =>
+      createTab(`query-${index}`, {
+        connectionId: 'c1',
+        activeDatabase: 'test',
+        code: `db.items.findOne({ index: ${index} })`,
+        runtime: 'mongosh'
+      })
+    )
+    useAppStore.setState({
+      tabs: [...queryTabs, createTab('remaining-tab', { connectionId: 'c1' })],
+      activeTabId: 'query-0',
+      notifications: []
+    })
+
+    const runs = queryTabs.map((tab) => {
+      useAppStore.setState({ activeTabId: tab.id })
+      return useAppStore.getState().runShell()
+    })
+    expect(execute).toHaveBeenCalledTimes(10)
+
+    for (const tab of queryTabs) useAppStore.getState().closeTab(tab.id)
+    expect(abort).toHaveBeenCalledTimes(10)
+
+    for (const finish of finishes) {
+      finish({
+        kind: 'error',
+        errorName: 'MongoServerError',
+        error: 'late failure',
+        failureKind: 'server'
+      })
+    }
+    await Promise.all(runs)
+
+    expect(useAppStore.getState().tabs).toEqual([
+      expect.objectContaining({ id: 'remaining-tab', results: [], running: false })
+    ])
+    expect(useAppStore.getState().notifications).toEqual([])
+  })
+
   it('stores the exact executed selection on its result tab', async () => {
     const execute = vi.fn().mockResolvedValue({
       kind: 'documents',
@@ -545,7 +688,8 @@ db.unselectedAfter.find({})`
         createTab('c1-tab', {
           connectionId: 'c1',
           activeDatabase: 'shop',
-          code: editorCode
+          code: editorCode,
+          runtime: 'mongosh'
         })
       ],
       activeTabId: 'c1-tab'
@@ -553,7 +697,53 @@ db.unselectedAfter.find({})`
 
     await useAppStore.getState().runShell(selection)
 
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection }))
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection, runtime: 'mongosh' }))
     expect(useAppStore.getState().tabs[0].results[0].query?.code).toBe(selection)
+    expect(useAppStore.getState().tabs[0].results[0].query?.runtime).toBe('mongosh')
+  })
+
+  it('asks before switching to the runtime required by an unambiguous construct', async () => {
+    const execute = vi.fn().mockResolvedValue({ kind: 'value', data: null } satisfies ShellResult)
+    const prepare = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute, prepare },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    useAppStore.setState({
+      tabs: [
+        createTab('runtime-tab', {
+          connectionId: 'c1',
+          activeDatabase: 'test',
+          code: 'db.getMongo().startSession()',
+          runtime: 'legacy'
+        })
+      ],
+      activeTabId: 'runtime-tab'
+    })
+
+    await useAppStore.getState().runShell()
+
+    expect(execute).not.toHaveBeenCalled()
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      runtime: 'legacy',
+      runtimeSuggestion: {
+        runtime: 'mongosh',
+        construct: 'db.getMongo()',
+        code: 'db.getMongo().startSession()'
+      }
+    })
+
+    useAppStore.getState().dismissShellRuntimeSuggestion()
+    expect(useAppStore.getState().tabs[0].runtimeSuggestion).toBeNull()
+    expect(execute).not.toHaveBeenCalled()
+
+    await useAppStore.getState().runShell()
+    await useAppStore.getState().acceptShellRuntimeSuggestion()
+
+    expect(useAppStore.getState().tabs[0].runtime).toBe('mongosh')
+    expect(prepare).toHaveBeenCalledWith('mongosh')
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'mongosh' }))
   })
 })

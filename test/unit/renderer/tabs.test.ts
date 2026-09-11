@@ -59,6 +59,7 @@ describe('createTab', () => {
       id: 'a',
       connectionId: null,
       code: '',
+      runtime: 'mongosh',
       activeDatabase: '',
       pristine: true,
       results: [],

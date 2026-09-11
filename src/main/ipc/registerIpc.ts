@@ -17,7 +17,8 @@ import type {
   OpenFileOptions,
   SavedQueryInput,
   SchemaTarget,
-  ShellRequest
+  ShellRequest,
+  ShellRuntime
 } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
@@ -34,7 +35,7 @@ import {
   listUsers,
   sampleFields
 } from '../mongo/catalog'
-import { executeShell, abortShell } from '../mongo/shellEngine'
+import { executeShell, abortShell, prepareShellRuntime } from '../mongo/shellEngine'
 import { cancelDocumentRead, deleteDocument, readDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { analyzeCollectionSchema } from '../mongo/schemaAnalysis'
 import {
@@ -201,6 +202,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.schemasOverwriteDraft, (_e, target: SchemaTarget) => schemaStore.overwriteDraft(target))
 
   // shell — run, then record an automatic history entry
+  ipcMain.handle(IPC.shellPrepare, (_e, runtime: ShellRuntime) => prepareShellRuntime(runtime))
   ipcMain.handle(IPC.shellExecute, async (_e, req: ShellRequest) => {
     const result = await executeShell(req)
     queryStore.addHistory(
@@ -208,6 +210,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
         code: req.code,
         connectionId: req.connectionId,
         database: req.database,
+        runtime: req.runtime,
         ok: result.kind !== 'error',
         summary: historySummary(result.kind, result.count, result.elapsedMs, result.errorName)
       },
