@@ -127,7 +127,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     connectionId: null,
     activeDatabase: '',
     code: '',
-    runtime: 'legacy',
+    runtime: 'mongosh',
     runtimeSuggestion: null,
     pristine: true,
     results: [],
@@ -166,7 +166,7 @@ export function pickFillTarget(
         t.connectionId === match.connectionId &&
         t.activeDatabase === match.database &&
         t.code === match.code &&
-        t.runtime === (match.runtime ?? 'legacy')
+        t.runtime === (match.runtime ?? 'mongosh')
     )
     if (existing) return { focusId: existing.id }
   }

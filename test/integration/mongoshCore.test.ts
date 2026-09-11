@@ -78,6 +78,49 @@ describe("official mongosh runtime compatibility", () => {
     ).toBe(1);
   });
 
+  it("reports the official Compass restriction for explicit new connections", async () => {
+    const uri = replicaSet.getUri();
+    const result = await runMongoshOnClient(
+      client,
+      `new Mongo(${JSON.stringify(uri)})`,
+      { database: "mongosh_spike" },
+    );
+
+    expect(result).toMatchObject({
+      kind: "error",
+      errorName: "MongoshUnimplementedError",
+    });
+    expect(result.error).toContain("new Mongo connections are not supported for current platform: Compass");
+  });
+
+  it("exposes the selected database through the explicit driverDb escape hatch", async () => {
+    const result = await runMongoshOnClient(
+      client,
+      'driverDb.collection("items").find({}, { projection: { _id: 0, n: 1 } }).sort({ n: 1 }).toArray()',
+      { database: "mongosh_spike" },
+    );
+
+    expect(result).toMatchObject({
+      kind: "documents",
+      count: 3,
+      data: [
+        { n: { $numberInt: "1" } },
+        { n: { $numberInt: "2" } },
+        { n: { $numberInt: "3" } },
+      ],
+    });
+  });
+
+  it("keeps driverDb reads inside the configured timeout", async () => {
+    const result = await runMongoshOnClient(
+      client,
+      'driverDb.collection("items").find({ $where: "sleep(10000); return true" }).toArray()',
+      { database: "mongosh_spike", timeoutMS: 100 },
+    );
+
+    expect(result).toMatchObject({ kind: "error", failureKind: "timeout" });
+  }, 15_000);
+
   it("maps bounded cursors and explicit arrays to the existing result contract", async () => {
     const cursor = await runMongoshOnClient(
       client,
@@ -639,7 +682,7 @@ describe("official mongosh runtime compatibility", () => {
     ["cursor.project(spec)", "db.items.find().project({ n: 1 })", "project"],
     ["collection.indexes()", "db.items.indexes()", "indexes"],
   ])(
-    "classifies Legacy-only extension %s without fallback",
+    "classifies AMDM driver-only extension %s without fallback",
     async (_name, code, method) => {
       const result = await runMongoshOnClient(client, code, {
         database: "mongosh_spike",

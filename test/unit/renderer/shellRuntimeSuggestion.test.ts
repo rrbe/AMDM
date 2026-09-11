@@ -15,7 +15,7 @@ describe('suggestShellRuntime', () => {
     ['db.items.indexes()', 'collection.indexes()'],
     ["db.getCollection('items').indexes()", 'collection.indexes()'],
     ['db.items.find({}).project({ name: 1 })', 'cursor.project()']
-  ])('recognizes Legacy-only construct %s', (code, construct) => {
+  ])('recognizes AMDM driver-only construct %s', (code, construct) => {
     expect(suggestShellRuntime(code, 'mongosh')).toEqual({ runtime: 'legacy', construct })
   })
 

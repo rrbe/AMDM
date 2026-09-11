@@ -40,15 +40,15 @@ interface ShellBackend {
 }
 ```
 
-- `LegacyShellBackend`: the current `shellCore.ts` behavior.
+- `AmdmDriverShellBackend`: the current `shellCore.ts` behavior.
 - `MongoshShellBackend`: official evaluator and Shell API with AMDM lifecycle and result adapters.
 - `shellEngine.ts`: the only backend router exposed to IPC.
 
-The official runtime should be the eventual default. The legacy backend is a migration mechanism, not the desired permanent architecture. Long term, explicit Node Driver access should use a named escape hatch such as `driverDb` instead of changing the meaning of the official `db` global.
+The official runtime should be the eventual default. AMDM driver is a migration mechanism, not the desired permanent architecture. Long term, explicit Node Driver access should use a named escape hatch such as `driverDb` instead of changing the meaning of the official `db` global.
 
 ## Preliminary measurements
 
-Measurements were taken on Apple M1 Pro arm64 with Node 24.11.1 and pnpm 10.33.2. They are isolated-process estimates and must be replaced with packaged Electron measurements before rollout.
+Measurements were taken on Apple M1 Pro arm64 with Node 24.11.1 and pnpm 10.33.2. They are the initial isolated-process comparison; packaged Electron measurements used for rollout are recorded under Stage 5.
 
 | Runtime import set                       | Minified bundle |    Gzip | Cold import | Peak RSS |
 | ---------------------------------------- | --------------: | ------: | ----------: | -------: |
@@ -66,7 +66,7 @@ An initial disposable build experiment also triggered a Rolldown module-finalize
 
 ### Stage 0: packaging and runtime spike
 
-Status: **in progress**
+Status: **completed**
 
 - [x] Pin a mutually compatible official package set.
 - [x] Instantiate the official Shell API over an existing AMDM `MongoClient`.
@@ -74,7 +74,7 @@ Status: **in progress**
 - [x] Preserve raw values through a custom evaluator result handler.
 - [x] Establish a build strategy that does not panic in Rolldown.
 - [x] Build and launch an unpacked macOS arm64 application.
-- [ ] Record actual `out/main`, `app.asar`, ZIP, startup, first-query, warm-query, and RSS deltas.
+- [x] Record actual `out/main`, `app.asar`, ZIP, startup, first-query, warm-query, and RSS deltas.
 - [x] Confirm that no new native dependency is accidentally required at startup.
 
 Stage-0 evidence so far:
@@ -82,10 +82,10 @@ Stage-0 evidence so far:
 - The pinned set is `@mongosh/shell-evaluator@5.5.0`, `@mongosh/shell-api@5.5.0`, and `@mongosh/service-provider-node-driver@5.2.0`.
 - Real replica-set integration tests pass for a bounded cursor and the standard `db.getMongo().startSession()` / `withTransaction()` flow.
 - Directly exposing the official packages to the current Rolldown graph still panics. A separate esbuild-produced CommonJS vendor artifact succeeds and can be required without `node_modules` present.
-- The vendor artifact is 5,725,416 bytes (1,520,197 bytes gzip). The existing main bundle grows by 173,770 bytes because optional Driver integrations must remain external to Rolldown.
-- The current packaged arm64 `app.asar` is 39,515,985 bytes, 5,908,908 bytes above the previous 26.8.17 artifact. The Stage-0 macOS ZIP was 127,690,368 bytes, 1,632,031 bytes above the previous 26.8.17 ZIP and within the 5 MB ZIP gate.
+- The initial vendor artifact was 5,725,416 bytes (1,520,197 bytes gzip). Excluding the connection stack that the official Compass provider cannot invoke reduced the current artifact to 4,237,139 bytes (1,052,916 bytes gzip). The existing main bundle grows by 173,770 bytes because optional Driver integrations must remain external to Rolldown.
+- The Stage-0 packaged arm64 `app.asar` was 39,515,985 bytes, 5,908,908 bytes above the previous 26.8.17 artifact. Its macOS ZIP was 127,690,368 bytes, 1,632,031 bytes above the previous 26.8.17 ZIP and within the 5 MB ZIP gate.
 - The unpacked application launches successfully. Electron CDP validation against a real local replica set selected Mongosh in the rendered query tab and executed both a normal cursor query and a `db.getMongo().startSession()` / `withTransaction()` script through packaged IPC. The successful transaction-plus-query result was `2 docs · 21ms`.
-- In a fresh packaged process, the first three-document Mongosh cursor query took 215 ms and the next identical query took 13 ms. Main-process RSS rose from 225,008 KiB before loading Mongosh to a 286,688 KiB observed peak, then settled at 278,144 KiB. This is a single reference-machine sample, not a release benchmark; the 150 ms first-query gate is therefore not yet satisfied.
+- Before runtime optimization, a fresh packaged process took 215 ms for the first three-document Mongosh cursor query and 13 ms for the next identical query. Main-process RSS rose from 225,008 KiB before loading Mongosh to a 286,688 KiB observed peak, then settled at 278,144 KiB. The optimized Stage-5 package subsequently passed the 150 ms initialization gate.
 - CDP also confirmed the real Renderer selector event, a 112 × 28 px computed control size, editor focus after selection, and the resulting Table/Tree/JSON-compatible document output.
 - The packaged app starts without Kerberos, Client-Side Field Level Encryption, AWS credentials, or GCP metadata packages in `app.asar`; the standalone vendor artifact also loads with no `node_modules` directory. Those integrations remain explicitly outside the current connection-mode guarantee.
 - The first packaging attempt was blocked by a Sparkle download timeout. Reusing the already verified local Sparkle 2.9.2 artifact allowed the packaging check to complete; this was an environment failure, not a runtime build failure.
@@ -96,14 +96,14 @@ Exit criteria:
 - [x] The unpacked application launches and executes both a normal query and a transaction.
 - [x] The macOS ZIP grows by no more than 5 MB unless the increase is explicitly accepted.
 - [x] App cold startup regression is below 100 ms, or the runtime is lazy-loaded.
-- [ ] First-query runtime initialization is below 150 ms on the reference machine.
+- [x] First-query runtime initialization is below 150 ms on the reference machine.
 - [x] No unsupported native module is required for currently supported connection modes.
 
 ### Stage 1: dual backend boundary
 
 Status: **completed**
 
-- [x] Keep the current implementation behavior unchanged behind `LegacyShellBackend`.
+- [x] Keep the current implementation behavior unchanged behind `AmdmDriverShellBackend`.
 - [x] Add `MongoshShellBackend` without changing Renderer result components.
 - [x] Add an explicit backend field to execution, saved-query, and history contracts.
 - [x] Keep backend state scoped to a query tab; switching backends clears runtime-owned state.
@@ -137,18 +137,18 @@ Each Mongosh execution now tracks and ends sessions that its script leaves open.
 
 ### Stage 4: compatibility suite
 
-Status: **in progress**
+Status: **completed**
 
 - [x] Run the existing Shell integration and parser regression baseline.
 - [x] Add `Mongo`, `Session`, `getMongo`, `startSession`, `getDatabase`, and `withTransaction` coverage.
 - [x] Add representative `rs`, `sh`, admin, BSON, top-level await, async callback, and multi-statement scripts.
 - [x] Add an AI-style multi-collection cleanup transaction as an immutable integration case.
-- [x] Classify cases as identical, normalized-output difference, legacy-only, or mongosh-only in `docs/mongosh-compatibility.md`.
+- [x] Classify cases as identical, normalized-output difference, AMDM driver-only, or mongosh-only in `docs/mongosh-compatibility.md`.
 - [x] Run write cases against reset databases; never execute a failed write in both engines against the same state.
 
-The real-replica-set suite currently contains 27 Mongosh-specific cases alongside the 100-case Legacy Shell baseline. Successful sharding operations remain environment-dependent and are tracked separately in the compatibility matrix.
+The real-replica-set suite currently contains 30 Mongosh-specific cases alongside the 100-case AMDM driver baseline. Successful sharding operations remain environment-dependent and are tracked separately in the compatibility matrix.
 
-Known legacy extensions requiring an explicit decision:
+Known AMDM driver extensions requiring an explicit decision:
 
 - `db.client`
 - `db.collection(name)`
@@ -160,36 +160,42 @@ Low-cost aliases may be retained around the official API. Raw Driver access shou
 
 ### Stage 5: performance and release validation
 
-Status: **in progress**
+Status: **completed**
 
 - [x] Benchmark app cold startup and first/warm query latency.
 - [x] Benchmark 50 ordinary documents and 50 large nested documents.
 - [x] Benchmark 1,000 Console lines.
 - [x] Run ten concurrent query tabs and repeated query/tab-close memory tests.
 - [x] Measure cancellation latency for slow find and aggregation operations.
-- [x] Inspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage.
-- [x] Inspect packaged dynamic `require()` calls and native `.node` files for every target architecture.
+- [x] Reinspect `out/main/index.js`, `app.asar`, macOS ZIP/DMG, Windows NSIS, and Linux AppImage after the runtime-size optimization.
+- [x] Reinspect packaged dynamic `require()` calls and native `.node` files for every target architecture after the runtime-size optimization.
 
-Selecting Mongosh now starts loading the runtime through a dedicated IPC call instead of waiting for Run. In a packaged Electron sample with 60 ordinary documents, main-process RSS moved from 225,408 KiB to 270,832 KiB after prewarming; the first subsequent 50-document query reported 47 ms, and a warm query reported 11 ms with 20 ms Renderer-observed wall time. Immediate selection-and-Run still includes initialization latency, so the underlying 150 ms cold-initialization gate remains open.
+Selecting Mongosh now starts loading the runtime through a dedicated IPC call instead of waiting for Run. In a packaged Electron sample with 60 ordinary documents, main-process RSS moved from 225,408 KiB to 270,832 KiB after prewarming; the first subsequent 50-document query reported 47 ms, and a warm query reported 11 ms with 20 ms Renderer-observed wall time.
+
+The official Compass provider rejects explicit new connections such as `new Mongo(uri)`, but its top-level import still pulled the unused connection/OIDC/SSH stack into the generated artifact. Replacing that unreachable dependency with a build-time stub reduced the runtime from 5,725,471 to 4,237,139 bytes. The lazy loader also enables Node's compile cache before requiring the generated runtime. In a newly packaged Electron 43 arm64 app, runtime preparation took 113.8 ms with a fresh compile-cache directory, 66.9 ms on the next launch, and 0.2 ms for another prepare call in the same process. This passes the 150 ms initialization gate without loading Mongosh for users who remain on AMDM driver. The first real query after preparation returned three expected database names in 42 ms (61.1 ms Renderer-observed wall time).
 
 An isolated real-replica-set benchmark after runtime warm-up measured 50 ordinary documents at 14 ms, 50 documents containing a 128 KiB nested payload at 47 ms, 1,000 Console lines at 9 ms, and ten concurrent `findOne()` executions at 71 ms total. Slow find and `$function` aggregation operations both returned the cancelled result within 1 ms of the abort signal (about 105–109 ms total including the intentional 100 ms delay before cancellation). These are single reference-machine samples and exclude Renderer painting time.
 
-The same process completed 600 sequential query executions. RSS rose from 313 MB to 504 MB, with the last two 100-query batches adding about 5.5 MB and 3.0 MB; forced-GC heap samples oscillated rather than growing monotonically. This shows an eventual allocation plateau, but the high transient memory cost remains a rollout concern. Renderer tests additionally start and close ten simultaneous Mongosh query tabs and prove that every execution is aborted without publishing late results or notifications.
+The optimized packaged app completed two consecutive batches of 600 sequential queries. After runtime preparation, the first batch reached 459 MB RSS and settled to 312 MB after ten idle seconds. The second batch started at 312 MB, reached 474 MB, and settled to 308 MB. The rapid synthetic workload still creates a high transient peak, but settled memory did not accumulate across batches. Renderer tests additionally start and close ten simultaneous Mongosh query tabs and prove that every execution is aborted without publishing late results or notifications.
 
-Release-target inspection produced a 127,692,587-byte macOS arm64 ZIP, 127,544,777-byte macOS arm64 DMG, 105,775,611-byte Windows x64 NSIS installer, and 136,229,646-byte Linux x64 AppImage. macOS arm64/x64, Windows x64, and Linux x64 packages all contain the same 5,725,471-byte Mongosh runtime with SHA-256 `838cc0cc574a33f80b417901c4ce0ccc831e0390acfa4e092ddc1d5078e8ca17`. No optional Kerberos, CSFLE, AWS/GCP credential package, or Mongosh-owned `.node` file is present. The only packaged native addon is the existing macOS Sparkle addon, which is a universal arm64/x86_64 binary. Both macOS apps pass strict deep signature verification; the generated Windows and Linux executables report the expected x86-64 formats.
+AMDM also disables Mongosh's deep-inspection service-provider wrappers because result inspection remains owned by the existing adapter and Renderer. In an isolated 600-query comparison with forced GC every 100 executions, the final RSS delta fell from 115.8 MiB to 112.1 MiB while the heap delta remained effectively unchanged at 8.5 versus 8.4 MiB. After the first 100 executions, the optimized run added 5.3 MiB RSS and 1.3 MiB heap over the remaining 500 executions, supporting the plateau diagnosis rather than an unbounded retained-object leak.
+
+The optimized release-target inspection produced a 127,225,607-byte macOS arm64 ZIP, 127,054,370-byte macOS arm64 DMG, 132,272,967-byte macOS x64 ZIP, 132,063,470-byte macOS x64 DMG, 105,514,880-byte Windows x64 NSIS installer, and 135,839,949-byte Linux x64 AppImage. Every package contains the same 4,237,139-byte Mongosh runtime with SHA-256 `c2ede43f87e95ad1e97b40349b1f369ac8cccce4f03842e491a2ee4c59b3f7e1`. The packaged runtime contains neither the unreachable connection/OIDC/SSH stack nor a Mongosh-owned `.node` file. Both macOS apps pass strict deep signature verification and report their expected native arm64 and x86_64 formats; the generated Windows and Linux executables report the expected x86-64 formats.
 
 ### Stage 6: rollout
 
-Status: **in progress**
+Status: **completed**
 
-- [x] Initially expose runtime selection per query tab with Legacy as the default.
+- [x] Initially expose runtime selection per query tab with AMDM driver as the default.
 - [x] Store the selected runtime with history and saved queries.
 - [x] Detect unambiguous runtime-specific constructs before execution and offer a mode change; do not switch silently.
-- [ ] Make Mongosh the default only after parity, packaging, cancellation, and performance gates pass.
-- [ ] Retain Legacy for a defined transition period.
-- [ ] Replace remaining raw Driver use with an explicit `driverDb` escape hatch, then reassess removing Legacy.
+- [x] Make Mongosh the default only after parity, packaging, cancellation, and performance gates pass.
+- [x] Retain AMDM driver for a defined transition period.
+- [x] Replace remaining raw Driver use with an explicit `driverDb` escape hatch, then reassess removing AMDM driver.
 
-Before execution, the Renderer uses its existing JavaScript syntax parser to recognize only structurally unambiguous calls. `db.getMongo()` offers Mongosh; `db.collection()`, `db.listCollections()`, collection `indexes()`, and find-cursor `project()` offer Legacy. Comments, strings, and similarly named methods on other objects are ignored. The user must confirm the switch; cancelling preserves the current runtime and does not execute the query, and execution failures are never retried in another runtime.
+Before execution, the Renderer uses its existing JavaScript syntax parser to recognize only structurally unambiguous calls. `db.getMongo()` offers Mongosh; `db.collection()`, `db.listCollections()`, collection `indexes()`, and find-cursor `project()` offer AMDM driver. Comments, strings, and similarly named methods on other objects are ignored. The user must confirm the switch; cancelling preserves the current runtime and does not execute the query, and execution failures are never retried in another runtime.
+
+New query tabs now default to Mongosh. AMDM driver remains selectable for at least one stable release, and saved queries or history entries created before runtime persistence continue to open with AMDM driver. Mongosh exposes `driverDb` as the explicit raw Node Driver escape hatch on the selected connection and database. AMDM driver removal was reassessed and deferred until after that transition release and until usage no longer shows a meaningful compatibility need.
 
 ## Validation commands
 

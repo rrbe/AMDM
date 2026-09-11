@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { enableCompileCache } from 'node:module'
 import { join } from 'node:path'
 import vm from 'node:vm'
 import { EventEmitter } from 'node:events'
@@ -9,7 +10,7 @@ import type { ShellEvaluator } from '@mongosh/shell-evaluator'
 import type { ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 import { classifyOperationFailure } from './errorCore'
-import { detectCollection, OutputCollector, prepareTopLevelAwait } from './shellCore'
+import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait } from './shellCore'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
@@ -30,6 +31,9 @@ function loadMongoshRuntime(): MongoshRuntime {
   const packagedPath = join(__dirname, 'mongosh-runtime.cjs')
   const developmentPath = join(process.cwd(), 'out', 'main', 'mongosh-runtime.cjs')
   const runtimePath = existsSync(packagedPath) ? packagedPath : developmentPath
+  // Persist V8's compiled form after the first load so later app launches do
+  // not repeatedly parse the large generated CommonJS runtime.
+  enableCompileCache()
   loadedRuntime = require(runtimePath) as MongoshRuntime
   return loadedRuntime
 }
@@ -94,7 +98,11 @@ export async function evaluateMongosh(
   options: MongoshEvaluationOptions = {}
 ): Promise<MongoshEvaluation> {
   const runtime = loadMongoshRuntime()
-  const state = new runtime.ShellInstanceState(provider)
+  // AMDM renders results itself, so mongosh's deep-inspection wrappers only
+  // add per-execution proxy/closure allocation without affecting output.
+  const state = new runtime.ShellInstanceState(provider, undefined, {
+    deepInspect: false
+  })
   state.setPreFetchCollectionAndDatabaseNames(false)
   state.displayBatchSizeFromDBQuery = options.limit ?? DEFAULT_LIMIT
   state.currentDb = state.currentDb.getMongo().getDB(database)
@@ -117,6 +125,12 @@ export async function evaluateMongosh(
     })
   }
   state.setCtx(contextObject)
+  Object.defineProperty(contextObject, 'driverDb', {
+    configurable: true,
+    enumerable: true,
+    get: () =>
+      makeDriverDbProxy(provider.mongoClient.db(state.currentDb.getName()), options.signal, options.timeoutMS)
+  })
   if (options.output) {
     const print = (...values: unknown[]): void => options.output?.push('print', values)
     contextObject.console = {

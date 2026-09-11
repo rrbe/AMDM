@@ -20,14 +20,17 @@ The compatibility suite also executes an AI-style four-collection cleanup transa
 
 ## Intentional differences
 
-| Construct                       | Legacy                     | Mongosh                         | Classification                                       |
-| ------------------------------- | -------------------------- | ------------------------------- | ---------------------------------------------------- |
-| `db.getMongo()` and Session API | Unsupported                | Official behavior               | Mongosh-only                                         |
-| `db.collection(name)`           | Driver-style alias         | Unsupported                     | Legacy-only extension; use `db.getCollection(name)`  |
-| `cursor.project(spec)`          | Driver-style alias         | Unsupported                     | Legacy-only extension; use `cursor.projection(spec)` |
-| `collection.indexes()`          | Driver-style alias         | Unsupported                     | Legacy-only extension; use `collection.getIndexes()` |
-| `db.listCollections()`          | Driver cursor escape hatch | Unsupported                     | Legacy-only extension; use `db.getCollectionInfos()` |
-| `show collections`              | String rows                | Official `{ name, badge }` rows | Normalized-output difference                         |
+| Construct                       | AMDM driver                | Mongosh                         | Classification                                            |
+| ------------------------------- | -------------------------- | ------------------------------- | --------------------------------------------------------- |
+| `db.getMongo()` and Session API | Unsupported                | Official behavior               | Mongosh-only                                              |
+| `db.collection(name)`           | Driver-style alias         | Unsupported                     | AMDM driver-only extension; use `db.getCollection(name)`  |
+| `cursor.project(spec)`          | Driver-style alias         | Unsupported                     | AMDM driver-only extension; use `cursor.projection(spec)` |
+| `collection.indexes()`          | Driver-style alias         | Unsupported                     | AMDM driver-only extension; use `collection.getIndexes()` |
+| `db.listCollections()`          | Driver cursor escape hatch | Unsupported                     | AMDM driver-only extension; use `db.getCollectionInfos()` |
+| `new Mongo(uri)`                | Unsupported                | Unsupported by Compass provider | Use AMDM connection management                            |
+| `show collections`              | String rows                | Official `{ name, badge }` rows | Normalized-output difference                              |
+
+Mongosh exposes `driverDb` for scripts that intentionally require raw Node Driver method signatures, for example `driverDb.collection(name)` or `driverDb.listCollections()`. It always uses the selected AMDM connection and database; standard scripts should continue to use the official `db` API.
 
 The runtime router never retries a failed script in the other engine. These differences therefore surface as explicit errors instead of risking a duplicate write.
 

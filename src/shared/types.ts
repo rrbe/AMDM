@@ -264,7 +264,7 @@ export interface ShellRequest {
   connectionId: string
   database: string
   code: string
-  /** Execution engine selected by the query tab. Missing means Legacy for
+  /** Execution engine selected by the query tab. Missing means AMDM driver for
       compatibility with callers and persisted data created before 26.8.17. */
   runtime?: ShellRuntime
   /** Default page size applied to bare cursors so results remain bounded. */

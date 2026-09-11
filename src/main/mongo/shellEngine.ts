@@ -1,6 +1,6 @@
 import type { ShellRequest, ShellResult, ShellRuntime } from '../../shared/types'
 import { sessionManager } from './sessionManager'
-import { legacyShellBackend, mongoshShellBackend } from './shellBackends'
+import { amdmDriverShellBackend, mongoshShellBackend } from './shellBackends'
 import { prepareMongoshRuntime } from './mongoshCore'
 
 /**
@@ -40,7 +40,7 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
   const controller = req.execId ? new AbortController() : undefined
   if (req.execId && controller) inFlight.set(req.execId, controller)
   try {
-    const backend = req.runtime === 'mongosh' ? mongoshShellBackend : legacyShellBackend
+    const backend = req.runtime === 'mongosh' ? mongoshShellBackend : amdmDriverShellBackend
     return await backend.execute(client, req, controller?.signal)
   } finally {
     if (req.execId) inFlight.delete(req.execId)

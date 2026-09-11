@@ -7,7 +7,7 @@ export interface ShellBackend {
   execute(client: MongoClient, request: ShellRequest, signal?: AbortSignal): Promise<ShellResult>
 }
 
-export const legacyShellBackend: ShellBackend = {
+export const amdmDriverShellBackend: ShellBackend = {
   execute(client, request, signal) {
     return runShellOnDb(client.db(request.database), request.code, {
       limit: request.limit,

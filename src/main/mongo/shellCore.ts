@@ -620,6 +620,37 @@ function makeCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: numbe
   })
 }
 
+/** Raw Node Driver collection signatures for the explicit `driverDb` escape
+    hatch, with AMDM's execution signal and read timeout still applied. */
+function makeDriverCollProxy(coll: Collection, signal?: AbortSignal, timeoutMS?: number): Collection {
+  return new Proxy(coll, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
+      switch (prop) {
+        case 'find':
+          return (filter?: Document, options?: Document) =>
+            target.find(filter ?? {}, withReadOptions(options, signal, timeoutMS) as FindOptions)
+        case 'findOne':
+          return (filter?: Document, options?: Document) =>
+            target.findOne(filter ?? {}, withReadOptions(options, signal, timeoutMS) as FindOptions)
+        case 'aggregate':
+          return (pipeline?: Document[], options?: Document) =>
+            target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
+        case 'countDocuments':
+          return (filter?: Document, options?: Document) =>
+            target.countDocuments(filter ?? {}, withReadOptions(options, signal, timeoutMS))
+        case 'distinct':
+          return (key: string, filter?: Document, options?: Document) =>
+            target.distinct(key, filter ?? {}, withReadOptions(options, signal, timeoutMS) as DistinctOptions)
+        case 'indexes':
+          return (options?: Document) => target.indexes(withReadOptions(options, signal, timeoutMS))
+      }
+      const value = (target as unknown as Record<string, unknown>)[prop]
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value
+    }
+  })
+}
+
 // ---------------------------------------------------------------------------
 // db proxy
 // ---------------------------------------------------------------------------
@@ -694,6 +725,31 @@ export function makeDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): D
       }
       // Unknown property → treat as a collection name (mongosh: `db.<coll>`).
       return makeCollProxy(target.collection(prop), signal, timeoutMS)
+    }
+  })
+}
+
+/** Preserve Node Driver method signatures behind `driverDb` while retaining
+    the execution-scoped cancellation and read-timeout contract. */
+export function makeDriverDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: number): Db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver)
+      switch (prop) {
+        case 'collection':
+          return (name: string) => makeDriverCollProxy(target.collection(name), signal, timeoutMS)
+        case 'aggregate':
+          return (pipeline?: Document[], options?: Document) =>
+            target.aggregate(pipeline ?? [], withReadOptions(options, signal, timeoutMS))
+        case 'command':
+          return (command: Document, options?: Document) =>
+            target.command(command, withReadOptions(options, signal, timeoutMS))
+        case 'listCollections':
+          return (filter?: Document, options?: Document) =>
+            target.listCollections(filter ?? {}, withReadOptions(options, signal, timeoutMS))
+      }
+      const value = (target as unknown as Record<string, unknown>)[prop]
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value
     }
   })
 }

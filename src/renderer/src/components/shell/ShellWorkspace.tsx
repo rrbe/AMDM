@@ -210,8 +210,8 @@ export function ShellWorkspace(): React.JSX.Element {
                 options={[
                   {
                     value: 'legacy',
-                    label: t('shell.runtimeLegacy'),
-                    description: t('shell.runtimeLegacyDescription')
+                    label: t('shell.runtimeAmdmDriver'),
+                    description: t('shell.runtimeAmdmDriverDescription')
                   },
                   {
                     value: 'mongosh',
@@ -326,7 +326,7 @@ export function ShellWorkspace(): React.JSX.Element {
               <Button variant="primary" onClick={() => void acceptShellRuntimeSuggestion()}>
                 {t('shell.switchRuntime', {
                   runtime: t(
-                    runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeLegacy'
+                    runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeAmdmDriver'
                   )
                 })}
               </Button>
@@ -337,7 +337,7 @@ export function ShellWorkspace(): React.JSX.Element {
             {t('shell.runtimeSuggestion', {
               construct: runtimeSuggestion.construct,
               runtime: t(
-                runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeLegacy'
+                runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeAmdmDriver'
               )
             })}
           </p>
