@@ -7,7 +7,7 @@
 .ctx-menu {
   position: fixed;
   min-width: 180px;
-  background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
   backdrop-filter: blur(28px) saturate(1.35);
   -webkit-backdrop-filter: blur(28px) saturate(1.35);
   border: 1px solid color-mix(in srgb, var(--separator-strong) 75%, transparent);
