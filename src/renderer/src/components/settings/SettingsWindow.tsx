@@ -10,6 +10,7 @@ import {
   type KeyboardShortcutId,
   type Language,
   type ShellRuntime,
+  type TableNestedDisplay,
   type ThemeMode
 } from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
@@ -113,6 +114,9 @@ export function SettingsWindow(): React.JSX.Element {
         t('shell.runtimeAmdmDriver'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
+        t('settings.tableNestedDisplay'),
+        t('settings.tableNestedInline'),
+        t('settings.tableNestedGrouped'),
         t('settings.queryTimeout'),
         t('settings.queryTimeoutHint'),
         t('settings.historyLimit'),
@@ -399,6 +403,17 @@ export function SettingsWindow(): React.JSX.Element {
 
           {displayedSectionId === 'query' && (
             <>
+              <Field label={t('settings.tableNestedDisplay')}>
+                <Select<TableNestedDisplay>
+                  value={settings.tableNestedDisplay}
+                  onChange={(tableNestedDisplay) => void updateSettings({ tableNestedDisplay })}
+                  options={[
+                    { label: t('settings.tableNestedInline'), value: 'inline' },
+                    { label: t('settings.tableNestedGrouped'), value: 'grouped' }
+                  ]}
+                  aria-label={t('settings.tableNestedDisplay')}
+                />
+              </Field>
               <Field label={t('settings.defaultShellRuntime')} hint={t('settings.defaultShellRuntimeHint')}>
                 <Select<ShellRuntime>
                   value={settings.defaultShellRuntime}

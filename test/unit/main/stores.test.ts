@@ -86,6 +86,7 @@ describe('settingsStore', () => {
       historyLimit: 200,
       defaultShellRuntime: 'mongosh',
       dataFontSize: 13,
+      tableNestedDisplay: 'inline',
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],
@@ -106,6 +107,16 @@ describe('settingsStore', () => {
     settingsStore.update({ defaultExportDirectory: directory })
     settingsStore.init()
     expect(settingsStore.get().defaultExportDirectory).toBe(directory)
+  })
+
+  it('defaults existing installations to inline previews and persists grouped headers', () => {
+    electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
+    settingsStore.init()
+    expect(settingsStore.get().tableNestedDisplay).toBe('inline')
+    settingsStore.update({ tableNestedDisplay: 'grouped' })
+    settingsStore.init()
+    expect(settingsStore.get().tableNestedDisplay).toBe('grouped')
+    expect(settingsStore.get().theme).toBe('dark')
   })
 
   it('persists the acknowledged update version', () => {

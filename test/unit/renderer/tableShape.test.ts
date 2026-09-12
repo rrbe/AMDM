@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   deriveColumns,
+  deriveTableColumnGroups,
   cellValue,
   orderTableColumns,
   sortTableRows,
@@ -67,7 +68,69 @@ describe('orderTableColumns', () => {
   })
 })
 
+describe('deriveTableColumnGroups', () => {
+  const docs = [
+    { orderNo: 1001, notified: { shipped: false, transit: true }, tags: ['new'], id: { $oid: OID } },
+    { orderNo: 1002, notified: { delivered: false, details: { attempts: 2 } }, tags: [], id: { $oid: OID } }
+  ]
+
+  it('keeps one column per top-level field in inline mode', () => {
+    const groups = deriveTableColumnGroups(docs, 'inline', 'natural')
+    expect(groups.map((group) => group.key)).toEqual(['orderNo', 'notified', 'tags', 'id'])
+    expect(groups.map((group) => group.columns.map((column) => column.path))).toEqual([
+      [['orderNo']],
+      [['notified']],
+      [['tags']],
+      [['id']]
+    ])
+  })
+
+  it('unions one level of object fields while retaining arrays and BSON scalars', () => {
+    const groups = deriveTableColumnGroups(docs, 'grouped', 'natural')
+    expect(groups[1].columns.map((column) => column.path)).toEqual([
+      ['notified', 'shipped'],
+      ['notified', 'transit'],
+      ['notified', 'delivered'],
+      ['notified', 'details']
+    ])
+    expect(groups[2].columns[0].path).toEqual(['tags'])
+    expect(groups[3].columns[0].path).toEqual(['id'])
+    expect(cellValue(docs[1], groups[1].columns[3].path).value).toEqual({ attempts: 2 })
+  })
+
+  it('applies alphabetical ordering to both header levels', () => {
+    const groups = deriveTableColumnGroups(docs, 'grouped', 'alpha')
+    expect(groups.map((group) => group.key)).toEqual(['id', 'notified', 'orderNo', 'tags'])
+    expect(groups[1].columns.map((column) => column.label)).toEqual(['delivered', 'details', 'shipped', 'transit'])
+  })
+
+  it('retains mixed-type and empty fields without discarding their values', () => {
+    for (const mixed of [null, 'pending', false, [], { $numberInt: '2' }]) {
+      const group = deriveTableColumnGroups([{ field: { a: 1 } }, { field: mixed }], 'grouped')[0]
+      expect(group.columns.map((column) => column.path)).toEqual([['field']])
+      expect(cellValue({ field: mixed }, group.columns[0].path)).toEqual({ present: true, value: mixed })
+    }
+    expect(deriveTableColumnGroups([{ field: {} }], 'grouped')[0].columns[0].path).toEqual(['field'])
+    const sparse = deriveTableColumnGroups([{ field: { a: 1 } }, {}], 'grouped')[0].columns[0]
+    expect(cellValue({}, sparse.path).present).toBe(false)
+  })
+
+  it('distinguishes literal dotted keys from nested paths', () => {
+    const doc = { 'a.b': 1, a: { b: 2, 'c.d': 3 } }
+    const columns = deriveTableColumnGroups([doc], 'grouped', 'natural').flatMap((group) => group.columns)
+    expect(new Set(columns.map((column) => column.id)).size).toBe(3)
+    expect(columns.map((column) => cellValue(doc, column.path).value)).toEqual([1, 2, 3])
+  })
+})
+
 describe('cellValue', () => {
+  it('reads explicit nested paths without following inherited fields or BSON internals', () => {
+    const doc = { a: { b: false, c: null }, id: { $oid: OID } }
+    expect(cellValue(doc, ['a', 'b'])).toEqual({ present: true, value: false })
+    expect(cellValue(doc, ['a', 'c'])).toEqual({ present: true, value: null })
+    expect(cellValue(doc, ['a', 'toString']).present).toBe(false)
+    expect(cellValue(doc, ['id', '$oid']).present).toBe(false)
+  })
   it('reads a top-level field', () => {
     expect(cellValue({ a: 1 }, 'a')).toEqual({ present: true, value: 1 })
   })
@@ -96,6 +159,12 @@ describe('cellValue', () => {
 })
 
 describe('sortTableRows', () => {
+  it('sorts nested BSON values and preserves source indexes and missing-value order', () => {
+    const docs = [{ a: { b: { $numberInt: '10' } } }, {}, { a: { b: { $numberInt: '2' } } }]
+    const rows = sortTableRows(docs, { column: ['a', 'b'], direction: 'asc' })
+    expect(rows.map((row) => row.sourceIndex)).toEqual([2, 0, 1])
+    expect(rows[0].doc).toBe(docs[2])
+  })
   const values = (docs: unknown[], sort: TableSortState): unknown[] =>
     sortTableRows(docs, sort, 'en').map((row) => cellValue(row.doc, sort.column).value)
 

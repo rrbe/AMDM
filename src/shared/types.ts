@@ -556,6 +556,7 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
 export type KeyboardShortcutId = 'newConnection' | 'newQuery' | 'contextualTabs' | 'resultView' | 'openSettings'
+export type TableNestedDisplay = 'inline' | 'grouped'
 
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
@@ -585,6 +586,8 @@ export interface AppSettings {
   editorFontSize: number
   /** Data result views font size in px (Tree / JSON / Table / Console). */
   dataFontSize: number
+  /** Nested objects in Table: inline preview or one-level grouped columns. */
+  tableNestedDisplay: TableNestedDisplay
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
@@ -647,6 +650,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultShellRuntime: 'mongosh',
   editorFontSize: 13,
   dataFontSize: 13,
+  tableNestedDisplay: 'inline',
   editorWordWrap: false,
   editorTabSize: 2,
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,

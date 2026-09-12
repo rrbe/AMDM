@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ResizableModal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { copyText, toPlainJson } from '@renderer/lib/resultCopy'
-import { cellValue } from '@renderer/lib/tableShape'
+import { cellValue, type TableColumnPath } from '@renderer/lib/tableShape'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { JsonView } from './JsonView'
 
@@ -14,7 +14,7 @@ export interface JsonPreviewSource {
   collection: string
   id?: unknown
   /** Table field path to select after refreshing the owning document. */
-  field?: string
+  field?: TableColumnPath
 }
 
 interface JsonPreviewModalProps {
@@ -100,7 +100,9 @@ export function JsonPreviewModal({
       if (!refreshed.present) {
         notify({
           variant: 'warn',
-          title: t('result.fieldMissing', { field: source.field }),
+          title: t('result.fieldMissing', {
+            field: typeof source.field === 'string' ? source.field : source.field.join('.')
+          }),
           source: 'document'
         })
         return
