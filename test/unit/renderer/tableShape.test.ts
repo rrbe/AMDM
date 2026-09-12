@@ -2,7 +2,13 @@
  * Column derivation + cell extraction shared by the Table view and CSV/TSV.
  */
 import { describe, it, expect } from 'vitest'
-import { deriveColumns, cellValue, sortTableRows, type TableSortState } from '@renderer/lib/tableShape'
+import {
+  deriveColumns,
+  cellValue,
+  orderTableColumns,
+  sortTableRows,
+  type TableSortState
+} from '@renderer/lib/tableShape'
 
 const OID = '64b7f0f0f0f0f0f0f0f0f0f0'
 
@@ -34,6 +40,30 @@ describe('deriveColumns', () => {
   })
   it('ignores stray non-object docs when object columns exist', () => {
     expect(deriveColumns([{ a: 1 }, 5])).toEqual(['a'])
+  })
+})
+
+describe('orderTableColumns', () => {
+  it('uses the configured field order until columns are manually arranged', () => {
+    const columns = ['name', '_id']
+    expect(orderTableColumns(columns, [])).toBe(columns)
+  })
+
+  it('keeps arranged fields in place and appends new fields in their derived order', () => {
+    expect(orderTableColumns(['_id', 'age', 'name', 'status'], ['name', '_id'])).toEqual([
+      'name',
+      '_id',
+      'age',
+      'status'
+    ])
+  })
+
+  it('remembers missing fields across sparse and empty results', () => {
+    const order = ['name', 'age', '_id']
+    expect(orderTableColumns(['_id', 'name'], order)).toEqual(['name', '_id'])
+    expect(orderTableColumns([], order)).toEqual([])
+    expect(orderTableColumns(['_id', 'age', 'name'], order)).toEqual(['name', 'age', '_id'])
+    expect(order).toEqual(['name', 'age', '_id'])
   })
 })
 

@@ -193,6 +193,7 @@ interface AppState {
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
+  setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
   browseCollection(db: string, coll: string): void
@@ -1118,6 +1119,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setResultView(view) {
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { resultView: view }) }))
+  },
+
+  setTableColumnOrder(order) {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { tableColumnOrder: order }) }))
   },
 
   browseCollection(db, coll) {

@@ -1,14 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
-import { cellValue, deriveColumns, isPlainObject, sortTableRows, type TableSortState } from '@renderer/lib/tableShape'
+import {
+  cellValue,
+  deriveColumns,
+  isPlainObject,
+  orderTableColumns,
+  sortTableRows,
+  type TableSortState
+} from '@renderer/lib/tableShape'
+import { useHorizontalReorder } from '@renderer/lib/useHorizontalReorder'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeVisibleSelection } from '@renderer/lib/selection'
-import { useAppStore } from '@renderer/store/useAppStore'
+import { getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
   copyText,
@@ -62,6 +70,22 @@ interface TableViewProps {
 const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
+const COLUMN_REORDER = {
+  itemSelector: '.tbl-th[data-column]',
+  idAttribute: 'data-column',
+  ignoreSelector: '.tbl-col-resizer',
+  sortingClass: 'table-columns-sorting',
+  draggingClass: 'tbl-column-dragging'
+}
+
+function columnStyle(width: number, index: number): CSSProperties {
+  return {
+    width,
+    transform: `var(--reorder-offset-${index})`,
+    zIndex: `var(--reorder-z-${index})`,
+    transitionDuration: `var(--reorder-duration-${index}, 0ms)`
+  }
+}
 
 export function TableView({
   docs,
@@ -76,6 +100,8 @@ export function TableView({
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const columnOrder = useAppStore((s) => getActiveTab(s).tableColumnOrder)
+  const setColumnOrder = useAppStore((s) => s.setTableColumnOrder)
   // Document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [preview, setPreview] = useState<{
@@ -119,7 +145,19 @@ export function TableView({
     window.addEventListener('mouseup', onUp)
   }
 
-  const columns = useMemo<string[]>(() => deriveColumns(docs, fieldSort), [docs, fieldSort])
+  const derivedColumns = useMemo(() => deriveColumns(docs, fieldSort), [docs, fieldSort])
+  const columns = useMemo(() => orderTableColumns(derivedColumns, columnOrder), [derivedColumns, columnOrder])
+  const moveColumn = useCallback(
+    (source: string, target: string) => {
+      if (source === target) return
+      const next = [...columns]
+      next.splice(columns.indexOf(source), 1)
+      next.splice(columns.indexOf(target), 0, source)
+      setColumnOrder(next)
+    },
+    [columns, setColumnOrder]
+  )
+  useHorizontalReorder(parentRef, JSON.stringify(columns), COLUMN_REORDER, moveColumn)
   const rows = useMemo(
     () => sortTableRows(docs, tableSort, tableI18n.resolvedLanguage ?? tableI18n.language),
     [docs, tableSort, tableI18n.resolvedLanguage, tableI18n.language]
@@ -302,11 +340,12 @@ export function TableView({
           <div className="tbl-th idx" style={{ width: INDEX_COL_WIDTH }}>
             #
           </div>
-          {columns.map((col) => (
+          {columns.map((col, columnIndex) => (
             <div
               key={col}
               className="tbl-th"
-              style={{ width: widthOf(col) }}
+              data-column={col}
+              style={columnStyle(widthOf(col), columnIndex)}
               role="columnheader"
               aria-sort={
                 tableSort?.column === col ? (tableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
@@ -375,12 +414,12 @@ export function TableView({
                   {vi.index + 1}
                 </div>
               </Tooltip>
-              {columns.map((col) => (
+              {columns.map((col, columnIndex) => (
                 <Cell
                   key={col}
                   doc={doc}
                   column={col}
-                  width={widthOf(col)}
+                  style={columnStyle(widthOf(col), columnIndex)}
                   selected={selectedCell?.row === sourceIndex && selectedCell?.col === col}
                   editing={editing?.row === sourceIndex && editing?.col === col}
                   editError={editError}
@@ -499,7 +538,7 @@ function tableCopyMenuItems(
 function Cell({
   doc,
   column,
-  width,
+  style,
   selected,
   editing,
   editError,
@@ -512,7 +551,7 @@ function Cell({
 }: {
   doc: unknown
   column: string
-  width: number
+  style: CSSProperties
   selected: boolean
   editing: boolean
   editError: string | null
@@ -528,7 +567,7 @@ function Cell({
 
   if (editing) {
     return (
-      <div className={cellCls} style={{ width }}>
+      <div className={cellCls} style={style}>
         <CellInput initial={editableText(value) ?? ''} error={editError} onCommit={onCommit} onCancel={onCancel} />
       </div>
     )
@@ -536,7 +575,7 @@ function Cell({
 
   if (!present) {
     return (
-      <div className={cellCls} style={{ width }} onClick={onClick} onContextMenu={onContextMenu}>
+      <div className={cellCls} style={style} onClick={onClick} onContextMenu={onContextMenu}>
         <span className="empty">—</span>
       </div>
     )
@@ -559,7 +598,7 @@ function Cell({
     >
       <div
         className={cellCls}
-        style={{ width, cursor: expandable ? 'pointer' : undefined }}
+        style={{ ...style, cursor: expandable ? 'pointer' : undefined }}
         role={expandable ? 'button' : undefined}
         tabIndex={expandable ? 0 : undefined}
         onClick={onClick}

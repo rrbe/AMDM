@@ -109,6 +109,8 @@ export interface QueryTab {
   activeResultId: string | null
   /** Selected Tree/JSON/Table view for this query tab. */
   resultView: ResultView
+  /** Last manually arranged Table columns, retained for this query tab's lifetime. */
+  tableColumnOrder: string[]
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
@@ -133,6 +135,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     results: [],
     activeResultId: null,
     resultView: 'tree',
+    tableColumnOrder: [],
     resultSeq: 0,
     running: false,
     stopping: false,

@@ -385,7 +385,33 @@
   font: inherit;
   line-height: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.table-columns-sorting,
+.table-columns-sorting .tbl-sort-trigger {
+  cursor: grabbing;
+}
+.table-columns-sorting .tbl-th,
+.table-columns-sorting .tbl-td {
+  transition-property: transform;
+  transition-timing-function: var(--ease-standard);
+}
+.table-columns-sorting .tbl-row,
+.table-columns-sorting .tbl-th {
+  background: var(--surface-content);
+}
+.table-columns-sorting .tbl-td {
+  background: inherit;
+}
+.table-columns-sorting .tbl-column-dragging {
+  color: var(--text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-columns-sorting .tbl-th,
+  .table-columns-sorting .tbl-td {
+    transition: none;
+  }
 }
 .tbl-sort-trigger:hover,
 .tbl-sort-trigger.active {

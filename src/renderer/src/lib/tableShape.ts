@@ -57,6 +57,17 @@ export function deriveColumns(docs: unknown[], sort: CollectionSort = 'alpha'): 
   return sort === 'alpha' ? cols.sort((a, b) => a.localeCompare(b)) : cols
 }
 
+/** Apply a tab's column order without forgetting fields absent from this result. */
+export function orderTableColumns(columns: string[], order: string[]): string[] {
+  if (order.length === 0) return columns
+  const available = new Set(columns)
+  const remembered = new Set(order)
+  return [
+    ...order.filter((column) => available.has(column)),
+    ...columns.filter((column) => !remembered.has(column))
+  ]
+}
+
 /**
  * Build the Table's visible row order without mutating the query result.
  *

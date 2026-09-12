@@ -56,6 +56,45 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('table')
   })
 
+  it('retains column order across query reruns, refreshes, and result/view switches', async () => {
+    const execute = vi.fn().mockResolvedValue({ kind: 'documents', data: [{ _id: 1, name: 'item' }] })
+    vi.stubGlobal('window', {
+      api: { shell: { execute }, history: { list: vi.fn().mockResolvedValue([]) } }
+    })
+    useAppStore.getState().setCode('db.items.find({})')
+    useAppStore.getState().setTableColumnOrder(['name', '_id'])
+    const order = useAppStore.getState().tabs[0].tableColumnOrder
+
+    await useAppStore.getState().runShell()
+    const firstResultId = useAppStore.getState().tabs[0].activeResultId
+    await useAppStore.getState().runShell()
+    expect(useAppStore.getState().tabs[0].activeResultId).not.toBe(firstResultId)
+    await useAppStore.getState().loadPage(0)
+    expect(execute).toHaveBeenCalledTimes(3)
+    useAppStore.getState().setActiveResultTab(firstResultId!)
+    useAppStore.getState().setResultView('json')
+    useAppStore.getState().setResultView('table')
+
+    expect(useAppStore.getState().tabs[0].tableColumnOrder).toBe(order)
+  })
+
+  it('isolates column order per query tab and releases it when the tab closes', () => {
+    const other = createTab('c2-tab', { connectionId: 'c2' })
+    useAppStore.setState({ tabs: [...useAppStore.getState().tabs, other] })
+    useAppStore.getState().setTableColumnOrder(['name', '_id'])
+    expect(useAppStore.getState().tabs[1]).toBe(other)
+    useAppStore.getState().setActiveTab('c2-tab')
+    expect(useAppStore.getState().tabs[1].tableColumnOrder).toEqual([])
+    useAppStore.getState().setTableColumnOrder(['_id', 'name'])
+    useAppStore.getState().setActiveTab('c1-tab')
+    expect(useAppStore.getState().tabs[0].tableColumnOrder).toEqual(['name', '_id'])
+    useAppStore.getState().closeTab('c1-tab')
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(['c2-tab'])
+    expect(useAppStore.getState().tabs[0].tableColumnOrder).toEqual(['_id', 'name'])
+    useAppStore.getState().closeTab('c2-tab')
+    expect(useAppStore.getState().tabs[0].tableColumnOrder).toEqual([])
+  })
+
   it('moves query tabs without changing focus, connection, or the state owned by each tab', () => {
     const tabs = [
       createTab('first', { connectionId: 'c1', code: 'db.orders.find({})', pristine: false }),
