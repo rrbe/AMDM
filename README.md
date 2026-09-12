@@ -6,6 +6,25 @@ A lean, performance-first MongoDB desktop GUI, powered by Electron.
 
 > Still under development — don't use it for anything important; no liability for data loss.
 
+![AMDM light theme with an aggregation query and table results](./docs/screenshots/table-light.png)
+
+<details>
+<summary>More screenshots: document tree, dark theme, and visual explain</summary>
+
+**Document tree**
+
+![Nested order document with BSON types and collection details](./docs/screenshots/tree-light.png)
+
+**Dark theme**
+
+![Product document in the dark JSON view](./docs/screenshots/json-dark.png)
+
+**Visual explain**
+
+![Query execution statistics and an indexed execution plan](./docs/screenshots/explain-light.png)
+
+</details>
+
 ## Run
 
 ```bash
