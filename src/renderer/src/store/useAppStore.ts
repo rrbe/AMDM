@@ -52,6 +52,7 @@ import {
   dbCollRef,
   indexDetailsQuery,
   isRunFailure,
+  moveTab,
   patchResult,
   patchTab,
   pickActiveAfterClose,
@@ -172,12 +173,14 @@ interface AppState {
   newTab(): void
   /** Focus an existing tab. */
   setActiveTab(id: string): void
+  moveQueryTab(sourceId: string, targetId: string): void
   /** Close a tab (aborts its run if any); always leaves ≥1 tab open. */
   closeTab(id: string): void
 
   // ---- actions: result tabs (operate on the active query tab) ----
   /** Focus one of the active tab's result tabs. */
   setActiveResultTab(id: string): void
+  moveResultTab(sourceId: string, targetId: string): void
   /** Close one of the active tab's result tabs. */
   closeResultTab(id: string): void
 
@@ -952,6 +955,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  moveQueryTab(sourceId, targetId) {
+    set((s) => {
+      const tabs = moveTab(s.tabs, sourceId, targetId)
+      return tabs === s.tabs ? s : { tabs }
+    })
+  },
+
   closeTab(id) {
     const closing = get().tabs.find((t) => t.id === id)
     // Free a server-side run the closed tab may have had in flight.
@@ -971,6 +981,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   // --------------------------------------------------------------- result tabs
   setActiveResultTab(id) {
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeResultId: id }) }))
+  },
+
+  moveResultTab(sourceId, targetId) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      const results = moveTab(tab.results, sourceId, targetId)
+      return results === tab.results ? s : { tabs: patchTab(s.tabs, tab.id, { results }) }
+    })
   },
 
   closeResultTab(id) {

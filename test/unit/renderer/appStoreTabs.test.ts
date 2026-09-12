@@ -56,6 +56,62 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('table')
   })
 
+  it('moves query tabs without changing focus, connection, or the state owned by each tab', () => {
+    const tabs = [
+      createTab('first', { connectionId: 'c1', code: 'db.orders.find({})', pristine: false }),
+      createTab('second', { connectionId: 'c2', running: true, runningExecId: 'running-query' }),
+      createTab('third', { connectionId: 'c3', resultView: 'table' })
+    ]
+    useAppStore.setState({ tabs, activeTabId: 'second', activeConnectionId: 'c2' })
+
+    useAppStore.getState().moveQueryTab('second', 'third')
+    const moved = useAppStore.getState()
+    expect(moved.tabs.map((tab) => tab.id)).toEqual(['first', 'third', 'second'])
+    expect(moved.tabs[2]).toBe(tabs[1])
+    expect(moved.tabs[0]).toBe(tabs[0])
+    expect(moved.tabs[1]).toBe(tabs[2])
+    expect(moved.activeTabId).toBe('second')
+    expect(moved.activeConnectionId).toBe('c2')
+
+    useAppStore.getState().moveQueryTab('second', 'first')
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(['second', 'first', 'third'])
+    const unchanged = useAppStore.getState()
+    useAppStore.getState().moveQueryTab('second', 'second')
+    useAppStore.getState().moveQueryTab('closed-tab', 'first')
+    expect(useAppStore.getState()).toBe(unchanged)
+  })
+
+  it('moves results only within their query tab and closes the next visual neighbor', () => {
+    const results = [1, 2, 3].map((seq) => ({
+      id: `r${seq}`,
+      seq,
+      result: { kind: 'value', data: seq } as ShellResult,
+      executedAt: seq,
+      query: null,
+      skip: seq * 10
+    }))
+    const other = createTab('other', { connectionId: 'c2' })
+    useAppStore.setState({
+      tabs: [createTab('c1-tab', { results, activeResultId: 'r1', resultSeq: 3 }), other]
+    })
+
+    useAppStore.getState().moveResultTab('r1', 'r3')
+    const moved = useAppStore.getState()
+    expect(moved.tabs[0].results.map((result) => result.id)).toEqual(['r2', 'r3', 'r1'])
+    expect(moved.tabs[0].results[2]).toBe(results[0])
+    expect(moved.tabs[0].results[0]).toBe(results[1])
+    expect(moved.tabs[0].activeResultId).toBe('r1')
+    expect(moved.tabs[0].resultSeq).toBe(3)
+    expect(moved.tabs[1]).toBe(other)
+
+    useAppStore.getState().closeResultTab('r1')
+    expect(useAppStore.getState().tabs[0].activeResultId).toBe('r3')
+    useAppStore.getState().setActiveTab('other')
+    const unchanged = useAppStore.getState()
+    useAppStore.getState().moveResultTab('r2', 'r3')
+    expect(useAppStore.getState()).toBe(unchanged)
+  })
+
   it('keeps runtime per tab and clears results when it changes', () => {
     const prepare = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('window', { api: { shell: { prepare } } })

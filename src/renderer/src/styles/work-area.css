@@ -72,6 +72,7 @@
   font-size: var(--fs-sm);
   cursor: pointer;
   user-select: none;
+  touch-action: none;
   white-space: nowrap;
   transition:
     background var(--motion-fast) var(--ease-standard),
@@ -122,6 +123,23 @@
   z-index: 2;
   background: var(--surface-content);
   color: var(--text-primary);
+}
+.tab-strip-sorting {
+  cursor: grabbing;
+  -webkit-app-region: no-drag;
+}
+.tab-strip-sorting .document-tab {
+  transition: transform var(--motion-fast) var(--ease-standard);
+  cursor: grabbing;
+}
+.tab-strip-sorting .document-tab-dragging {
+  z-index: 3;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-strip-sorting .document-tab {
+    transition: none;
+  }
 }
 .document-tab-label {
   flex: 1;

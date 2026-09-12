@@ -23,6 +23,7 @@ import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
+import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Modal } from '@renderer/components/common/Modal'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
@@ -364,6 +365,8 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const stripRef = useRef<HTMLDivElement>(null)
+  const moveQueryTab = useAppStore((s) => s.moveQueryTab)
+  useTabReorder(stripRef, tabs, setActiveTab, moveQueryTab)
   const connectionTextColor = (connectionId: string | null): string | undefined => {
     const color = connections.find((conn) => conn.id === connectionId)?.color
     return color ? `color-mix(in srgb, ${color} 60%, var(--text-secondary))` : undefined

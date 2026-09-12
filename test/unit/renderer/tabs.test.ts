@@ -248,6 +248,16 @@ describe('appendResult', () => {
     expect(tab.results.map((r) => r.seq)).toEqual([2, 3])
     expect(tab.activeResultId).toBe('r3')
   })
+  it('evicts by run sequence after sorting, retaining the surviving display order', () => {
+    const tab = tabWithResults(3)
+    const [first, second, third] = tab.results
+    const next = appendResult({ ...tab, results: [third, first, second] }, 'r4', docsResult(), QUERY, 3)
+    expect(next.results?.map((result) => result.id)).toEqual(['r3', 'r2', 'r4'])
+    expect(next.results?.[0]).toBe(third)
+    expect(next.results?.[1]).toBe(second)
+    expect(next.activeResultId).toBe('r4')
+    expect(next.resultSeq).toBe(4)
+  })
 })
 
 describe('patchResult', () => {

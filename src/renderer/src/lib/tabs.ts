@@ -103,7 +103,7 @@ export interface QueryTab {
       editor's onChange (user keystrokes only — external value syncs don't
       fire it), never set back. */
   pristine: boolean
-  /** Result strip: one entry per run, newest last, capped at MAX_RESULT_TABS. */
+  /** Result strip in display order, capped at MAX_RESULT_TABS. New runs append. */
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
   activeResultId: string | null
@@ -217,6 +217,16 @@ export function activeResult(tab: QueryTab): ResultTab | null {
   return tab.results.find((r) => r.id === tab.activeResultId) ?? null
 }
 
+/** Move a tab to another tab's index without replacing its editor or result state. */
+export function moveTab<T extends { id: string }>(tabs: T[], sourceId: string, targetId: string): T[] {
+  const from = tabs.findIndex((tab) => tab.id === sourceId)
+  const to = tabs.findIndex((tab) => tab.id === targetId)
+  if (from < 0 || to < 0 || from === to) return tabs
+  const next = [...tabs]
+  next.splice(to, 0, ...next.splice(from, 1))
+  return next
+}
+
 /** Append a new run's result as a fresh, focused result tab (evicting the
     oldest beyond `max`). */
 export function appendResult(
@@ -228,8 +238,12 @@ export function appendResult(
 ): Partial<QueryTab> {
   const seq = tab.resultSeq + 1
   const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0 }]
+  // Display order can change; eviction still follows the run sequence.
+  const evicted = new Set(
+    [...results].sort((a, b) => a.seq - b.seq).slice(0, Math.max(0, results.length - max))
+  )
   return {
-    results: results.length > max ? results.slice(results.length - max) : results,
+    results: evicted.size ? results.filter((entry) => !evicted.has(entry)) : results,
     activeResultId: id,
     resultSeq: seq
   }

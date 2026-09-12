@@ -11,6 +11,7 @@ import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
+import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -391,6 +392,8 @@ function ResultTabStrip({
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
   const stripRef = useRef<HTMLDivElement>(null)
+  const moveResultTab = useAppStore((s) => s.moveResultTab)
+  useTabReorder(stripRef, results, setActiveResultTab, moveResultTab)
 
   useEffect(() => {
     if (!activeId) return
