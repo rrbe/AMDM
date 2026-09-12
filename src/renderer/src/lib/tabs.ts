@@ -20,6 +20,8 @@ export interface ResultQuery {
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
 export interface ResultTab {
   id: string
+  /** Selected Tree/JSON/Table view for this result tab. */
+  resultView?: ResultView
   /** 1-based run sequence within its query tab (drives the "结果 N" label).
       Monotonic — eviction of old results never renumbers survivors. */
   seq: number
@@ -107,8 +109,6 @@ export interface QueryTab {
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
   activeResultId: string | null
-  /** Selected Tree/JSON/Table view for this query tab. */
-  resultView: ResultView
   /** Last manually arranged Table columns, retained for this query tab's lifetime. */
   tableColumnOrder: string[]
   /** Monotonic run counter feeding ResultTab.seq. */
@@ -134,7 +134,6 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     pristine: true,
     results: [],
     activeResultId: null,
-    resultView: 'tree',
     tableColumnOrder: [],
     resultSeq: 0,
     running: false,
@@ -240,7 +239,7 @@ export function appendResult(
   max = MAX_RESULT_TABS
 ): Partial<QueryTab> {
   const seq = tab.resultSeq + 1
-  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0 }]
+  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0, resultView: 'tree' as const }]
   // Display order can change; eviction still follows the run sequence.
   const evicted = new Set(
     [...results].sort((a, b) => a.seq - b.seq).slice(0, Math.max(0, results.length - max))

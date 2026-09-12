@@ -1118,7 +1118,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setResultView(view) {
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { resultView: view }) }))
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.activeResultId) return s
+      return { tabs: patchTab(s.tabs, tab.id, patchResult(tab, tab.activeResultId, { resultView: view })) }
+    })
   },
 
   setTableColumnOrder(order) {

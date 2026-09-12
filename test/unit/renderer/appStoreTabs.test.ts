@@ -33,27 +33,40 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().activeTabId).toBe(c2Tab?.id)
   })
 
-  it('keeps the result view independent for each query tab', () => {
+  it('keeps the result view independent for each data tab and query tab', () => {
+    const result = (id: string) => ({
+      id,
+      seq: 1,
+      result: { kind: 'documents' as const, data: [] },
+      executedAt: 1,
+      query: null,
+      skip: 0,
+      resultView: 'tree' as const
+    })
     useAppStore.setState({
       tabs: [
-        createTab('c1-tab', { connectionId: 'c1' }),
-        createTab('c2-tab', { connectionId: 'c2' })
+        createTab('c1-tab', { connectionId: 'c1', results: [result('r1'), result('r2')], activeResultId: 'r1' }),
+        createTab('c2-tab', { connectionId: 'c2', results: [result('r3')], activeResultId: 'r3' })
       ],
       activeTabId: 'c1-tab',
       activeConnectionId: 'c1'
     })
 
     useAppStore.getState().setResultView('json')
+    useAppStore.getState().setActiveResultTab('r2')
+    expect(useAppStore.getState().tabs[0].results[1].resultView).toBe('tree')
+    useAppStore.getState().setResultView('table')
+    useAppStore.getState().setActiveResultTab('r1')
+    expect(useAppStore.getState().tabs[0].results[0].resultView).toBe('json')
     useAppStore.getState().setActiveTab('c2-tab')
 
-    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c1-tab')?.resultView).toBe('json')
-    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('tree')
+    expect(useAppStore.getState().tabs[1].results[0].resultView).toBe('tree')
 
     useAppStore.getState().setResultView('table')
     useAppStore.getState().setActiveTab('c1-tab')
 
-    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c1-tab')?.resultView).toBe('json')
-    expect(useAppStore.getState().tabs.find((tab) => tab.id === 'c2-tab')?.resultView).toBe('table')
+    expect(useAppStore.getState().tabs[0].results.map((r) => r.resultView)).toEqual(['json', 'table'])
+    expect(useAppStore.getState().tabs[1].results[0].resultView).toBe('table')
   })
 
   it('retains column order across query reruns, refreshes, and result/view switches', async () => {
@@ -99,7 +112,7 @@ describe('connection-bound tabs', () => {
     const tabs = [
       createTab('first', { connectionId: 'c1', code: 'db.orders.find({})', pristine: false }),
       createTab('second', { connectionId: 'c2', running: true, runningExecId: 'running-query' }),
-      createTab('third', { connectionId: 'c3', resultView: 'table' })
+      createTab('third', { connectionId: 'c3' })
     ]
     useAppStore.setState({ tabs, activeTabId: 'second', activeConnectionId: 'c2' })
 

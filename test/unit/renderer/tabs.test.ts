@@ -64,7 +64,6 @@ describe('createTab', () => {
       pristine: true,
       results: [],
       activeResultId: null,
-      resultView: 'tree',
       resultSeq: 0,
       running: false,
       stopping: false,
