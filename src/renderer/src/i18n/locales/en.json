@@ -413,6 +413,7 @@
     "deployment": "Deployment",
     "database": "Database",
     "collection": "Collection",
+    "queryTime": "Query time",
     "type": "Type",
     "documents": "Documents",
     "indexes": "Indexes",

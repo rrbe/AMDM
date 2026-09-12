@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
-import { formatQueryTime } from '@renderer/lib/queryTime'
+import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
@@ -388,7 +388,7 @@ function ResultTabStrip({
   activeId: string | null
   showShortcutHints: boolean
 }): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -413,7 +413,12 @@ function ResultTabStrip({
             className="rtab"
             dataTabId={r.id}
             label={resultTabLabel(r)}
-            tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : undefined}
+            tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : resultTabLabel(r)}
+            tooltipFooter={() => (
+              <span data-result-tab-time="">
+                {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
+              </span>
+            )}
             tooltipVariant="code"
             closeLabel={t('result.closeTab')}
             onSelect={() => setActiveResultTab(r.id)}

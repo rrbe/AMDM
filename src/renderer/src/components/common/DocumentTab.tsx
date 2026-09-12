@@ -14,6 +14,7 @@ interface DocumentTabProps {
   status?: ReactNode
   statusAction?: { label: string; onClick: () => void }
   tooltip?: TooltipContent
+  tooltipFooter?: TooltipContent
   tooltipVariant?: TooltipVariant
   shortcutNumber?: number
 }
@@ -30,6 +31,7 @@ export function DocumentTab({
   status,
   statusAction,
   tooltip,
+  tooltipFooter,
   tooltipVariant,
   shortcutNumber
 }: DocumentTabProps): React.JSX.Element {
@@ -63,7 +65,7 @@ export function DocumentTab({
           {status}
         </span>
       )}
-      <Tooltip content={tooltip} variant={tooltipVariant}>
+      <Tooltip content={tooltip} footer={tooltipFooter} variant={tooltipVariant}>
         <span className="document-tab-label">{label}</span>
       </Tooltip>
       {shortcutNumber == null ? (

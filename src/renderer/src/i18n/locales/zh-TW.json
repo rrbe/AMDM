@@ -418,6 +418,7 @@
     "indexes": "索引",
     "notLoaded": "尚未載入",
     "lastResult": "最近結果",
+    "queryTime": "查詢時間",
     "result": "結果",
     "elapsed": "耗時",
     "noResult": "尚未執行",
