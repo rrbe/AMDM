@@ -58,6 +58,10 @@
 .tab-strip::-webkit-scrollbar {
   display: none;
 }
+.context-toggle {
+  align-self: center;
+  margin-bottom: 4px;
+}
 /* Shared Query/Result document-tab language. */
 .document-tab {
   position: relative;

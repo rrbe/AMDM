@@ -186,7 +186,11 @@ export function ShellWorkspace(): React.JSX.Element {
 
   return (
     <div className="work">
-      <TabBar showShortcutHints={shortcutHintRegion === 'query'} />
+      <TabBar
+        showShortcutHints={shortcutHintRegion === 'query'}
+        contextOpen={contextOpen}
+        onContextToggle={() => setContextOpen((open) => !open)}
+      />
       <div className="shell-body">
         <main className={`shell-main${expandedRegion ? ` ${expandedRegion}-expanded` : ''}`}>
           <div className="work-header" data-shortcut-region="query">
@@ -259,13 +263,6 @@ export function ShellWorkspace(): React.JSX.Element {
                 onClick={() => setExpandedRegion((current) => (current === 'query' ? null : 'query'))}
               >
                 {queryExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
-              <button
-                className="work-icon-btn context-toggle"
-                onClick={() => setContextOpen((open) => !open)}
-                aria-label={t(contextOpen ? 'context.close' : 'context.open')}
-              >
-                {contextOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
               </button>
             </div>
           </div>
@@ -353,7 +350,15 @@ export function ShellWorkspace(): React.JSX.Element {
  * The query-tab strip: one chip per open tab (label derived from its code), a
  * fixed status slot (spinner / failure dot), a close ✕, and a trailing "+".
  */
-function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JSX.Element {
+function TabBar({
+  showShortcutHints,
+  contextOpen,
+  onContextToggle
+}: {
+  showShortcutHints: boolean
+  contextOpen: boolean
+  onContextToggle: () => void
+}): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const connections = useAppStore((s) => s.connections)
@@ -505,6 +510,14 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
           <Plus size={14} />
         </button>
       </div>
+      <button
+        className="side-head-action context-toggle"
+        onClick={onContextToggle}
+        aria-label={t(contextOpen ? 'context.close' : 'context.open')}
+        aria-expanded={contextOpen}
+      >
+        {contextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+      </button>
     </div>
   )
 }
