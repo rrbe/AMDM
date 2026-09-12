@@ -392,10 +392,21 @@ function TabBar({
     return () => observer.disconnect()
   }, [activeTabId])
 
-  // ⌘T / Ctrl+T opens a new query tab (reads the action via getState to keep
-  // this listener stable). ⌘W is left alone — it's Electron's window close.
+  // Cmd/Ctrl+W closes the query first; an already empty workspace closes the window.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (isPrimaryShortcut(e, 'w', isMacPlatform())) {
+        e.preventDefault()
+        if (e.repeat || hasOpenShortcutLayer()) return
+        const state = useAppStore.getState()
+        const tab = getActiveTab(state)
+        if (state.tabs.length === 1 && !tab.code.trim() && tab.results.length === 0 && !tab.running) {
+          window.close()
+        } else {
+          state.closeTab(tab.id)
+        }
+        return
+      }
       if (
         isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newQuery') &&
         !e.repeat &&
@@ -406,8 +417,8 @@ function TabBar({
         useAppStore.getState().newTab()
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   return (

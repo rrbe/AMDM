@@ -54,7 +54,9 @@ export function shortcutRegionFromTarget(target: EventTarget | null): ShortcutRe
 
 /** Dialogs and popovers own the keyboard while open; do not act behind them. */
 export function hasOpenShortcutLayer(root: ParentNode = document): boolean {
-  return root.querySelector('[role="dialog"], [role="menu"], [role="listbox"]') != null
+  return Array.from(root.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]')).some((layer) =>
+    layer.checkVisibility()
+  )
 }
 
 export function isAppShortcutEnabled(
