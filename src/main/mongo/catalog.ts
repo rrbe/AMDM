@@ -2,6 +2,7 @@ import type { MongoClient } from 'mongodb'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import { sessionManager } from './sessionManager'
 import {
+  dropCollectionOnDb,
   estimateCollectionCountOnDb,
   listCollectionsOnDb,
   listIndexesOnDb,
@@ -136,6 +137,17 @@ export async function listIndexes(
 
 const SAMPLE_LIMIT = 50
 const fieldCache = new Map<string, string[]>()
+
+/** Destructive catalog operations must surface disconnects and server failures. */
+export async function dropCollection(
+  connectionId: string,
+  database: string,
+  collection: string,
+  options: { timeoutMS: number; signal: AbortSignal }
+): Promise<void> {
+  await dropCollectionOnDb(sessionManager.getClient(connectionId).db(database), collection, options)
+  fieldCache.delete(`${connectionId}:${database}.${collection}`)
+}
 
 /**
  * Sample a bounded number of documents and return their (dot-pathed) field

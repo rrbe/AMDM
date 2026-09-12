@@ -133,6 +133,7 @@
     "disconnectFailed": "中斷連線失敗：{{error}}",
     "loadDatabasesFailed": "載入資料庫失敗：{{error}}",
     "loadCollectionsFailed": "載入集合失敗（{{db}}）：{{error}}",
+    "dropCollectionFailed": "刪除集合失敗（{{target}}）：{{error}}",
     "loadIndexesFailed": "載入索引失敗（{{key}}）：{{error}}",
     "loadUsersFailed": "載入使用者失敗（{{db}}）：{{error}}",
     "formatFailed": "格式化失敗：{{error}}",
@@ -181,7 +182,7 @@
       "connect": "連線",
       "disconnect": "中斷連線",
       "edit": "編輯",
-      "delete": "刪除",
+      "delete": "刪除連線",
       "deleteConfirm": "確定刪除連線「{{name}}」嗎？"
     },
     "status": {
@@ -301,6 +302,8 @@
     }
   },
   "explorer": {
+    "dropCollection": "刪除集合",
+    "dropCollectionConfirm": "確定要刪除此集合嗎？\n\n連線：{{connection}}\n資料庫：{{database}}\n集合：{{collection}}\n\n集合內的所有文件和索引都將被永久刪除，此操作無法復原。",
     "search": "搜尋目前可見目錄",
     "searchPlaceholder": "搜尋目前可見的連線與目錄…",
     "clearSearch": "清除搜尋",
@@ -619,7 +622,7 @@
     "menuLoad": "載入至編輯器",
     "menuMoveTo": "移動至「{{folder}}」",
     "menuMoveOut": "從資料夾移出",
-    "menuDelete": "刪除",
+    "menuDelete": "刪除查詢",
     "noDb": "無資料庫"
   },
   "docEditor": {

@@ -193,6 +193,7 @@ export function Explorer({
   const loadCollections = useAppStore((s) => s.loadCollections)
   const loadIndexes = useAppStore((s) => s.loadIndexes)
   const refreshCollection = useAppStore((s) => s.refreshCollection)
+  const dropCollection = useAppStore((s) => s.dropCollection)
   const browseCollection = useAppStore((s) => s.browseCollection)
   const inspectIndex = useAppStore((s) => s.inspectIndex)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -370,6 +371,27 @@ export function Explorer({
               db: coll.db,
               collection: coll.name
             })
+        },
+        'separator',
+        {
+          label: t('explorer.dropCollection'),
+          icon: <Trash2 size={14} />,
+          danger: true,
+          disabled: row.loading,
+          onClick: () => {
+            const connection = connections.find((item) => item.id === row.connId)
+            if (
+              window.confirm(
+                t('explorer.dropCollectionConfirm', {
+                  connection: connection?.name ?? row.connId,
+                  database: coll.db,
+                  collection: coll.name
+                })
+              )
+            ) {
+              void dropCollection(row.connId, coll.db, coll.name)
+            }
+          }
         }
       ]
     })

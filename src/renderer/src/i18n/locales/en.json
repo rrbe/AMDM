@@ -133,6 +133,7 @@
     "disconnectFailed": "Failed to disconnect: {{error}}",
     "loadDatabasesFailed": "Failed to load databases: {{error}}",
     "loadCollectionsFailed": "Failed to load collections for {{db}}: {{error}}",
+    "dropCollectionFailed": "Failed to drop collection {{target}}: {{error}}",
     "loadIndexesFailed": "Failed to load indexes for {{key}}: {{error}}",
     "loadUsersFailed": "Failed to load users for {{db}}: {{error}}",
     "formatFailed": "Format failed: {{error}}",
@@ -181,7 +182,7 @@
       "connect": "Connect",
       "disconnect": "Disconnect",
       "edit": "Edit",
-      "delete": "Delete",
+      "delete": "Delete Connection",
       "deleteConfirm": "Delete connection “{{name}}”?"
     },
     "status": {
@@ -301,6 +302,8 @@
     }
   },
   "explorer": {
+    "dropCollection": "Drop Collection",
+    "dropCollectionConfirm": "Drop this collection?\n\nConnection: {{connection}}\nDatabase: {{database}}\nCollection: {{collection}}\n\nAll documents and indexes in this collection will be permanently deleted. This cannot be undone.",
     "search": "Search visible catalog",
     "searchPlaceholder": "Search visible connections and catalog…",
     "clearSearch": "Clear search",
@@ -619,7 +622,7 @@
     "menuLoad": "Load into editor",
     "menuMoveTo": "Move to \"{{folder}}\"",
     "menuMoveOut": "Remove from folder",
-    "menuDelete": "Delete",
+    "menuDelete": "Delete Query",
     "noDb": "no db"
   },
   "docEditor": {

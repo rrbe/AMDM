@@ -36,6 +36,8 @@ const api: Api = {
       ipcRenderer.invoke(IPC.catalogCollections, connectionId, database),
     collectionCount: (connectionId, database, collection) =>
       ipcRenderer.invoke(IPC.catalogCollectionCount, connectionId, database, collection),
+    dropCollection: (connectionId, database, collection) =>
+      ipcRenderer.invoke(IPC.catalogDropCollection, connectionId, database, collection),
     indexes: (connectionId, database, collection) =>
       ipcRenderer.invoke(IPC.catalogIndexes, connectionId, database, collection),
     users: (connectionId, database) => ipcRenderer.invoke(IPC.catalogUsers, connectionId, database),

@@ -165,6 +165,7 @@ interface AppState {
   loadCollections(connId: string, db: string): Promise<void>
   /** Refresh one collection's estimated document count and indexes together. */
   refreshCollection(connId: string, db: string, coll: string): Promise<void>
+  dropCollection(connId: string, db: string, coll: string): Promise<void>
   loadIndexes(connId: string, db: string, coll: string): Promise<void>
   loadUsers(connId: string, db: string): Promise<void>
 
@@ -839,6 +840,52 @@ export const useAppStore = create<AppState>((set, get) => ({
       )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  async dropCollection(connId, db, coll) {
+    const nodeId = `${connId}:coll:${db}/${coll}`
+    if (get().catalogs[connId]?.loading.has(nodeId)) return
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      await window.api.catalog.dropCollection(connId, db, coll)
+      set((s) => {
+        const fieldCache = { ...s.fieldCache }
+        delete fieldCache[`${connId}:${db}.${coll}`]
+        const catalog = s.catalogs[connId]
+        if (!catalog) return { fieldCache }
+        const indexes = { ...catalog.indexes }
+        delete indexes[`${db}/${coll}`]
+        const expanded = new Set(catalog.expanded)
+        expanded.delete(nodeId)
+        expanded.delete(`${connId}:idx:${db}/${coll}`)
+        return {
+          fieldCache,
+          catalogs: {
+            ...s.catalogs,
+            [connId]: {
+              ...catalog,
+              collections: {
+                ...catalog.collections,
+                [db]: catalog.collections[db]?.filter((collection) => collection.name !== coll)
+              },
+              indexes,
+              expanded
+            }
+          }
+        }
+      })
+    } catch (e) {
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.dropCollectionFailed', { target: `${db}.${coll}`, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:${coll}:drop`
+        )
+      )
+    } finally {
+      set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : s))
     }
   },
 

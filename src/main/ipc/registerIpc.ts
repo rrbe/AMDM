@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { homedir } from 'node:os'
 import { IPC } from '../../shared/ipc'
 import { buildMongoUri } from '../../shared/connectionUri'
+import { DEFAULT_SETTINGS } from '../../shared/types'
 import type {
   AppSettings,
   ConnectionConfig,
@@ -28,6 +29,7 @@ import { sessionManager } from '../mongo/sessionManager'
 import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
 import {
+  dropCollection,
   estimateCollectionCount,
   listCollections,
   listDatabases,
@@ -182,6 +184,19 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.catalogCollectionCount, (_e, id: string, db: string, coll: string) =>
     estimateCollectionCount(id, db, coll)
   )
+  ipcMain.handle(IPC.catalogDropCollection, async (event, id: string, db: string, coll: string) => {
+    const controller = new AbortController()
+    const cancel = (): void => controller.abort()
+    event.sender.once('destroyed', cancel)
+    try {
+      await dropCollection(id, db, coll, {
+        timeoutMS: DEFAULT_SETTINGS.queryTimeoutMS,
+        signal: controller.signal
+      })
+    } finally {
+      event.sender.removeListener('destroyed', cancel)
+    }
+  })
   ipcMain.handle(IPC.catalogIndexes, (_e, id: string, db: string, coll: string) =>
     listIndexes(id, db, coll)
   )
