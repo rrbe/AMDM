@@ -39,6 +39,42 @@ The release workflow publishes more than the interactive installers:
 
 `scripts/generate-sparkle-appcast.mjs` downloads the three most recent full ZIPs from the previous appcast before generating the next macOS feed. Historical release ZIPs must remain available. Windows/Linux update metadata is emitted because their electron-builder targets declare the public GitHub provider even when packaging uses `--publish never`; the release job uploads it later.
 
+## Release notes and changelog
+
+The tag-triggered Release workflow generates notes from Git commit subjects between
+published release tags, including direct master commits and commits merged through
+PRs. Merge commits and version/changelog bookkeeping are excluded. `feat`, `fix`,
+and `perf` are grouped separately; all other subjects remain under other updates.
+Subjects retain their original language. Dates follow the tagged commits, so a
+rerun produces the same notes. Stable versions include changes from prereleases.
+
+One generated snapshot supplies the GitHub Release body and Sparkle notes. Sparkle
+embeds the target version and up to two preceding stable releases in its native
+window (prerelease targets may also include prereleases). The HTML is escaped and
+embedded in both architecture feeds, with a link to the full changelog. Appcast
+creation requires `SPARKLE_RELEASE_NOTES` pointing to the generated HTML fragment.
+The three-version display limit is independent of the delta archive limit.
+
+After publishing succeeds, a serialized job rebuilds `CHANGELOG.md` from all
+published releases and commits it to master. Unpublished/draft releases do not
+appear. A failed changelog job can be rerun without rebuilding or republishing the
+installers. Branch rules must allow the workflow token to push this docs commit;
+the job uses normal pushes and rebases over concurrent master commits. The
+workflow token's push does not recursively trigger another workflow run.
+
+To regenerate locally with the GitHub CLI authenticated and all tags available:
+
+```bash
+gh api --paginate --slurp 'repos/rrbe/AMDM/releases?per_page=100' > /tmp/amdm-releases.json
+node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --changelog CHANGELOG.md
+# Preview a tagged release and its Sparkle HTML without publishing:
+node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --tag v26.9.1 --output /tmp/amdm-release-notes
+```
+
+`CHANGELOG.md` is generated; edit commit subjects before release rather than
+maintaining a separate release description. The initial history includes all
+commits reachable from the first published tag.
+
 ## Validation by change type
 
 | Change                           | Minimum validation                                       |

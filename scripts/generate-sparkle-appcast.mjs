@@ -24,6 +24,9 @@ if (!privateKey)
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const maximumDeltas = 3;
+const releaseNotesPath = process.env.SPARKLE_RELEASE_NOTES;
+if (!releaseNotesPath) throw new Error("SPARKLE_RELEASE_NOTES is required");
+const releaseNotes = readFileSync(resolve(releaseNotesPath), "utf8");
 const distDir = resolve(process.argv[2] ?? join(root, "dist"));
 const sparkleDir = join(root, "build", "sparkle");
 const generateAppcast = join(sparkleDir, "bin", "generate_appcast");
@@ -55,6 +58,7 @@ for (const arch of ["arm64", "x64"]) {
 
   try {
     for (const archive of archives) {
+      writeFileSync(join(workDir, archive.replace(/\.zip$/, ".html")), releaseNotes);
       const source = join(distDir, archive);
       const target = join(workDir, archive);
       try {
@@ -99,6 +103,9 @@ for (const arch of ["arm64", "x64"]) {
         downloadUrlPrefix,
         "--link",
         "https://github.com/rrbe/AMDM/releases",
+        "--embed-release-notes",
+        "--full-release-notes-url",
+        "https://github.com/rrbe/AMDM/blob/master/CHANGELOG.md",
         "--maximum-deltas",
         String(maximumDeltas),
         "-o",
