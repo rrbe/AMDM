@@ -2,7 +2,7 @@
  * JSON-line builder for the virtualized JSON view (shell-style scalars).
  */
 import { describe, it, expect } from 'vitest'
-import { toJsonLines, indentFor } from '@renderer/lib/format'
+import { toInlineJsonTokens, toJsonLines, indentFor } from '@renderer/lib/format'
 
 const OID = '64b7f0f0f0f0f0f0f0f0f0f0'
 const texts = (v: unknown): string[] => toJsonLines(v).map((l) => l.text)
@@ -46,5 +46,52 @@ describe('indentFor', () => {
     expect(indentFor(0)).toBe('')
     expect(indentFor(1)).toBe('  ')
     expect(indentFor(3)).toBe('      ')
+  })
+})
+
+describe('toInlineJsonTokens', () => {
+  const preview = (value: unknown): string => toInlineJsonTokens(value).map((token) => token.text).join('')
+
+  it('previews immediate fields with their value colors', () => {
+    const tokens = toInlineJsonTokens({ notShipped3Days: false, notShipped7Days: false, preTransit5Days: false })
+    expect(tokens.map((token) => token.text).join('')).toBe(
+      '{ notShipped3Days: false, notShipped7Days: false, preTransit5Days: false }'
+    )
+    expect(tokens.filter((token) => token.cls === 'v-boolean').map((token) => token.text)).toEqual([
+      'false',
+      'false',
+      'false'
+    ])
+  })
+
+  it('quotes strings and special keys while keeping BSON wrappers as scalar values', () => {
+    expect(preview({ 'full name': 'Ada\nLovelace', count: { $numberInt: '2' }, id: { $oid: OID } })).toBe(
+      `{ "full name": "Ada\\nLovelace", count: 2, id: ObjectId("${OID}") }`
+    )
+    expect(toInlineJsonTokens({ count: { $numberLong: '9007199254740993' } })).toContainEqual({
+      text: 'NumberLong("9007199254740993")',
+      cls: 'v-long'
+    })
+  })
+
+  it('shows array items and keeps deeper containers compact', () => {
+    expect(preview(['ready', false, 3, null])).toBe('[ "ready", false, 3, null ]')
+    expect(preview({ nested: { secret: true }, list: [1, 2], empty: {} })).toBe(
+      '{ nested: { … }, list: [ 2 ], empty: {} }'
+    )
+    expect(preview({})).toBe('{}')
+    expect(preview([])).toBe('[]')
+  })
+
+  it('limits entries, long text, and traversal depth', () => {
+    expect(preview([1, 2, 3, 4, 5, 6])).toBe('[ 1, 2, 3, 4, 5, … ]')
+    const value = {
+      a: 1, b: 2, c: 3, d: 4, e: 5,
+      get f() { throw new Error('outside preview') }
+    }
+    expect(preview(value)).toBe('{ a: 1, b: 2, c: 3, d: 4, e: 5, … }')
+    expect(preview({ text: 'x'.repeat(100_000) }).length).toBeLessThan(100)
+    const deep = { get child() { throw new Error('deeper than preview') } }
+    expect(preview({ nested: deep })).toBe('{ nested: { … } }')
   })
 })

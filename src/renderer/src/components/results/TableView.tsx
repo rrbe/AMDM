@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
-import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
+import { formatScalar, isExtended } from '@renderer/lib/ejson'
+import { toInlineJsonTokens } from '@renderer/lib/format'
 import {
   cellValue,
   deriveColumns,
@@ -45,9 +46,8 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
  *    exist in the DOM, so a 100k-doc result renders the same handful of rows.
  *  - Columns are derived ONCE (memoized on docs identity) by scanning every
  *    document for top-level field names, preserving first-seen order. We
- *    dot-flatten ONE level for nested plain objects (e.g. `address.city`);
- *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves, not flattened.
- *    Deeper recursive flattening is intentionally out of scope (Phase 2).
+ *    show one level of nested objects/arrays inside their original cells.
+ *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves.
  *  - The header is CSS-sticky; the whole table scrolls horizontally as a unit.
  *    Columns default to a fixed width but are resizable — drag the handle on a
  *    header cell's right edge; header and body share the per-column width.
@@ -580,19 +580,12 @@ function Cell({
       </div>
     )
   }
-  // Containers show a compact summary; scalars/EJSON show formatted text.
-  const display =
-    isPlainObject(value) && !isExtended(value)
-      ? summarize(value)
-      : Array.isArray(value)
-        ? summarize(value)
-        : formatScalar(value)
-  const text = typeof display === 'string' ? display : display.text
-  const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
+  const tokens = expandable ? toInlineJsonTokens(value) : null
+  const scalar = tokens ? null : formatScalar(value)
   return (
     <Tooltip
-      content={expandable ? () => formatJsonPreview(value).text : text}
+      content={expandable ? () => formatJsonPreview(value).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
       variant={expandable ? 'code' : 'compact'}
     >
@@ -611,7 +604,13 @@ function Cell({
         onDoubleClick={expandable ? () => onOpen(value) : undefined}
         onContextMenu={onContextMenu}
       >
-        <span className={cls}>{text}</span>
+        {tokens ? (
+          tokens.map((token, index) => (
+            <span key={index} className={token.cls}>{token.text}</span>
+          ))
+        ) : (
+          <span className={`v-${scalar!.type}`}>{scalar!.text}</span>
+        )}
       </div>
     </Tooltip>
   )
