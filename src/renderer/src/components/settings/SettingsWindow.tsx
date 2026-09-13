@@ -23,6 +23,7 @@ import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNestedDisplayPreview'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { cn } from '@renderer/lib/utils'
@@ -117,6 +118,7 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.tableNestedDisplay'),
         t('settings.tableNestedInline'),
         t('settings.tableNestedGrouped'),
+        t('settings.tableNestedAuto'),
         t('settings.queryTimeout'),
         t('settings.queryTimeoutHint'),
         t('settings.historyLimit'),
@@ -409,10 +411,12 @@ export function SettingsWindow(): React.JSX.Element {
                   onChange={(tableNestedDisplay) => void updateSettings({ tableNestedDisplay })}
                   options={[
                     { label: t('settings.tableNestedInline'), value: 'inline' },
-                    { label: t('settings.tableNestedGrouped'), value: 'grouped' }
+                    { label: t('settings.tableNestedGrouped'), value: 'grouped' },
+                    { label: t('settings.tableNestedAuto'), value: 'auto' }
                   ]}
                   aria-label={t('settings.tableNestedDisplay')}
                 />
+                <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
               </Field>
               <Field label={t('settings.defaultShellRuntime')} hint={t('settings.defaultShellRuntimeHint')}>
                 <Select<ShellRuntime>

@@ -115,6 +115,53 @@ describe('deriveTableColumnGroups', () => {
     expect(cellValue({}, sparse.path).present).toBe(false)
   })
 
+  it('auto groups up to three distinct children per field and previews wider unions', () => {
+    const groups = deriveTableColumnGroups(
+      [
+        { small: { b: 1, a: { deep: { value: 2 } } }, wide: { a: 1, b: 2 } },
+        { small: { c: 3, a: 4 }, wide: { c: 3, d: 4 } }
+      ],
+      'auto'
+    )
+    expect(groups.map((group) => group.columns.map((column) => column.path))).toEqual([
+      [
+        ['small', 'a'],
+        ['small', 'b'],
+        ['small', 'c']
+      ],
+      [['wide']]
+    ])
+    expect(
+      deriveTableColumnGroups([{ field: { b: 1, a: 2 } }], 'auto', 'natural')[0].columns.map(
+        (column) => column.label
+      )
+    ).toEqual(['b', 'a'])
+  })
+
+  it('auto stops inspecting a field after its fourth distinct child', () => {
+    const later = {
+      get field(): unknown {
+        throw new Error('should not inspect later values')
+      }
+    }
+    expect(
+      deriveTableColumnGroups([{ field: { a: 1, b: 2, c: 3, d: 4 } }, later], 'auto')[0].columns[0].path
+    ).toEqual(['field'])
+  })
+
+  it('auto preserves mixed values, empty objects, and sparse fields', () => {
+    for (const value of [null, 'pending', [], { $numberInt: '2' }]) {
+      expect(
+        deriveTableColumnGroups([{ field: { a: 1 } }, {}, { field: value }], 'auto')[0].columns[0].path
+      ).toEqual(['field'])
+    }
+    expect(deriveTableColumnGroups([{ field: {} }], 'auto')[0].columns[0].path).toEqual(['field'])
+    expect(deriveTableColumnGroups([{ field: { a: 1 } }, {}], 'auto')[0].columns[0].path).toEqual([
+      'field',
+      'a'
+    ])
+  })
+
   it('distinguishes literal dotted keys from nested paths', () => {
     const doc = { 'a.b': 1, a: { b: 2, 'c.d': 3 } }
     const columns = deriveTableColumnGroups([doc], 'grouped', 'natural').flatMap((group) => group.columns)

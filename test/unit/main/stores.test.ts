@@ -116,6 +116,9 @@ describe('settingsStore', () => {
     settingsStore.update({ tableNestedDisplay: 'grouped' })
     settingsStore.init()
     expect(settingsStore.get().tableNestedDisplay).toBe('grouped')
+    settingsStore.update({ tableNestedDisplay: 'auto' })
+    settingsStore.init()
+    expect(settingsStore.get().tableNestedDisplay).toBe('auto')
     expect(settingsStore.get().theme).toBe('dark')
   })
 

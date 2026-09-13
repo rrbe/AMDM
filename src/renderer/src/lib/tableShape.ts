@@ -98,7 +98,11 @@ export function deriveTableColumnGroups(
       if (!present) continue
       // Mixed scalars, arrays and BSON wrappers retain their complete original cell.
       if (!isPlainObject(value) || isExtended(value)) return single
-      for (const child of Object.keys(value)) children.add(child)
+      for (const child of Object.keys(value)) {
+        children.add(child)
+        // Once this field needs a preview, later documents cannot change that decision.
+        if (display === 'auto' && children.size > 3) return single
+      }
     }
     const keys = [...children]
     if (keys.length === 0) return single
