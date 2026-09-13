@@ -2,6 +2,31 @@
 
 <!-- Generated from published release tags and Git commits. Dates follow the tagged commits. -->
 
+## [v26.9.2](https://github.com/rrbe/AMDM/releases/tag/v26.9.2) — 2026-09-13
+
+### 新功能
+
+- add automatic nested table display and settings preview
+- generate commit\-based changelog and Sparkle release notes
+- add grouped table headers and display setting
+- preview nested values in table cells
+- support table column drag sorting per query tab
+- add confirmed collection deletion
+- show relative query times in tab tooltips
+- support drag sorting for query and result tabs
+
+### 修复
+
+- preserve historical Sparkle archive release URLs
+- isolate result view per data tab
+- close query tab before closing window
+- move context toggle to top tab bar
+- improve glass menu readability
+
+### 其他更新
+
+- add AMDM screenshots to bilingual readmes
+
 ## [v26.9.1](https://github.com/rrbe/AMDM/releases/tag/v26.9.1) — 2026-09-11
 
 ### 新功能
