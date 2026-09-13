@@ -146,6 +146,8 @@ jobs:
             compgen -G "dist/*.delta" >/dev/null || { echo "::error::No Sparkle delta files generated"; exit 1; }
             grep -q '<description' dist/appcast-arm64.xml
             grep -q '<description' dist/appcast-x64.xml
+            grep -q '<description' dist/appcast-arm64-cn.xml
+            grep -q '<description' dist/appcast-x64-cn.xml
             grep -q '<sparkle:deltas>' dist/appcast-arm64.xml
             grep -q '<sparkle:deltas>' dist/appcast-x64.xml
             grep -q -- '-arm64.delta' dist/appcast-arm64.xml
@@ -229,8 +231,8 @@ jobs:
           git fetch origin master
           git merge --ff-only origin/master
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
-          node scripts/generate-release-notes.mjs --releases "$RUNNER_TEMP/releases.json" --changelog CHANGELOG.md
-          git add CHANGELOG.md
+          node scripts/generate-release-notes.mjs --releases "$RUNNER_TEMP/releases.json" --changelog CHANGELOG.md --changelog-cn CHANGELOG_CN.md
+          git add CHANGELOG.md CHANGELOG_CN.md
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

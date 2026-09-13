@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { restoreArchiveReleaseUrls } from "./sparkle-archive-urls.mjs";
+import { localizeSparkleAppcast } from "./localize-sparkle-appcast.mjs";
 
 if (process.platform !== "darwin") {
   throw new Error("Sparkle appcasts must be generated on macOS");
@@ -28,6 +29,10 @@ const maximumDeltas = 3;
 const releaseNotesPath = process.env.SPARKLE_RELEASE_NOTES;
 if (!releaseNotesPath) throw new Error("SPARKLE_RELEASE_NOTES is required");
 const releaseNotes = readFileSync(resolve(releaseNotesPath), "utf8");
+const chineseReleaseNotes = readFileSync(
+  join(dirname(resolve(releaseNotesPath)), "sparkle-notes-cn.html"), "utf8",
+);
+const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const distDir = resolve(process.argv[2] ?? join(root, "dist"));
 const sparkleDir = join(root, "build", "sparkle");
 const generateAppcast = join(sparkleDir, "bin", "generate_appcast");
@@ -145,6 +150,10 @@ for (const arch of ["arm64", "x64"]) {
     }
 
     copyFileSync(previousAppcast, join(distDir, appcastName));
+    writeFileSync(
+      join(distDir, `appcast-${arch}-cn.xml`),
+      localizeSparkleAppcast(appcast, version, chineseReleaseNotes),
+    );
     for (const delta of generatedDeltas.map((name) => name.replace(/\.delta$/, `-${arch}.delta`))) {
       copyFileSync(join(workDir, delta), join(distDir, delta));
     }

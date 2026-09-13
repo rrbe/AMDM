@@ -12,7 +12,7 @@ The typical call chain is: store action → `window.api` → preload → IPC han
 
 ## Application updates
 
-- macOS uses the native Sparkle bridge with architecture-specific appcasts and EdDSA-signed delta archives. Each release keeps deltas from the three most recent compatible versions and always retains the full ZIP fallback.
+- macOS uses the native Sparkle bridge with architecture-specific English/Chinese appcasts selected by the application language and EdDSA-signed delta archives. Each release keeps deltas from the three most recent compatible versions and always retains the full ZIP fallback.
 - Windows NSIS and Linux AppImage builds use `electron-updater` with GitHub release metadata. Downloads start only after an explicit user action; the main process owns progress, cancellation, and installation state.
 - Update state crosses into the Renderer only through the shared IPC contract. Windows/Linux automatically check at most every six hours when enabled; macOS scheduling remains owned by Sparkle.
 - Windows requires `latest.yml` plus the installer blockmap. Linux requires `latest-linux.yml`; its blockmap is embedded in the AppImage. These files are part of the release contract, not optional build output.

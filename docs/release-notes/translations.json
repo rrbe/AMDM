@@ -1,0 +1,886 @@
+{
+  "add automatic nested table display and settings preview": {
+    "en": "Add automatic nested table display and settings preview",
+    "zh": "新增嵌套表格自动展示和设置预览"
+  },
+  "generate commit-based changelog and Sparkle release notes": {
+    "en": "Generate commit-based changelog and Sparkle release notes",
+    "zh": "根据提交记录生成更新日志和 Sparkle 发布说明"
+  },
+  "add grouped table headers and display setting": {
+    "en": "Add grouped table headers and display setting",
+    "zh": "新增表格分组表头和显示设置"
+  },
+  "preview nested values in table cells": {
+    "en": "Preview nested values in table cells",
+    "zh": "在表格单元格中预览嵌套值"
+  },
+  "support table column drag sorting per query tab": {
+    "en": "Support table column drag sorting per query tab",
+    "zh": "支持按查询标签页保存表格列拖拽排序"
+  },
+  "add confirmed collection deletion": {
+    "en": "Add confirmed collection deletion",
+    "zh": "新增带确认的集合删除操作"
+  },
+  "show relative query times in tab tooltips": {
+    "en": "Show relative query times in tab tooltips",
+    "zh": "在标签页提示中显示查询的相对时间"
+  },
+  "support drag sorting for query and result tabs": {
+    "en": "Support drag sorting for query and result tabs",
+    "zh": "支持拖拽排序查询标签页和结果标签页"
+  },
+  "preserve historical Sparkle archive release URLs": {
+    "en": "Preserve historical Sparkle archive release URLs",
+    "zh": "保留 Sparkle 历史安装包所属版本的下载地址"
+  },
+  "isolate result view per data tab": {
+    "en": "Isolate result view per data tab",
+    "zh": "按数据标签页隔离结果视图"
+  },
+  "close query tab before closing window": {
+    "en": "Close query tab before closing window",
+    "zh": "关闭窗口前优先关闭查询标签页"
+  },
+  "move context toggle to top tab bar": {
+    "en": "Move context toggle to top tab bar",
+    "zh": "将查询上下文开关移至顶部标签栏"
+  },
+  "improve glass menu readability": {
+    "en": "Improve glass menu readability",
+    "zh": "改善玻璃效果菜单的可读性"
+  },
+  "add AMDM screenshots to bilingual readmes": {
+    "en": "Add AMDM screenshots to bilingual readmes",
+    "zh": "为中英文 README 添加 AMDM 截图"
+  },
+  "add selectable mongosh query runtime": {
+    "en": "Add selectable mongosh query runtime",
+    "zh": "支持选择 mongosh 查询运行时"
+  },
+  "add cross-platform differential updates": {
+    "en": "Add cross-platform differential updates",
+    "zh": "新增跨平台增量更新"
+  },
+  "clarify disconnected tabs and align view switch corners": {
+    "en": "Clarify disconnected tabs and align view switch corners",
+    "zh": "明确断开连接的标签页状态并统一视图切换控件圆角"
+  },
+  "update TODO": {
+    "en": "Update TODO",
+    "zh": "更新 TODO"
+  },
+  "refine context menu glass effect": {
+    "en": "Refine context menu glass effect",
+    "zh": "优化右键菜单玻璃效果"
+  },
+  "expand document transfer formats": {
+    "en": "Expand document transfer formats",
+    "zh": "扩展文档导入导出格式"
+  },
+  "refine JSON format menus": {
+    "en": "Refine JSON format menus",
+    "zh": "优化 JSON 格式菜单"
+  },
+  "clarify result copy menu": {
+    "en": "Clarify result copy menu",
+    "zh": "明确结果复制菜单文案"
+  },
+  "copy focused table cell with shortcut": {
+    "en": "Copy focused table cell with shortcut",
+    "zh": "支持快捷键复制当前聚焦的表格单元格"
+  },
+  "reveal contextual tab shortcuts": {
+    "en": "Reveal contextual tab shortcuts",
+    "zh": "显示与标签页上下文对应的快捷键"
+  },
+  "centralize app notifications": {
+    "en": "Centralize app notifications",
+    "zh": "集中管理应用通知"
+  },
+  "classify connection and query failures": {
+    "en": "Classify connection and query failures",
+    "zh": "区分连接和查询失败类型"
+  },
+  "configure export destination": {
+    "en": "Configure export destination",
+    "zh": "支持配置导出目录"
+  },
+  "open exported files from success notice": {
+    "en": "Open exported files from success notice",
+    "zh": "支持从成功通知打开导出文件"
+  },
+  "keep result views scoped to query tabs": {
+    "en": "Keep result views scoped to query tabs",
+    "zh": "将结果视图状态限定在各自的查询标签页内"
+  },
+  "show exact query context in tab tooltips": {
+    "en": "Show exact query context in tab tooltips",
+    "zh": "在标签页提示中显示准确的查询上下文"
+  },
+  "improve automatic update checks": {
+    "en": "Improve automatic update checks",
+    "zh": "完善自动更新检查"
+  },
+  "allow disconnecting errored connections": {
+    "en": "Allow disconnecting errored connections",
+    "zh": "允许断开处于错误状态的连接"
+  },
+  "update readme usage and license": {
+    "en": "Update readme usage and license",
+    "zh": "更新 README 使用说明和许可证"
+  },
+  "adopt gpl-3.0-only license": {
+    "en": "Adopt gpl-3.0-only license",
+    "zh": "采用 GPL-3.0-only 许可证"
+  },
+  "add document preview actions": {
+    "en": "Add document preview actions",
+    "zh": "新增文档预览操作"
+  },
+  "refine tooltips and query controls": {
+    "en": "Refine tooltips and query controls",
+    "zh": "优化提示和查询控件"
+  },
+  "refresh and highlight available updates": {
+    "en": "Refresh and highlight available updates",
+    "zh": "刷新并突出显示可用更新"
+  },
+  "refine tooltip appearance and placement": {
+    "en": "Refine tooltip appearance and placement",
+    "zh": "优化提示的外观和位置"
+  },
+  "remove checkbox focus rings": {
+    "en": "Remove checkbox focus rings",
+    "zh": "移除复选框焦点环"
+  },
+  "refine button and checkbox treatments": {
+    "en": "Refine button and checkbox treatments",
+    "zh": "优化按钮和复选框样式"
+  },
+  "refine query search and focus styles": {
+    "en": "Refine query search and focus styles",
+    "zh": "优化查询搜索和焦点样式"
+  },
+  "simplify query context menu": {
+    "en": "Simplify query context menu",
+    "zh": "简化查询右键菜单"
+  },
+  "add table result sorting (#21)": {
+    "en": "Add table result sorting (#21)",
+    "zh": "新增表格结果排序（#21）"
+  },
+  "highlight saved query previews (#20)": {
+    "en": "Highlight saved query previews (#20)",
+    "zh": "为已保存查询的预览添加语法高亮（#20）"
+  },
+  "add contextual query run gutter (#19)": {
+    "en": "Add contextual query run gutter (#19)",
+    "zh": "新增按上下文运行查询的编辑器侧栏（#19）"
+  },
+  "add indexes refresh action": {
+    "en": "Add indexes refresh action",
+    "zh": "新增索引刷新操作"
+  },
+  "avoid catalog loading flicker": {
+    "en": "Avoid catalog loading flicker",
+    "zh": "避免目录加载时闪烁"
+  },
+  "add unified collection and result exports": {
+    "en": "Add unified collection and result exports",
+    "zh": "统一集合和结果导出"
+  },
+  "add configurable keyboard shortcuts": {
+    "en": "Add configurable keyboard shortcuts",
+    "zh": "支持自定义键盘快捷键"
+  },
+  "upgrade electron and security dependencies": {
+    "en": "Upgrade electron and security dependencies",
+    "zh": "升级 Electron 和安全相关依赖"
+  },
+  "upgrade application dependencies": {
+    "en": "Upgrade application dependencies",
+    "zh": "升级应用依赖"
+  },
+  "reorganize engineering documentation": {
+    "en": "Reorganize engineering documentation",
+    "zh": "重新组织工程文档"
+  },
+  "add gentle update reminders": {
+    "en": "Add gentle update reminders",
+    "zh": "新增温和的更新提醒"
+  },
+  "show scheduled update prompt": {
+    "en": "Show scheduled update prompt",
+    "zh": "显示定时检查发现的更新提示"
+  },
+  "inspect and copy collection indexes": {
+    "en": "Inspect and copy collection indexes",
+    "zh": "支持查看和复制集合索引"
+  },
+  "refresh collection metadata": {
+    "en": "Refresh collection metadata",
+    "zh": "刷新集合元数据"
+  },
+  "show query timestamps": {
+    "en": "Show query timestamps",
+    "zh": "显示查询时间戳"
+  },
+  "preserve query tabs across connection loss": {
+    "en": "Preserve query tabs across connection loss",
+    "zh": "连接断开后保留查询标签页"
+  },
+  "add data font size setting": {
+    "en": "Add data font size setting",
+    "zh": "新增数据字号设置"
+  },
+  "add customizable editor color schemes": {
+    "en": "Add customizable editor color schemes",
+    "zh": "支持自定义编辑器配色"
+  },
+  "bring settings window to front": {
+    "en": "Bring settings window to front",
+    "zh": "将设置窗口置于前台"
+  },
+  "add schema analysis and modeling": {
+    "en": "Add schema analysis and modeling",
+    "zh": "新增 Schema 分析和建模"
+  },
+  "add nested result context menus": {
+    "en": "Add nested result context menus",
+    "zh": "新增嵌套结果右键菜单"
+  },
+  "make feedback text copyable": {
+    "en": "Make feedback text copyable",
+    "zh": "允许复制反馈文本"
+  },
+  "watch electron process during development": {
+    "en": "Watch electron process during development",
+    "zh": "开发时监听 Electron 进程变化"
+  },
+  "enhance shell editor completion": {
+    "en": "Enhance shell editor completion",
+    "zh": "增强 Shell 编辑器补全"
+  },
+  "refine explorer and history settings": {
+    "en": "Refine explorer and history settings",
+    "zh": "优化资源管理器和历史记录设置"
+  },
+  "add query timeout and reliable stopping": {
+    "en": "Add query timeout and reliable stopping",
+    "zh": "新增查询超时设置并改善停止执行的可靠性"
+  },
+  "show catalog statistics": {
+    "en": "Show catalog statistics",
+    "zh": "显示目录统计信息"
+  },
+  "disable selection match highlighting": {
+    "en": "Disable selection match highlighting",
+    "zh": "禁用选中文本的匹配高亮"
+  },
+  "stop app before mac install": {
+    "en": "Stop app before mac install",
+    "zh": "在 macOS 安装前停止应用"
+  },
+  "persist connection ordering": {
+    "en": "Persist connection ordering",
+    "zh": "持久化连接排序"
+  },
+  "remove modal backdrop blur": {
+    "en": "Remove modal backdrop blur",
+    "zh": "移除弹窗背景模糊"
+  },
+  "require context menu for cell editing": {
+    "en": "Require context menu for cell editing",
+    "zh": "通过右键菜单进入单元格编辑"
+  },
+  "move users after collections": {
+    "en": "Move users after collections",
+    "zh": "将用户列表移至集合列表之后"
+  },
+  "reuse resizable modal": {
+    "en": "Reuse resizable modal",
+    "zh": "复用可调整尺寸的弹窗"
+  },
+  "streamline package scripts": {
+    "en": "Streamline package scripts",
+    "zh": "精简打包脚本"
+  },
+  "improve result field browsing": {
+    "en": "Improve result field browsing",
+    "zh": "改善结果字段浏览"
+  },
+  "color tabs by connection": {
+    "en": "Color tabs by connection",
+    "zh": "按连接为标签页着色"
+  },
+  "apply neutral ui design system": {
+    "en": "Apply neutral ui design system",
+    "zh": "应用中性 UI 设计系统"
+  },
+  "improve connection options": {
+    "en": "Improve connection options",
+    "zh": "完善连接选项"
+  },
+  "优化连接设置表单交互": {
+    "en": "Improve connection settings form interactions",
+    "zh": "优化连接设置表单交互"
+  },
+  "重构设置窗口并优化版本标识": {
+    "en": "Refactor the settings window and improve version labels",
+    "zh": "重构设置窗口并优化版本标识"
+  },
+  "refine explorer actions": {
+    "en": "Refine explorer actions",
+    "zh": "优化资源管理器操作"
+  },
+  "完善连接反馈和目录刷新": {
+    "en": "Improve connection feedback and catalog refresh",
+    "zh": "完善连接反馈和目录刷新"
+  },
+  "支持多成员 MongoDB 连接地址": {
+    "en": "Support MongoDB connection URLs with multiple members",
+    "zh": "支持多成员 MongoDB 连接地址"
+  },
+  "define neutral ui design direction": {
+    "en": "Define neutral ui design direction",
+    "zh": "确定中性 UI 设计方向"
+  },
+  "fix pack bug": {
+    "en": "Fix pack bug",
+    "zh": "修复打包问题"
+  },
+  "simplify project documentation": {
+    "en": "Simplify project documentation",
+    "zh": "精简项目文档"
+  },
+  "加入 Sparkle 自动更新机制": {
+    "en": "Add Sparkle automatic updates",
+    "zh": "加入 Sparkle 自动更新机制"
+  },
+  "优化结果工具栏交互": {
+    "en": "Improve result toolbar interactions",
+    "zh": "优化结果工具栏交互"
+  },
+  "重做侧栏导航和查询跳转": {
+    "en": "Redesign sidebar navigation and query switching",
+    "zh": "重做侧栏导航和查询跳转"
+  },
+  "首次打开集合自动执行默认查询": {
+    "en": "Run the default query when a collection is first opened",
+    "zh": "首次打开集合自动执行默认查询"
+  },
+  "添加查询标签执行状态指示": {
+    "en": "Show execution status on query tabs",
+    "zh": "添加查询标签执行状态指示"
+  },
+  "调整构建版本号格式": {
+    "en": "Adjust the build version format",
+    "zh": "调整构建版本号格式"
+  },
+  "重做应用三栏视觉": {
+    "en": "Redesign the three-pane application layout",
+    "zh": "重做应用三栏视觉"
+  },
+  "缩小默认编辑区高度": {
+    "en": "Reduce the default editor height",
+    "zh": "缩小默认编辑区高度"
+  },
+  "突出查询运行状态": {
+    "en": "Highlight query execution status",
+    "zh": "突出查询运行状态"
+  },
+  "显示构建号": {
+    "en": "Display the build number",
+    "zh": "显示构建号"
+  },
+  "UI 重做迁移到 Tailwind v4 + shadcn(zinc+蓝) (#17)": {
+    "en": "Redesign the UI with Tailwind v4 and shadcn zinc and blue styling (#17)",
+    "zh": "UI 重做迁移到 Tailwind v4 + shadcn(zinc+蓝) (#17)"
+  },
+  "SSH 隧道 — 主机密钥校验 + 跳板机(ProxyJump) + 逐跳连通性检测 + 健壮性": {
+    "en": "Add SSH host key verification, ProxyJump, per-hop connectivity checks, and robustness improvements",
+    "zh": "SSH 隧道 — 主机密钥校验 + 跳板机(ProxyJump) + 逐跳连通性检测 + 健壮性"
+  },
+  "记忆并恢复原生全屏态 (#16)": {
+    "en": "Remember and restore native fullscreen state (#16)",
+    "zh": "记忆并恢复原生全屏态 (#16)"
+  },
+  "记住并恢复上次的窗口大小/位置 (#15)": {
+    "en": "Remember and restore window size and position (#15)",
+    "zh": "记住并恢复上次的窗口大小/位置 (#15)"
+  },
+  "mongo shell 补全增强 — 类型感知 / REPL / 排序 / snippet (#12)": {
+    "en": "Improve Mongo shell completion with type awareness, REPL support, sorting, and snippets (#12)",
+    "zh": "mongo shell 补全增强 — 类型感知 / REPL / 排序 / snippet (#12)"
+  },
+  "侧边栏精修 — sticky 滚动、连接行右键菜单、查询与历史拆分 (#10)": {
+    "en": "Refine the sidebar with sticky scrolling, connection context menus, and separate query and history sections (#10)",
+    "zh": "侧边栏精修 — sticky 滚动、连接行右键菜单、查询与历史拆分 (#10)"
+  },
+  "聚合管道可视化构建器 (#9)": {
+    "en": "Add a visual aggregation pipeline builder (#9)",
+    "zh": "聚合管道可视化构建器 (#9)"
+  },
+  "explain 阶段树改为图形化连线盒子树 (#8)": {
+    "en": "Display explain stages as a connected box tree (#8)",
+    "zh": "explain 阶段树改为图形化连线盒子树 (#8)"
+  },
+  "BSON 导入导出改为进程内原生处理,移除 mongodump/mongorestore 依赖 (#7)": {
+    "en": "Handle BSON imports and exports in process without mongodump or mongorestore (#7)",
+    "zh": "BSON 导入导出改为进程内原生处理,移除 mongodump/mongorestore 依赖 (#7)"
+  },
+  "浏览集合落到独立 query tab,不再覆盖用户编辑的代码 (#5)": {
+    "en": "Open collections in separate query tabs without overwriting edited code (#5)",
+    "zh": "浏览集合落到独立 query tab,不再覆盖用户编辑的代码 (#5)"
+  },
+  "隐式 await——mongosh 多步脚本原样粘贴可跑(async-rewriter2)": {
+    "en": "Support implicit await for pasted mongosh scripts with async-rewriter2",
+    "zh": "隐式 await——mongosh 多步脚本原样粘贴可跑(async-rewriter2)"
+  },
+  "捕获 shell print 输出并新增 Console 结果视图": {
+    "en": "Capture Shell print output and add a Console result view",
+    "zh": "捕获 shell print 输出并新增 Console 结果视图"
+  },
+  "结果区多 tab——每次运行落入新 result tab，可切换/关闭": {
+    "en": "Open each execution in a new result tab that can be switched or closed",
+    "zh": "结果区多 tab——每次运行落入新 result tab，可切换/关闭"
+  },
+  "新增 components/ui 封装层（基于 @base-ui/react）": {
+    "en": "Add a components/ui wrapper layer based on @base-ui/react",
+    "zh": "新增 components/ui 封装层（基于 @base-ui/react）"
+  },
+  "接入 @base-ui/react 并加 isolation 基线": {
+    "en": "Integrate @base-ui/react and establish an isolation baseline",
+    "zh": "接入 @base-ui/react 并加 isolation 基线"
+  },
+  "统一全宽顶部标题栏并补全结果区 ⌘C 复制": {
+    "en": "Unify the full-width title bar and complete Command-C copying in results",
+    "zh": "统一全宽顶部标题栏并补全结果区 ⌘C 复制"
+  },
+  "整体改为 Slate 中性专业配色,弃用 Compass 绿调水泥灰": {
+    "en": "Adopt a neutral Slate palette in place of the Compass green and gray theme",
+    "zh": "整体改为 Slate 中性专业配色,弃用 Compass 绿调水泥灰"
+  },
+  "连接编辑拆分 From URL / To URL 为两个单向小弹窗": {
+    "en": "Separate From URL and To URL connection editing into two dialogs",
+    "zh": "连接编辑拆分 From URL / To URL 为两个单向小弹窗"
+  },
+  "多语言(zh-CN/en/zh-TW)+集中式设置界面": {
+    "en": "Add English, Simplified Chinese, and Traditional Chinese with centralized settings",
+    "zh": "多语言(zh-CN/en/zh-TW)+集中式设置界面"
+  },
+  "运行时窗口与 macOS dock 图标": {
+    "en": "Add runtime window and macOS Dock icons",
+    "zh": "运行时窗口与 macOS dock 图标"
+  },
+  "添加应用图标({ ⋯ } BSON 文档)": {
+    "en": "Add the BSON document application icon",
+    "zh": "添加应用图标({ ⋯ } BSON 文档)"
+  },
+  "多查询标签页(每 tab 独立 code/result/运行)": {
+    "en": "Add query tabs with independent code, results, and execution",
+    "zh": "多查询标签页(每 tab 独立 code/result/运行)"
+  },
+  "连接配置导出/备份(密钥不导出)": {
+    "en": "Export and back up connection settings without secrets",
+    "zh": "连接配置导出/备份(密钥不导出)"
+  },
+  "保存查询支持文件夹/两级组织": {
+    "en": "Organize saved queries into folders with two levels",
+    "zh": "保存查询支持文件夹/两级组织"
+  },
+  "统一样式化 tooltip,替换原生 title=": {
+    "en": "Replace native title tooltips with consistent styled tooltips",
+    "zh": "统一样式化 tooltip,替换原生 title="
+  },
+  "编辑器偏好(字号/自动换行/Tab 宽度)": {
+    "en": "Add editor font size, word wrap, and tab width preferences",
+    "zh": "编辑器偏好(字号/自动换行/Tab 宽度)"
+  },
+  "停止执行 / Stop Script(driver AbortSignal 取消)": {
+    "en": "Support stopping scripts through the driver's AbortSignal",
+    "zh": "停止执行 / Stop Script(driver AbortSignal 取消)"
+  },
+  "结果区补齐应用级多选/选行，替代被禁用的原生选区": {
+    "en": "Add application-managed row selection and multi-selection in results",
+    "zh": "结果区补齐应用级多选/选行，替代被禁用的原生选区"
+  },
+  "结果翻页 + 每页条数可配置": {
+    "en": "Add result pagination and configurable page sizes",
+    "zh": "结果翻页 + 每页条数可配置"
+  },
+  "按钮宽度跨状态恒定，移除运行提示文案": {
+    "en": "Keep button widths stable across states and remove execution hint text",
+    "zh": "按钮宽度跨状态恒定，移除运行提示文案"
+  },
+  "编辑器区域右键菜单，对齐 NoSQLBooster": {
+    "en": "Add an editor context menu aligned with NoSQLBooster",
+    "zh": "编辑器区域右键菜单，对齐 NoSQLBooster"
+  },
+  "Tree 类型列按类型上色，与值同色": {
+    "en": "Color the Tree type column consistently with values",
+    "zh": "Tree 类型列按类型上色，与值同色"
+  },
+  "Tree view 第三列 Type，显示每行值的 BSON 类型": {
+    "en": "Add a Type column showing BSON types in the Tree view",
+    "zh": "Tree view 第三列 Type，显示每行值的 BSON 类型"
+  },
+  "行内编辑校验失败时透出原因（红框 + 悬停提示）": {
+    "en": "Show inline validation errors with a red border and hover message",
+    "zh": "行内编辑校验失败时透出原因（红框 + 悬停提示）"
+  },
+  "结果视图双击行内编辑，编辑/删除入口改右键菜单": {
+    "en": "Support double-click inline editing and move edit and delete actions to the context menu",
+    "zh": "结果视图双击行内编辑，编辑/删除入口改右键菜单"
+  },
+  "复制格式对齐 NoSQLBooster（去重），新增 CSV/TSV 表格导出": {
+    "en": "Align copy formats with NoSQLBooster and add CSV and TSV table exports",
+    "zh": "复制格式对齐 NoSQLBooster（去重），新增 CSV/TSV 表格导出"
+  },
+  "结果视图复制能力（Tree/JSON/Table，三种格式）": {
+    "en": "Support copying from Tree, JSON, and Table views in three formats",
+    "zh": "结果视图复制能力（Tree/JSON/Table，三种格式）"
+  },
+  "数据库列表对齐 Compass，补全授权但为空的库": {
+    "en": "Include authorized empty databases in the database list",
+    "zh": "数据库列表对齐 Compass，补全授权但为空的库"
+  },
+  "侧栏与编辑器可拖动调整尺寸，修复 header 底边错位": {
+    "en": "Allow resizing the sidebar and editor and fix header border alignment",
+    "zh": "侧栏与编辑器可拖动调整尺寸，修复 header 底边错位"
+  },
+  "shell 引擎补全 mongosh 语法并加真实 MongoDB 集成测试": {
+    "en": "Expand mongosh syntax support and add real MongoDB integration tests",
+    "zh": "shell 引擎补全 mongosh 语法并加真实 MongoDB 集成测试"
+  },
+  "侧栏内置 Saved Queries 抽屉，移除顶部 Library 按钮": {
+    "en": "Move saved queries into a sidebar drawer and remove the top Library button",
+    "zh": "侧栏内置 Saved Queries 抽屉，移除顶部 Library 按钮"
+  },
+  "编辑器格式化快捷键 + 主题跟随系统修复": {
+    "en": "Add an editor formatting shortcut and fix system theme handling",
+    "zh": "编辑器格式化快捷键 + 主题跟随系统修复"
+  },
+  "主题支持跟随系统（三态循环），侧栏标题改为 Mongo Shell GUI": {
+    "en": "Add a system-following theme mode and rename the sidebar title to Mongo Shell GUI",
+    "zh": "主题支持跟随系统（三态循环），侧栏标题改为 Mongo Shell GUI"
+  },
+  "配色与字体对齐 MongoDB Compass（LeafyGreen）": {
+    "en": "Align colors and fonts with MongoDB Compass and LeafyGreen",
+    "zh": "配色与字体对齐 MongoDB Compass（LeafyGreen）"
+  },
+  "Table 结果视图列宽可拖拽，改用虚线网格、行号从 1 起": {
+    "en": "Add resizable table columns, dashed grid lines, and row numbers starting at 1",
+    "zh": "Table 结果视图列宽可拖拽，改用虚线网格、行号从 1 起"
+  },
+  "结果视图支持 ⌘1/2/3 快捷切换 Tree/JSON/Table": {
+    "en": "Switch between Tree, JSON, and Table views with Command-1, Command-2, and Command-3",
+    "zh": "结果视图支持 ⌘1/2/3 快捷切换 Tree/JSON/Table"
+  },
+  "JSON 结果视图语法高亮": {
+    "en": "Add syntax highlighting to JSON results",
+    "zh": "JSON 结果视图语法高亮"
+  },
+  "Tree 结果视图改为两列 key/value 布局": {
+    "en": "Use a two-column key/value layout in the Tree view",
+    "zh": "Tree 结果视图改为两列 key/value 布局"
+  },
+  "explorer 图标改用 lucide，导入导出改右键菜单": {
+    "en": "Use Lucide explorer icons and move import and export actions into context menus",
+    "zh": "explorer 图标改用 lucide，导入导出改右键菜单"
+  },
+  "retheme UI to light-first Pine design with dark mode": {
+    "en": "Retheme UI to light-first Pine design with dark mode",
+    "zh": "将 UI 改为以浅色优先的 Pine 设计，并支持深色模式"
+  },
+  "merge connections + catalog into one explorer tree": {
+    "en": "Merge connections + catalog into one explorer tree",
+    "zh": "将连接与目录合并为统一的资源管理器树"
+  },
+  "initial MVP — lean MongoDB shell GUI": {
+    "en": "Initial MVP — lean MongoDB shell GUI",
+    "zh": "首个 MVP：轻量 MongoDB Shell 图形界面"
+  },
+  "完善 Sparkle ad-hoc 发布链路": {
+    "en": "Complete the Sparkle release flow for ad-hoc signed builds",
+    "zh": "完善 Sparkle ad-hoc 发布链路"
+  },
+  "调整结果复制格式文案": {
+    "en": "Clarify result copy format labels",
+    "zh": "调整结果复制格式文案"
+  },
+  "修复结果复制行为": {
+    "en": "Fix result copying behavior",
+    "zh": "修复结果复制行为"
+  },
+  "优化窗口拖拽和提示行为": {
+    "en": "Improve window dragging and tooltip behavior",
+    "zh": "优化窗口拖拽和提示行为"
+  },
+  "固定用户目录英文标签": {
+    "en": "Keep the user catalog label in English",
+    "zh": "固定用户目录英文标签"
+  },
+  "支持取消正在建立的连接": {
+    "en": "Allow cancelling connections while they are being established",
+    "zh": "支持取消正在建立的连接"
+  },
+  "修复 shell 选区执行": {
+    "en": "Fix execution of selected Shell code",
+    "zh": "修复 shell 选区执行"
+  },
+  "bind tabs to connections (#18)": {
+    "en": "Bind tabs to connections (#18)",
+    "zh": "将标签页绑定到连接（#18）"
+  },
+  "driver 超时放宽到 30s,避免慢查询被心跳超时误杀 (#4)": {
+    "en": "Increase the driver timeout to 30 seconds to avoid interrupting slow queries (#4)",
+    "zh": "driver 超时放宽到 30s,避免慢查询被心跳超时误杀 (#4)"
+  },
+  "sort 异步比较器响亮报错,并清理评审遗留小项 (#2)": {
+    "en": "Report errors for async sort comparators and address remaining review issues (#2)",
+    "zh": "sort 异步比较器响亮报错,并清理评审遗留小项 (#2)"
+  },
+  "驱动返回的数组支持异步回调的 forEach/map 等迭代方法 (#1)": {
+    "en": "Support async callbacks in forEach, map, and other driver-returned array methods (#1)",
+    "zh": "驱动返回的数组支持异步回调的 forEach/map 等迭代方法 (#1)"
+  },
+  "安装 @babel/preset-typescript 供 rollup 内联,修复打包后启动崩溃": {
+    "en": "Install and inline @babel/preset-typescript to fix packaged startup crashes",
+    "zh": "安装 @babel/preset-typescript 供 rollup 内联,修复打包后启动崩溃"
+  },
+  "内联 @mongosh/async-rewriter2 修复打包后启动崩溃": {
+    "en": "Inline @mongosh/async-rewriter2 to fix packaged startup crashes",
+    "zh": "内联 @mongosh/async-rewriter2 修复打包后启动崩溃"
+  },
+  "结果网格点击后 ⌘C 因编辑器残留选区而失效": {
+    "en": "Fix Command-C in the result grid when the editor retains a selection",
+    "zh": "结果网格点击后 ⌘C 因编辑器残留选区而失效"
+  },
+  "同步 pnpm-lock 中 @base-ui/react 的 specifier": {
+    "en": "Synchronize the @base-ui/react specifier in pnpm-lock",
+    "zh": "同步 pnpm-lock 中 @base-ui/react 的 specifier"
+  },
+  "打包后启动崩溃,改为内联打包 exceljs": {
+    "en": "Inline exceljs to fix packaged startup crashes",
+    "zh": "打包后启动崩溃,改为内联打包 exceljs"
+  },
+  "构建支持 Intel x64,修正 ADR 中 arm64-only 误读与无据断言": {
+    "en": "Support Intel x64 builds and correct architecture claims in the ADR",
+    "zh": "构建支持 Intel x64,修正 ADR 中 arm64-only 误读与无据断言"
+  },
+  "release workflow 直接调 electron-builder,修复 --publish never 失效": {
+    "en": "Invoke electron-builder directly in the release workflow so --publish never takes effect",
+    "zh": "release workflow 直接调 electron-builder,修复 --publish never 失效"
+  },
+  "修复 CI pnpm 版本冲突(改由 packageManager 字段决定)": {
+    "en": "Resolve CI pnpm version conflicts using the packageManager field",
+    "zh": "修复 CI pnpm 版本冲突(改由 packageManager 字段决定)"
+  },
+  "关闭编辑器内容区的 macOS 自动更正/拼写检查": {
+    "en": "Disable macOS autocorrection and spell checking in the editor",
+    "zh": "关闭编辑器内容区的 macOS 自动更正/拼写检查"
+  },
+  "抽离 docOps/catalog 内核并修复 _id 与数值类型保真": {
+    "en": "Extract docOps and catalog cores and preserve _id and numeric types",
+    "zh": "抽离 docOps/catalog 内核并修复 _id 与数值类型保真"
+  },
+  "统一 ejson 扩展类型判定并修复空容器渲染": {
+    "en": "Unify extended EJSON type detection and fix empty container rendering",
+    "zh": "统一 ejson 扩展类型判定并修复空容器渲染"
+  },
+  "网格点击夺取焦点，修复多选后 ⌘C 不复制": {
+    "en": "Focus the result grid on click so Command-C works after multi-selection",
+    "zh": "网格点击夺取焦点，修复多选后 ⌘C 不复制"
+  },
+  "结果网格禁用原生文本选区，交回应用选择模型": {
+    "en": "Use application-managed selection instead of native text selection in result grids",
+    "zh": "结果网格禁用原生文本选区，交回应用选择模型"
+  },
+  "toast 改不透明并支持多语义，去掉透明度透字 bug": {
+    "en": "Use opaque semantic toasts to prevent background text showing through",
+    "zh": "toast 改不透明并支持多语义，去掉透明度透字 bug"
+  },
+  "空库占位提示改为灰斜体且不可点，两条 admin 命令并行": {
+    "en": "Show empty database placeholders as disabled gray italics and run admin commands concurrently",
+    "zh": "空库占位提示改为灰斜体且不可点，两条 admin 命令并行"
+  },
+  "shell 支持无 new 的 ObjectId() 构造器与 cursor.projection()": {
+    "en": "Support ObjectId() without new and cursor.projection() in Shell scripts",
+    "zh": "shell 支持无 new 的 ObjectId() 构造器与 cursor.projection()"
+  },
+  "offload BSON→EJSON serialization and field sampling to a worker": {
+    "en": "Offload BSON→EJSON serialization and field sampling to a worker",
+    "zh": "将 BSON → EJSON 序列化和字段采样移至 Worker"
+  },
+  "调整版本号和构建标识": {
+    "en": "Adjust version numbers and build identifiers",
+    "zh": "调整版本号和构建标识"
+  },
+  "升级 typescript 和 vite": {
+    "en": "Upgrade TypeScript and Vite",
+    "zh": "升级 typescript 和 vite"
+  },
+  "精简连接与查询工作区": {
+    "en": "Simplify the connection and query workspace",
+    "zh": "精简连接与查询工作区"
+  },
+  "升级版本至 0.5.0": {
+    "en": "Upgrade to version 0.5.0",
+    "zh": "升级版本至 0.5.0"
+  },
+  "收口暗黑模式视觉": {
+    "en": "Refine dark mode styling",
+    "zh": "收口暗黑模式视觉"
+  },
+  "固定连接目录英文术语": {
+    "en": "Keep connection catalog terminology in English",
+    "zh": "固定连接目录英文术语"
+  },
+  "延迟并右置 tooltip": {
+    "en": "Delay tooltips and position them to the right",
+    "zh": "延迟并右置 tooltip"
+  },
+  "简化界面排版与阴影": {
+    "en": "Simplify layout and shadows",
+    "zh": "简化界面排版与阴影"
+  },
+  "移除独立窗口标题栏": {
+    "en": "Remove the separate window title bar",
+    "zh": "移除独立窗口标题栏"
+  },
+  "clean up build and repository files": {
+    "en": "Clean up build and repository files",
+    "zh": "清理构建和仓库文件"
+  },
+  "bump version to 0.4.0 (#13)": {
+    "en": "Bump version to 0.4.0 (#13)",
+    "zh": "升级版本至 0.4.0（#13）"
+  },
+  "样式拆分 + 引入 CSS Module 范本 + 文档整理 (#11)": {
+    "en": "Split styles, add a CSS Module template, and organize documentation (#11)",
+    "zh": "样式拆分 + 引入 CSS Module 范本 + 文档整理 (#11)"
+  },
+  "upgrade electron-vite to v5, vite to v7, vitest to v4 (#6)": {
+    "en": "Upgrade electron-vite to v5, vite to v7, vitest to v4 (#6)",
+    "zh": "升级 electron-vite 至 v5、Vite 至 v7、Vitest 至 v4（#6）"
+  },
+  "bump version to 0.3.1 (#3)": {
+    "en": "Bump version to 0.3.1 (#3)",
+    "zh": "升级版本至 0.3.1（#3）"
+  },
+  "dist:dir 跳过证书签名,本地打包用 ad-hoc 提速": {
+    "en": "Use ad-hoc signing for faster local dist:dir builds",
+    "zh": "dist:dir 跳过证书签名,本地打包用 ad-hoc 提速"
+  },
+  "CLAUDE.md 记录主进程新依赖须内联以绕开 electron-builder 收集器丢包": {
+    "en": "Document inlining main-process dependencies to avoid electron-builder collection omissions",
+    "zh": "CLAUDE.md 记录主进程新依赖须内联以绕开 electron-builder 收集器丢包"
+  },
+  "dev 模式把 store 暴露为 window.__appStore 便于调试复现": {
+    "en": "Expose the store as window.__appStore in development for debugging",
+    "zh": "dev 模式把 store 暴露为 window.__appStore 便于调试复现"
+  },
+  "强化 result tab 激活态——accent 顶条+加粗,未激活降噪": {
+    "en": "Highlight active result tabs with an accent border and bold text",
+    "zh": "强化 result tab 激活态——accent 顶条+加粗,未激活降噪"
+  },
+  "Base UI 迁移收尾——删死 CSS 并补 DESIGN.md 文档": {
+    "en": "Complete the Base UI migration, remove unused CSS, and update DESIGN.md",
+    "zh": "Base UI 迁移收尾——删死 CSS 并补 DESIGN.md 文档"
+  },
+  "连接表单整体迁移到 Base UI（Tabs/Field/Input/Select/Checkbox/Dialog）": {
+    "en": "Migrate connection forms to Base UI Tabs, Field, Input, Select, Checkbox, and Dialog",
+    "zh": "连接表单整体迁移到 Base UI（Tabs/Field/Input/Select/Checkbox/Dialog）"
+  },
+  "右键菜单统一到 Base UI Menu（ContextMenu 内部重写,API 不变）": {
+    "en": "Unify context menus with Base UI Menu while preserving the existing API",
+    "zh": "右键菜单统一到 Base UI Menu（ContextMenu 内部重写,API 不变）"
+  },
+  "设置/保存查询表单迁移到 Base UI Field/Input/Select/Checkbox": {
+    "en": "Migrate settings and saved-query forms to Base UI Field, Input, Select, and Checkbox",
+    "zh": "设置/保存查询表单迁移到 Base UI Field/Input/Select/Checkbox"
+  },
+  "工作区选库迁移到 ui/Select": {
+    "en": "Use ui/Select for workspace database selection",
+    "zh": "工作区选库迁移到 ui/Select"
+  },
+  "弹窗统一到 Base UI Dialog（Modal 内部重写,API 不变）": {
+    "en": "Unify modals with Base UI Dialog while preserving the existing API",
+    "zh": "弹窗统一到 Base UI Dialog（Modal 内部重写,API 不变）"
+  },
+  "发布 v0.2.1": {
+    "en": "Release v0.2.1",
+    "zh": "发布 v0.2.1"
+  },
+  "新增 Base UI 迁移计划(可直接开工的执行文档)": {
+    "en": "Add an actionable Base UI migration plan",
+    "zh": "新增 Base UI 迁移计划(可直接开工的执行文档)"
+  },
+  "升级 GitHub Actions 至最新主版本并切到 Node 22": {
+    "en": "Upgrade GitHub Actions to current major versions and use Node 22",
+    "zh": "升级 GitHub Actions 至最新主版本并切到 Node 22"
+  },
+  "新增 release workflow,打 tag 触发跨平台打包 + 创建 Release": {
+    "en": "Add a tag-triggered workflow for cross-platform packaging and GitHub Releases",
+    "zh": "新增 release workflow,打 tag 触发跨平台打包 + 创建 Release"
+  },
+  "精简 README 并新增中文版 README_CN": {
+    "en": "Simplify README and add README_CN in Chinese",
+    "zh": "精简 README 并新增中文版 README_CN"
+  },
+  "移除 UI 文案的强制大写，标题/列头改 Title Case": {
+    "en": "Use title case instead of forced uppercase in UI headings and columns",
+    "zh": "移除 UI 文案的强制大写，标题/列头改 Title Case"
+  },
+  "发布准备(LICENSE + README 刷新 + 商标免责声明)": {
+    "en": "Prepare the release license, README, and trademark notice",
+    "zh": "发布准备(LICENSE + README 刷新 + 商标免责声明)"
+  },
+  "项目更名为 AMDM (Another Mongo Desktop Manager)": {
+    "en": "Rename the project to AMDM (Another Mongo Desktop Manager)",
+    "zh": "项目更名为 AMDM (Another Mongo Desktop Manager)"
+  },
+  "添加 electron-builder 打包配置": {
+    "en": "Add electron-builder packaging configuration",
+    "zh": "添加 electron-builder 打包配置"
+  },
+  "补齐契约/单元/集成测试覆盖": {
+    "en": "Expand contract, unit, and integration test coverage",
+    "zh": "补齐契约/单元/集成测试覆盖"
+  },
+  "抽离选择逻辑为纯函数 computeSelection": {
+    "en": "Extract selection logic into the pure computeSelection function",
+    "zh": "抽离选择逻辑为纯函数 computeSelection"
+  },
+  "搭建测试框架与 CI(分层/脚本/覆盖率/约定)": {
+    "en": "Set up test layers, scripts, coverage, conventions, and CI",
+    "zh": "搭建测试框架与 CI(分层/脚本/覆盖率/约定)"
+  },
+  "新增 TODO.md 路线图（经代码核对的 backlog，纠正 SPEC §4 过时项）": {
+    "en": "Add a code-verified TODO.md roadmap and correct outdated SPEC section 4 items",
+    "zh": "新增 TODO.md 路线图（经代码核对的 backlog，纠正 SPEC §4 过时项）"
+  },
+  "文字动作按钮收口到 <Button> 组件": {
+    "en": "Consolidate text action buttons into the Button component",
+    "zh": "文字动作按钮收口到 <Button> 组件"
+  },
+  "移除复制的「已复制」toast 与 JSON 全选提示条": {
+    "en": "Remove copy confirmation toasts and the JSON select-all hint",
+    "zh": "移除复制的「已复制」toast 与 JSON 全选提示条"
+  },
+  "重构 side panel 间距、排版与连接字体": {
+    "en": "Refine side panel spacing, typography, and connection fonts",
+    "zh": "重构 side panel 间距、排版与连接字体"
+  },
+  "新增 DESIGN.md（Pine 设计系统文档）": {
+    "en": "Add DESIGN.md for the Pine design system",
+    "zh": "新增 DESIGN.md（Pine 设计系统文档）"
+  },
+  "新增 CLAUDE.md，记录架构、命令与项目协作规则": {
+    "en": "Add CLAUDE.md with architecture, commands, and collaboration rules",
+    "zh": "新增 CLAUDE.md，记录架构、命令与项目协作规则"
+  }
+}

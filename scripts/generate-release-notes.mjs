@@ -6,6 +6,58 @@ import { parseArgs } from "node:util";
 
 const repositoryUrl = "https://github.com/rrbe/AMDM";
 const tagPattern = /^v\d+\.\d+\.\d+(?:-[\w.-]+)?$/;
+const translations = JSON.parse(
+  readFileSync(
+    new URL("../docs/release-notes/translations.json", import.meta.url),
+    "utf8",
+  ),
+);
+const labels = {
+  en: {
+    categories: {
+      新功能: "Features",
+      修复: "Fixes",
+      性能优化: "Performance",
+      其他更新: "Other Updates",
+    },
+    empty: "No additional updates.",
+    title: "Changelog",
+    file: "CHANGELOG.md",
+    full: "Full changelog",
+    other: "[中文](CHANGELOG_CN.md)",
+  },
+  zh: {
+    categories: {
+      新功能: "新功能",
+      修复: "修复",
+      性能优化: "性能优化",
+      其他更新: "其他更新",
+    },
+    empty: "无额外更新条目。",
+    title: "更新日志",
+    file: "CHANGELOG_CN.md",
+    full: "完整更新记录",
+    other: "[English](CHANGELOG.md)",
+  },
+};
+
+export function localizeHistory(history, language, catalog = translations) {
+  return history.map((release) => ({
+    ...release,
+    groups: release.groups.map(([category, entries]) => [
+      labels[language].categories[category],
+      entries.map((entry) => {
+        const text = catalog[entry]?.[language];
+        if (typeof text !== "string" || !text.trim())
+          throw new Error(
+            `Missing ${language} release-note translation: ${entry}`,
+          );
+        return text;
+      }),
+    ]),
+  }));
+}
+
 const categories = ["新功能", "修复", "性能优化", "其他更新"];
 const categoryByType = { feat: "新功能", fix: "修复", perf: "性能优化" };
 
@@ -109,21 +161,22 @@ const escapeHtml = (value) =>
 const escapeMarkdown = (value) =>
   escapeHtml(value).replace(/[\\`*_[\]{}()#+.!|~-]/g, "\\$&");
 
-export function renderMarkdown(release) {
+export function renderMarkdown(release, language = "en") {
   const groups = release.groups
     .map(
       ([category, entries]) =>
         `### ${category}\n\n${entries.map((entry) => `- ${escapeMarkdown(entry)}`).join("\n")}`,
     )
     .join("\n\n");
-  return `## [${release.tag}](${repositoryUrl}/releases/tag/${release.tag}) — ${release.date}\n\n${groups || "无额外更新条目。"}`;
+  return `## [${release.tag}](${repositoryUrl}/releases/tag/${release.tag}) — ${release.date}\n\n${groups || labels[language].empty}`;
 }
 
-export function renderChangelog(history) {
-  return `# Changelog\n\n<!-- Generated from published release tags and Git commits. Dates follow the tagged commits. -->\n\n${history.map(renderMarkdown).join("\n\n")}\n`;
+export function renderChangelog(history, language = "en") {
+  const locale = labels[language];
+  return `# ${locale.title}\n\n${locale.other}\n\n<!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->\n\n${history.map((release) => renderMarkdown(release, language)).join("\n\n")}\n`;
 }
 
-export function renderSparkleNotes(history, tag) {
+export function renderSparkleNotes(history, tag, language = "en") {
   const index = history.findIndex((release) => release.tag === tag);
   if (index < 0) throw new Error(`Missing release: ${tag}`);
   const recent = history
@@ -141,11 +194,11 @@ export function renderSparkleNotes(history, tag) {
                 ([category, entries]) =>
                   `<h3>${category}</h3><ul>${entries.map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}</ul>`,
               )
-              .join("") || "<p>无额外更新条目。</p>"
+              .join("") || `<p>${labels[language].empty}</p>`
           }</section>`,
       )
       .join("\n") +
-    `\n<p><a href="${repositoryUrl}/blob/master/CHANGELOG.md">完整更新记录</a></p>\n`
+    `\n<p><a href="${repositoryUrl}/blob/master/${labels[language].file}">${labels[language].full}</a></p>\n`
   );
 }
 
@@ -172,6 +225,7 @@ if (
       tag: { type: "string" },
       output: { type: "string" },
       changelog: { type: "string" },
+      "changelog-cn": { type: "string" },
     },
   });
   if (!values.releases)
@@ -182,18 +236,29 @@ if (
     releases,
     tag: values.tag,
   });
+  const english = localizeHistory(history, "en");
+  const chinese = localizeHistory(history, "zh");
   if (values.changelog)
-    writeFileSync(values.changelog, renderChangelog(history));
+    writeFileSync(values.changelog, renderChangelog(english, "en"));
+  if (values["changelog-cn"])
+    writeFileSync(values["changelog-cn"], renderChangelog(chinese, "zh"));
   if (values.output) {
     if (!values.tag) throw new Error("--tag is required with --output");
     mkdirSync(values.output, { recursive: true });
     writeFileSync(
       join(values.output, "release-notes.md"),
-      `${renderMarkdown(history.find((release) => release.tag === values.tag))}\n\n${macInstructions}`,
+      `${renderMarkdown(
+        chinese.find((release) => release.tag === values.tag),
+        "zh",
+      )}\n\n${macInstructions}`,
     );
     writeFileSync(
       join(values.output, "sparkle-notes.html"),
-      renderSparkleNotes(history, values.tag),
+      renderSparkleNotes(english, values.tag, "en"),
+    );
+    writeFileSync(
+      join(values.output, "sparkle-notes-cn.html"),
+      renderSparkleNotes(chinese, values.tag, "zh"),
     );
   }
 }

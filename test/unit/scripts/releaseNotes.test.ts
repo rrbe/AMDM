@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   groupCommits,
+  localizeHistory,
   releaseHistory,
   renderChangelog,
   renderSparkleNotes,
@@ -136,5 +137,50 @@ describe("commit-based release notes", () => {
     expect(() =>
       releaseHistory({ cwd, releases: published("v1.0.1") }),
     ).toThrow();
+  });
+});
+
+describe("bilingual release notes", () => {
+  const history = [
+    {
+      tag: "v1.0.0",
+      date: "2026-09-13",
+      groups: [["新功能", ["新增表格预览", "add query tabs"]]],
+    },
+  ];
+  const catalog = {
+    新增表格预览: { en: "Add table previews", zh: "新增表格预览" },
+    "add query tabs": { en: "Add query tabs", zh: "新增查询标签页" },
+  };
+
+  it("translates entries and headings independently of commit language", () => {
+    const english = localizeHistory(history, "en", catalog);
+    const chinese = localizeHistory(history, "zh", catalog);
+    const en = renderChangelog(english, "en");
+    const zh = renderChangelog(chinese, "zh");
+    expect(en).toContain("### Features");
+    expect(en).toContain("Add table previews");
+    expect(en).not.toContain("新增表格预览");
+    expect(zh).toContain("### 新功能");
+    expect(zh).toContain("新增查询标签页");
+    expect(zh).not.toContain("Add query tabs");
+    expect(renderSparkleNotes(english, "v1.0.0", "en")).toContain(
+      "CHANGELOG.md",
+    );
+    expect(renderSparkleNotes(chinese, "v1.0.0", "zh")).toContain(
+      "CHANGELOG_CN.md",
+    );
+  });
+
+  it("rejects missing or blank translations before publication", () => {
+    expect(() => localizeHistory(history, "en", {})).toThrow(
+      "Missing en release-note translation",
+    );
+    expect(() =>
+      localizeHistory(history, "zh", {
+        ...catalog,
+        "add query tabs": { en: "Add query tabs", zh: " " },
+      }),
+    ).toThrow("Missing zh release-note translation");
   });
 });

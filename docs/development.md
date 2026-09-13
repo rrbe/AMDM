@@ -45,18 +45,31 @@ The tag-triggered Release workflow generates notes from Git commit subjects betw
 published release tags, including direct master commits and commits merged through
 PRs. Merge commits and version/changelog bookkeeping are excluded. `feat`, `fix`,
 and `perf` are grouped separately; all other subjects remain under other updates.
-Subjects retain their original language. Dates follow the tagged commits, so a
-rerun produces the same notes. Stable versions include changes from prereleases.
+Release entries are translated in `docs/release-notes/translations.json`, keyed by the
+commit summary after removing the Conventional Commit type (scope and breaking-change
+markers are retained). Each entry must contain reviewed `en` and `zh` text. Before
+releasing, add translations for every new entry; the notes job fails on missing
+translations. Commit language does not determine the displayed language.
 
-One generated snapshot supplies the GitHub Release body and Sparkle notes. Sparkle
-embeds the target version and up to two preceding stable releases in its native
-window (prerelease targets may also include prereleases). The HTML is escaped and
-embedded in both architecture feeds, with a link to the full changelog. Appcast
-creation requires `SPARKLE_RELEASE_NOTES` pointing to the generated HTML fragment.
-The three-version display limit is independent of the delta archive limit.
+The generator writes English `CHANGELOG.md`, Chinese `CHANGELOG_CN.md`, a Chinese
+GitHub Release body, and English/Chinese Sparkle HTML. Dates follow tagged commits,
+so reruns produce the same notes. Stable versions include changes from prereleases.
+Sparkle displays the target version and up to two preceding stable releases.
+HTML is escaped before embedding in the appcast.
 
-After publishing succeeds, a serialized job rebuilds `CHANGELOG.md` from all
-published releases and commits it to master. Unpublished/draft releases do not
+macOS publishes `appcast-arm64.xml` / `appcast-x64.xml` in English and
+`appcast-arm64-cn.xml` / `appcast-x64-cn.xml` in Chinese. Both language feeds share
+the same signed archives and deltas. The native updater selects the feed from
+`AppSettings.language`: English uses the English feed; both Chinese settings use
+the Chinese feed; system mode uses the same locale resolution as the renderer.
+Changes take effect on the next update check; an already open native window keeps
+its current content. Sparkle's native buttons follow macOS localization separately.
+`SPARKLE_RELEASE_NOTES` points to `sparkle-notes.html`; its sibling
+`sparkle-notes-cn.html` is also required. Historical full ZIP URLs must retain the
+release tag from their filenames, even when Sparkle rewrites the download prefix.
+
+After publishing succeeds, a serialized job rebuilds both changelogs from all
+published releases and commits them to master. Unpublished/draft releases do not
 appear. A failed changelog job can be rerun without rebuilding or republishing the
 installers. Branch rules must allow the workflow token to push this docs commit;
 the job uses normal pushes and rebases over concurrent master commits. The
@@ -66,14 +79,15 @@ To regenerate locally with the GitHub CLI authenticated and all tags available:
 
 ```bash
 gh api --paginate --slurp 'repos/rrbe/AMDM/releases?per_page=100' > /tmp/amdm-releases.json
-node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --changelog CHANGELOG.md
-# Preview a tagged release and its Sparkle HTML without publishing:
-node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --tag v26.9.1 --output /tmp/amdm-release-notes
+node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --changelog CHANGELOG.md --changelog-cn CHANGELOG_CN.md
+# Preview a tagged release and its Chinese body and bilingual Sparkle HTML:
+node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --tag v26.9.2 --output /tmp/amdm-release-notes
 ```
 
-`CHANGELOG.md` is generated; edit commit subjects before release rather than
-maintaining a separate release description. The initial history includes all
-commits reachable from the first published tag.
+Both changelogs are generated. Update the translation catalog before release;
+do not edit generated Markdown directly. GitHub Releases remain Chinese and do
+not switch with the app language. The first entry includes all commits reachable
+from the first published tag.
 
 ## Validation by change type
 

@@ -6,11 +6,16 @@
 static SPUStandardUpdaterController *updaterController;
 static napi_env scheduledUpdateEnv;
 static napi_ref scheduledUpdateCallback;
+static NSString *localizedFeedURL;
 
-@interface AMDMUpdaterDelegate : NSObject <SPUStandardUserDriverDelegate>
+@interface AMDMUpdaterDelegate : NSObject <SPUStandardUserDriverDelegate, SPUUpdaterDelegate>
 @end
 
 @implementation AMDMUpdaterDelegate
+
+- (NSString *)feedURLStringForUpdater:(SPUUpdater *)updater {
+  return localizedFeedURL;
+}
 
 - (BOOL)supportsGentleScheduledUpdateReminders {
   return YES;
@@ -61,7 +66,7 @@ static void createUpdaterController(void) {
   }
   updaterController = [[SPUStandardUpdaterController alloc]
       initWithStartingUpdater:YES
-               updaterDelegate:nil
+               updaterDelegate:updaterDelegate
               userDriverDelegate:updaterDelegate];
 }
 
@@ -69,6 +74,21 @@ static napi_value getUndefined(napi_env env) {
   napi_value value;
   napi_get_undefined(env, &value);
   return value;
+}
+
+static napi_value setFeedURL(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1];
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  char url[512];
+  size_t length;
+  if (argc != 1 || napi_get_value_string_utf8(env, args[0], url, sizeof(url), &length) != napi_ok ||
+      length >= sizeof(url) - 1) {
+    napi_throw_type_error(env, nullptr, "Expected a feed URL string");
+    return nullptr;
+  }
+  localizedFeedURL = [[NSString alloc] initWithBytes:url length:length encoding:NSUTF8StringEncoding];
+  return getUndefined(env);
 }
 
 static napi_value startUpdater(napi_env env, napi_callback_info) {
@@ -156,6 +176,8 @@ static napi_value setAutomaticallyChecksForUpdates(napi_env env, napi_callback_i
 
 static napi_value initialize(napi_env env, napi_value exports) {
   napi_property_descriptor properties[] = {
+      {"setFeedURL", nullptr, setFeedURL, nullptr, nullptr, nullptr, napi_default,
+       nullptr},
       {"start", nullptr, startUpdaterWithCallback, nullptr, nullptr, nullptr, napi_default,
        nullptr},
       {"checkForUpdates", nullptr, checkForUpdates, nullptr, nullptr, nullptr, napi_default,
@@ -168,7 +190,7 @@ static napi_value initialize(napi_env env, napi_value exports) {
        nullptr, nullptr, napi_default, nullptr},
   };
 
-  if (napi_define_properties(env, exports, 5, properties) != napi_ok) {
+  if (napi_define_properties(env, exports, 6, properties) != napi_ok) {
     napi_throw_error(env, "SPARKLE_INIT_ERROR", "Unable to expose Sparkle API");
     return nullptr;
   }

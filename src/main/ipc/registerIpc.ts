@@ -49,6 +49,7 @@ import {
 } from '../io/exporter'
 import { importData } from '../io/importer'
 import { registerUpdatesIpc } from './registerUpdatesIpc'
+import { updateSparkleLanguage } from '../sparkle'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
   if (kind === 'documents') return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`
@@ -288,6 +289,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.settingsGet, () => settingsStore.get())
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: Partial<AppSettings>) => {
     const settings = settingsStore.update(patch)
+    if (patch.language !== undefined) updateSparkleLanguage()
     if (patch.historyLimit !== undefined) queryStore.trimHistory(settings.historyLimit)
     return settings
   })
