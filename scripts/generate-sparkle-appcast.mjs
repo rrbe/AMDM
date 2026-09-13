@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { restoreArchiveReleaseUrls } from "./sparkle-archive-urls.mjs";
 
 if (process.platform !== "darwin") {
   throw new Error("Sparkle appcasts must be generated on macOS");
@@ -78,7 +79,9 @@ for (const arch of ["arm64", "x64"]) {
     }
 
     if (existsSync(previousAppcast)) {
-      const previousFeed = readFileSync(previousAppcast, "utf8");
+      const previousFeed = restoreArchiveReleaseUrls(
+        readFileSync(previousAppcast, "utf8"),
+      );
       const previousArchives = [...previousFeed.matchAll(/<item>[\s\S]*?<\/item>/g)]
         .map(([item]) => item.match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1])
         .filter((url) => url?.endsWith(`-${arch}-mac.zip`))
@@ -122,7 +125,9 @@ for (const arch of ["arm64", "x64"]) {
     if (result.status !== 0)
       throw new Error(`generate_appcast exited with ${result.status}`);
 
-    let appcast = readFileSync(previousAppcast, "utf8");
+    let appcast = restoreArchiveReleaseUrls(
+      readFileSync(previousAppcast, "utf8"),
+    );
     const generatedDeltas = readdirSync(workDir).filter((name) => name.endsWith(".delta"));
     for (const delta of generatedDeltas) {
       const architectureDelta = delta.replace(/\.delta$/, `-${arch}.delta`);
