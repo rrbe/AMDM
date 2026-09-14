@@ -67,8 +67,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 8px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  font-weight: 600;
   border: 0;
   border-radius: var(--radius-row);
   background: transparent;
@@ -81,11 +82,28 @@
 .explorer-nav-item.is-active {
   background: var(--interaction-selected);
   color: var(--text-primary);
-  padding: 0 11px;
-  font-weight: 600;
 }
 .explorer-nav-item svg {
   flex: 0 0 auto;
+}
+.explorer-nav-label {
+  /* Keep labels mounted so intrinsic width can animate in either direction. */
+  interpolate-size: allow-keywords;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    width var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+.explorer-nav-label > span {
+  display: block;
+  padding-left: 7px;
+}
+.explorer-nav-item.is-active .explorer-nav-label {
+  width: auto;
+  opacity: 1;
 }
 .explorer-search {
   height: 38px;

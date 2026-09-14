@@ -467,7 +467,7 @@ export function Explorer({
       </div>
 
       <nav className="explorer-nav" aria-label={t('navigation.title')}>
-        <Tooltip content={view === 'connections' ? undefined : t('navigation.data')}>
+        <Tooltip content={t('navigation.data')}>
           <button
             className={view === 'connections' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
             aria-label={t('navigation.data')}
@@ -475,10 +475,12 @@ export function Explorer({
             onClick={() => onViewChange('connections')}
           >
             <Database size={17} />
-            {view === 'connections' && <span>{t('navigation.data')}</span>}
+            <span className="explorer-nav-label" aria-hidden="true">
+              <span>{t('navigation.data')}</span>
+            </span>
           </button>
         </Tooltip>
-        <Tooltip content={view === 'savedQueries' ? undefined : t('navigation.saved')}>
+        <Tooltip content={t('navigation.saved')}>
           <button
             className={view === 'savedQueries' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
             aria-label={t('navigation.saved')}
@@ -486,10 +488,12 @@ export function Explorer({
             onClick={() => onViewChange('savedQueries')}
           >
             <Bookmark size={17} />
-            {view === 'savedQueries' && <span>{t('navigation.saved')}</span>}
+            <span className="explorer-nav-label" aria-hidden="true">
+              <span>{t('navigation.saved')}</span>
+            </span>
           </button>
         </Tooltip>
-        <Tooltip content={view === 'history' ? undefined : t('navigation.history')}>
+        <Tooltip content={t('navigation.history')}>
           <button
             className={view === 'history' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
             aria-label={t('navigation.history')}
@@ -497,7 +501,9 @@ export function Explorer({
             onClick={() => onViewChange('history')}
           >
             <Clock3 size={17} />
-            {view === 'history' && <span>{t('navigation.history')}</span>}
+            <span className="explorer-nav-label" aria-hidden="true">
+              <span>{t('navigation.history')}</span>
+            </span>
           </button>
         </Tooltip>
       </nav>
