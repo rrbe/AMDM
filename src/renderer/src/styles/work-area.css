@@ -48,7 +48,7 @@
 .tab-strip {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--document-tab-gap, 4px);
   height: 36px;
   padding: 0 10px;
   flex: 1;
@@ -218,8 +218,8 @@
   }
 }
 .qtab {
-  flex: 0 0 178px;
-  width: 178px;
+  flex: 0 0 var(--document-tab-width, 178px);
+  width: var(--document-tab-width, 178px);
 }
 .qtab-spinner {
   width: 10px;
@@ -794,4 +794,57 @@
 .context-disclosure {
   --panel-offset: 6px;
   max-width: 32vw;
+}
+
+.document-tab-strip-container {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  background: var(--surface-chrome);
+}
+.query-tab-strip-container {
+  flex: 1;
+}
+.result-tab-strip-container {
+  flex: 0 0 auto;
+}
+.document-tab-scroll {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  height: 30px;
+  margin-bottom: 4px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  -webkit-app-region: no-drag;
+}
+.document-tab-strip-container[data-overflow='true'] > .document-tab-scroll {
+  display: flex;
+}
+.document-tab-scroll:hover:not(:disabled) {
+  background: var(--interaction-hover);
+}
+.document-tab-scroll:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.document-tab-close {
+  flex: 0 0 18px;
+}
+[data-compact='true'] .document-tab:not(.active):not(:hover):not(:focus-within) .document-tab-close {
+  opacity: 0;
+  pointer-events: none;
+}
+.result-tab-compact-label {
+  display: none;
+}
+[data-compact='true'] .result-tab-full-label {
+  display: none;
+}
+[data-compact='true'] .result-tab-compact-label {
+  display: inline;
 }

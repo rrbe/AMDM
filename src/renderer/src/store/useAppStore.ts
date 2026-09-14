@@ -53,6 +53,7 @@ import {
   indexDetailsQuery,
   isRunFailure,
   moveTab,
+  MAX_RESULT_TABS,
   patchResult,
   patchTab,
   pickActiveAfterClose,
@@ -352,6 +353,35 @@ function patchCurrentExecution(
   const tab = s.tabs.find((item) => item.id === tabId)
   if (!tab || tab.runningExecId !== execId) return {}
   return { tabs: patchTab(s.tabs, tabId, make(tab)) }
+}
+
+/** Append and explain actual result eviction in the same execution-owned state update. */
+function appendExecutionResult(
+  s: AppState,
+  tabId: string,
+  execId: string,
+  result: ShellResult,
+  query: ResultTab['query']
+): Partial<AppState> {
+  const tab = s.tabs.find((item) => item.id === tabId)
+  if (!tab || tab.runningExecId !== execId) return {}
+  const patch = appendResult(tab, newResultId(), result, query)
+  const evicted = patch.results!.length < tab.results.length + 1
+  return {
+    tabs: patchTab(s.tabs, tabId, patch),
+    notifications: evicted
+      ? enqueueNotification(
+          s.notifications,
+          appNotice(
+            'info',
+            tr('notify.resultRetentionLimit', { count: MAX_RESULT_TABS }),
+            'query',
+            `query:${tabId}:resultRetention`
+          ),
+          { id: crypto.randomUUID(), now: Date.now() }
+        )
+      : s.notifications
+  }
 }
 
 function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): boolean {
@@ -1207,7 +1237,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // earlier results stay around for side-by-side comparison.
       const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
       // `use <db>` REPL command: switch only the tab that still owns this run.
@@ -1226,7 +1256,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
       if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
       set((s) =>
@@ -1345,7 +1375,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
@@ -1356,7 +1386,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         errorName: 'IPCError',
         failureKind: 'ipc'
       }
-      set((s) => patchCurrentExecution(s, tabId, execId, (t) => appendResult(t, newResultId(), result, query)))
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
       if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
       set((s) =>

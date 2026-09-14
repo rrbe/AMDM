@@ -128,6 +128,7 @@
     "restartToUpdate": "Restart and update"
   },
   "notify": {
+    "resultRetentionLimit": "To limit memory use, each query keeps only the latest {{count}} results. The oldest result has been removed.",
     "loadConnectionsFailed": "Failed to load connections: {{error}}",
     "saveConnectionFailed": "Failed to save connection: {{error}}",
     "deleteConnectionFailed": "Failed to delete connection: {{error}}",
@@ -383,6 +384,8 @@
     "closeTab": "Close tab",
     "newTabTip": "New query tab (⌘T)",
     "newTabLabel": "New query tab",
+    "scrollTabsLeft": "Scroll tabs left",
+    "scrollTabsRight": "Scroll tabs right",
     "tabListLabel": "All query tabs",
     "reconnect": "Connection lost. Click to reconnect",
     "loadingEditor": "Loading editor…",
@@ -425,6 +428,9 @@
     "deployment": "Deployment",
     "database": "Database",
     "collection": "Collection",
+    "resultDataSize": "Data size",
+    "totalResultDataSize": "Total result data",
+    "measuringDataSize": "Calculating…",
     "queryTime": "Query time",
     "type": "Type",
     "documents": "Documents",

@@ -855,3 +855,38 @@ db.unselectedAfter.find({})`
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'mongosh' }))
   })
 })
+
+describe('result retention notice', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it.each(['runShell', 'runExplain'] as const)('notifies only on eviction during %s and merges repeated notices', async (action) => {
+    vi.stubGlobal('window', {
+      api: {
+        shell: { execute: vi.fn().mockResolvedValue({ kind: 'documents', data: [], pageable: true }) },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    useAppStore.setState({
+      tabs: [createTab('retention', { connectionId: 'c1', code: 'db.items.find({})' })],
+      activeTabId: 'retention',
+      notifications: [],
+      settings: DEFAULT_SETTINGS
+    })
+    for (let i = 0; i < 8; i++) await useAppStore.getState()[action]()
+    expect(useAppStore.getState().notifications).toHaveLength(0)
+    await useAppStore.getState()[action]()
+    expect(useAppStore.getState().tabs[0].results.map((r) => r.seq)).toEqual([2, 3, 4, 5, 6, 7, 8, 9])
+    expect(useAppStore.getState().notifications).toEqual([
+      expect.objectContaining({ variant: 'info', dedupeKey: 'query:retention:resultRetention', repeatCount: 1 })
+    ])
+    await useAppStore.getState()[action]()
+    expect(useAppStore.getState().notifications).toHaveLength(1)
+    expect(useAppStore.getState().notifications[0].repeatCount).toBe(2)
+    useAppStore.getState().clearNotifications()
+    await useAppStore.getState().refreshResult()
+    expect(useAppStore.getState().notifications).toHaveLength(0)
+    useAppStore.getState().closeResultTab(useAppStore.getState().tabs[0].activeResultId!)
+    await useAppStore.getState()[action]()
+    expect(useAppStore.getState().notifications).toHaveLength(0)
+  })
+})

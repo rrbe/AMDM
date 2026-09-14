@@ -23,6 +23,8 @@ import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
+import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
+import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
@@ -379,20 +381,6 @@ function TabBar({
     return color ? `color-mix(in srgb, ${color} 60%, var(--text-secondary))` : undefined
   }
 
-  useEffect(() => {
-    const strip = stripRef.current
-    if (!strip) return
-    const revealActive = (): void => {
-      strip
-        .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-    revealActive()
-    const observer = new ResizeObserver(revealActive)
-    observer.observe(strip)
-    return () => observer.disconnect()
-  }, [activeTabId])
-
   // Cmd/Ctrl+W closes the query first; an already empty workspace closes the window.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -448,7 +436,7 @@ function TabBar({
         }
         aria-label={t('shell.tabListLabel')}
       />
-      <div ref={stripRef} className="tab-strip">
+      <DocumentTabStrip stripRef={stripRef} count={tabs.length} activeId={activeTabId} kind="query">
         {tabs.map((tab, i) => {
           const connectionStatus = tab.connectionId ? statuses[tab.connectionId] : undefined
           const connectionName = connections.find((connection) => connection.id === tab.connectionId)?.name
@@ -480,6 +468,8 @@ function TabBar({
                   <dd className="m-0 min-w-0 break-words">{tab.activeDatabase || '—'}</dd>
                   <dt className="text-primary-foreground/65">{t('context.collection')}</dt>
                   <dd className="m-0 min-w-0 break-words">{collection ?? '—'}</dd>
+                  <dt className="text-primary-foreground/65">{t('context.totalResultDataSize')}</dt>
+                  <dd className="m-0"><ResultDataSize results={tab.results} /></dd>
                   {lastExecutedAt > 0 && (
                     <>
                       <dt className="text-primary-foreground/65">{t('context.queryTime')}</dt>
@@ -521,7 +511,7 @@ function TabBar({
         <button className="qtab-new" aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
           <Plus size={14} />
         </button>
-      </div>
+      </DocumentTabStrip>
       <button
         className="side-head-action context-toggle"
         onClick={onContextToggle}

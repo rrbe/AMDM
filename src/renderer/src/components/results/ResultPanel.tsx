@@ -10,6 +10,8 @@ import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
+import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
+import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
@@ -404,15 +406,8 @@ function ResultTabStrip({
   const moveResultTab = useAppStore((s) => s.moveResultTab)
   useTabReorder(stripRef, results, setActiveResultTab, moveResultTab)
 
-  useEffect(() => {
-    if (!activeId) return
-    stripRef.current
-      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`)
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [activeId])
-
   return (
-    <div ref={stripRef} className="result-tabs">
+    <DocumentTabStrip stripRef={stripRef} count={results.length} activeId={activeId} kind="result">
       {results.map((r, index) => {
         const query = r.query
         return (
@@ -421,12 +416,20 @@ function ResultTabStrip({
             active={r.id === activeId}
             className="rtab"
             dataTabId={r.id}
-            label={resultTabLabel(r)}
+            label={
+              <>
+                <span className="result-tab-full-label">{resultTabLabel(r)}</span>
+                <span className="result-tab-compact-label">{r.seq}</span>
+              </>
+            }
             tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : resultTabLabel(r)}
             tooltipFooter={() => (
-              <span data-result-tab-time="">
-                {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
-              </span>
+              <div className="flex flex-col gap-1">
+                <span data-result-tab-time="">
+                  {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
+                </span>
+                <span>{t('context.resultDataSize')} · <ResultDataSize results={[r]} /></span>
+              </div>
             )}
             tooltipVariant="code"
             closeLabel={t('result.closeTab')}
@@ -436,7 +439,7 @@ function ResultTabStrip({
           />
         )
       })}
-    </div>
+    </DocumentTabStrip>
   )
 }
 

@@ -15,7 +15,8 @@
   min-height: 41px;
   padding: 5px 12px 0;
   background: var(--surface-chrome);
-  flex: 0 0 auto;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -23,8 +24,8 @@
   display: none;
 }
 .rtab {
-  flex: 0 0 190px;
-  width: 190px;
+  flex: 0 0 var(--document-tab-width, 190px);
+  width: var(--document-tab-width, 190px);
 }
 
 .result-bar {

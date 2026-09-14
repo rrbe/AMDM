@@ -128,6 +128,7 @@
     "restartToUpdate": "重启并更新"
   },
   "notify": {
+    "resultRetentionLimit": "为控制内存占用，每个查询仅保留最近 {{count}} 个结果，已移除最早的结果。",
     "loadConnectionsFailed": "加载连接失败：{{error}}",
     "saveConnectionFailed": "保存连接失败：{{error}}",
     "deleteConnectionFailed": "删除连接失败：{{error}}",
@@ -383,6 +384,8 @@
     "closeTab": "关闭标签页",
     "newTabTip": "新建查询标签页 (⌘T)",
     "newTabLabel": "新建查询标签页",
+    "scrollTabsLeft": "向左滚动标签页",
+    "scrollTabsRight": "向右滚动标签页",
     "tabListLabel": "全部查询标签页",
     "reconnect": "连接已断开，点击重连",
     "loadingEditor": "编辑器加载中…",
@@ -430,6 +433,9 @@
     "indexes": "索引",
     "notLoaded": "未加载",
     "lastResult": "最近结果",
+    "resultDataSize": "数据大小",
+    "totalResultDataSize": "结果数据合计",
+    "measuringDataSize": "计算中…",
     "queryTime": "查询时间",
     "result": "结果",
     "elapsed": "耗时",
