@@ -198,3 +198,40 @@ body {
     animation: none !important;
   }
 }
+
+/* Share one moving background while labels and hit targets stay in place. */
+.sliding-selection {
+  position: relative;
+  isolation: isolate;
+  anchor-scope: --selection-target;
+}
+.sliding-selection > button {
+  position: relative;
+  z-index: 1;
+}
+.sliding-selection > .is-selected {
+  anchor-name: --selection-target;
+  background: transparent;
+}
+.sliding-selection > .selection-indicator {
+  position: absolute;
+  position-anchor: --selection-target;
+  left: anchor(left);
+  top: anchor(top);
+  width: anchor-size(width);
+  height: anchor-size(height);
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    left var(--motion-base) var(--ease-standard),
+    top var(--motion-base) var(--ease-standard),
+    width var(--motion-base) var(--ease-standard),
+    height var(--motion-base) var(--ease-standard);
+}
+.sliding-selection:not(:has(> .is-selected)) > .selection-indicator {
+  display: none;
+}
+.settings-sections > .selection-indicator {
+  border-radius: var(--radius-control);
+  background: var(--interaction-selected);
+}

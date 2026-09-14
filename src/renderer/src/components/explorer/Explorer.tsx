@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
@@ -200,7 +200,17 @@ export function Explorer({
   const showAvailableUpdate = useAppStore((s) => s.showAvailableUpdate)
 
   const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchToggleRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (view === 'connections' && searchOpen) searchInputRef.current?.focus({ preventScroll: true })
+  }, [view, searchOpen])
   const [search, setSearch] = useState('')
+  const closeSearch = (): void => {
+    setSearch('')
+    setSearchOpen(false)
+    searchToggleRef.current?.focus({ preventScroll: true })
+  }
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const [connForm, setConnForm] = useState<{
     open: boolean
@@ -508,43 +518,52 @@ export function Explorer({
         </Tooltip>
       </nav>
 
-      {view === 'connections' && searchOpen && (
-        <div className="explorer-search">
-          <Search size={14} aria-hidden />
-          <input
-            autoFocus
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t('explorer.searchPlaceholder')}
-            aria-label={t('explorer.search')}
-          />
-          {search && (
-            <Tooltip content={t('explorer.clearSearch')}>
-              <button onClick={() => setSearch('')} aria-label={t('explorer.clearSearch')}>
-                <X size={13} />
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      )}
-
       {view === 'connections' ? (
         <>
           <div className="side-section side-section--conns">
-            <div className="side-section-head">
-              <span className="side-section-title">Connections</span>
-              <span className="library-count">· {connections.length}</span>
-              <Tooltip content={t('explorer.search')}>
+            <div className={searchOpen ? 'side-section-head is-searching' : 'side-section-head'}>
+              <div className="side-search-slot">
+                <div className="side-search-heading" aria-hidden={searchOpen}>
+                  <span className="side-section-title">Connections</span>
+                  <span className="library-count">· {connections.length}</span>
+                </div>
+                <div className="explorer-search" inert={!searchOpen} aria-hidden={!searchOpen}>
+                  <Search size={14} aria-hidden />
+                  <input
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        closeSearch()
+                      }
+                    }}
+                    placeholder={t('explorer.searchPlaceholder')}
+                    aria-label={t('explorer.search')}
+                  />
+                  {search && (
+                    <Tooltip content={t('explorer.clearSearch')}>
+                      <button onClick={() => setSearch('')} aria-label={t('explorer.clearSearch')}>
+                        <X size={13} />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
+              </div>
+              <Tooltip content={t(searchOpen ? 'explorer.closeSearch' : 'explorer.search')}>
                 <button
-                  className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
-                  aria-label={t('explorer.search')}
-                  aria-pressed={searchOpen}
+                  ref={searchToggleRef}
+                  className="side-head-action side-search-toggle"
+                  aria-label={t(searchOpen ? 'explorer.closeSearch' : 'explorer.search')}
+                  aria-expanded={searchOpen}
                   onClick={() => {
-                    if (searchOpen) setSearch('')
-                    setSearchOpen((open) => !open)
+                    if (searchOpen) closeSearch()
+                    else setSearchOpen(true)
                   }}
                 >
-                  <Search size={16} />
+                  {searchOpen ? t('common.cancel') : <Search size={16} />}
                 </button>
               </Tooltip>
             </div>

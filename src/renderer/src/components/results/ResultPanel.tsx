@@ -240,13 +240,14 @@ export function ResultPanel({
     <div className="result-panel" data-shortcut-region="result">
       {strip}
       <div className="result-bar">
-        <div className="view-switch">
+        <div className="view-switch sliding-selection">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
             const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
             return (
               <button
                 key={v}
-                className={!showConsole && view === v ? 'active' : ''}
+                className={!showConsole && view === v ? 'active is-selected' : ''}
+                aria-pressed={!showConsole && view === v}
                 onClick={() => {
                   chooseConsole(false)
                   setView(v)
@@ -259,11 +260,16 @@ export function ResultPanel({
           })}
           {hasOutput && (
             <Tooltip content="Console (⌘4)">
-              <button className={showConsole ? 'active' : ''} onClick={() => chooseConsole(true)}>
+              <button
+                className={showConsole ? 'active is-selected' : ''}
+                aria-pressed={showConsole}
+                onClick={() => chooseConsole(true)}
+              >
                 {t('result.view.console')}
               </button>
             </Tooltip>
           )}
+          <span className="selection-indicator" aria-hidden="true" />
         </div>
         <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
@@ -282,7 +288,10 @@ export function ResultPanel({
             setCopyMenu({ x: r.left, y: r.bottom + 4 })
           }}
         >
-          {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+          <span className={copied ? 'copy-feedback is-copied' : 'copy-feedback'} aria-hidden="true">
+            <Copy size={14} />
+            <Check size={14} className="text-[var(--ok)]" />
+          </span>
         </button>
         <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
       </div>
@@ -590,7 +599,10 @@ function ErrorView({
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}
             onClick={() => onCopy(`${name}: ${message}`)}
           >
-            {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+            <span className={copied ? 'copy-feedback is-copied' : 'copy-feedback'} aria-hidden="true">
+              <Copy size={14} />
+              <Check size={14} className="text-[var(--ok)]" />
+            </span>
           </button>
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>

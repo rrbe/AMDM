@@ -313,6 +313,7 @@
     "dropCollection": "Drop Collection",
     "dropCollectionConfirm": "Drop this collection?\n\nConnection: {{connection}}\nDatabase: {{database}}\nCollection: {{collection}}\n\nAll documents and indexes in this collection will be permanently deleted. This cannot be undone.",
     "search": "Search visible catalog",
+    "closeSearch": "Close search",
     "searchPlaceholder": "Search visible connections and catalog…",
     "clearSearch": "Clear search",
     "noSearchResults": "No matching loaded items.",

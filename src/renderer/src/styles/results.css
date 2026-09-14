@@ -57,17 +57,17 @@
   background: transparent;
   color: var(--text-muted);
 }
-.view-switch button:first-child {
+.view-switch button:first-of-type {
   border-top-left-radius: calc(var(--radius-control) - 1px);
   border-bottom-left-radius: calc(var(--radius-control) - 1px);
 }
-.view-switch button:last-child {
+.view-switch button:last-of-type {
   border-right: 0;
   border-top-right-radius: calc(var(--radius-control) - 1px);
   border-bottom-right-radius: calc(var(--radius-control) - 1px);
 }
 .view-switch button.active {
-  background: var(--primary);
+  background: transparent;
   color: var(--primary-foreground);
 }
 .result-meta {
@@ -680,4 +680,31 @@
   margin: 0;
   max-width: 360px;
   line-height: 1.5;
+}
+
+.view-switch .selection-indicator {
+  background: var(--primary);
+  border-radius: 0;
+}
+.copy-feedback {
+  display: grid;
+  width: 14px;
+  height: 14px;
+}
+.copy-feedback > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
+.copy-feedback > svg:last-child {
+  opacity: 0;
+  transform: scale(0.8);
+}
+.copy-feedback.is-copied > svg:first-child {
+  opacity: 0;
+}
+.copy-feedback.is-copied > svg:last-child {
+  opacity: 1;
+  transform: scale(1);
 }

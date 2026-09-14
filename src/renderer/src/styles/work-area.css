@@ -24,6 +24,7 @@
   background: var(--surface-content);
 }
 .context-rail {
+  height: 100%;
   width: 300px;
   max-width: 32vw;
   flex: 0 0 300px;
@@ -782,10 +783,15 @@
 
 /* Keep the data workspace usable at compact window widths. */
 @media (max-width: 1199px) {
-  .context-rail {
+  .context-disclosure {
     display: none;
   }
   .context-toggle {
     display: none;
   }
+}
+
+.context-disclosure {
+  --panel-offset: 6px;
+  max-width: 32vw;
 }

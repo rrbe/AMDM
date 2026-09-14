@@ -18,6 +18,7 @@ import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabCollection, tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
+import { Collapsible } from '@renderer/components/ui/Collapsible'
 import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
@@ -306,11 +307,11 @@ export function ShellWorkspace(): React.JSX.Element {
           />
         </main>
 
-        {contextOpen && (
+        <Collapsible open={contextOpen} axis="horizontal" className="context-disclosure">
           <aside className="context-rail">
             <ContextPanel />
           </aside>
-        )}
+        </Collapsible>
       </div>
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}

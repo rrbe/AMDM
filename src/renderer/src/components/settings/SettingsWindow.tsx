@@ -258,25 +258,28 @@ export function SettingsWindow(): React.JSX.Element {
           />
         </label>
 
-        {visibleSections.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={`flex items-center gap-2.5 rounded-md border-0 px-3 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] ${
-              displayedSectionId === id
-                ? 'bg-[var(--bg-sel)] text-foreground'
-                : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-            aria-current={displayedSectionId === id ? 'page' : undefined}
-            onClick={() => setActiveSection(id)}
-          >
-            <Icon size={16} aria-hidden />
-            <span>{label}</span>
-            {id === 'updates' && updateState.availableVersion ? (
-              <UpdateAvailableDot version={updateState.availableVersion} className="ml-auto" />
-            ) : null}
-          </button>
-        ))}
+        <div className="settings-sections sliding-selection flex flex-col gap-1">
+          {visibleSections.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={`flex items-center gap-2.5 rounded-md border-0 px-3 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] ${
+                displayedSectionId === id
+                  ? 'is-selected text-foreground'
+                  : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+              aria-current={displayedSectionId === id ? 'page' : undefined}
+              onClick={() => setActiveSection(id)}
+            >
+              <Icon size={16} aria-hidden />
+              <span>{label}</span>
+              {id === 'updates' && updateState.availableVersion ? (
+                <UpdateAvailableDot version={updateState.availableVersion} className="ml-auto" />
+              ) : null}
+            </button>
+          ))}
+          <span className="selection-indicator" aria-hidden="true" />
+        </div>
       </nav>
 
       <main className="relative overflow-y-auto bg-card px-8 pb-8 pt-[52px]">

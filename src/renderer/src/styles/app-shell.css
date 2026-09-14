@@ -133,3 +133,10 @@
 .is-mac .app-drag .qtab {
   -webkit-app-region: no-drag;
 }
+
+.explorer-disclosure {
+  max-width: calc(100vw - 480px);
+}
+.explorer-disclosure > .explorer {
+  height: 100%;
+}

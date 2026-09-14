@@ -313,6 +313,7 @@
     "dropCollection": "删除集合",
     "dropCollectionConfirm": "确定要删除此集合吗？\n\n连接：{{connection}}\n数据库：{{database}}\n集合：{{collection}}\n\n集合内的所有文档和索引都将被永久删除，此操作无法撤销。",
     "search": "搜索当前可见目录",
+    "closeSearch": "收起搜索",
     "searchPlaceholder": "搜索当前可见的连接和目录…",
     "clearSearch": "清除搜索",
     "noSearchResults": "没有匹配的已加载项目。",

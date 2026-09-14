@@ -1,0 +1,31 @@
+.panel {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+  opacity: 1;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
+.horizontal {
+  width: var(--collapsible-panel-width);
+  transition-property: width, opacity, transform;
+}
+.vertical {
+  height: var(--collapsible-panel-height);
+  transition-property: height, opacity;
+}
+.panel[data-starting-style],
+.panel[data-ending-style] {
+  opacity: 0;
+}
+.horizontal[data-starting-style],
+.horizontal[data-ending-style] {
+  width: 0;
+  transform: translateX(var(--panel-offset, -6px));
+}
+.vertical[data-starting-style],
+.vertical[data-ending-style] {
+  height: 0;
+}
