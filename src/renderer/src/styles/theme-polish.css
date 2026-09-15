@@ -109,7 +109,7 @@ body {
   padding: 7px 10px;
   background: var(--surface-sidebar);
 }
-.side-foot-build {
+.side-foot-version {
   min-width: 0;
   flex: 1;
   overflow: hidden;

@@ -5,7 +5,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { version } from './package.json'
 
-const buildId = `${version} - ${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
 const mongoshRuntimePlugin = {
   name: 'build-mongosh-runtime',
   closeBundle(): void {
@@ -84,7 +83,7 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     define: {
-      __BUILD_ID__: JSON.stringify(buildId)
+      __APP_VERSION__: JSON.stringify(version)
     },
     resolve: {
       alias: {

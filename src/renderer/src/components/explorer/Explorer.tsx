@@ -672,8 +672,8 @@ export function Explorer({
             </span>
           </button>
         ) : (
-          <span className="side-foot-build" title={__BUILD_ID__}>
-            {__BUILD_ID__}
+          <span className="side-foot-version" title={__APP_VERSION__}>
+            {__APP_VERSION__}
           </span>
         )}
         <Tooltip content={t('common.settings')}>
