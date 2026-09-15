@@ -1,4 +1,20 @@
 {
+  "adapt tab widths and show result data size and retention notices": {
+    "en": "Adapt tab widths and show result data size and retention notices",
+    "zh": "调整标签页宽度，并显示结果数据大小和保留提示"
+  },
+  "add interface motion and inline explorer search": {
+    "en": "Add interface transitions and inline Explorer search",
+    "zh": "新增界面过渡动效和资源浏览器行内搜索"
+  },
+  "smooth explorer navigation transitions and preserve focus": {
+    "en": "Smooth Explorer navigation transitions and preserve focus",
+    "zh": "优化资源浏览器导航过渡并保留焦点"
+  },
+  "localize changelogs and Sparkle release notes": {
+    "en": "Localize changelogs and Sparkle release notes",
+    "zh": "为更新日志和 Sparkle 更新说明提供中英文版本"
+  },
   "add automatic nested table display and settings preview": {
     "en": "Add automatic nested table display and settings preview",
     "zh": "新增嵌套表格自动展示和设置预览"
