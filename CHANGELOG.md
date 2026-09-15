@@ -4,6 +4,18 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.9.3](https://github.com/rrbe/AMDM/releases/tag/v26.9.3) — 2026-09-15
+
+### Features
+
+- Adapt tab widths and show result data size and retention notices
+- Add interface transitions and inline Explorer search
+- Localize changelogs and Sparkle release notes
+
+### Fixes
+
+- Smooth Explorer navigation transitions and preserve focus
+
 ## [v26.9.2](https://github.com/rrbe/AMDM/releases/tag/v26.9.2) — 2026-09-13
 
 ### Features

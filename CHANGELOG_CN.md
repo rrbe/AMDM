@@ -4,6 +4,18 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.9.3](https://github.com/rrbe/AMDM/releases/tag/v26.9.3) — 2026-09-15
+
+### 新功能
+
+- 调整标签页宽度，并显示结果数据大小和保留提示
+- 新增界面过渡动效和资源浏览器行内搜索
+- 为更新日志和 Sparkle 更新说明提供中英文版本
+
+### 修复
+
+- 优化资源浏览器导航过渡并保留焦点
+
 ## [v26.9.2](https://github.com/rrbe/AMDM/releases/tag/v26.9.2) — 2026-09-13
 
 ### 新功能
