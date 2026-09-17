@@ -10,6 +10,7 @@ interface DocumentTabProps {
   onSelect: () => void
   onClose: () => void
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
+  contextMenuOpen?: boolean
   className?: string
   dataTabId?: string
   status?: ReactNode
@@ -28,6 +29,7 @@ export function DocumentTab({
   onSelect,
   onClose,
   onContextMenu,
+  contextMenuOpen,
   className,
   dataTabId,
   status,
@@ -40,7 +42,7 @@ export function DocumentTab({
   return (
     <div
       data-tab-id={dataTabId}
-      className={cn('document-tab', active && 'active', className)}
+      className={cn('document-tab', active && 'active', contextMenuOpen && 'context-menu-open', className)}
       onClick={onSelect}
       onContextMenu={onContextMenu}
       onAuxClick={(event) => {

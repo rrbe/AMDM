@@ -116,11 +116,11 @@
 .document-tab:has(+ .document-tab.active)::after {
   opacity: 0;
 }
-.document-tab:hover {
+.document-tab:is(:hover, .context-menu-open) {
   background: var(--interaction-hover);
   color: var(--text-secondary);
 }
-.document-tab:not(.active):hover {
+.document-tab:not(.active):is(:hover, .context-menu-open) {
   border-radius: var(--radius-lg);
   box-shadow: inset 0 0 0 3px var(--surface-chrome);
 }
@@ -187,7 +187,7 @@
   color: var(--fg-3);
   opacity: 0.7;
 }
-.document-tab:hover .document-tab-close,
+.document-tab:is(:hover, .context-menu-open) .document-tab-close,
 .document-tab.active .document-tab-close {
   opacity: 1;
 }
@@ -850,7 +850,7 @@
 .document-tab-close {
   flex: 0 0 18px;
 }
-[data-compact='true'] .document-tab:not(.active):not(:hover):not(:focus-within) .document-tab-close {
+[data-compact='true'] .document-tab:not(.active):not(:hover):not(.context-menu-open):not(:focus-within) .document-tab-close {
   opacity: 0;
   pointer-events: none;
 }

@@ -472,6 +472,7 @@ function TabBar({
             <DocumentTab
               key={tab.id}
               active={tab.id === activeTabId}
+              contextMenuOpen={menu?.tabId === tab.id}
               className="qtab"
               dataTabId={tab.id}
               label={<span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, i)}</span>}
