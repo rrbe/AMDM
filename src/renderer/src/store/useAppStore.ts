@@ -172,12 +172,16 @@ interface AppState {
 
   // ---- actions: tabs ----
   /** Open a new empty query tab and focus it. */
-  newTab(): void
+  newTab(afterId?: string): void
+  /** Copy a tab's query and connection into a new tab beside it. */
+  duplicateTab(id: string): void
   /** Focus an existing tab. */
   setActiveTab(id: string): void
   moveQueryTab(sourceId: string, targetId: string): void
   /** Close a tab (aborts its run if any); always leaves ≥1 tab open. */
   closeTab(id: string): void
+  /** Close several tabs in one update, aborting any running queries. */
+  closeTabs(ids: string[]): void
 
   // ---- actions: result tabs (operate on the active query tab) ----
   /** Focus one of the active tab's result tabs. */
@@ -1019,10 +1023,33 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ---------------------------------------------------------------------- tabs
-  newTab() {
+  newTab(afterId) {
     set((s) => {
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
-      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+      const index = afterId ? s.tabs.findIndex((item) => item.id === afterId) : -1
+      const connectionId = index < 0 ? s.activeConnectionId : s.tabs[index].connectionId
+      const tab = createDefaultTab(newTabId(), s.settings, { connectionId })
+      const tabs = [...s.tabs]
+      tabs.splice(index < 0 ? tabs.length : index + 1, 0, tab)
+      return { tabs, activeTabId: tab.id, activeConnectionId: connectionId }
+    })
+  },
+
+  duplicateTab(id) {
+    set((s) => {
+      const index = s.tabs.findIndex((tab) => tab.id === id)
+      if (index < 0) return s
+      const source = s.tabs[index]
+      const tab = createDefaultTab(newTabId(), s.settings, {
+        connectionId: source.connectionId,
+        activeDatabase: source.activeDatabase,
+        code: source.code,
+        runtime: source.runtime,
+        runtimeSuggestion: source.runtimeSuggestion,
+        pristine: !source.code.trim()
+      })
+      const tabs = [...s.tabs]
+      tabs.splice(index + 1, 0, tab)
+      return { tabs, activeTabId: tab.id, activeConnectionId: tab.connectionId }
     })
   },
 
@@ -1041,16 +1068,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   closeTab(id) {
-    const closing = get().tabs.find((t) => t.id === id)
-    // Free a server-side run the closed tab may have had in flight.
-    if (closing?.runningExecId) void window.api.shell.abort(closing.runningExecId).catch(() => {})
+    get().closeTabs([id])
+  },
+
+  closeTabs(ids) {
+    const closingIds = new Set(ids)
+    for (const tab of get().tabs) {
+      if (closingIds.has(tab.id) && tab.runningExecId) {
+        void window.api.shell.abort(tab.runningExecId).catch(() => {})
+      }
+    }
     set((s) => {
-      const remaining = s.tabs.filter((t) => t.id !== id)
+      const remaining = s.tabs.filter((t) => !closingIds.has(t.id))
+      if (remaining.length === s.tabs.length) return s
       if (remaining.length === 0) {
         const fresh = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id }
       }
-      const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
+      const activeIndex = s.tabs.findIndex((tab) => tab.id === s.activeTabId)
+      const leftNeighbor = s.tabs.slice(0, activeIndex).reverse().find((tab) => !closingIds.has(tab.id))
+      const nextActive = remaining.some((tab) => tab.id === s.activeTabId)
+        ? s.activeTabId
+        : (leftNeighbor?.id ?? remaining[0].id)
       const activeConnectionId = remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
       return { tabs: remaining, activeTabId: nextActive, activeConnectionId }
     })

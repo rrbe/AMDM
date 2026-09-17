@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
 import { Tooltip, type TooltipContent, type TooltipVariant } from '@renderer/components/ui/Tooltip'
@@ -9,6 +9,7 @@ interface DocumentTabProps {
   closeLabel: string
   onSelect: () => void
   onClose: () => void
+  onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
   className?: string
   dataTabId?: string
   status?: ReactNode
@@ -26,6 +27,7 @@ export function DocumentTab({
   closeLabel,
   onSelect,
   onClose,
+  onContextMenu,
   className,
   dataTabId,
   status,
@@ -40,6 +42,7 @@ export function DocumentTab({
       data-tab-id={dataTabId}
       className={cn('document-tab', active && 'active', className)}
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       onAuxClick={(event) => {
         if (event.button === 1) {
           event.preventDefault()

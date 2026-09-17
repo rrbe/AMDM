@@ -33,6 +33,56 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().activeTabId).toBe(c2Tab?.id)
   })
 
+  it('opens and duplicates tabs beside the right-clicked tab with independent query state', () => {
+    useAppStore.setState({
+      tabs: [
+        createTab('source', {
+          connectionId: 'c2',
+          activeDatabase: 'shop',
+          code: 'db.orders.find({})',
+          runtime: 'mongosh',
+          results: [
+            {
+              id: 'result',
+              seq: 1,
+              result: { kind: 'documents', data: [] },
+              executedAt: 1,
+              query: null,
+              skip: 0,
+              resultView: 'tree'
+            }
+          ],
+          running: true,
+          runningExecId: 'running-query'
+        }),
+        createTab('other', { connectionId: 'c1' })
+      ],
+      activeTabId: 'other',
+      activeConnectionId: 'c1'
+    })
+
+    useAppStore.getState().newTab('source')
+    const blank = useAppStore.getState().tabs[1]
+    expect(blank).toMatchObject({ connectionId: 'c2', code: '', results: [] })
+    expect(useAppStore.getState().activeConnectionId).toBe('c2')
+
+    useAppStore.getState().duplicateTab('source')
+    const copy = useAppStore.getState().tabs[1]
+    expect(copy).toMatchObject({
+      connectionId: 'c2',
+      activeDatabase: 'shop',
+      code: 'db.orders.find({})',
+      runtime: 'mongosh',
+      pristine: false,
+      results: [],
+      running: false,
+      runningExecId: null
+    })
+    expect(copy.id).not.toBe('source')
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(['source', copy.id, blank.id, 'other'])
+    expect(useAppStore.getState().activeTabId).toBe(copy.id)
+  })
+
   it('keeps the result view independent for each data tab and query tab', () => {
     const result = (id: string) => ({
       id,
@@ -106,6 +156,27 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState().tabs[0].tableColumnOrder).toEqual(['_id', 'name'])
     useAppStore.getState().closeTab('c2-tab')
     expect(useAppStore.getState().tabs[0].tableColumnOrder).toEqual([])
+  })
+
+  it('closes selected tabs together, aborts their runs, and keeps a surviving connection active', () => {
+    const abort = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('window', { api: { shell: { abort } } })
+    useAppStore.setState({
+      tabs: [
+        createTab('left', { connectionId: 'c2' }),
+        createTab('middle', { connectionId: 'c1', runningExecId: 'run-middle' }),
+        createTab('right', { connectionId: 'c1', runningExecId: 'run-right' })
+      ],
+      activeTabId: 'right',
+      activeConnectionId: 'c1'
+    })
+
+    useAppStore.getState().closeTabs(['middle', 'right'])
+
+    expect(abort).toHaveBeenCalledWith('run-middle')
+    expect(abort).toHaveBeenCalledWith('run-right')
+    expect(useAppStore.getState()).toMatchObject({ activeTabId: 'left', activeConnectionId: 'c2' })
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(['left'])
   })
 
   it('moves query tabs without changing focus, connection, or the state owned by each tab', () => {

@@ -31,6 +31,7 @@ import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { Modal } from '@renderer/components/common/Modal'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
   contextualTabDigitIndex,
   hasOpenShortcutLayer,
@@ -369,11 +370,14 @@ function TabBar({
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
+  const closeTabs = useAppStore((s) => s.closeTabs)
   const newTab = useAppStore((s) => s.newTab)
+  const duplicateTab = useAppStore((s) => s.duplicateTab)
   const connect = useAppStore((s) => s.connect)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const stripRef = useRef<HTMLDivElement>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const moveQueryTab = useAppStore((s) => s.moveQueryTab)
   useTabReorder(stripRef, tabs, setActiveTab, moveQueryTab)
   const connectionTextColor = (connectionId: string | null): string | undefined => {
@@ -484,6 +488,10 @@ function TabBar({
               closeLabel={t('shell.closeTab')}
               onSelect={() => setActiveTab(tab.id)}
               onClose={() => closeTab(tab.id)}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                setMenu({ x: event.clientX, y: event.clientY, tabId: tab.id })
+              }}
               statusAction={
                 unavailable && tab.connectionId
                   ? {
@@ -520,6 +528,34 @@ function TabBar({
       >
         {contextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
       </button>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: t('shell.newTabMenu'), onClick: () => newTab(menu.tabId) },
+            { label: t('shell.duplicateTab'), onClick: () => duplicateTab(menu.tabId) },
+            'separator',
+            { label: t('shell.closeTab'), onClick: () => closeTab(menu.tabId) },
+            {
+              label: t('shell.closeConnectionTabs'),
+              disabled: !tabs.find((tab) => tab.id === menu.tabId)?.connectionId,
+              onClick: () => {
+                const connectionId = tabs.find((tab) => tab.id === menu.tabId)?.connectionId
+                closeTabs(tabs.filter((tab) => tab.connectionId === connectionId).map((tab) => tab.id))
+              }
+            },
+            {
+              label: t('shell.closeTabsToRight'),
+              disabled: tabs.findIndex((tab) => tab.id === menu.tabId) === tabs.length - 1,
+              onClick: () =>
+                closeTabs(tabs.slice(tabs.findIndex((tab) => tab.id === menu.tabId) + 1).map((tab) => tab.id))
+            },
+            { label: t('shell.closeAllTabs'), onClick: () => closeTabs(tabs.map((tab) => tab.id)) }
+          ]}
+        />
+      )}
     </div>
   )
 }
