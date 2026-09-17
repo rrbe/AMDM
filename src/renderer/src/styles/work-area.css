@@ -333,12 +333,27 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-secondary);
 }
 .work-icon-btn:hover:not(:disabled) {
   border-color: transparent;
   background: var(--interaction-hover);
   color: var(--text-primary);
+}
+.work-actions button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+.work-actions .work-icon-btn[aria-disabled='true'] {
+  color: var(--text-disabled);
+  opacity: 1;
+}
+.work-actions .work-icon-btn[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--text-disabled);
+}
+.work-actions .busy-btn[aria-disabled='true']:hover {
+  background: var(--primary);
 }
 .work-icon-btn.is-active {
   border-color: transparent;

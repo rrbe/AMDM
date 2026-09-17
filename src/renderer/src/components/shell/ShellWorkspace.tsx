@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Activity,
+  ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
   LoaderCircle,
@@ -236,38 +236,52 @@ export function ShellWorkspace(): React.JSX.Element {
                   {t(stopping ? 'shell.stopping' : 'shell.stopTip')}
                 </Button>
               ) : (
-                <Button variant="primary" disabled={busy} onClick={runEditor}>
-                  <Play aria-hidden /> {t('shell.runBtn')}
-                </Button>
+                <Tooltip content={t('shell.runTip')}>
+                  <Button
+                    variant="primary"
+                    aria-disabled={busy}
+                    onClick={() => {
+                      if (!busy) runEditor()
+                    }}
+                  >
+                    <Play aria-hidden /> {t('shell.runBtn')}
+                  </Button>
+                </Tooltip>
               )}
               <Tooltip content={t('shell.explainBtn')}>
                 <button
                   className="work-icon-btn"
-                  disabled={busy}
-                  onClick={() => void runExplain()}
+                  aria-disabled={busy}
+                  onClick={() => {
+                    if (!busy) void runExplain()
+                  }}
                   aria-label={t('shell.explainBtn')}
                 >
-                  <Activity size={15} />
+                  <ChartNoAxesCombined size={15} />
                 </button>
               </Tooltip>
               <Tooltip content={t('shell.saveQueryTip')}>
                 <button
                   className="work-icon-btn"
-                  disabled={contentBusy}
-                  onClick={() => setShowSave(true)}
+                  aria-disabled={contentBusy}
+                  onClick={() => {
+                    if (!contentBusy) setShowSave(true)
+                  }}
                   aria-label={t('shell.saveBtn')}
                 >
                   <Save size={15} />
                 </button>
               </Tooltip>
-              <button
-                className={`work-icon-btn${queryExpanded ? ' is-active' : ''}`}
-                aria-label={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}
-                aria-pressed={queryExpanded}
-                onClick={() => setExpandedRegion((current) => (current === 'query' ? null : 'query'))}
-              >
-                {queryExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
+              <Tooltip content={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}>
+                <button
+                  className={`work-icon-btn${queryExpanded ? ' is-active' : ''}`}
+                  aria-label={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}
+                  aria-pressed={queryExpanded}
+                  onClick={() => setExpandedRegion((current) => (current === 'query' ? null : 'query'))}
+                >
+                  {queryExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                </button>
+              </Tooltip>
             </div>
           </div>
 

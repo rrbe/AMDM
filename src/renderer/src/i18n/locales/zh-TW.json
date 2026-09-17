@@ -370,6 +370,7 @@
     "stopping": "正在停止…",
     "stopBtn": "停止",
     "runBtn": "執行",
+    "runTip": "執行查詢",
     "runtime": "查詢執行環境",
     "runtimeAmdmDriver": "AMDM driver",
     "runtimeAmdmDriverDescription": "AMDM 內建 MongoDB Driver 執行環境",

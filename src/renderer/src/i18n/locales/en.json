@@ -370,6 +370,7 @@
     "stopping": "Stopping…",
     "stopBtn": "Stop",
     "runBtn": "Run",
+    "runTip": "Run query",
     "runtime": "Query runtime",
     "runtimeAmdmDriver": "AMDM driver",
     "runtimeAmdmDriverDescription": "AMDM's built-in MongoDB Driver runtime",
