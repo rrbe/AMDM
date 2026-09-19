@@ -25,7 +25,7 @@ import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNestedDisplayPreview'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
-import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { isMacPlatform, resultViewShortcutLabel } from '@renderer/lib/keyboardShortcuts'
 import { cn } from '@renderer/lib/utils'
 
 type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
@@ -161,7 +161,7 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.keyboardShortcutsEnabled'),
         t('settings.shortcutNewConnection'),
         t('settings.shortcutNewQuery'),
-        t('settings.shortcutContextualTabs'),
+        t('settings.shortcutTabs'),
         t('settings.shortcutResultView'),
         t('settings.shortcutOpenSettings'),
         t('settings.shortcutClear'),
@@ -560,17 +560,15 @@ export function SettingsWindow(): React.JSX.Element {
                   enabled={!settings.disabledKeyboardShortcuts.includes('newQuery')}
                   onEnabledChange={(enabled) => setShortcutEnabled('newQuery', enabled)}
                 />
-                {isMacPlatform() && (
-                  <ShortcutRow
-                    label={t('settings.shortcutContextualTabs')}
-                    keys="⌃ 1–9"
-                    enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
-                    onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
-                  />
-                )}
+                <ShortcutRow
+                  label={t('settings.shortcutTabs')}
+                  keys={isMacPlatform() ? '⌘ 1–9 · ⌃ 1–9 · ⌃ Tab / ⌃ ⇧ Tab' : 'Ctrl+1–9 · Ctrl+Tab / Ctrl+Shift+Tab'}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
+                />
                 <ShortcutRow
                   label={t('settings.shortcutResultView')}
-                  keys={`${primaryKey} 1–4`}
+                  keys={resultViewShortcutLabel(isMacPlatform())}
                   enabled={!settings.disabledKeyboardShortcuts.includes('resultView')}
                   onEnabledChange={(enabled) => setShortcutEnabled('resultView', enabled)}
                 />

@@ -21,7 +21,8 @@ import {
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
   isMacPlatform,
-  primaryDigitIndex
+  isResultViewShortcut,
+  resultViewShortcutLabel
 } from '@renderer/lib/keyboardShortcuts'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
@@ -61,6 +62,8 @@ export function ResultPanel({
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
+  const viewShortcut = resultViewShortcutLabel(isMacPlatform())
+  const viewShortcutEnabled = isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
   const setView = useAppStore((s) => s.setResultView)
   const docCtx = docActionContext(result, active?.query ?? null)
   // Anchor for the "copy all" format dropdown (null = closed).
@@ -125,31 +128,23 @@ export function ResultPanel({
     })
   }
 
-  // Cmd+1/2/3 on macOS (Ctrl elsewhere) switches Tree/JSON/Table, with 4 for
-  // Console when present. macOS Ctrl+number is reserved for contextual tabs.
-  // while the switcher is showing (a documents/value result, not error/explain).
+  // Ctrl+backquote (also Ctrl+Esc on macOS) cycles the available data views.
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
     if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
     const views: ResultView[] = ['tree', 'json', 'table']
     const onKey = (e: KeyboardEvent): void => {
       if (hasOpenShortcutLayer()) return
-      const index = primaryDigitIndex(e, isMacPlatform())
-      if (index === 3) {
-        if (!hasOutput) return
-        e.preventDefault()
-        chooseConsole(true)
-        return
-      }
-      const target = index == null ? undefined : views[index]
-      if (!target) return
+      if (!isResultViewShortcut(e, isMacPlatform())) return
       e.preventDefault()
+      e.stopPropagation()
       chooseConsole(false)
-      setView(target)
+      const current = getActiveResult(useAppStore.getState())?.resultView ?? 'tree'
+      setView(showConsole ? 'tree' : views[(views.indexOf(current) + 1) % views.length])
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [switchable, hasOutput, active?.id, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [switchable, showConsole, active?.id, results, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   useEffect(() => {
     if (!result && expanded) onExpandedChange(false)
@@ -172,7 +167,7 @@ export function ResultPanel({
 
   if (!result) {
     return (
-      <div className="result-panel" data-shortcut-region="result">
+      <div className="result-panel">
         {strip}
         <div className="result-body">
           <div className="center-msg muted">{t('result.noResults')}</div>
@@ -185,7 +180,7 @@ export function ResultPanel({
     // The output printed before the failure is often the best clue — keep it
     // visible under the error.
     return (
-      <div className="result-panel" data-shortcut-region="result">
+      <div className="result-panel">
         {strip}
         <ErrorView
           result={result}
@@ -208,7 +203,7 @@ export function ResultPanel({
   // doc actions don't apply to it.
   if (result.kind === 'explain') {
     return (
-      <div className="result-panel" data-shortcut-region="result">
+      <div className="result-panel">
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
@@ -239,40 +234,39 @@ export function ResultPanel({
   }
 
   return (
-    <div className="result-panel" data-shortcut-region="result">
+    <div className="result-panel">
       {strip}
       <div className="result-bar">
-        <div className="view-switch sliding-selection">
-          {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
-            return (
-              <button
-                key={v}
-                className={!showConsole && view === v ? 'active is-selected' : ''}
-                aria-pressed={!showConsole && view === v}
-                onClick={() => {
-                  chooseConsole(false)
-                  setView(v)
-                }}
-              >
-                {label}
-                <span className="text-[0.8em] leading-none font-normal text-muted-foreground">(⌘{i + 1})</span>
-              </button>
-            )
-          })}
-          {hasOutput && (
-            <Tooltip content="Console (⌘4)">
-              <button
-                className={showConsole ? 'active is-selected' : ''}
-                aria-pressed={showConsole}
-                onClick={() => chooseConsole(true)}
-              >
+        <Tooltip
+          content={`${t('settings.shortcutResultView')} (${viewShortcut})`}
+          disabled={!viewShortcutEnabled}
+        >
+          <div className="view-switch sliding-selection">
+            {(['tree', 'json', 'table'] as ResultView[]).map((v) => {
+              const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
+              return (
+                <button
+                  key={v}
+                  className={!showConsole && view === v ? 'active is-selected' : ''}
+                  aria-pressed={!showConsole && view === v}
+                  onClick={() => {
+                    chooseConsole(false)
+                    setView(v)
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+            {hasOutput && (
+              <button className={showConsole ? 'active is-selected' : ''} aria-pressed={showConsole} onClick={() => chooseConsole(true)}>
                 {t('result.view.console')}
               </button>
-            </Tooltip>
-          )}
-          <span className="selection-indicator" aria-hidden="true" />
-        </div>
+            )}
+            <span className="selection-indicator" aria-hidden="true" />
+          </div>
+        </Tooltip>
+        {viewShortcutEnabled && <span className="text-[11px] text-muted-foreground">{viewShortcut}</span>}
         <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
         {result.kind === 'documents' && <PageSizeControl />}
@@ -402,6 +396,9 @@ function ResultTabStrip({
   const { t, i18n } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
+  const tabShortcutsEnabled = useAppStore((s) =>
+    isAppShortcutEnabled(s.settings.keyboardShortcutsEnabled, s.settings.disabledKeyboardShortcuts, 'contextualTabs')
+  )
   const stripRef = useRef<HTMLDivElement>(null)
   const moveResultTab = useAppStore((s) => s.moveResultTab)
   useTabReorder(stripRef, results, setActiveResultTab, moveResultTab)
@@ -435,7 +432,8 @@ function ResultTabStrip({
             closeLabel={t('result.closeTab')}
             onSelect={() => setActiveResultTab(r.id)}
             onClose={() => closeResultTab(r.id)}
-            shortcutNumber={showShortcutHints && index < 9 ? index + 1 : undefined}
+            shortcut={tabShortcutsEnabled && isMacPlatform() && index < 9 ? `⌃${index + 1}` : undefined}
+            showShortcutHint={showShortcutHints}
           />
         )
       })}

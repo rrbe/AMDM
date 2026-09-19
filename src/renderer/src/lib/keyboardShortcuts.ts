@@ -1,7 +1,5 @@
 import type { KeyboardShortcutId } from '@shared/types'
 
-export type ShortcutRegion = 'query' | 'result'
-
 interface ShortcutKeyEvent {
   key: string
   code: string
@@ -36,20 +34,33 @@ export function primaryDigitIndex(event: ShortcutKeyEvent, isMac: boolean): numb
 }
 
 /** macOS-only Ctrl+number, kept distinct from the primary Cmd+number binding. */
-export function contextualTabDigitIndex(event: ShortcutKeyEvent, isMac: boolean): number | null {
+export function dataTabDigitIndex(event: ShortcutKeyEvent, isMac: boolean): number | null {
   if (!isMac || !event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return null
   return digitIndex(event)
 }
 
-/** Holding Control on macOS reveals the contextual tab-number hints. */
-export function isContextualTabHintModifier(event: ShortcutKeyEvent, isMac: boolean): boolean {
-  return isMac && event.key === 'Control' && event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+export type ShortcutHintModifier = 'primary' | 'control'
+
+/** Match the modifier families used by the active platform's shortcuts. */
+export function shortcutHintModifier(event: ShortcutKeyEvent, isMac: boolean): ShortcutHintModifier | null {
+  if (hasPrimaryModifier(event, isMac)) return 'primary'
+  if (isMac && event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) return 'control'
+  return null
 }
 
-export function shortcutRegionFromTarget(target: EventTarget | null): ShortcutRegion | null {
-  if (!(target instanceof Element)) return null
-  const region = target.closest<HTMLElement>('[data-shortcut-region]')?.dataset.shortcutRegion
-  return region === 'query' || region === 'result' ? region : null
+/** Ctrl+Tab cycles query tabs independently of focus. */
+export function queryTabDirection(event: ShortcutKeyEvent): number | null {
+  if (event.key !== 'Tab' || !event.ctrlKey || event.metaKey || event.altKey) return null
+  return event.shiftKey ? -1 : 1
+}
+
+export function isResultViewShortcut(event: ShortcutKeyEvent, isMac: boolean): boolean {
+  if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
+  return event.code === 'Backquote' || (isMac && event.code === 'Escape')
+}
+
+export function resultViewShortcutLabel(isMac: boolean): string {
+  return isMac ? '⌃` / ⌃Esc' : 'Ctrl+`'
 }
 
 /** Dialogs and popovers own the keyboard while open; do not act behind them. */
