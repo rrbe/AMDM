@@ -33,6 +33,7 @@ import type {
   SchemaTarget,
   ShellRequest,
   ShellResult,
+  ShellRuntime,
   TestResult,
   UpdateState,
   UserInfo
@@ -54,6 +55,7 @@ export const IPC = {
   catalogDatabases: 'catalog:databases',
   catalogCollections: 'catalog:collections',
   catalogCollectionCount: 'catalog:collectionCount',
+  catalogDropCollection: 'catalog:dropCollection',
   catalogIndexes: 'catalog:indexes',
   catalogUsers: 'catalog:users',
   catalogSampleFields: 'catalog:sampleFields',
@@ -65,6 +67,7 @@ export const IPC = {
 
   shellExecute: 'shell:execute',
   shellAbort: 'shell:abort',
+  shellPrepare: 'shell:prepare',
 
   queriesList: 'queries:list',
   queriesSave: 'queries:save',
@@ -134,6 +137,7 @@ export interface Api {
     databases(connectionId: string): Promise<DatabaseInfo[]>
     collections(connectionId: string, database: string): Promise<CollectionInfo[]>
     collectionCount(connectionId: string, database: string, collection: string): Promise<number>
+    dropCollection(connectionId: string, database: string, collection: string): Promise<void>
     indexes(connectionId: string, database: string, collection: string): Promise<IndexInfo[]>
     users(connectionId: string, database: string): Promise<UserInfo[]>
     /** Bounded, cached field-name sampling for autocomplete. */
@@ -148,6 +152,8 @@ export interface Api {
     overwriteDraft(target: SchemaTarget): Promise<SchemaModel>
   }
   shell: {
+    /** Load runtime code before the first execution. */
+    prepare(runtime: ShellRuntime): Promise<void>
     execute(request: ShellRequest): Promise<ShellResult>
     /** Cancel an in-flight run by its `execId`. Resolves true if a matching
         run was found and signalled, false if it had already finished. */

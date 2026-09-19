@@ -3,9 +3,10 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import type { UpdateState } from '../shared/types'
 import { settingsStore } from './store/settingsStore'
-import { scheduledReminderVersion } from './updatesCore'
+import { scheduledReminderVersion, sparkleFeedURL } from './updatesCore'
 
 interface SparkleAddon {
+  setFeedURL(url: string): void
   start(onScheduledUpdate: (version: string) => void): void
   checkForUpdates(): void
   recheckForUpdates(): void
@@ -15,6 +16,21 @@ interface SparkleAddon {
 
 const stateListeners = new Set<(state: UpdateState) => void>()
 let pendingVersion: string | null = null
+let currentFeedURL: string | null = null
+let languageChanged = false
+
+function syncFeedLanguage(addon: SparkleAddon): void {
+  const url = sparkleFeedURL(settingsStore.get().language, app.getPreferredSystemLanguages(), process.arch)
+  if (url === currentFeedURL) return
+  if (currentFeedURL !== null) languageChanged = true
+  addon.setFeedURL(url)
+  currentFeedURL = url
+}
+
+export function updateSparkleLanguage(): void {
+  const addon = loadSparkleAddon()
+  if (addon) syncFeedLanguage(addon)
+}
 
 function loadSparkleAddon(): SparkleAddon | null {
   if (process.platform !== 'darwin' || !app.isPackaged) return null
@@ -39,6 +55,7 @@ export function startSparkle(): void {
   if (!addon) return
 
   try {
+    syncFeedLanguage(addon)
     addon.start((version) => {
       pendingVersion = scheduledReminderVersion(
         version,
@@ -97,7 +114,9 @@ export function showAvailableSparkleUpdate(): boolean {
   if (pendingVersion) settingsStore.update({ acknowledgedUpdateVersion: pendingVersion })
   pendingVersion = null
   emitState()
+  syncFeedLanguage(addon)
   addon.recheckForUpdates()
+  languageChanged = false
   return true
 }
 
@@ -107,7 +126,10 @@ export function checkSparkleForUpdates(): boolean {
   if (!addon) return false
 
   try {
-    addon.checkForUpdates()
+    syncFeedLanguage(addon)
+    if (languageChanged) addon.recheckForUpdates()
+    else addon.checkForUpdates()
+    languageChanged = false
     return true
   } catch (error) {
     console.error('[sparkle] failed to check for updates', error)

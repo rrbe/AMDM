@@ -15,7 +15,7 @@
  */
 import { isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
-import { cellValue, deriveColumns } from './tableShape'
+import { cellValue, deriveColumns, type TableColumnPath } from './tableShape'
 import type { CollectionSort, JsonEncoding } from '@shared/types'
 import { encodeCanonicalJson, toPlainJsonValue, unwrapEjsonWrapper } from '@shared/jsonSerialization'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -79,7 +79,7 @@ export function plainScalarText(value: unknown): string {
 /** Plain-text payload for the focused Table cell; no focus defers to native copy. */
 export function tableCellCopyText(
   docs: unknown[],
-  selectedCell: { row: number; col: string } | null
+  selectedCell: { row: number; col: TableColumnPath } | null
 ): string | null {
   if (!selectedCell) return null
   const { present, value } = cellValue(docs[selectedCell.row], selectedCell.col)

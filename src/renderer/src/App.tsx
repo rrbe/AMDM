@@ -8,6 +8,7 @@ import type { StoredQuerySelection } from '@renderer/components/explorer/SavedQu
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
 import { Toaster } from '@renderer/components/common/Toaster'
 import { TooltipLayer } from '@renderer/components/ui/Tooltip'
+import { Collapsible } from '@renderer/components/ui/Collapsible'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
@@ -61,6 +62,14 @@ export default function App(): React.JSX.Element {
 
   const [view, setView] = useState<ExplorerView>('connections')
   const [explorerOpen, setExplorerOpen] = useState(true)
+  const appBodyRef = useRef<HTMLDivElement>(null)
+  const explorerWasOpen = useRef(explorerOpen)
+  useEffect(() => {
+    if (explorerWasOpen.current === explorerOpen) return
+    explorerWasOpen.current = explorerOpen
+    const selector = explorerOpen ? '.explorer-head .side-head-action' : '.sidebar-toggle-open'
+    appBodyRef.current?.querySelector<HTMLButtonElement>(selector)?.focus({ preventScroll: true })
+  }, [explorerOpen])
   const [queryPrompt, setQueryPrompt] = useState<QueryPrompt | null>(null)
   const [palettePreview, setPalettePreview] = useState<EditorPalettePreviewMessage['palette']>(null)
   const [newConnectionRequested, setNewConnectionRequested] = useState(false)
@@ -146,7 +155,7 @@ export default function App(): React.JSX.Element {
   }, [activeEditorColorSchemeId, editorColorSchemes, isDark, palettePreview])
 
   const finishQueryLoad = (query: StoredQuerySelection, connectionId: string): void => {
-    applyQuery(query.code, query.database, connectionId)
+    applyQuery(query.code, query.database, connectionId, query.runtime)
     setQueryPrompt(null)
   }
 
@@ -204,8 +213,8 @@ export default function App(): React.JSX.Element {
       data-shortcut-hints={shortcutHints ?? undefined}
       style={{ '--data-font-size': `${dataFontSize}px` } as CSSProperties}
     >
-      <div className={explorerOpen ? 'app-body' : 'app-body explorer-collapsed'}>
-        {explorerOpen && (
+      <div ref={appBodyRef} className={explorerOpen ? 'app-body' : 'app-body explorer-collapsed'}>
+        <Collapsible open={explorerOpen} axis="horizontal" className="explorer-disclosure">
           <Explorer
             view={view}
             onViewChange={setView}
@@ -215,7 +224,7 @@ export default function App(): React.JSX.Element {
             newConnectionRequested={newConnectionRequested}
             onNewConnectionRequestHandled={() => setNewConnectionRequested(false)}
           />
-        )}
+        </Collapsible>
         {explorerOpen && (
           <ResizeHandle
             axis="x"

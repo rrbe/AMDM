@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatQueryTime } from '../../../src/renderer/src/lib/queryTime'
+import { formatQueryTime, formatRelativeQueryTime } from '../../../src/renderer/src/lib/queryTime'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -18,5 +18,13 @@ describe('formatQueryTime', () => {
 
   it('keeps clock time at exactly one day', () => {
     expect(formatQueryTime(now - DAY, 'en', now)).toBe('12:30')
+  })
+
+  it('uses relative time in tab tooltips even for recent queries and updates at each hover', () => {
+    const executedAt = now - 5 * 60_000
+    expect(formatRelativeQueryTime(executedAt, 'zh-CN', now)).toBe('5 分钟前')
+    expect(formatRelativeQueryTime(executedAt, 'zh-TW', now)).toBe('5 分鐘前')
+    expect(formatRelativeQueryTime(executedAt, 'en', now)).toBe('5 minutes ago')
+    expect(formatRelativeQueryTime(executedAt, 'en', now + 60_000)).toBe('6 minutes ago')
   })
 })

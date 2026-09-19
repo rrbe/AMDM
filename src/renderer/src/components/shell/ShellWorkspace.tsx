@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Activity,
+  ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
   LoaderCircle,
@@ -18,14 +18,21 @@ import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabCollection, tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
+import { Collapsible } from '@renderer/components/ui/Collapsible'
 import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
 import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
+import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
+import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
+import { useTabReorder } from '@renderer/lib/useTabReorder'
+import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
+import { Modal } from '@renderer/components/common/Modal'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
   dataTabDigitIndex,
   hasOpenShortcutLayer,
@@ -48,6 +55,8 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
   const connections = useAppStore((s) => s.connections)
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
   const code = useAppStore((s) => getActiveTab(s).code)
+  const runtime = useAppStore((s) => getActiveTab(s).runtime)
+  const runtimeSuggestion = useAppStore((s) => getActiveTab(s).runtimeSuggestion)
   const running = useAppStore((s) => getActiveTab(s).running)
   const stopping = useAppStore((s) => getActiveTab(s).stopping)
   const activeConnectionState = useAppStore((s) => {
@@ -56,6 +65,9 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
   })
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
+  const setShellRuntime = useAppStore((s) => s.setShellRuntime)
+  const dismissShellRuntimeSuggestion = useAppStore((s) => s.dismissShellRuntimeSuggestion)
+  const acceptShellRuntimeSuggestion = useAppStore((s) => s.acceptShellRuntimeSuggestion)
   const formatCode = useAppStore((s) => s.formatCode)
   const runShell = useAppStore((s) => s.runShell)
   const stopShell = useAppStore((s) => s.stopShell)
@@ -120,7 +132,11 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
 
   return (
     <div className="work">
-      <TabBar showShortcutHints={shortcutHints === 'primary'} />
+      <TabBar
+        showShortcutHints={shortcutHints === 'primary'}
+        contextOpen={contextOpen}
+        onContextToggle={() => setContextOpen((open) => !open)}
+      />
       <div className="shell-body">
         <main className={`shell-main${expandedRegion ? ` ${expandedRegion}-expanded` : ''}`}>
           <div className="work-header">
@@ -137,36 +153,67 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
             </div>
 
             <div className="work-actions">
+              <Select
+                value={runtime}
+                disabled={running}
+                onChange={setShellRuntime}
+                aria-label={t('shell.runtime')}
+                className="h-7 w-[112px] px-2"
+                options={[
+                  {
+                    value: 'legacy',
+                    label: t('shell.runtimeAmdmDriver'),
+                    description: t('shell.runtimeAmdmDriverDescription')
+                  },
+                  {
+                    value: 'mongosh',
+                    label: t('shell.runtimeMongosh'),
+                    description: t('shell.runtimeMongoshDescription')
+                  }
+                ]}
+              />
               {running ? (
                 <Button variant="danger" disabled={stopping} onClick={() => void stopShell()}>
                   <LoaderCircle className="animate-spin" aria-hidden />
                   {t(stopping ? 'shell.stopping' : 'shell.stopTip')}
                 </Button>
               ) : (
-                <Button variant="primary" disabled={busy} onClick={runEditor}>
-                  <ShortcutHint shortcut={busy ? undefined : `${primaryKey}↵`}>
-                    <Play aria-hidden />
-                  </ShortcutHint>{' '}
-                  {t('shell.runBtn')}
-                </Button>
+                <Tooltip content={t('shell.runTip')}>
+                  <Button
+                    variant="primary"
+                    aria-disabled={busy}
+                    onClick={() => {
+                      if (!busy) runEditor()
+                    }}
+                  >
+                    <ShortcutHint shortcut={busy ? undefined : `${primaryKey}↵`}>
+                      <Play aria-hidden />
+                    </ShortcutHint>{' '}
+                    {t('shell.runBtn')}
+                  </Button>
+                </Tooltip>
               )}
               <Tooltip content={t('shell.explainBtn')}>
                 <button
                   className="work-icon-btn"
-                  disabled={busy}
-                  onClick={() => void runExplain()}
+                  aria-disabled={busy}
+                  onClick={() => {
+                    if (!busy) void runExplain()
+                  }}
                   aria-label={t('shell.explainBtn')}
                 >
                   <ShortcutHint shortcut={busy ? undefined : `${primaryKey}E`}>
-                    <Activity size={15} />
+                    <ChartNoAxesCombined size={15} />
                   </ShortcutHint>
                 </button>
               </Tooltip>
               <Tooltip content={t('shell.saveQueryTip')}>
                 <button
                   className="work-icon-btn"
-                  disabled={contentBusy}
-                  onClick={() => setShowSave(true)}
+                  aria-disabled={contentBusy}
+                  onClick={() => {
+                    if (!contentBusy) setShowSave(true)
+                  }}
                   aria-label={t('shell.saveBtn')}
                 >
                   <ShortcutHint shortcut={contentBusy ? undefined : `${primaryKey}S`}>
@@ -174,21 +221,16 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
                   </ShortcutHint>
                 </button>
               </Tooltip>
-              <button
-                className={`work-icon-btn${queryExpanded ? ' is-active' : ''}`}
-                aria-label={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}
-                aria-pressed={queryExpanded}
-                onClick={() => setExpandedRegion((current) => (current === 'query' ? null : 'query'))}
-              >
-                {queryExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
-              <button
-                className="work-icon-btn context-toggle"
-                onClick={() => setContextOpen((open) => !open)}
-                aria-label={t(contextOpen ? 'context.close' : 'context.open')}
-              >
-                {contextOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-              </button>
+              <Tooltip content={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}>
+                <button
+                  className={`work-icon-btn${queryExpanded ? ' is-active' : ''}`}
+                  aria-label={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}
+                  aria-pressed={queryExpanded}
+                  onClick={() => setExpandedRegion((current) => (current === 'query' ? null : 'query'))}
+                >
+                  {queryExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -231,14 +273,42 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
           />
         </main>
 
-        {contextOpen && (
+        <Collapsible open={contextOpen} axis="horizontal" className="context-disclosure">
           <aside className="context-rail">
             <ContextPanel />
           </aside>
-        )}
+        </Collapsible>
       </div>
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
+      {runtimeSuggestion && (
+        <Modal
+          title={t('shell.runtimeSuggestionTitle')}
+          onClose={dismissShellRuntimeSuggestion}
+          size="sm"
+          footer={
+            <>
+              <Button onClick={dismissShellRuntimeSuggestion}>{t('common.cancel')}</Button>
+              <Button variant="primary" onClick={() => void acceptShellRuntimeSuggestion()}>
+                {t('shell.switchRuntime', {
+                  runtime: t(
+                    runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeAmdmDriver'
+                  )
+                })}
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {t('shell.runtimeSuggestion', {
+              construct: runtimeSuggestion.construct,
+              runtime: t(
+                runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeAmdmDriver'
+              )
+            })}
+          </p>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -247,15 +317,25 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
  * The query-tab strip: one chip per open tab (label derived from its code), a
  * fixed status slot (spinner / failure dot), a close ✕, and a trailing "+".
  */
-function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JSX.Element {
-  const { t } = useTranslation()
+function TabBar({
+  showShortcutHints,
+  contextOpen,
+  onContextToggle
+}: {
+  showShortcutHints: boolean
+  contextOpen: boolean
+  onContextToggle: () => void
+}): React.JSX.Element {
+  const { t, i18n } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
+  const closeTabs = useAppStore((s) => s.closeTabs)
   const newTab = useAppStore((s) => s.newTab)
+  const duplicateTab = useAppStore((s) => s.duplicateTab)
   const connect = useAppStore((s) => s.connect)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
@@ -267,29 +347,29 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
   const tabShortcut = (index: number): string | undefined =>
     tabShortcutsEnabled && index < 9 ? `${isMacPlatform() ? '⌘' : 'Ctrl+'}${index + 1}` : undefined
   const stripRef = useRef<HTMLDivElement>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
+  const moveQueryTab = useAppStore((s) => s.moveQueryTab)
+  useTabReorder(stripRef, tabs, setActiveTab, moveQueryTab)
   const connectionTextColor = (connectionId: string | null): string | undefined => {
     const color = connections.find((conn) => conn.id === connectionId)?.color
     return color ? `color-mix(in srgb, ${color} 60%, var(--text-secondary))` : undefined
   }
 
-  useEffect(() => {
-    const strip = stripRef.current
-    if (!strip) return
-    const revealActive = (): void => {
-      strip
-        .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-    revealActive()
-    const observer = new ResizeObserver(revealActive)
-    observer.observe(strip)
-    return () => observer.disconnect()
-  }, [activeTabId])
-
-  // ⌘T / Ctrl+T opens a new query tab (reads the action via getState to keep
-  // this listener stable). ⌘W is left alone — it's Electron's window close.
+  // Cmd/Ctrl+W closes the query first; an already empty workspace closes the window.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (isPrimaryShortcut(e, 'w', isMacPlatform())) {
+        e.preventDefault()
+        if (e.repeat || hasOpenShortcutLayer()) return
+        const state = useAppStore.getState()
+        const tab = getActiveTab(state)
+        if (state.tabs.length === 1 && !tab.code.trim() && tab.results.length === 0 && !tab.running) {
+          window.close()
+        } else {
+          state.closeTab(tab.id)
+        }
+        return
+      }
       if (
         isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newQuery') &&
         !e.repeat &&
@@ -300,8 +380,8 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
         useAppStore.getState().newTab()
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   return (
@@ -331,11 +411,12 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
         }
         aria-label={t('shell.tabListLabel')}
       />
-      <div ref={stripRef} className="tab-strip">
+      <DocumentTabStrip stripRef={stripRef} count={tabs.length} activeId={activeTabId} kind="query">
         {tabs.map((tab, i) => {
           const connectionStatus = tab.connectionId ? statuses[tab.connectionId] : undefined
           const connectionName = connections.find((connection) => connection.id === tab.connectionId)?.name
           const collection = tabCollection(tab)
+          const lastExecutedAt = tab.results.reduce((latest, result) => Math.max(latest, result.executedAt), 0)
           const unavailable =
             !!tab.connectionId &&
             (connectionStatus === undefined ||
@@ -348,6 +429,7 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
             <DocumentTab
               key={tab.id}
               active={tab.id === activeTabId}
+              contextMenuOpen={menu?.tabId === tab.id}
               className="qtab"
               dataTabId={tab.id}
               label={<span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, i)}</span>}
@@ -362,12 +444,26 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
                   <dd className="m-0 min-w-0 break-words">{tab.activeDatabase || '—'}</dd>
                   <dt className="text-primary-foreground/65">{t('context.collection')}</dt>
                   <dd className="m-0 min-w-0 break-words">{collection ?? '—'}</dd>
+                  <dt className="text-primary-foreground/65">{t('context.totalResultDataSize')}</dt>
+                  <dd className="m-0"><ResultDataSize results={tab.results} /></dd>
+                  {lastExecutedAt > 0 && (
+                    <>
+                      <dt className="text-primary-foreground/65">{t('context.queryTime')}</dt>
+                      <dd className="m-0" data-query-tab-time="">
+                        {formatRelativeQueryTime(lastExecutedAt, i18n.language)}
+                      </dd>
+                    </>
+                  )}
                 </dl>
               )}
               tooltipVariant="text"
               closeLabel={t('shell.closeTab')}
               onSelect={() => setActiveTab(tab.id)}
               onClose={() => closeTab(tab.id)}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                setMenu({ x: event.clientX, y: event.clientY, tabId: tab.id })
+              }}
               statusAction={
                 unavailable && tab.connectionId
                   ? {
@@ -404,7 +500,43 @@ function TabBar({ showShortcutHints }: { showShortcutHints: boolean }): React.JS
             <Plus size={14} />
           </ShortcutHint>
         </button>
-      </div>
+      </DocumentTabStrip>
+      <button
+        className="side-head-action context-toggle"
+        onClick={onContextToggle}
+        aria-label={t(contextOpen ? 'context.close' : 'context.open')}
+        aria-expanded={contextOpen}
+      >
+        {contextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+      </button>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: t('shell.newTabMenu'), onClick: () => newTab(menu.tabId) },
+            { label: t('shell.duplicateTab'), onClick: () => duplicateTab(menu.tabId) },
+            'separator',
+            { label: t('shell.closeTab'), onClick: () => closeTab(menu.tabId) },
+            {
+              label: t('shell.closeConnectionTabs'),
+              disabled: !tabs.find((tab) => tab.id === menu.tabId)?.connectionId,
+              onClick: () => {
+                const connectionId = tabs.find((tab) => tab.id === menu.tabId)?.connectionId
+                closeTabs(tabs.filter((tab) => tab.connectionId === connectionId).map((tab) => tab.id))
+              }
+            },
+            {
+              label: t('shell.closeTabsToRight'),
+              disabled: tabs.findIndex((tab) => tab.id === menu.tabId) === tabs.length - 1,
+              onClick: () =>
+                closeTabs(tabs.slice(tabs.findIndex((tab) => tab.id === menu.tabId) + 1).map((tab) => tab.id))
+            },
+            { label: t('shell.closeAllTabs'), onClick: () => closeTabs(tabs.map((tab) => tab.id)) }
+          ]}
+        />
+      )}
     </div>
   )
 }

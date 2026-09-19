@@ -24,6 +24,7 @@
   background: var(--surface-content);
 }
 .context-rail {
+  height: 100%;
   width: 300px;
   max-width: 32vw;
   flex: 0 0 300px;
@@ -47,7 +48,7 @@
 .tab-strip {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--document-tab-gap, 4px);
   height: 36px;
   padding: 0 10px;
   flex: 1;
@@ -57,6 +58,10 @@
 }
 .tab-strip::-webkit-scrollbar {
   display: none;
+}
+.context-toggle {
+  align-self: center;
+  margin-bottom: 4px;
 }
 /* Shared Query/Result document-tab language. */
 .document-tab {
@@ -72,6 +77,7 @@
   font-size: var(--fs-sm);
   cursor: pointer;
   user-select: none;
+  touch-action: none;
   white-space: nowrap;
   transition:
     background var(--motion-fast) var(--ease-standard),
@@ -110,11 +116,11 @@
 .document-tab:has(+ .document-tab.active)::after {
   opacity: 0;
 }
-.document-tab:hover {
+.document-tab:is(:hover, .context-menu-open) {
   background: var(--interaction-hover);
   color: var(--text-secondary);
 }
-.document-tab:not(.active):hover {
+.document-tab:not(.active):is(:hover, .context-menu-open) {
   border-radius: var(--radius-lg);
   box-shadow: inset 0 0 0 3px var(--surface-chrome);
 }
@@ -122,6 +128,23 @@
   z-index: 2;
   background: var(--surface-content);
   color: var(--text-primary);
+}
+.tab-strip-sorting {
+  cursor: grabbing;
+  -webkit-app-region: no-drag;
+}
+.tab-strip-sorting .document-tab {
+  transition: transform var(--motion-fast) var(--ease-standard);
+  cursor: grabbing;
+}
+.tab-strip-sorting .document-tab-dragging {
+  z-index: 3;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-strip-sorting .document-tab {
+    transition: none;
+  }
 }
 .document-tab-label {
   flex: 1;
@@ -164,7 +187,7 @@
   color: var(--fg-3);
   opacity: 0.7;
 }
-.document-tab:hover .document-tab-close,
+.document-tab:is(:hover, .context-menu-open) .document-tab-close,
 .document-tab.active .document-tab-close {
   opacity: 1;
 }
@@ -195,8 +218,8 @@
   }
 }
 .qtab {
-  flex: 0 0 178px;
-  width: 178px;
+  flex: 0 0 var(--document-tab-width, 178px);
+  width: var(--document-tab-width, 178px);
 }
 .qtab-spinner {
   width: 10px;
@@ -310,12 +333,27 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-secondary);
 }
 .work-icon-btn:hover:not(:disabled) {
   border-color: transparent;
   background: var(--interaction-hover);
   color: var(--text-primary);
+}
+.work-actions button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+.work-actions .work-icon-btn[aria-disabled='true'] {
+  color: var(--text-disabled);
+  opacity: 1;
+}
+.work-actions .work-icon-btn[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--text-disabled);
+}
+.work-actions .busy-btn[aria-disabled='true']:hover {
+  background: var(--primary);
 }
 .work-icon-btn.is-active {
   border-color: transparent;
@@ -760,10 +798,68 @@
 
 /* Keep the data workspace usable at compact window widths. */
 @media (max-width: 1199px) {
-  .context-rail {
+  .context-disclosure {
     display: none;
   }
   .context-toggle {
     display: none;
   }
+}
+
+.context-disclosure {
+  --panel-offset: 6px;
+  max-width: 32vw;
+}
+
+.document-tab-strip-container {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  background: var(--surface-chrome);
+}
+.query-tab-strip-container {
+  flex: 1;
+}
+.result-tab-strip-container {
+  flex: 0 0 auto;
+}
+.document-tab-scroll {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  height: 30px;
+  margin-bottom: 4px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  -webkit-app-region: no-drag;
+}
+.document-tab-strip-container[data-overflow='true'] > .document-tab-scroll {
+  display: flex;
+}
+.document-tab-scroll:hover:not(:disabled) {
+  background: var(--interaction-hover);
+}
+.document-tab-scroll:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.document-tab-close {
+  flex: 0 0 18px;
+}
+[data-compact='true'] .document-tab:not(.active):not(:hover):not(.context-menu-open):not(:focus-within) .document-tab-close {
+  opacity: 0;
+  pointer-events: none;
+}
+.result-tab-compact-label {
+  display: none;
+}
+[data-compact='true'] .result-tab-full-label {
+  display: none;
+}
+[data-compact='true'] .result-tab-compact-label {
+  display: inline;
 }

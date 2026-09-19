@@ -11,6 +11,7 @@ This file contains only repository-level non-negotiable rules. Read the relevant
 ## Releases
 
 - `bump version <version>` authorizes the complete release flow: update and validate the version, commit and push `master`, create and push the `v<version>` tag, then monitor the Release workflow to completion.
+- Maintain English `CHANGELOG.md` and Chinese `CHANGELOG_CN.md`. Before release, supply both languages for new entries in `docs/release-notes/translations.json`; GitHub Release bodies remain Chinese, and Sparkle notes follow the app language.
 - Report completion only after the workflow succeeds, the GitHub Release is published, and the expected macOS, Windows, Linux, and Sparkle appcast assets are present.
 
 ## Project and documentation

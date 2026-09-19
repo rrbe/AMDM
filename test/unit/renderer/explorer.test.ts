@@ -33,7 +33,7 @@ describe('explorer catalog rows', () => {
   })
 
   it('reveals database children together after collections finish loading', () => {
-    vi.stubGlobal('__BUILD_ID__', 'test')
+    vi.stubGlobal('__APP_VERSION__', 'test')
     const databaseNodeId = 'c1:db:ezze'
     const catalog: CatalogState = {
       databases: [{ name: 'ezze' }],
@@ -80,6 +80,7 @@ describe('explorer catalog rows', () => {
       )
 
     expect(renderExplorer()).not.toContain('>Users</span>')
+    expect(renderExplorer()).toContain('class="side-foot-version" title="test">test</span>')
 
     catalog.collections.ezze = [
       { name: 'addresses', type: 'collection' },

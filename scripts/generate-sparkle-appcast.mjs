@@ -13,6 +13,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { restoreArchiveReleaseUrls } from "./sparkle-archive-urls.mjs";
+import { localizeSparkleAppcast } from "./localize-sparkle-appcast.mjs";
 
 if (process.platform !== "darwin") {
   throw new Error("Sparkle appcasts must be generated on macOS");
@@ -24,6 +26,13 @@ if (!privateKey)
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const maximumDeltas = 3;
+const releaseNotesPath = process.env.SPARKLE_RELEASE_NOTES;
+if (!releaseNotesPath) throw new Error("SPARKLE_RELEASE_NOTES is required");
+const releaseNotes = readFileSync(resolve(releaseNotesPath), "utf8");
+const chineseReleaseNotes = readFileSync(
+  join(dirname(resolve(releaseNotesPath)), "sparkle-notes-cn.html"), "utf8",
+);
+const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const distDir = resolve(process.argv[2] ?? join(root, "dist"));
 const sparkleDir = join(root, "build", "sparkle");
 const generateAppcast = join(sparkleDir, "bin", "generate_appcast");
@@ -55,6 +64,7 @@ for (const arch of ["arm64", "x64"]) {
 
   try {
     for (const archive of archives) {
+      writeFileSync(join(workDir, archive.replace(/\.zip$/, ".html")), releaseNotes);
       const source = join(distDir, archive);
       const target = join(workDir, archive);
       try {
@@ -74,7 +84,9 @@ for (const arch of ["arm64", "x64"]) {
     }
 
     if (existsSync(previousAppcast)) {
-      const previousFeed = readFileSync(previousAppcast, "utf8");
+      const previousFeed = restoreArchiveReleaseUrls(
+        readFileSync(previousAppcast, "utf8"),
+      );
       const previousArchives = [...previousFeed.matchAll(/<item>[\s\S]*?<\/item>/g)]
         .map(([item]) => item.match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1])
         .filter((url) => url?.endsWith(`-${arch}-mac.zip`))
@@ -99,6 +111,9 @@ for (const arch of ["arm64", "x64"]) {
         downloadUrlPrefix,
         "--link",
         "https://github.com/rrbe/AMDM/releases",
+        "--embed-release-notes",
+        "--full-release-notes-url",
+        "https://github.com/rrbe/AMDM/blob/master/CHANGELOG.md",
         "--maximum-deltas",
         String(maximumDeltas),
         "-o",
@@ -115,7 +130,9 @@ for (const arch of ["arm64", "x64"]) {
     if (result.status !== 0)
       throw new Error(`generate_appcast exited with ${result.status}`);
 
-    let appcast = readFileSync(previousAppcast, "utf8");
+    let appcast = restoreArchiveReleaseUrls(
+      readFileSync(previousAppcast, "utf8"),
+    );
     const generatedDeltas = readdirSync(workDir).filter((name) => name.endsWith(".delta"));
     for (const delta of generatedDeltas) {
       const architectureDelta = delta.replace(/\.delta$/, `-${arch}.delta`);
@@ -133,6 +150,10 @@ for (const arch of ["arm64", "x64"]) {
     }
 
     copyFileSync(previousAppcast, join(distDir, appcastName));
+    writeFileSync(
+      join(distDir, `appcast-${arch}-cn.xml`),
+      localizeSparkleAppcast(appcast, version, chineseReleaseNotes),
+    );
     for (const delta of generatedDeltas.map((name) => name.replace(/\.delta$/, `-${arch}.delta`))) {
       copyFileSync(join(workDir, delta), join(distDir, delta));
     }

@@ -14,6 +14,11 @@ function dayjsLocale(language?: string): string {
   return 'en'
 }
 
+/** Resolve at hover time so closed tooltips need no background timer. */
+export function formatRelativeQueryTime(executedAt: number, language?: string, now = Date.now()): string {
+  return dayjs(executedAt).locale(dayjsLocale(language)).from(dayjs(now))
+}
+
 /** Compact query timestamp: clock time for the first day, relative time after that. */
 export function formatQueryTime(executedAt: number, language?: string, now = Date.now()): string {
   const time = dayjs(executedAt)

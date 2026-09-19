@@ -6,6 +6,25 @@
 
 > 尚在开发中，请勿用在重要场合，不对数据丢失负责
 
+![AMDM 浅色主题：聚合查询与表格结果](./docs/screenshots/table-light.png)
+
+<details>
+<summary>更多截图：文档树、深色主题与可视化 Explain</summary>
+
+**文档树**
+
+![嵌套订单文档、BSON 类型与集合详情](./docs/screenshots/tree-light.png)
+
+**深色主题**
+
+![深色 JSON 视图中的商品文档](./docs/screenshots/json-dark.png)
+
+**可视化 Explain**
+
+![查询执行统计与索引执行计划](./docs/screenshots/explain-light.png)
+
+</details>
+
 ## 运行
 
 ```bash

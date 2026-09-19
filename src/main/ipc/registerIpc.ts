@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { homedir } from 'node:os'
 import { IPC } from '../../shared/ipc'
 import { buildMongoUri } from '../../shared/connectionUri'
+import { DEFAULT_SETTINGS } from '../../shared/types'
 import type {
   AppSettings,
   ConnectionConfig,
@@ -17,7 +18,8 @@ import type {
   OpenFileOptions,
   SavedQueryInput,
   SchemaTarget,
-  ShellRequest
+  ShellRequest,
+  ShellRuntime
 } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
@@ -27,6 +29,7 @@ import { sessionManager } from '../mongo/sessionManager'
 import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
 import {
+  dropCollection,
   estimateCollectionCount,
   listCollections,
   listDatabases,
@@ -34,7 +37,7 @@ import {
   listUsers,
   sampleFields
 } from '../mongo/catalog'
-import { executeShell, abortShell } from '../mongo/shellEngine'
+import { executeShell, abortShell, prepareShellRuntime } from '../mongo/shellEngine'
 import { cancelDocumentRead, deleteDocument, readDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { analyzeCollectionSchema } from '../mongo/schemaAnalysis'
 import {
@@ -46,6 +49,7 @@ import {
 } from '../io/exporter'
 import { importData } from '../io/importer'
 import { registerUpdatesIpc } from './registerUpdatesIpc'
+import { updateSparkleLanguage } from '../sparkle'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
   if (kind === 'documents') return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`
@@ -181,6 +185,19 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.catalogCollectionCount, (_e, id: string, db: string, coll: string) =>
     estimateCollectionCount(id, db, coll)
   )
+  ipcMain.handle(IPC.catalogDropCollection, async (event, id: string, db: string, coll: string) => {
+    const controller = new AbortController()
+    const cancel = (): void => controller.abort()
+    event.sender.once('destroyed', cancel)
+    try {
+      await dropCollection(id, db, coll, {
+        timeoutMS: DEFAULT_SETTINGS.queryTimeoutMS,
+        signal: controller.signal
+      })
+    } finally {
+      event.sender.removeListener('destroyed', cancel)
+    }
+  })
   ipcMain.handle(IPC.catalogIndexes, (_e, id: string, db: string, coll: string) =>
     listIndexes(id, db, coll)
   )
@@ -201,6 +218,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.schemasOverwriteDraft, (_e, target: SchemaTarget) => schemaStore.overwriteDraft(target))
 
   // shell — run, then record an automatic history entry
+  ipcMain.handle(IPC.shellPrepare, (_e, runtime: ShellRuntime) => prepareShellRuntime(runtime))
   ipcMain.handle(IPC.shellExecute, async (_e, req: ShellRequest) => {
     const result = await executeShell(req)
     queryStore.addHistory(
@@ -208,6 +226,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
         code: req.code,
         connectionId: req.connectionId,
         database: req.database,
+        runtime: req.runtime,
         ok: result.kind !== 'error',
         summary: historySummary(result.kind, result.count, result.elapsedMs, result.errorName)
       },
@@ -270,6 +289,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.settingsGet, () => settingsStore.get())
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: Partial<AppSettings>) => {
     const settings = settingsStore.update(patch)
+    if (patch.language !== undefined) updateSparkleLanguage()
     if (patch.historyLimit !== undefined) queryStore.trimHistory(settings.historyLimit)
     return settings
   })

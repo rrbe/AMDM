@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
 import { ContextMenu as BaseContextMenu } from '@base-ui/react/context-menu'
 import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { CircleHelp } from 'lucide-react'
@@ -38,6 +38,7 @@ export type MenuItemDef = MenuActionDef | MenuSubmenuDef
 
 /** A divider between groups of items. */
 export type MenuEntry = MenuItemDef | 'separator'
+export type MenuFinalFocus = ComponentProps<typeof BaseMenu.Popup>['finalFocus']
 
 interface MenuProps {
   open: boolean
@@ -45,6 +46,7 @@ interface MenuProps {
   x: number
   y: number
   items: MenuEntry[]
+  finalFocus?: MenuFinalFocus
 }
 
 function MenuHelp({ label, description }: { label: string; description: ReactNode }): React.JSX.Element {
@@ -77,7 +79,7 @@ function MenuHelp({ label, description }: { label: string; description: ReactNod
   )
 }
 
-function MenuEntries({ items }: { items: MenuEntry[] }): React.JSX.Element {
+function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: MenuFinalFocus }): React.JSX.Element {
   return (
     <>
       {items.map((item, index) => {
@@ -115,8 +117,8 @@ function MenuEntries({ items }: { items: MenuEntry[] }): React.JSX.Element {
                   sideOffset={5}
                   alignOffset={-4}
                 >
-                  <BaseMenu.Popup className="ctx-menu ui-menu-popup">
-                    <MenuEntries items={item.children} />
+                  <BaseMenu.Popup className="ctx-menu ui-menu-popup" finalFocus={finalFocus}>
+                    <MenuEntries items={item.children} finalFocus={finalFocus} />
                   </BaseMenu.Popup>
                 </BaseMenu.Positioner>
               </BaseMenu.Portal>
@@ -141,7 +143,7 @@ function MenuEntries({ items }: { items: MenuEntry[] }): React.JSX.Element {
   )
 }
 
-export function Menu({ open, onClose, x, y, items }: MenuProps): React.JSX.Element {
+export function Menu({ open, onClose, x, y, items, finalFocus }: MenuProps): React.JSX.Element {
   // Virtual anchor: a zero-size rect at the cursor. Memoised so Base UI's
   // positioner isn't re-anchored on every render.
   const anchor = useMemo(
@@ -164,8 +166,8 @@ export function Menu({ open, onClose, x, y, items }: MenuProps): React.JSX.Eleme
           align="start"
           sideOffset={2}
         >
-          <BaseMenu.Popup className="ctx-menu ui-menu-popup">
-            <MenuEntries items={items} />
+          <BaseMenu.Popup className="ctx-menu ui-menu-popup" finalFocus={finalFocus}>
+            <MenuEntries items={items} finalFocus={finalFocus} />
           </BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>

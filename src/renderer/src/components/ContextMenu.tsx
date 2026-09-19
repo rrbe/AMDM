@@ -1,4 +1,4 @@
-import { Menu, type MenuEntry, type MenuItemDef } from '@renderer/components/ui/Menu'
+import { Menu, type MenuEntry, type MenuFinalFocus, type MenuItemDef } from '@renderer/components/ui/Menu'
 
 /**
  * The app's right-click menu. Public API unchanged (openers own the
@@ -16,12 +16,14 @@ export function ContextMenu({
   x,
   y,
   items,
-  onClose
+  onClose,
+  finalFocus
 }: {
   x: number
   y: number
   items: ContextMenuEntry[]
   onClose: () => void
+  finalFocus?: MenuFinalFocus
 }): React.JSX.Element {
-  return <Menu open onClose={onClose} x={x} y={y} items={items} />
+  return <Menu open onClose={onClose} x={x} y={y} items={items} finalFocus={finalFocus} />
 }

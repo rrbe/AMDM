@@ -57,6 +57,12 @@ describe('plainScalarText', () => {
 })
 
 describe('tableCellCopyText', () => {
+  it('copies nested cells separately from literal dotted fields', () => {
+    const docs = [{ 'a.b': 'literal', a: { b: false, c: { $numberLong: '9007199254740993' } } }]
+    expect(tableCellCopyText(docs, { row: 0, col: ['a', 'b'] })).toBe('false')
+    expect(tableCellCopyText(docs, { row: 0, col: ['a', 'c'] })).toBe('9007199254740993')
+    expect(tableCellCopyText(docs, { row: 0, col: ['a.b'] })).toBe('literal')
+  })
   const docs = [{ name: 'AMDM', count: { $numberInt: '7' } }]
 
   it('copies only the focused cell value', () => {

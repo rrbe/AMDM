@@ -113,4 +113,14 @@ describe('keyboard shortcuts', () => {
     expect(isAppShortcutEnabled(true, ['newConnection'], 'newQuery')).toBe(true)
     expect(isAppShortcutEnabled(false, [], 'newQuery')).toBe(false)
   })
+
+  it('blocks shortcuts only while a dialog or popup is visible', () => {
+    const hidden = { checkVisibility: () => false }
+    const visible = { checkVisibility: () => true }
+    const root = (layers: object[]): ParentNode => ({ querySelectorAll: () => layers }) as unknown as ParentNode
+
+    expect(hasOpenShortcutLayer(root([]))).toBe(false)
+    expect(hasOpenShortcutLayer(root([hidden]))).toBe(false)
+    expect(hasOpenShortcutLayer(root([hidden, visible]))).toBe(true)
+  })
 })

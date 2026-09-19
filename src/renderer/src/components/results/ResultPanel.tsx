@@ -4,13 +4,16 @@ import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
-import { formatQueryTime } from '@renderer/lib/queryTime'
+import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
+import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
+import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
+import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -54,7 +57,7 @@ export function ResultPanel({
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
-  const view = useAppStore((s) => getActiveTab(s).resultView)
+  const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
@@ -136,7 +139,7 @@ export function ResultPanel({
       e.preventDefault()
       e.stopPropagation()
       chooseConsole(false)
-      const current = getActiveTab(useAppStore.getState()).resultView
+      const current = getActiveResult(useAppStore.getState())?.resultView ?? 'tree'
       setView(showConsole ? 'tree' : views[(views.indexOf(current) + 1) % views.length])
     }
     window.addEventListener('keydown', onKey, true)
@@ -238,13 +241,14 @@ export function ResultPanel({
           content={`${t('settings.shortcutResultView')} (${viewShortcut})`}
           disabled={!viewShortcutEnabled}
         >
-          <div className="view-switch">
+          <div className="view-switch sliding-selection">
             {(['tree', 'json', 'table'] as ResultView[]).map((v) => {
               const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
               return (
                 <button
                   key={v}
-                  className={!showConsole && view === v ? 'active' : ''}
+                  className={!showConsole && view === v ? 'active is-selected' : ''}
+                  aria-pressed={!showConsole && view === v}
                   onClick={() => {
                     chooseConsole(false)
                     setView(v)
@@ -255,10 +259,11 @@ export function ResultPanel({
               )
             })}
             {hasOutput && (
-              <button className={showConsole ? 'active' : ''} onClick={() => chooseConsole(true)}>
+              <button className={showConsole ? 'active is-selected' : ''} aria-pressed={showConsole} onClick={() => chooseConsole(true)}>
                 {t('result.view.console')}
               </button>
             )}
+            <span className="selection-indicator" aria-hidden="true" />
           </div>
         </Tooltip>
         {viewShortcutEnabled && <span className="text-[11px] text-muted-foreground">{viewShortcut}</span>}
@@ -279,7 +284,10 @@ export function ResultPanel({
             setCopyMenu({ x: r.left, y: r.bottom + 4 })
           }}
         >
-          {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+          <span className={copied ? 'copy-feedback is-copied' : 'copy-feedback'} aria-hidden="true">
+            <Copy size={14} />
+            <Check size={14} className="text-[var(--ok)]" />
+          </span>
         </button>
         <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
       </div>
@@ -385,23 +393,18 @@ function ResultTabStrip({
   activeId: string | null
   showShortcutHints: boolean
 }): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
   const tabShortcutsEnabled = useAppStore((s) =>
     isAppShortcutEnabled(s.settings.keyboardShortcutsEnabled, s.settings.disabledKeyboardShortcuts, 'contextualTabs')
   )
   const stripRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!activeId) return
-    stripRef.current
-      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`)
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [activeId])
+  const moveResultTab = useAppStore((s) => s.moveResultTab)
+  useTabReorder(stripRef, results, setActiveResultTab, moveResultTab)
 
   return (
-    <div ref={stripRef} className="result-tabs">
+    <DocumentTabStrip stripRef={stripRef} count={results.length} activeId={activeId} kind="result">
       {results.map((r, index) => {
         const query = r.query
         return (
@@ -410,8 +413,21 @@ function ResultTabStrip({
             active={r.id === activeId}
             className="rtab"
             dataTabId={r.id}
-            label={resultTabLabel(r)}
-            tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : undefined}
+            label={
+              <>
+                <span className="result-tab-full-label">{resultTabLabel(r)}</span>
+                <span className="result-tab-compact-label">{r.seq}</span>
+              </>
+            }
+            tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : resultTabLabel(r)}
+            tooltipFooter={() => (
+              <div className="flex flex-col gap-1">
+                <span data-result-tab-time="">
+                  {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
+                </span>
+                <span>{t('context.resultDataSize')} · <ResultDataSize results={[r]} /></span>
+              </div>
+            )}
             tooltipVariant="code"
             closeLabel={t('result.closeTab')}
             onSelect={() => setActiveResultTab(r.id)}
@@ -421,7 +437,7 @@ function ResultTabStrip({
           />
         )
       })}
-    </div>
+    </DocumentTabStrip>
   )
 }
 
@@ -584,7 +600,10 @@ function ErrorView({
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}
             onClick={() => onCopy(`${name}: ${message}`)}
           >
-            {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+            <span className={copied ? 'copy-feedback is-copied' : 'copy-feedback'} aria-hidden="true">
+              <Copy size={14} />
+              <Check size={14} className="text-[var(--ok)]" />
+            </span>
           </button>
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>

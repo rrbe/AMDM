@@ -9,6 +9,8 @@ import {
   type CollectionSort,
   type KeyboardShortcutId,
   type Language,
+  type ShellRuntime,
+  type TableNestedDisplay,
   type ThemeMode
 } from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
@@ -21,6 +23,7 @@ import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNestedDisplayPreview'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 import { isMacPlatform, resultViewShortcutLabel } from '@renderer/lib/keyboardShortcuts'
 import { cn } from '@renderer/lib/utils'
@@ -106,8 +109,16 @@ export function SettingsWindow(): React.JSX.Element {
       icon: Search,
       keywords: [
         t('settings.sectionQuery'),
+        t('settings.defaultShellRuntime'),
+        t('settings.defaultShellRuntimeHint'),
+        t('shell.runtimeMongosh'),
+        t('shell.runtimeAmdmDriver'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
+        t('settings.tableNestedDisplay'),
+        t('settings.tableNestedInline'),
+        t('settings.tableNestedGrouped'),
+        t('settings.tableNestedAuto'),
         t('settings.queryTimeout'),
         t('settings.queryTimeoutHint'),
         t('settings.historyLimit'),
@@ -247,25 +258,28 @@ export function SettingsWindow(): React.JSX.Element {
           />
         </label>
 
-        {visibleSections.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={`flex items-center gap-2.5 rounded-md border-0 px-3 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] ${
-              displayedSectionId === id
-                ? 'bg-[var(--bg-sel)] text-foreground'
-                : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-            aria-current={displayedSectionId === id ? 'page' : undefined}
-            onClick={() => setActiveSection(id)}
-          >
-            <Icon size={16} aria-hidden />
-            <span>{label}</span>
-            {id === 'updates' && updateState.availableVersion ? (
-              <UpdateAvailableDot version={updateState.availableVersion} className="ml-auto" />
-            ) : null}
-          </button>
-        ))}
+        <div className="settings-sections sliding-selection flex flex-col gap-1">
+          {visibleSections.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={`flex items-center gap-2.5 rounded-md border-0 px-3 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] ${
+                displayedSectionId === id
+                  ? 'is-selected text-foreground'
+                  : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+              aria-current={displayedSectionId === id ? 'page' : undefined}
+              onClick={() => setActiveSection(id)}
+            >
+              <Icon size={16} aria-hidden />
+              <span>{label}</span>
+              {id === 'updates' && updateState.availableVersion ? (
+                <UpdateAvailableDot version={updateState.availableVersion} className="ml-auto" />
+              ) : null}
+            </button>
+          ))}
+          <span className="selection-indicator" aria-hidden="true" />
+        </div>
       </nav>
 
       <main className="relative overflow-y-auto bg-card px-8 pb-8 pt-[52px]">
@@ -394,6 +408,30 @@ export function SettingsWindow(): React.JSX.Element {
 
           {displayedSectionId === 'query' && (
             <>
+              <Field label={t('settings.tableNestedDisplay')}>
+                <Select<TableNestedDisplay>
+                  value={settings.tableNestedDisplay}
+                  onChange={(tableNestedDisplay) => void updateSettings({ tableNestedDisplay })}
+                  options={[
+                    { label: t('settings.tableNestedInline'), value: 'inline' },
+                    { label: t('settings.tableNestedGrouped'), value: 'grouped' },
+                    { label: t('settings.tableNestedAuto'), value: 'auto' }
+                  ]}
+                  aria-label={t('settings.tableNestedDisplay')}
+                />
+                <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
+              </Field>
+              <Field label={t('settings.defaultShellRuntime')} hint={t('settings.defaultShellRuntimeHint')}>
+                <Select<ShellRuntime>
+                  value={settings.defaultShellRuntime}
+                  onChange={(defaultShellRuntime) => void updateSettings({ defaultShellRuntime })}
+                  options={[
+                    { label: t('shell.runtimeMongosh'), value: 'mongosh' },
+                    { label: t('shell.runtimeAmdmDriver'), value: 'legacy' }
+                  ]}
+                  aria-label={t('settings.defaultShellRuntime')}
+                />
+              </Field>
               <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
                 <Select<number>
                   value={settings.queryLimit}

@@ -12,7 +12,7 @@ The typical call chain is: store action → `window.api` → preload → IPC han
 
 ## Application updates
 
-- macOS uses the native Sparkle bridge with architecture-specific appcasts and EdDSA-signed delta archives. Each release keeps deltas from the three most recent compatible versions and always retains the full ZIP fallback.
+- macOS uses the native Sparkle bridge with architecture-specific English/Chinese appcasts selected by the application language and EdDSA-signed delta archives. Each release keeps deltas from the three most recent compatible versions and always retains the full ZIP fallback.
 - Windows NSIS and Linux AppImage builds use `electron-updater` with GitHub release metadata. Downloads start only after an explicit user action; the main process owns progress, cancellation, and installation state.
 - Update state crosses into the Renderer only through the shared IPC contract. Windows/Linux automatically check at most every six hours when enabled; macOS scheduling remains owned by Sparkle.
 - Windows requires `latest.yml` plus the installer blockmap. Linux requires `latest-linux.yml`; its blockmap is embedded in the AppImage. These files are part of the release contract, not optional build output.
@@ -23,11 +23,19 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 ## Shell compatibility layer
 
-`src/main/mongo/shellCore.ts` is authoritative for Shell behavior and the shim catalog. Preserve these contracts when maintaining it:
+`src/main/mongo/shellEngine.ts` routes each execution to the runtime selected by its query tab. `shellCore.ts` owns the AMDM driver runtime, while `mongoshCore.ts` adapts the official evaluator, Shell API, and Node Driver provider to the same `ShellResult` contract. Runtime selection is explicit and is never used as an automatic retry or fallback after execution begins.
 
-- Implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.
-- Do not replace mongosh positional arguments, completion values, or implicit-await behavior with superficially similar Node driver APIs.
-- Preserve synthetic promise tagging across proxies and cursor patches; otherwise multi-statement scripts can observe unresolved promises.
+Selecting Mongosh asks main to prepare its lazy runtime before the first Run. Each execution owns its provider listeners, cursors, and sessions; cleanup ends sessions left open by the isolated script without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
+
+Mongosh scripts that intentionally need the Node Driver API use the explicit `driverDb` global. It resolves to the selected database on the existing connection and follows `use <database>` changes; it never creates or owns another `MongoClient`.
+
+Before execution, `shellRuntimeSuggestion.ts` uses the Renderer JavaScript syntax tree to identify only unambiguous runtime-specific calls. A mismatch blocks execution and presents an explicit switch-and-run confirmation; dismissing it leaves both the selected runtime and database untouched. This check is advisory routing before execution, never an error-triggered fallback.
+
+Preserve these contracts when maintaining either runtime:
+
+- In AMDM driver, implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.
+- In Mongosh, preserve official positional arguments, completion values, and implicit-await behavior rather than replacing them with superficially similar Node Driver APIs.
+- In AMDM driver, preserve synthetic promise tagging across proxies and cursor patches; otherwise multi-statement scripts can observe unresolved promises.
 - Errors created inside `vm` come from another realm. Extract error details structurally instead of relying on `instanceof Error`.
 - Bound results by default. Materialize a complete cursor only when the user explicitly invokes a full-result API.
 

@@ -5,10 +5,19 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { version } from './package.json'
 
-const buildId = `${version} - ${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
+const mongoshRuntimePlugin = {
+  name: 'build-mongosh-runtime',
+  closeBundle(): void {
+    execFileSync(process.execPath, [resolve('scripts/build-mongosh-runtime.mjs')], { stdio: 'inherit' })
+  }
+}
 
 export default defineConfig({
   main: {
+    // electron-vite clears out/main before both production and dev builds.
+    // Build the isolated mongosh artifact only after the main bundle has been
+    // written so Electron never starts with the companion file missing.
+    plugins: [mongoshRuntimePlugin],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')
@@ -39,6 +48,16 @@ export default defineConfig({
         ]
       },
       rollupOptions: {
+        // These optional Driver integrations are present only because the
+        // official mongosh provider uses them. Keep the existing main bundle
+        // from traversing that dependency graph; the Stage-0 runtime is built
+        // separately by scripts/build-mongosh-runtime.mjs.
+        external: [
+          '@aws-sdk/credential-providers',
+          'gcp-metadata',
+          'kerberos',
+          'mongodb-client-encryption'
+        ],
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           // Emitted as out/main/serializer.worker.js; loaded by serializerPool
@@ -64,7 +83,7 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     define: {
-      __BUILD_ID__: JSON.stringify(buildId)
+      __APP_VERSION__: JSON.stringify(version)
     },
     resolve: {
       alias: {

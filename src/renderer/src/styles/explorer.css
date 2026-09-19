@@ -53,6 +53,11 @@
   background: var(--interaction-selected);
   color: var(--text-primary);
 }
+.side-search-toggle {
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+}
 .explorer-nav {
   min-height: 51px;
   flex: 0 0 51px;
@@ -67,8 +72,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 8px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  font-weight: 600;
   border: 0;
   border-radius: var(--radius-row);
   background: transparent;
@@ -81,24 +87,72 @@
 .explorer-nav-item.is-active {
   background: var(--interaction-selected);
   color: var(--text-primary);
-  padding: 0 11px;
-  font-weight: 600;
 }
 .explorer-nav-item svg {
   flex: 0 0 auto;
 }
+.explorer-nav-label {
+  /* Keep labels mounted so intrinsic width can animate in either direction. */
+  interpolate-size: allow-keywords;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    width var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+.explorer-nav-label > span {
+  display: block;
+  padding-left: 7px;
+}
+.explorer-nav-item.is-active .explorer-nav-label {
+  width: auto;
+  opacity: 1;
+}
+.side-search-slot {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+}
+.side-search-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  transition: opacity var(--motion-base) var(--ease-standard);
+}
+.is-searching .side-search-heading {
+  opacity: 0;
+}
 .explorer-search {
-  height: 38px;
-  flex: 0 0 auto;
+  position: absolute;
+  inset: 0;
+  height: 28px;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 6px 8px 0;
   padding: 0 8px;
   border: 1px solid var(--separator);
   border-radius: var(--radius-control);
   background: var(--surface-control);
   color: var(--fg-3);
+  clip-path: inset(-4px -4px -4px 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    clip-path var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+.is-searching .explorer-search {
+  clip-path: inset(-4px);
+  opacity: 1;
+  pointer-events: auto;
+}
+.explorer-search > svg,
+.explorer-search button {
+  flex-shrink: 0;
 }
 .explorer-search:focus-within {
   border-color: var(--separator-strong);

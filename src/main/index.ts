@@ -95,6 +95,15 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => win.show())
 
+  // Let the query workspace handle Cmd/Ctrl+W before Electron closes the window.
+  win.webContents.on('before-input-event', (_event, input) => {
+    const primaryModifier =
+      process.platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta
+    win.webContents.setIgnoreMenuShortcuts(
+      primaryModifier && !input.alt && !input.shift && input.key.toLowerCase() === 'w'
+    )
+  })
+
   // Remember the window geometry across launches. getNormalBounds() returns the
   // restored (un-maximized, un-fullscreen) rect, so re-maximizing / re-entering
   // full screen next launch still restores to a sane size. Debounced because

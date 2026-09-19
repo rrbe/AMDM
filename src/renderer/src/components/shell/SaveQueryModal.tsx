@@ -19,6 +19,7 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): React.JSX.Elem
   const code = useAppStore((s) => getActiveTab(s).code)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
+  const runtime = useAppStore((s) => getActiveTab(s).runtime)
   const savedQueries = useAppStore((s) => s.savedQueries)
   const saveQuery = useAppStore((s) => s.saveQuery)
 
@@ -42,6 +43,7 @@ export function SaveQueryModal({ onClose }: SaveQueryModalProps): React.JSX.Elem
       code,
       connectionId: activeConnectionId ?? undefined,
       database: activeDatabase || undefined,
+      runtime,
       folder: folder.trim() || undefined
     })
     setSaving(false)

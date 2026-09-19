@@ -5,7 +5,7 @@
  * outcomes can be compared side by side.
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
-import type { ShellResult } from '@shared/types'
+import type { ShellResult, ShellRuntime } from '@shared/types'
 
 export type ResultView = 'tree' | 'json' | 'table'
 
@@ -14,11 +14,14 @@ export interface ResultQuery {
   connectionId: string
   database: string
   code: string
+  runtime: ShellRuntime
 }
 
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
 export interface ResultTab {
   id: string
+  /** Selected Tree/JSON/Table view for this result tab. */
+  resultView?: ResultView
   /** 1-based run sequence within its query tab (drives the "结果 N" label).
       Monotonic — eviction of old results never renumbers survivors. */
   seq: number
@@ -92,18 +95,22 @@ export interface QueryTab {
   /** Per-tab active database shown in the workspace breadcrumb. */
   activeDatabase: string
   code: string
+  /** Query language/runtime selected for this tab. */
+  runtime: ShellRuntime
+  /** An execution-blocking suggestion for code owned by the other runtime. */
+  runtimeSuggestion: { runtime: ShellRuntime; construct: string; code: string } | null
   /** True while `code` is blank or a programmatic fill (browse seed, loaded
       query) the user hasn't edited. Only pristine tabs may be refilled in
       place; anything the user typed gets a tab of its own. Cleared by the
       editor's onChange (user keystrokes only — external value syncs don't
       fire it), never set back. */
   pristine: boolean
-  /** Result strip: one entry per run, newest last, capped at MAX_RESULT_TABS. */
+  /** Result strip in display order, capped at MAX_RESULT_TABS. New runs append. */
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
   activeResultId: string | null
-  /** Selected Tree/JSON/Table view for this query tab. */
-  resultView: ResultView
+  /** Last manually arranged Table columns, retained for this query tab's lifetime. */
+  tableColumnOrder: string[]
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
@@ -122,10 +129,12 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     connectionId: null,
     activeDatabase: '',
     code: '',
+    runtime: 'mongosh',
+    runtimeSuggestion: null,
     pristine: true,
     results: [],
     activeResultId: null,
-    resultView: 'tree',
+    tableColumnOrder: [],
     resultSeq: 0,
     running: false,
     stopping: false,
@@ -151,11 +160,15 @@ export function isRunFailure(result: ShellResult): boolean {
 export function pickFillTarget(
   tabs: QueryTab[],
   activeTabId: string,
-  match?: { connectionId: string; database: string; code: string }
+  match?: { connectionId: string; database: string; code: string; runtime?: ShellRuntime }
 ): { focusId?: string; reuseId?: string } {
   if (match) {
     const existing = tabs.find(
-      (t) => t.connectionId === match.connectionId && t.activeDatabase === match.database && t.code === match.code
+      (t) =>
+        t.connectionId === match.connectionId &&
+        t.activeDatabase === match.database &&
+        t.code === match.code &&
+        t.runtime === (match.runtime ?? 'mongosh')
     )
     if (existing) return { focusId: existing.id }
   }
@@ -206,6 +219,16 @@ export function activeResult(tab: QueryTab): ResultTab | null {
   return tab.results.find((r) => r.id === tab.activeResultId) ?? null
 }
 
+/** Move a tab to another tab's index without replacing its editor or result state. */
+export function moveTab<T extends { id: string }>(tabs: T[], sourceId: string, targetId: string): T[] {
+  const from = tabs.findIndex((tab) => tab.id === sourceId)
+  const to = tabs.findIndex((tab) => tab.id === targetId)
+  if (from < 0 || to < 0 || from === to) return tabs
+  const next = [...tabs]
+  next.splice(to, 0, ...next.splice(from, 1))
+  return next
+}
+
 /** Append a new run's result as a fresh, focused result tab (evicting the
     oldest beyond `max`). */
 export function appendResult(
@@ -216,9 +239,13 @@ export function appendResult(
   max = MAX_RESULT_TABS
 ): Partial<QueryTab> {
   const seq = tab.resultSeq + 1
-  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0 }]
+  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0, resultView: 'tree' as const }]
+  // Display order can change; eviction still follows the run sequence.
+  const evicted = new Set(
+    [...results].sort((a, b) => a.seq - b.seq).slice(0, Math.max(0, results.length - max))
+  )
   return {
-    results: results.length > max ? results.slice(results.length - max) : results,
+    results: evicted.size ? results.filter((entry) => !evicted.has(entry)) : results,
     activeResultId: id,
     resultSeq: seq
   }

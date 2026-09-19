@@ -1,19 +1,31 @@
 /**
- * Tabular shape of a result set — the column derivation shared by the Table
- * view and the CSV/TSV serializers (so a copied table matches what's on screen).
+ * Tabular shape of a result set. Top-level columns are shared by Table and
+ * CSV/TSV serialization; Table can additionally group one level of object fields.
  *
  * Columns are the union of top-level field names across all docs. Nested
- * objects and arrays remain single cells and open in the value-preview modal.
+ * objects use inline previews by default; arrays and BSON wrappers stay in one cell.
  */
-import type { CollectionSort } from '@shared/types'
+import type { CollectionSort, TableNestedDisplay } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 
 type Dict = Record<string, unknown>
 
 export type TableSortDirection = 'asc' | 'desc'
+export type TableColumnPath = string | readonly string[]
+
+export interface TableColumn {
+  id: string
+  label: string
+  path: readonly string[]
+}
+
+export interface TableColumnGroup {
+  key: string
+  columns: TableColumn[]
+}
 
 export interface TableSortState {
-  column: string
+  column: TableColumnPath
   direction: TableSortDirection
 }
 
@@ -27,13 +39,26 @@ export function isPlainObject(value: unknown): value is Dict {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** The top-level value for `column` in a document. */
-export function cellValue(doc: unknown, column: string): { present: boolean; value: unknown } {
+/** Strings name literal fields; arrays explicitly address nested fields. */
+export function cellValue(doc: unknown, column: TableColumnPath): { present: boolean; value: unknown } {
+  const path = typeof column === 'string' ? [column] : column
   if (!isPlainObject(doc)) {
-    return column === '(value)' ? { present: true, value: doc } : { present: false, value: undefined }
+    return path.length === 1 && path[0] === '(value)'
+      ? { present: true, value: doc }
+      : { present: false, value: undefined }
   }
-  if (Object.prototype.hasOwnProperty.call(doc, column)) return { present: true, value: doc[column] }
-  return { present: false, value: undefined }
+  let value: unknown = doc
+  for (const [index, key] of path.entries()) {
+    if (
+      !isPlainObject(value) ||
+      (index > 0 && isExtended(value)) ||
+      !Object.prototype.hasOwnProperty.call(value, key)
+    ) {
+      return { present: false, value: undefined }
+    }
+    value = value[key]
+  }
+  return { present: true, value }
 }
 
 /** Derive the ordered column list for a set of documents. */
@@ -55,6 +80,46 @@ export function deriveColumns(docs: unknown[], sort: CollectionSort = 'alpha'): 
   }
   if (sawNonObject && cols.length === 0) cols.push('(value)')
   return sort === 'alpha' ? cols.sort((a, b) => a.localeCompare(b)) : cols
+}
+
+/** Expand one object level only when every present value is a plain object. */
+export function deriveTableColumnGroups(
+  docs: unknown[],
+  display: TableNestedDisplay,
+  sort: CollectionSort = 'alpha'
+): TableColumnGroup[] {
+  const column = (path: string[]): TableColumn => ({ id: JSON.stringify(path), label: path[path.length - 1], path })
+  return deriveColumns(docs, sort).map((key) => {
+    const single = { key, columns: [column([key])] }
+    if (display === 'inline') return single
+    const children = new Set<string>()
+    for (const doc of docs) {
+      const { present, value } = cellValue(doc, key)
+      if (!present) continue
+      // Mixed scalars, arrays and BSON wrappers retain their complete original cell.
+      if (!isPlainObject(value) || isExtended(value)) return single
+      for (const child of Object.keys(value)) {
+        children.add(child)
+        // Once this field needs a preview, later documents cannot change that decision.
+        if (display === 'auto' && children.size > 3) return single
+      }
+    }
+    const keys = [...children]
+    if (keys.length === 0) return single
+    if (sort === 'alpha') keys.sort((a, b) => a.localeCompare(b))
+    return { key, columns: keys.map((child) => column([key, child])) }
+  })
+}
+
+/** Apply a tab's column order without forgetting fields absent from this result. */
+export function orderTableColumns(columns: string[], order: string[]): string[] {
+  if (order.length === 0) return columns
+  const available = new Set(columns)
+  const remembered = new Set(order)
+  return [
+    ...order.filter((column) => available.has(column)),
+    ...columns.filter((column) => !remembered.has(column))
+  ]
 }
 
 /**

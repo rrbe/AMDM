@@ -1,14 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
-import { formatScalar, isExtended, summarize } from '@renderer/lib/ejson'
-import { cellValue, deriveColumns, isPlainObject, sortTableRows, type TableSortState } from '@renderer/lib/tableShape'
+import { formatScalar, isExtended } from '@renderer/lib/ejson'
+import { toInlineJsonTokens } from '@renderer/lib/format'
+import {
+  cellValue,
+  deriveTableColumnGroups,
+  isPlainObject,
+  orderTableColumns,
+  sortTableRows,
+  type TableColumn,
+  type TableSortDirection,
+  type TableSortState
+} from '@renderer/lib/tableShape'
+import { useHorizontalReorder } from '@renderer/lib/useHorizontalReorder'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeVisibleSelection } from '@renderer/lib/selection'
-import { useAppStore } from '@renderer/store/useAppStore'
+import { getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
   copyText,
@@ -37,9 +48,9 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
  *    exist in the DOM, so a 100k-doc result renders the same handful of rows.
  *  - Columns are derived ONCE (memoized on docs identity) by scanning every
  *    document for top-level field names, preserving first-seen order. We
- *    dot-flatten ONE level for nested plain objects (e.g. `address.city`);
- *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves, not flattened.
- *    Deeper recursive flattening is intentionally out of scope (Phase 2).
+ *    show nested values inline by default; grouped mode gives object fields
+ *    a second header row and independent child columns.
+ *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves.
  *  - The header is CSS-sticky; the whole table scrolls horizontally as a unit.
  *    Columns default to a fixed width but are resizable — drag the handle on a
  *    header cell's right edge; header and body share the per-column width.
@@ -62,6 +73,22 @@ interface TableViewProps {
 const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
+const COLUMN_REORDER = {
+  itemSelector: '.tbl-column-group[data-column]',
+  idAttribute: 'data-column',
+  ignoreSelector: '.tbl-col-resizer, .tbl-group-children',
+  sortingClass: 'table-columns-sorting',
+  draggingClass: 'tbl-column-dragging'
+}
+
+function columnStyle(width: number, index: number): CSSProperties {
+  return {
+    width,
+    transform: `var(--reorder-offset-${index})`,
+    zIndex: `var(--reorder-z-${index})`,
+    transitionDuration: `var(--reorder-duration-${index}, 0ms)`
+  }
+}
 
 export function TableView({
   docs,
@@ -76,6 +103,9 @@ export function TableView({
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const nestedDisplay = useAppStore((s) => s.settings.tableNestedDisplay)
+  const columnOrder = useAppStore((s) => getActiveTab(s).tableColumnOrder)
+  const setColumnOrder = useAppStore((s) => s.setTableColumnOrder)
   // Document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [preview, setPreview] = useState<{
@@ -85,31 +115,32 @@ export function TableView({
     source?: JsonPreviewSource
   } | null>(null)
   // Inline edit: which cell, and whether the last commit failed validation.
-  const [editing, setEditing] = useState<{ row: number; col: string } | null>(null)
+  const [editing, setEditing] = useState<{ row: number; col: TableColumn } | null>(null)
+  const editingFromMenu = useRef(false)
   const [editError, setEditError] = useState<string | null>(null)
-  // Per-column widths (column name → px); unset columns use COL_WIDTH.
+  // Per-column widths (serialized field path → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const [tableSort, setTableSort] = useState<TableSortState | null>(null)
-  const widthOf = (col: string): number => colWidths[col] ?? COL_WIDTH
+  const widthOf = (col: TableColumn): number => colWidths[col.id] ?? COL_WIDTH
 
   // Selection: a set of whole rows, plus the one "focused" cell that gets an
   // extra overlay highlight on top of its (already selected) row. A single click
   // on any cell selects that whole row and focuses the cell; the # handle selects
   // a row without focusing a cell. Shift extends a row range, ⌘/Ctrl toggles —
   // but no modifier is needed: a plain click already selects the row.
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: string } | null>(null)
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: TableColumn } | null>(null)
   const selectedRows = selectedDocIndexes
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // Drag a header cell's right-edge handle to resize that column.
-  const startColResize = (col: string, e: MouseEvent): void => {
+  const startColResize = (col: TableColumn, e: MouseEvent): void => {
     e.preventDefault()
     const startX = e.clientX
     const startW = widthOf(col)
     const onMove = (ev: globalThis.MouseEvent): void => {
       const w = Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX)
-      setColWidths((prev) => ({ ...prev, [col]: w }))
+      setColWidths((prev) => ({ ...prev, [col.id]: w }))
     }
     const onUp = (): void => {
       window.removeEventListener('mousemove', onMove)
@@ -119,11 +150,34 @@ export function TableView({
     window.addEventListener('mouseup', onUp)
   }
 
-  const columns = useMemo<string[]>(() => deriveColumns(docs, fieldSort), [docs, fieldSort])
-  const rows = useMemo(
-    () => sortTableRows(docs, tableSort, tableI18n.resolvedLanguage ?? tableI18n.language),
-    [docs, tableSort, tableI18n.resolvedLanguage, tableI18n.language]
+  const derivedGroups = useMemo(
+    () => deriveTableColumnGroups(docs, nestedDisplay, fieldSort),
+    [docs, nestedDisplay, fieldSort]
   )
+  const groups = useMemo(() => {
+    const byKey = new Map(derivedGroups.map((group) => [group.key, group]))
+    return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
+  }, [derivedGroups, columnOrder])
+  const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
+  const headerHeight = (fontSize + 11) * (groups.some((group) => group.columns[0].path.length > 1) ? 2 : 1)
+  const moveColumn = useCallback(
+    (source: string, target: string) => {
+      if (source === target) return
+      const next = groups.map((group) => group.key)
+      const sourceIndex = next.indexOf(source)
+      const targetIndex = next.indexOf(target)
+      next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, source)
+      setColumnOrder(next)
+    },
+    [groups, setColumnOrder]
+  )
+  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn)
+  const rows = useMemo(() => {
+    const column = columns.find((column) => column.id === tableSort?.column)
+    const sort = tableSort && column ? { ...tableSort, column: column.path } : null
+    return sortTableRows(docs, sort, tableI18n.resolvedLanguage ?? tableI18n.language)
+  }, [docs, columns, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
 
   useEffect(() => {
     onDocumentOrderChange(rows.map((row) => row.sourceIndex))
@@ -136,12 +190,20 @@ export function TableView({
     overscan: 12
   })
 
-  useEffect(() => rowVirtualizer.measure(), [fontSize, rowVirtualizer])
+  useEffect(() => rowVirtualizer.measure(), [fontSize, headerHeight, rowVirtualizer])
+
+  useEffect(() => {
+    setSelectedCell(null)
+    setEditing(null)
+    setEditError(null)
+    setTableSort(null)
+    setMenu(null)
+  }, [nestedDisplay])
 
   // Cmd/Ctrl+C copies the focused cell. Row/document copies live in the context menu.
   useCopyHotkey(() => {
     if (preview) return null
-    return tableCellCopyText(docs, selectedCell)
+    return tableCellCopyText(docs, selectedCell ? { row: selectedCell.row, col: selectedCell.col.path } : null)
   })
 
   // Core row-selection logic shared by cell clicks and the # handle: plain = just
@@ -162,7 +224,7 @@ export function TableView({
     setAnchorRow(anchor)
   }
   // Single-click a cell: select its whole row AND focus that cell (cell overlay).
-  const clickCell = (visibleRow: number, sourceRow: number, col: string, e: MouseEvent): void => {
+  const clickCell = (visibleRow: number, sourceRow: number, col: TableColumn, e: MouseEvent): void => {
     setSelectedCell({ row: sourceRow, col })
     applyRowSelection(visibleRow, e)
   }
@@ -173,24 +235,25 @@ export function TableView({
   }
   // A cell is inline-editable when we know the collection, the row's doc has an
   // _id, the column isn't _id, and the value is a supported scalar.
-  const canEditCell = (row: number, col: string): boolean => {
-    if (!docCtx || col === '_id') return false
+  const canEditCell = (row: number, col: TableColumn): boolean => {
+    if (!docCtx || col.path[0] === '_id') return false
     const doc = docs[row]
     if (!docHasId(doc)) return false
     // A literal dotted key is readable/copyable, but Mongo's ordinary update
     // path syntax would target a nested field instead.
-    if (col.includes('.') && Object.prototype.hasOwnProperty.call(doc, col)) return false
-    const { present, value } = cellValue(doc, col)
+    if (col.path.some((key) => key.includes('.') || key.startsWith('$'))) return false
+    const { present, value } = cellValue(doc, col.path)
     return present && editableText(value) != null
   }
-  const startEditCell = (row: number, col: string): void => {
+  const startEditCell = (row: number, col: TableColumn): void => {
+    editingFromMenu.current = true
     setEditError(null)
     setEditing({ row, col })
   }
-  const commitCell = async (row: number, col: string, text: string): Promise<void> => {
+  const commitCell = async (row: number, col: TableColumn, text: string): Promise<void> => {
     const doc = docs[row]
     if (!docCtx || !docHasId(doc)) return
-    const { present, value } = cellValue(doc, col)
+    const { present, value } = cellValue(doc, col.path)
     if (!present) return
     const coerced = coerceEdit(value, text)
     if ('error' in coerced) {
@@ -202,7 +265,7 @@ export function TableView({
       database: docCtx.database,
       collection: docCtx.collection,
       id: doc._id,
-      path: col,
+      path: col.path.join('.'),
       valueEjson: JSON.stringify(coerced.value)
     })
     if (res.ok) {
@@ -213,8 +276,9 @@ export function TableView({
     }
   }
 
-  const openMenu = (e: MouseEvent, row: number, col: string | null): void => {
+  const openMenu = (e: MouseEvent, row: number, col: TableColumn | null): void => {
     e.preventDefault()
+    editingFromMenu.current = false
     // Right-clicking inside a multi-selection keeps it; otherwise focus this row
     // (and the cell under the cursor, if any).
     const selectedInDisplayOrder = rows
@@ -281,6 +345,22 @@ export function TableView({
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
+  const renderColumnHeader = (col: TableColumn): React.JSX.Element => (
+    <TableColumnHeader
+      key={col.id}
+      column={col}
+      width={widthOf(col)}
+      direction={tableSort?.column === col.id ? tableSort.direction : undefined}
+      onResize={(event) => startColResize(col, event)}
+      onSort={() =>
+        setTableSort((current) => {
+          if (current?.column !== col.id) return { column: col.id, direction: 'asc' }
+          return current.direction === 'asc' ? { column: col.id, direction: 'desc' } : null
+        })
+      }
+    />
+  )
+
   return (
     <div
       ref={parentRef}
@@ -296,62 +376,34 @@ export function TableView({
         if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor')) claimCopyFocus(parentRef.current)
       }}
     >
-      <div className="tbl" style={{ width: totalWidth, height: rowVirtualizer.getTotalSize() + fontSize + 11 }}>
+      <div className="tbl" style={{ width: totalWidth, height: rowVirtualizer.getTotalSize() + headerHeight }}>
         {/* Sticky header */}
-        <div className="tbl-head" style={{ width: totalWidth }}>
+        <div className="tbl-head" style={{ width: totalWidth, height: headerHeight }}>
           <div className="tbl-th idx" style={{ width: INDEX_COL_WIDTH }}>
             #
           </div>
-          {columns.map((col) => (
+          {groups.map((group, groupIndex) => (
             <div
-              key={col}
-              className="tbl-th"
-              style={{ width: widthOf(col) }}
-              role="columnheader"
-              aria-sort={
-                tableSort?.column === col ? (tableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
-              }
+              key={group.key}
+              className="tbl-column-group"
+              data-column={group.key}
+              style={columnStyle(
+                group.columns.reduce((sum, col) => sum + widthOf(col), 0),
+                groupIndex
+              )}
             >
-              <Tooltip
-                content={
-                  tableSort?.column !== col
-                    ? t('table.sortAscending', { column: col })
-                    : tableSort.direction === 'asc'
-                      ? t('table.sortDescending', { column: col })
-                      : t('table.clearSort', { column: col })
-                }
-              >
-                <button
-                  type="button"
-                  className={`tbl-sort-trigger${tableSort?.column === col ? ' active' : ''}`}
-                  aria-label={
-                    tableSort?.column !== col
-                      ? t('table.sortAscending', { column: col })
-                      : tableSort.direction === 'asc'
-                        ? t('table.sortDescending', { column: col })
-                        : t('table.clearSort', { column: col })
-                  }
-                  onClick={() =>
-                    setTableSort((current) => {
-                      if (current?.column !== col) return { column: col, direction: 'asc' }
-                      if (current.direction === 'asc') return { column: col, direction: 'desc' }
-                      return null
-                    })
-                  }
-                >
-                  <span className="tbl-col-label">{col}</span>
-                  {tableSort?.column === col ? (
-                    tableSort.direction === 'asc' ? (
-                      <ArrowUp size={13} aria-hidden="true" />
-                    ) : (
-                      <ArrowDown size={13} aria-hidden="true" />
-                    )
-                  ) : (
-                    <ChevronsUpDown size={13} className="tbl-sort-idle" aria-hidden="true" />
-                  )}
-                </button>
-              </Tooltip>
-              <span className="tbl-col-resizer" onMouseDown={(e) => startColResize(col, e)} />
+              {group.columns[0].path.length > 1 ? (
+                <>
+                  <div className="tbl-group-title" role="columnheader" aria-colspan={group.columns.length}>
+                    <Tooltip content={group.key}>
+                      <span className="tbl-col-label">{group.key}</span>
+                    </Tooltip>
+                  </div>
+                  <div className="tbl-group-children">{group.columns.map(renderColumnHeader)}</div>
+                </>
+              ) : (
+                renderColumnHeader(group.columns[0])
+              )}
             </div>
           ))}
         </div>
@@ -363,7 +415,7 @@ export function TableView({
             <div
               key={sourceIndex}
               className={`tbl-row${selectedRows.has(sourceIndex) ? ' selected' : ''}`}
-              style={{ transform: `translateY(${vi.start + fontSize + 11}px)`, width: totalWidth }}
+              style={{ transform: `translateY(${vi.start + headerHeight}px)`, width: totalWidth }}
             >
               <Tooltip content={t('table.selectRowTip')}>
                 <div
@@ -375,34 +427,36 @@ export function TableView({
                   {vi.index + 1}
                 </div>
               </Tooltip>
-              {columns.map((col) => (
-                <Cell
-                  key={col}
-                  doc={doc}
-                  column={col}
-                  width={widthOf(col)}
-                  selected={selectedCell?.row === sourceIndex && selectedCell?.col === col}
-                  editing={editing?.row === sourceIndex && editing?.col === col}
-                  editError={editError}
-                  openPreviewHint={t('table.doubleClickForFullInfo')}
-                  onClick={(e) => clickCell(vi.index, sourceIndex, col, e)}
-                  onOpen={(value) =>
-                    setPreview({
-                      title: col,
-                      value,
-                      source: docCtx
-                        ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}), field: col }
-                        : undefined
-                    })
-                  }
-                  onCommit={(text) => void commitCell(sourceIndex, col, text)}
-                  onCancel={() => {
-                    setEditing(null)
-                    setEditError(null)
-                  }}
-                  onContextMenu={(e) => openMenu(e, sourceIndex, col)}
-                />
-              ))}
+              {groups.flatMap((group, groupIndex) =>
+                group.columns.map((col) => (
+                  <Cell
+                    key={col.id}
+                    doc={doc}
+                    column={col}
+                    style={columnStyle(widthOf(col), groupIndex)}
+                    selected={selectedCell?.row === sourceIndex && selectedCell?.col.id === col.id}
+                    editing={editing?.row === sourceIndex && editing?.col.id === col.id}
+                    editError={editError}
+                    openPreviewHint={t('table.doubleClickForFullInfo')}
+                    onClick={(e) => clickCell(vi.index, sourceIndex, col, e)}
+                    onOpen={(value) =>
+                      setPreview({
+                        title: col.path.join('.'),
+                        value,
+                        source: docCtx
+                          ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}), field: col.path }
+                          : undefined
+                      })
+                    }
+                    onCommit={(text) => void commitCell(sourceIndex, col, text)}
+                    onCancel={() => {
+                      setEditing(null)
+                      setEditError(null)
+                    }}
+                    onContextMenu={(e) => openMenu(e, sourceIndex, col)}
+                  />
+                ))
+              )}
             </div>
           )
         })}
@@ -431,7 +485,65 @@ export function TableView({
         />
       )}
 
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={menu.items}
+          onClose={() => setMenu(null)}
+          finalFocus={() => !editingFromMenu.current}
+        />
+      )}
+    </div>
+  )
+}
+
+function TableColumnHeader({
+  column,
+  width,
+  direction,
+  onSort,
+  onResize
+}: {
+  column: TableColumn
+  width: number
+  direction?: TableSortDirection
+  onSort: () => void
+  onResize: (event: MouseEvent) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const label = t(
+    direction === undefined ? 'table.sortAscending' : direction === 'asc' ? 'table.sortDescending' : 'table.clearSort',
+    {
+      column: column.path.join('.')
+    }
+  )
+  return (
+    <div
+      className="tbl-th"
+      data-column-path={column.id}
+      style={{ width }}
+      role="columnheader"
+      aria-sort={direction === undefined ? 'none' : direction === 'asc' ? 'ascending' : 'descending'}
+    >
+      <Tooltip content={label}>
+        <button
+          type="button"
+          className={`tbl-sort-trigger${direction ? ' active' : ''}`}
+          aria-label={label}
+          onClick={onSort}
+        >
+          <span className="tbl-col-label">{column.label}</span>
+          {direction === 'asc' ? (
+            <ArrowUp size={13} aria-hidden="true" />
+          ) : direction === 'desc' ? (
+            <ArrowDown size={13} aria-hidden="true" />
+          ) : (
+            <ChevronsUpDown size={13} className="tbl-sort-idle" aria-hidden="true" />
+          )}
+        </button>
+      </Tooltip>
+      <span className="tbl-col-resizer" onMouseDown={onResize} />
     </div>
   )
 }
@@ -447,11 +559,11 @@ function exportMenuItems(
 function tableCopyMenuItems(
   rows: number[],
   row: number,
-  col: string | null,
+  col: TableColumn | null,
   docs: unknown[],
   fieldSort: CollectionSort
 ): ContextMenuEntry[] {
-  const cell = col == null ? { present: false, value: undefined } : cellValue(docs[row], col)
+  const cell = col == null ? { present: false, value: undefined } : cellValue(docs[row], col.path)
   const hasValue = col != null && cell.present
   const single = docs[row]
   const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
@@ -461,7 +573,7 @@ function tableCopyMenuItems(
     {
       label: i18n.t('result.dataMenu.copyKey'),
       disabled: col == null,
-      onClick: () => void copyText(col ?? '')
+      onClick: () => void copyText(col?.path.join('.') ?? '')
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
@@ -471,7 +583,7 @@ function tableCopyMenuItems(
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
       disabled: !hasValue,
-      onClick: () => void copyText(toPlainKeyValue(col ?? '', cell.value))
+      onClick: () => void copyText(toPlainKeyValue(col?.path.join('.') ?? '', cell.value))
     },
     'separator',
     {
@@ -499,7 +611,7 @@ function tableCopyMenuItems(
 function Cell({
   doc,
   column,
-  width,
+  style,
   selected,
   editing,
   editError,
@@ -511,8 +623,8 @@ function Cell({
   onContextMenu
 }: {
   doc: unknown
-  column: string
-  width: number
+  column: TableColumn
+  style: CSSProperties
   selected: boolean
   editing: boolean
   editError: string | null
@@ -523,12 +635,12 @@ function Cell({
   onCancel: () => void
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
-  const { present, value } = cellValue(doc, column)
+  const { present, value } = cellValue(doc, column.path)
   const cellCls = `tbl-td${selected ? ' selected' : ''}`
 
   if (editing) {
     return (
-      <div className={cellCls} style={{ width }}>
+      <div className={cellCls} style={style}>
         <CellInput initial={editableText(value) ?? ''} error={editError} onCommit={onCommit} onCancel={onCancel} />
       </div>
     )
@@ -536,30 +648,23 @@ function Cell({
 
   if (!present) {
     return (
-      <div className={cellCls} style={{ width }} onClick={onClick} onContextMenu={onContextMenu}>
+      <div className={cellCls} style={style} onClick={onClick} onContextMenu={onContextMenu}>
         <span className="empty">—</span>
       </div>
     )
   }
-  // Containers show a compact summary; scalars/EJSON show formatted text.
-  const display =
-    isPlainObject(value) && !isExtended(value)
-      ? summarize(value)
-      : Array.isArray(value)
-        ? summarize(value)
-        : formatScalar(value)
-  const text = typeof display === 'string' ? display : display.text
-  const cls = typeof display === 'string' ? 'v-object' : `v-${display.type}`
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
+  const tokens = expandable ? toInlineJsonTokens(value) : null
+  const scalar = tokens ? null : formatScalar(value)
   return (
     <Tooltip
-      content={expandable ? () => formatJsonPreview(value).text : text}
+      content={expandable ? () => formatJsonPreview(value).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
       variant={expandable ? 'code' : 'compact'}
     >
       <div
         className={cellCls}
-        style={{ width, cursor: expandable ? 'pointer' : undefined }}
+        style={{ ...style, cursor: expandable ? 'pointer' : undefined }}
         role={expandable ? 'button' : undefined}
         tabIndex={expandable ? 0 : undefined}
         onClick={onClick}
@@ -572,7 +677,13 @@ function Cell({
         onDoubleClick={expandable ? () => onOpen(value) : undefined}
         onContextMenu={onContextMenu}
       >
-        <span className={cls}>{text}</span>
+        {tokens ? (
+          tokens.map((token, index) => (
+            <span key={index} className={token.cls}>{token.text}</span>
+          ))
+        ) : (
+          <span className={`v-${scalar!.type}`}>{scalar!.text}</span>
+        )}
       </div>
     </Tooltip>
   )

@@ -258,10 +258,15 @@ export interface SchemaModel {
 // Shell execution
 // ---------------------------------------------------------------------------
 
+export type ShellRuntime = 'legacy' | 'mongosh'
+
 export interface ShellRequest {
   connectionId: string
   database: string
   code: string
+  /** Execution engine selected by the query tab. Missing means AMDM driver for
+      compatibility with callers and persisted data created before 26.8.17. */
+  runtime?: ShellRuntime
   /** Default page size applied to bare cursors so results remain bounded. */
   limit?: number
   /** Page offset injected into a `find()` cursor for prev/next paging. Only
@@ -341,6 +346,7 @@ export interface SavedQuery {
   /** Optional binding to a connection + database. */
   connectionId?: string
   database?: string
+  runtime?: ShellRuntime
   /** Optional folder name for two-level organization in the sidebar. Empty /
       undefined = ungrouped. */
   folder?: string
@@ -355,6 +361,7 @@ export interface SavedQueryInput {
   code: string
   connectionId?: string
   database?: string
+  runtime?: ShellRuntime
   folder?: string
 }
 
@@ -363,6 +370,7 @@ export interface HistoryEntry {
   code: string
   connectionId: string
   database: string
+  runtime?: ShellRuntime
   ranAt: number
   ok: boolean
   /** Short summary, e.g. "12 docs · 8ms" or an error name. */
@@ -548,6 +556,7 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
 export type KeyboardShortcutId = 'newConnection' | 'newQuery' | 'contextualTabs' | 'resultView' | 'openSettings'
+export type TableNestedDisplay = 'inline' | 'grouped' | 'auto'
 
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
@@ -571,10 +580,14 @@ export interface AppSettings {
   queryTimeoutMS: number
   /** Maximum number of executed queries retained in History. */
   historyLimit: number
+  /** Runtime selected for newly created query tabs. */
+  defaultShellRuntime: ShellRuntime
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number
   /** Data result views font size in px (Tree / JSON / Table / Console). */
   dataFontSize: number
+  /** Nested objects in Table: inline preview or one-level grouped columns. */
+  tableNestedDisplay: TableNestedDisplay
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
@@ -634,8 +647,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   queryLimit: 50,
   queryTimeoutMS: 30_000,
   historyLimit: 200,
+  defaultShellRuntime: 'mongosh',
   editorFontSize: 13,
   dataFontSize: 13,
+  tableNestedDisplay: 'inline',
   editorWordWrap: false,
   editorTabSize: 2,
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,

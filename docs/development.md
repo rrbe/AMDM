@@ -27,6 +27,8 @@ When electron-builder reconstructs the dependency tree from a pnpm lockfile, it 
 
 Do not treat packages with native bindings as pure JavaScript dependencies. Confirm their ABI, target architecture, and electron-builder collection behavior first.
 
+`pnpm build:mongosh-runtime` manually rebuilds the bundled official mongosh runtime in `out/main`. Because the official Compass provider rejects explicit new connections such as `new Mongo(uri)`, the build excludes its unreachable connection/OIDC/SSH stack. The main Electron Vite build invokes the same script from its `closeBundle` hook after writing `out/main`; this ordering applies to production and development builds and prevents Electron Vite's output cleanup from removing the companion artifact. Integration tests build it from their pre-script before importing the runtime.
+
 ## Update artifacts
 
 The release workflow publishes more than the interactive installers:
@@ -36,6 +38,56 @@ The release workflow publishes more than the interactive installers:
 - Linux: the AppImage and `latest-linux.yml`; electron-builder embeds the blockmap in the AppImage.
 
 `scripts/generate-sparkle-appcast.mjs` downloads the three most recent full ZIPs from the previous appcast before generating the next macOS feed. Historical release ZIPs must remain available. Windows/Linux update metadata is emitted because their electron-builder targets declare the public GitHub provider even when packaging uses `--publish never`; the release job uploads it later.
+
+## Release notes and changelog
+
+The tag-triggered Release workflow generates notes from Git commit subjects between
+published release tags, including direct master commits and commits merged through
+PRs. Merge commits and version/changelog bookkeeping are excluded. `feat`, `fix`,
+and `perf` are grouped separately; all other subjects remain under other updates.
+Release entries are translated in `docs/release-notes/translations.json`, keyed by the
+commit summary after removing the Conventional Commit type (scope and breaking-change
+markers are retained). Each entry must contain reviewed `en` and `zh` text. Before
+releasing, add translations for every new entry; the notes job fails on missing
+translations. Commit language does not determine the displayed language.
+
+The generator writes English `CHANGELOG.md`, Chinese `CHANGELOG_CN.md`, a Chinese
+GitHub Release body, and English/Chinese Sparkle HTML. Dates follow tagged commits,
+so reruns produce the same notes. Stable versions include changes from prereleases.
+Sparkle displays the target version and up to two preceding stable releases.
+HTML is escaped before embedding in the appcast.
+
+macOS publishes `appcast-arm64.xml` / `appcast-x64.xml` in English and
+`appcast-arm64-cn.xml` / `appcast-x64-cn.xml` in Chinese. Both language feeds share
+the same signed archives and deltas. The native updater selects the feed from
+`AppSettings.language`: English uses the English feed; both Chinese settings use
+the Chinese feed; system mode uses the same locale resolution as the renderer.
+Changes take effect on the next update check; an already open native window keeps
+its current content. Sparkle's native buttons follow macOS localization separately.
+`SPARKLE_RELEASE_NOTES` points to `sparkle-notes.html`; its sibling
+`sparkle-notes-cn.html` is also required. Historical full ZIP URLs must retain the
+release tag from their filenames, even when Sparkle rewrites the download prefix.
+
+After publishing succeeds, a serialized job rebuilds both changelogs from all
+published releases and commits them to master. Unpublished/draft releases do not
+appear. A failed changelog job can be rerun without rebuilding or republishing the
+installers. Branch rules must allow the workflow token to push this docs commit;
+the job uses normal pushes and rebases over concurrent master commits. The
+workflow token's push does not recursively trigger another workflow run.
+
+To regenerate locally with the GitHub CLI authenticated and all tags available:
+
+```bash
+gh api --paginate --slurp 'repos/rrbe/AMDM/releases?per_page=100' > /tmp/amdm-releases.json
+node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --changelog CHANGELOG.md --changelog-cn CHANGELOG_CN.md
+# Preview a tagged release and its Chinese body and bilingual Sparkle HTML:
+node scripts/generate-release-notes.mjs --releases /tmp/amdm-releases.json --tag v26.9.2 --output /tmp/amdm-release-notes
+```
+
+Both changelogs are generated. Update the translation catalog before release;
+do not edit generated Markdown directly. GitHub Releases remain Chinese and do
+not switch with the app language. The first entry includes all commits reachable
+from the first published tag.
 
 ## Validation by change type
 

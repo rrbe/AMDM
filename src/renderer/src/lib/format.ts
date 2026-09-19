@@ -56,6 +56,58 @@ function scalarText(value: unknown): string {
   }
 }
 
+const INLINE_PREVIEW_ITEMS = 5
+const INLINE_PREVIEW_TEXT_LENGTH = 80
+
+function inlineText(text: string): string {
+  return text.length > INLINE_PREVIEW_TEXT_LENGTH ? `${text.slice(0, INLINE_PREVIEW_TEXT_LENGTH)}…` : text
+}
+
+function inlineValue(value: unknown): JsonToken {
+  if (Array.isArray(value)) return { text: value.length ? `[ ${value.length} ]` : '[]', cls: 'v-array' }
+  if (typeof value === 'object' && value !== null && !isExtended(value)) {
+    return { text: Object.keys(value).length ? '{ … }' : '{}', cls: 'v-object' }
+  }
+  const { type } = formatScalar(value)
+  const text = typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(scalarText(value))
+  return { text, cls: `v-${type}` }
+}
+
+/** One level of an object/array, with bounded entries and text for Table cells. */
+export function toInlineJsonTokens(value: unknown): JsonToken[] {
+  const isArray = Array.isArray(value)
+  if (!isArray && (typeof value !== 'object' || value === null || isExtended(value))) {
+    return [inlineValue(value)]
+  }
+
+  const tokens: JsonToken[] = [punct(isArray ? '[' : '{')]
+  let count = 0
+  const addValue = (item: unknown, key?: string): void => {
+    tokens.push(punct(count++ ? ', ' : ' '))
+    if (key !== undefined) {
+      const text = inlineText(key)
+      tokens.push({ text: /^[A-Za-z_$][\w$]*$/.test(text) ? text : quoteKey(text), cls: 'json-key' }, punct(': '))
+    }
+    tokens.push(inlineValue(item))
+  }
+
+  if (isArray) {
+    for (let index = 0; index < Math.min(value.length, INLINE_PREVIEW_ITEMS); index++) addValue(value[index])
+    if (value.length > INLINE_PREVIEW_ITEMS) tokens.push(punct(', …'))
+  } else {
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue
+      if (count === INLINE_PREVIEW_ITEMS) {
+        tokens.push(punct(', …'))
+        break
+      }
+      addValue((value as Record<string, unknown>)[key], key)
+    }
+  }
+  tokens.push(punct(`${count ? ' ' : ''}${isArray ? ']' : '}'}`))
+  return tokens
+}
+
 /**
  * Recursively flatten a value into JsonLine[]. `keyPrefix`, when provided, is
  * prepended to the opening line (e.g. `"name": `).
