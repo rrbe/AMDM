@@ -112,6 +112,7 @@ export function TableView({
     title: string
     value: unknown
     documentView?: boolean
+    documentId?: unknown
     source?: JsonPreviewSource
   } | null>(null)
   // Inline edit: which cell, and whether the last commit failed validation.
@@ -449,6 +450,7 @@ export function TableView({
                       setPreview({
                         title: col.path.join('.'),
                         value,
+                        documentId: docHasId(doc) ? doc._id : undefined,
                         source: docCtx
                           ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}), field: col.path }
                           : undefined
@@ -485,6 +487,7 @@ export function TableView({
           value={preview.value}
           fontSize={fontSize}
           documentView={preview.documentView}
+          documentId={preview.documentId}
           source={preview.source}
           onValueChange={(value) => setPreview((current) => (current ? { ...current, value } : current))}
           onClose={() => setPreview(null)}
