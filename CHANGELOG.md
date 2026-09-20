@@ -4,6 +4,20 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.9.4](https://github.com/rrbe/AMDM/releases/tag/v26.9.4) — 2026-09-20
+
+### Features
+
+- Pin document IDs in tables and improve preview headers \(\#24\)
+- Manage query tabs from the context menu
+
+### Fixes
+
+- Reuse local Electron for installation and set macOS 12 as the minimum supported version
+- Keep the query tab highlighted while its context menu is open
+- Clarify query toolbar actions and disabled states
+- Show only the app version in the sidebar
+
 ## [v26.9.3](https://github.com/rrbe/AMDM/releases/tag/v26.9.3) — 2026-09-15
 
 ### Features

@@ -4,6 +4,20 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.9.4](https://github.com/rrbe/AMDM/releases/tag/v26.9.4) — 2026-09-20
+
+### 新功能
+
+- 固定表格中的文档 ID 列，并改进预览标题（\#24）
+- 通过右键菜单管理查询标签页
+
+### 修复
+
+- 本地安装复用已下载的 Electron，最低支持 macOS 12
+- 右键菜单打开时保持对应查询标签页高亮
+- 改进查询工具栏操作提示和禁用状态
+- 侧边栏仅显示应用版本号
+
 ## [v26.9.3](https://github.com/rrbe/AMDM/releases/tag/v26.9.3) — 2026-09-15
 
 ### 新功能
