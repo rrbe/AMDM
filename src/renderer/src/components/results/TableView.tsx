@@ -51,7 +51,7 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
  *    show nested values inline by default; grouped mode gives object fields
  *    a second header row and independent child columns.
  *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves.
- *  - The header is CSS-sticky; the whole table scrolls horizontally as a unit.
+ *  - The header sticks vertically; row handles and _id stay visible horizontally.
  *    Columns default to a fixed width but are resizable — drag the handle on a
  *    header cell's right edge; header and body share the per-column width.
  *
@@ -74,7 +74,7 @@ const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 const COLUMN_REORDER = {
-  itemSelector: '.tbl-column-group[data-column]',
+  itemSelector: '.tbl-column-group[data-column]:not(.tbl-pinned-id)',
   idAttribute: 'data-column',
   ignoreSelector: '.tbl-col-resizer, .tbl-group-children',
   sortingClass: 'table-columns-sorting',
@@ -121,7 +121,8 @@ export function TableView({
   // Per-column widths (serialized field path → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const [tableSort, setTableSort] = useState<TableSortState | null>(null)
-  const widthOf = (col: TableColumn): number => colWidths[col.id] ?? COL_WIDTH
+  const widthOf = (col: TableColumn): number =>
+    colWidths[col.id] ?? (col.path[0] === '_id' ? Math.max(COL_WIDTH, Math.ceil(fontSize * 0.61 * 24) + 28) : COL_WIDTH)
 
   // Selection: a set of whole rows, plus the one "focused" cell that gets an
   // extra overlay highlight on top of its (already selected) row. A single click
@@ -159,6 +160,11 @@ export function TableView({
     return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
   }, [derivedGroups, columnOrder])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
+  const hasPinnedId = groups[0]?.key === '_id'
+  const groupStyle = (width: number, groupIndex: number): CSSProperties =>
+    hasPinnedId && groupIndex === 0
+      ? { width, left: INDEX_COL_WIDTH }
+      : columnStyle(width, groupIndex - Number(hasPinnedId))
   const headerHeight = (fontSize + 11) * (groups.some((group) => group.columns[0].path.length > 1) ? 2 : 1)
   const moveColumn = useCallback(
     (source: string, target: string) => {
@@ -364,7 +370,7 @@ export function TableView({
   return (
     <div
       ref={parentRef}
-      className="table-scroller"
+      className={`table-scroller${hasPinnedId ? ' has-pinned-id' : ''}`}
       // Focusable so a grid click claims the ⌘C hotkey: claimCopyFocus moves
       // focus off the query editor AND clears a selection lingering there
       // (user-select:none rows don't collapse it natively — useCopyHotkey would
@@ -385,9 +391,9 @@ export function TableView({
           {groups.map((group, groupIndex) => (
             <div
               key={group.key}
-              className="tbl-column-group"
+              className={`tbl-column-group${group.key === '_id' ? ' tbl-pinned-id' : ''}`}
               data-column={group.key}
-              style={columnStyle(
+              style={groupStyle(
                 group.columns.reduce((sum, col) => sum + widthOf(col), 0),
                 groupIndex
               )}
@@ -433,7 +439,7 @@ export function TableView({
                     key={col.id}
                     doc={doc}
                     column={col}
-                    style={columnStyle(widthOf(col), groupIndex)}
+                    style={groupStyle(widthOf(col), groupIndex)}
                     selected={selectedCell?.row === sourceIndex && selectedCell?.col.id === col.id}
                     editing={editing?.row === sourceIndex && editing?.col.id === col.id}
                     editError={editError}
@@ -636,7 +642,7 @@ function Cell({
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
   const { present, value } = cellValue(doc, column.path)
-  const cellCls = `tbl-td${selected ? ' selected' : ''}`
+  const cellCls = `tbl-td${column.path[0] === '_id' ? ' tbl-pinned-id' : ''}${selected ? ' selected' : ''}`
 
   if (editing) {
     return (
@@ -682,7 +688,9 @@ function Cell({
             <span key={index} className={token.cls}>{token.text}</span>
           ))
         ) : (
-          <span className={`v-${scalar!.type}`}>{scalar!.text}</span>
+          <span className={`v-${scalar!.type}`}>
+            {column.path[0] === '_id' && scalar!.type === 'objectId' ? plainScalarText(value) : scalar!.text}
+          </span>
         )}
       </div>
     </Tooltip>
