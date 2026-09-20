@@ -17,6 +17,12 @@ Test files are outside the application tsconfig includes, so `pnpm typecheck` do
 
 Integration tests prefer a locally cached `mongod` binary and may need to download one when no cache exists. Worker artifacts are generally not built during tests, so worker-backed modules must support an inline path through the same core.
 
+## Local macOS installation
+
+The minimum supported macOS version is 12 Monterey for both arm64 and x64. The app bundle declares `minimumSystemVersion: "12.0"` in `electron-builder.yml`, and the native Sparkle addon uses `-mmacosx-version-min=12.0` for both architectures, matching Electron 43's minimum requirement.
+
+`pnpm install:mac` builds and installs the arm64 app using the Electron distribution already installed in `node_modules/electron/dist`. Install dependencies first with `pnpm install` on an Apple Silicon Mac. This local command avoids Electron archive downloads and online checksum requests during packaging; it still builds the app and signs the bundle. Sparkle is downloaded only when its prepared framework is missing or its pinned version changes.
+
 ## Main-process dependency packaging
 
 When electron-builder reconstructs the dependency tree from a pnpm lockfile, it can omit leaf runtime dependencies of pure JavaScript packages. If a packaged app reports `Cannot find module`:

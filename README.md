@@ -50,7 +50,7 @@ pnpm clean                           # remove generated build files
 
 ## macOS installation
 
-Requires macOS 12 Monterey or later.
+Requires macOS 12 Monterey or later on both Apple Silicon (arm64) and Intel (x64).
 
 macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. On first launch, select Open Anyway in Privacy & Security or run `xattr -dr com.apple.quarantine /Applications/AMDM.app`.
 
