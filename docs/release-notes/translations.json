@@ -1,4 +1,28 @@
 {
+  "pin document IDs in tables and improve preview headers (#24)": {
+    "en": "Pin document IDs in tables and improve preview headers (#24)",
+    "zh": "固定表格中的文档 ID 列，并改进预览标题（#24）"
+  },
+  "manage query tabs from context menu": {
+    "en": "Manage query tabs from the context menu",
+    "zh": "通过右键菜单管理查询标签页"
+  },
+  "reuse local Electron for installation and target macOS 12": {
+    "en": "Reuse local Electron for installation and set macOS 12 as the minimum supported version",
+    "zh": "本地安装复用已下载的 Electron，最低支持 macOS 12"
+  },
+  "keep query tab highlighted while context menu is open": {
+    "en": "Keep the query tab highlighted while its context menu is open",
+    "zh": "右键菜单打开时保持对应查询标签页高亮"
+  },
+  "clarify query toolbar actions and disabled states": {
+    "en": "Clarify query toolbar actions and disabled states",
+    "zh": "改进查询工具栏操作提示和禁用状态"
+  },
+  "show app version without git commit id": {
+    "en": "Show only the app version in the sidebar",
+    "zh": "侧边栏仅显示应用版本号"
+  },
   "adapt tab widths and show result data size and retention notices": {
     "en": "Adapt tab widths and show result data size and retention notices",
     "zh": "调整标签页宽度，并显示结果数据大小和保留提示"
