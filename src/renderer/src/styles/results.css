@@ -549,6 +549,45 @@
   background: var(--interaction-hover);
 }
 
+/* Opaque pinned cells keep scrolled data out of the identity column, including
+   the translucent hover and selection treatments used by the rest of the row. */
+.has-pinned-id .tbl-row {
+  --tbl-row-overlay: transparent;
+}
+.has-pinned-id .tbl-row:hover {
+  --tbl-row-overlay: var(--interaction-hover);
+}
+.has-pinned-id .tbl-row.selected {
+  --tbl-row-overlay: var(--accent-soft-strong);
+}
+.has-pinned-id .idx,
+.has-pinned-id .tbl-pinned-id {
+  position: sticky;
+  z-index: 3;
+  background: var(--surface-content);
+}
+.has-pinned-id .idx {
+  left: 0;
+}
+.has-pinned-id .tbl-pinned-id {
+  border-right: 1px solid var(--separator-strong);
+}
+.has-pinned-id .tbl-pinned-id .tbl-sort-trigger {
+  cursor: pointer;
+}
+.has-pinned-id .tbl-row > .idx,
+.has-pinned-id .tbl-row > .tbl-pinned-id {
+  background: linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+.has-pinned-id .tbl-row > .tbl-pinned-id.selected {
+  background: linear-gradient(var(--accent-soft-strong), var(--accent-soft-strong)),
+    linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+.has-pinned-id .tbl-row > .idx-select:hover {
+  background: linear-gradient(var(--interaction-hover), var(--interaction-hover)),
+    linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+
 /* Icon actions in the result bar. */
 .result-bar-spacer {
   flex: 1;

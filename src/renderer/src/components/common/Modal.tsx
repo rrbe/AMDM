@@ -189,7 +189,7 @@ export function Modal({
           'flex shrink-0 justify-between',
           sheet
             ? 'items-start gap-4 px-[26px] pb-1 pt-6'
-            : 'items-center border-b border-[var(--separator)] px-6 py-4 text-[15px] font-semibold',
+            : 'items-center gap-2 border-b border-[var(--separator)] px-6 py-4 text-[15px] font-semibold',
           movable && 'cursor-move touch-none select-none'
         )}
         onPointerDown={startMove}
@@ -197,19 +197,24 @@ export function Modal({
         onPointerUp={endMove}
         onPointerCancel={endMove}
       >
-        <div className={cn('min-w-0 flex-1', !sheet && titleMeta != null && 'flex items-baseline gap-2')}>
+        <div className={cn('min-w-0 flex-1', !sheet && titleMeta != null && 'flex flex-col gap-1.5')}>
           <DialogTitle
             id={titleId}
             render={
               <span
-                className={sheet ? 'text-[20px] font-semibold tracking-[-0.02em]' : undefined}
+                className={
+                  sheet
+                    ? 'text-[20px] font-semibold tracking-[-0.02em]'
+                    : 'block min-w-0 truncate'
+                }
+                title={title}
               />
             }
           >
             {title}
           </DialogTitle>
           {!sheet && titleMeta != null && (
-            <span className="min-w-0 truncate text-[12px] font-normal text-muted-foreground">{titleMeta}</span>
+            <span className="min-w-0 text-[12px] font-normal text-muted-foreground">{titleMeta}</span>
           )}
           {description != null && (
             <div className="mt-1.5 text-[12px] font-normal text-muted-foreground">
@@ -221,7 +226,7 @@ export function Modal({
           <div className="flex shrink-0 items-center gap-1">{headerActions}</div>
         )}
         <DialogClose
-          className="-mr-1.5 inline-flex size-7 items-center justify-center rounded-[var(--radius-control)] border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-[var(--interaction-hover)] hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          className="-mr-1.5 inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-control)] border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-[var(--interaction-hover)] hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           aria-label={t('common.close')}
         >
           ✕

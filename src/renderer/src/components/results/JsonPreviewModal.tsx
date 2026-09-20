@@ -3,7 +3,8 @@ import { Check, Copy, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ResizableModal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
-import { copyText, toPlainJson } from '@renderer/lib/resultCopy'
+import { copyText, plainScalarText, toPlainJson } from '@renderer/lib/resultCopy'
+import { docHasId } from '@renderer/lib/docActions'
 import { cellValue, type TableColumnPath } from '@renderer/lib/tableShape'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { JsonView } from './JsonView'
@@ -22,6 +23,7 @@ interface JsonPreviewModalProps {
   value: unknown
   fontSize: number
   documentView?: boolean
+  documentId?: unknown
   source?: JsonPreviewSource
   onValueChange?: (value: unknown) => void
   onClose: () => void
@@ -32,6 +34,7 @@ export function JsonPreviewModal({
   value,
   fontSize,
   documentView = false,
+  documentId,
   source,
   onValueChange,
   onClose
@@ -45,6 +48,8 @@ export function JsonPreviewModal({
   const copyTimer = useRef<number | null>(null)
   const refreshTask = useRef<string | null>(null)
   const canRefresh = source?.id !== undefined && onValueChange != null
+  const id = documentView && docHasId(value) ? value._id : documentId
+  const idText = id === undefined ? undefined : plainScalarText(id)
 
   useEffect(
     () => () => {
@@ -125,7 +130,32 @@ export function JsonPreviewModal({
   return (
     <ResizableModal
       title={title}
-      titleMeta={source ? `${source.database}.${source.collection}` : undefined}
+      titleMeta={
+        source || idText !== undefined ? (
+          <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 leading-4">
+            {source && (
+              <span className="min-w-0 truncate" title={`${source.database}.${source.collection}`}>
+                {source.database}.{source.collection}
+              </span>
+            )}
+            {idText !== undefined && (
+              <button
+                className="group inline-flex min-w-0 max-w-full cursor-pointer items-baseline gap-1.5 rounded-sm border-0 bg-transparent p-0 text-left text-[12px] leading-4 text-muted-foreground outline-none hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+                aria-label={`${t('result.dataMenu.copy')} _id`}
+                title={`${t('result.dataMenu.copy')} _id: ${idText}`}
+                onClick={async () => {
+                  if (await copyText(idText)) {
+                    notify({ variant: 'success', title: t('notify.copied'), source: 'document' })
+                  }
+                }}
+              >
+                <span className="truncate font-mono text-foreground">{idText}</span>
+                <Copy className="size-3 shrink-0 self-center opacity-50 group-hover:opacity-100 group-focus-visible:opacity-100" />
+              </button>
+            )}
+          </span>
+        ) : undefined
+      }
       compactHeader
       className={documentView ? 'h-[560px] min-h-[420px]' : undefined}
       backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"

@@ -91,7 +91,7 @@ export function deriveTableColumnGroups(
   const column = (path: string[]): TableColumn => ({ id: JSON.stringify(path), label: path[path.length - 1], path })
   return deriveColumns(docs, sort).map((key) => {
     const single = { key, columns: [column([key])] }
-    if (display === 'inline') return single
+    if (display === 'inline' || key === '_id') return single
     const children = new Set<string>()
     for (const doc of docs) {
       const { present, value } = cellValue(doc, key)
@@ -111,14 +111,14 @@ export function deriveTableColumnGroups(
   })
 }
 
-/** Apply a tab's column order without forgetting fields absent from this result. */
+/** Keep the document identity first, then apply the tab's order to other fields. */
 export function orderTableColumns(columns: string[], order: string[]): string[] {
-  if (order.length === 0) return columns
   const available = new Set(columns)
   const remembered = new Set(order)
   return [
-    ...order.filter((column) => available.has(column)),
-    ...columns.filter((column) => !remembered.has(column))
+    ...(available.has('_id') ? ['_id'] : []),
+    ...order.filter((column) => column !== '_id' && available.has(column)),
+    ...columns.filter((column) => column !== '_id' && !remembered.has(column))
   ]
 }
 
