@@ -45,6 +45,7 @@ export function JsonPreviewModal({
   const notify = useAppStore((state) => state.notify)
   const [copied, setCopied] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   const copyTimer = useRef<number | null>(null)
   const refreshTask = useRef<string | null>(null)
   const canRefresh = source?.id !== undefined && onValueChange != null
@@ -162,6 +163,7 @@ export function JsonPreviewModal({
       backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
       headerActions={
         <>
+          <span className="inline-flex" ref={setFoldControls} />
           <Button
             variant="ghost"
             size="sm"
@@ -182,7 +184,7 @@ export function JsonPreviewModal({
       onClose={close}
     >
       <div className="h-full min-h-0 overflow-hidden">
-        <JsonView value={value} fontSize={fontSize} controlsContainer={null} />
+        <JsonView value={value} fontSize={fontSize} controlsContainer={foldControls} />
       </div>
     </ResizableModal>
   )
