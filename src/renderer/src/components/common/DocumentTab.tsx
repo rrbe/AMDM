@@ -18,7 +18,8 @@ interface DocumentTabProps {
   tooltip?: TooltipContent
   tooltipFooter?: TooltipContent
   tooltipVariant?: TooltipVariant
-  shortcutNumber?: number
+  shortcut?: string
+  showShortcutHint?: boolean
 }
 
 /** Shared Chrome-style document tab used by Query and Result strips. */
@@ -37,7 +38,8 @@ export function DocumentTab({
   tooltip,
   tooltipFooter,
   tooltipVariant,
-  shortcutNumber
+  shortcut,
+  showShortcutHint
 }: DocumentTabProps): React.JSX.Element {
   return (
     <div
@@ -70,10 +72,19 @@ export function DocumentTab({
           {status}
         </span>
       )}
-      <Tooltip content={tooltip} footer={tooltipFooter} variant={tooltipVariant}>
+      <Tooltip
+        content={tooltip ?? shortcut}
+        footer={tooltipFooter ? () => (
+          <>
+            {typeof tooltipFooter === 'function' ? tooltipFooter() : tooltipFooter}
+            {shortcut && <span>{shortcut}</span>}
+          </>
+        ) : tooltip ? shortcut : undefined}
+        variant={tooltipVariant}
+      >
         <span className="document-tab-label">{label}</span>
       </Tooltip>
-      {shortcutNumber == null ? (
+      {!showShortcutHint || !shortcut ? (
         <button
           className="document-tab-close"
           aria-label={closeLabel}
@@ -85,8 +96,8 @@ export function DocumentTab({
           <X size={12} />
         </button>
       ) : (
-        <span className="document-tab-shortcut" data-shortcut-number={shortcutNumber} aria-hidden="true">
-          ⌃{shortcutNumber}
+        <span className="document-tab-shortcut" data-shortcut={shortcut} aria-hidden="true">
+          {shortcut}
         </span>
       )}
     </div>
