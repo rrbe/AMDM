@@ -14,7 +14,8 @@ export function useHorizontalReorder(
   order: string,
   options: ReorderOptions,
   onMove: (sourceId: string, targetId: string) => void,
-  onSelect?: (id: string) => void
+  onSelect?: (id: string) => void,
+  onDragEnd?: () => void
 ): void {
   useEffect(() => {
     const strip = stripRef.current
@@ -53,6 +54,7 @@ export function useHorizontalReorder(
         strip.style.removeProperty(`--reorder-duration-${index}`)
       }
       if (strip.hasPointerCapture(current.pointerId)) strip.releasePointerCapture(current.pointerId)
+      if (current.started) onDragEnd?.()
       if (commit && current.started) {
         onMove(current.slots[current.source].id, current.slots[current.target].id)
       }
@@ -196,7 +198,7 @@ export function useHorizontalReorder(
       window.removeEventListener('blur', cancel)
       window.removeEventListener('keydown', key, true)
     }
-  }, [stripRef, order, options, onSelect, onMove])
+  }, [stripRef, order, options, onSelect, onMove, onDragEnd])
 }
 
 /** Cross the midpoint of each displaced item, including unequal-width columns. */

@@ -60,7 +60,8 @@ import {
   pickFillTarget,
   type QueryTab,
   type ResultTab,
-  type ResultView
+  type ResultView,
+  type ResultFoldView
 } from '@renderer/lib/tabs'
 import {
   dismissNotification as removeNotification,
@@ -198,6 +199,7 @@ interface AppState {
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
+  setResultFoldedLines(view: ResultFoldView, lines: number[]): void
   setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
@@ -1191,6 +1193,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tab = getActiveTab(s)
       if (!tab.activeResultId) return s
       return { tabs: patchTab(s.tabs, tab.id, patchResult(tab, tab.activeResultId, { resultView: view })) }
+    })
+  },
+
+  setResultFoldedLines(view, lines) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      const result = activeResult(tab)
+      if (!result) return s
+      return {
+        tabs: patchTab(s.tabs, tab.id, patchResult(tab, result.id, {
+          foldedLines: { ...result.foldedLines, [view]: lines }
+        }))
+      }
     })
   },
 

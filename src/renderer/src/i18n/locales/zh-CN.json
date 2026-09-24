@@ -527,7 +527,11 @@
   },
   "json": {
     "noOutput": "无输出。",
-    "copySelection": "复制选区"
+    "copySelection": "复制选区",
+    "collapseNode": "折叠 JSON 内容",
+    "expandNode": "展开 JSON 内容",
+    "collapseAll": "全部折叠",
+    "expandAll": "全部展开"
   },
   "table": {
     "noDocuments": "无文档。",

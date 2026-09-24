@@ -327,7 +327,80 @@
 }
 .json-line pre {
   margin: 0;
+  padding-left: 28px;
   white-space: pre;
+}
+.foldable-json-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  font-family: var(--font-mono);
+}
+.foldable-json-lines .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  padding: 12px;
+}
+.json-fold-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.json-fold-action:hover:not(:disabled) {
+  background: var(--interaction-hover);
+  color: var(--text-primary);
+}
+.json-fold-toggle {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: calc(100% - 4px);
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.json-fold-toggle[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.json-fold-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--interaction-hover);
+}
+.json-fold-summary {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  margin: 0 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 3px;
+  vertical-align: baseline;
+  background: var(--interaction-hover);
+  color: var(--text-secondary);
+  font: inherit;
+  line-height: 1;
+}
+.json-fold-toggle:focus-visible,
+.json-fold-summary:focus-visible,
+.json-fold-action:focus-visible {
+  outline: 2px solid var(--separator-strong);
+  outline-offset: -2px;
 }
 .json-key {
   color: var(--t-key);
@@ -650,11 +723,6 @@
   display: flex;
   flex-direction: column;
 }
-.json-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
 .json-body.all-selected .json-line {
   background: var(--accent-soft);
 }
@@ -665,11 +733,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.console-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
 }
 .console-line pre {
   color: var(--fg-1);

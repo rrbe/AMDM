@@ -63,9 +63,12 @@ Use pnpm exclusively. The project has no linter; the default validation gates ar
 4. Load only the data and code needed for startup and frequent interactions. Fetch samples, metadata, and heavy features on demand, and do not issue implicit queries solely to decorate the UI.
 5. Release owned cursors, clients, tunnels, workers, listeners, and result caches when their tab, connection, task, or application lifecycle ends.
 6. Explicit full operations still need progress or busy feedback and should support cancellation where practical. Do not trade silent truncation for apparent responsiveness.
+7. Budget rendering by total mounted cells and per-cell cost, not just document count. Wide tables must virtualize body columns as well as rows; off-screen cells must not eagerly initialize tooltips, listeners, or formatting work. A bounded query result alone does not guarantee responsive rendering.
+8. View and tab switches are performance-sensitive interactions. Keep synchronous rendering and transformation work bounded, preserve per-result UI state across remounts, and keep focused editors, pinned columns, and active drag targets stable during virtualization.
 
 ## Validation scope
 
 - Run the relevant integration tests for changes to real MongoDB behavior, write paths, or IPC handlers.
 - Run a production build for dependency, main-build, or packaging changes. For main-process runtime dependencies, also inspect and launch the unpacked artifact for the target architecture.
 - Validate UI behavior against the current Electron Renderer with Electron DevTools/CDP, including DOM, computed styles, events, focus, and scrolling. A regular Chrome page is not a substitute.
+- For changes to data views or shared per-cell components, profile view switching and scrolling in Electron with representative wide and nested results. Compare before/after timings and mounted cell/DOM counts using the same data, viewport, and build mode. Passing type checks and tests is not evidence of acceptable interaction latency; investigate measured bottlenecks before choosing an optimization.
