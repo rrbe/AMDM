@@ -6,6 +6,9 @@ import { describe, it, expect } from 'vitest'
 import { computeInlineHint } from '@renderer/lib/inlineHint'
 
 describe('computeInlineHint', () => {
+  it('supports the official cursor projection method', () => {
+    expect(computeInlineHint('db.items.find().projection({ name: ')).toEqual({ insert: '1' })
+  })
   it('sort({ _id: → -1', () => {
     expect(computeInlineHint('db.c.find().sort({ _id: ')).toEqual({ insert: '-1' })
   })

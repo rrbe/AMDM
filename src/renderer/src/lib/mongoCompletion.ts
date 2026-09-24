@@ -34,6 +34,7 @@ import {
   type ValueChoice
 } from '@renderer/lib/completionRegistry'
 import { methodCompletion, withCompletionInfo } from '@renderer/lib/completionInfo'
+import methods from 'virtual:mongosh-methods'
 
 // --------------------------------------------------------------------------
 // Method vocabularies — the regex-fallback path. The TS engine is the primary
@@ -41,21 +42,9 @@ import { methodCompletion, withCompletionInfo } from '@renderer/lib/completionIn
 // still works (less precisely) when the worker is unavailable.
 // --------------------------------------------------------------------------
 
-const DB_METHODS = ['getMongo', 'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'aggregate', 'runCommand', 'adminCommand', 'stats']
-
-const COLLECTION_METHODS = [
-  'find', 'findOne', 'aggregate', 'countDocuments', 'estimatedDocumentCount', 'count', 'distinct',
-  'insertOne', 'insertMany', 'updateOne', 'updateMany', 'replaceOne', 'deleteOne', 'deleteMany',
-  'findOneAndUpdate', 'findOneAndReplace', 'findOneAndDelete', 'bulkWrite',
-  'createIndex', 'createIndexes', 'dropIndex', 'dropIndexes', 'getIndexes',
-  'drop', 'renameCollection', 'watch', 'mapReduce'
-]
-
-const CURSOR_METHODS = [
-  'sort', 'limit', 'skip', 'projection', 'count', 'toArray', 'forEach', 'map',
-  'hasNext', 'next', 'explain', 'pretty', 'hint', 'collation', 'comment', 'batchSize', 'size',
-  'allowDiskUse', 'maxTimeMS', 'min', 'max', 'returnKey', 'showRecordId', 'tailable', 'addOption'
-]
+const DB_METHODS = methods.Database
+const COLLECTION_METHODS = methods.Collection
+const CURSOR_METHODS = methods.Cursor
 
 // --------------------------------------------------------------------------
 // Option builders
@@ -168,6 +157,7 @@ export function isInsideSort(before: string): boolean {
 
 /** Are we inside a projection — `find(filter, { … })` or `$project: { … }`? */
 export function isInsideProjection(before: string): boolean {
+  if (/\.projection\s*\(\s*\{[^{}]*$/.test(before)) return true
   if (/\.find\s*\(\s*(\{[^{}]*\})?\s*,\s*\{[^{}]*$/.test(before)) return true
   if (/\$project\s*:\s*\{[^{}]*$/.test(before)) return true
   return false

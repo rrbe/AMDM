@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
+import { mongoshEditorPlugin } from './scripts/mongosh-editor-types.mjs'
 
 // Test layers:
 //   test/unit/**      pure logic, node env, no mongo — CI gate
@@ -9,6 +10,7 @@ import { defineConfig } from 'vitest/config'
 // parallel files spinning up competing servers. Unit/contract files don't
 // import the harness, so they never start mongod.
 export default defineConfig({
+  plugins: [mongoshEditorPlugin()],
   resolve: {
     alias: {
       '@shared': resolve(import.meta.dirname, 'src/shared'),

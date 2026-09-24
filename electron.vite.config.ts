@@ -4,6 +4,7 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { version } from './package.json'
+import { mongoshEditorPlugin } from './scripts/mongosh-editor-types.mjs'
 
 const mongoshRuntimePlugin = {
   name: 'build-mongosh-runtime',
@@ -91,7 +92,8 @@ export default defineConfig({
         '@': resolve('src/renderer/src')
       }
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), mongoshEditorPlugin()],
+    worker: { plugins: () => [mongoshEditorPlugin()] },
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/renderer/index.html') }

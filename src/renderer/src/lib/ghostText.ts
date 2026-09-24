@@ -12,6 +12,7 @@ import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemir
 import { StateField, type Extension } from '@codemirror/state'
 import { completionStatus } from '@codemirror/autocomplete'
 import { computeInlineHint } from '@renderer/lib/inlineHint'
+import { isShellText } from './shellSyntax'
 
 class GhostWidget extends WidgetType {
   constructor(readonly text: string) {
@@ -47,6 +48,7 @@ const ghostField = StateField.define<DecorationSet>({
     if (sel.ranges.length !== 1 || !sel.main.empty) return Decoration.none
 
     const pos = sel.main.head
+    if (isShellText(state, pos)) return Decoration.none
     const hint = computeInlineHint(state.sliceDoc(0, pos))
     if (!hint) return Decoration.none
     // side: 1 → drawn after the cursor when the cursor sits at this position.

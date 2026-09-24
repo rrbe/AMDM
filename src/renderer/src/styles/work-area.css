@@ -500,6 +500,7 @@
   color: var(--t-date);
 }
 .editor-wrap .cm-shell-operator,
+.editor-wrap .cm-shell-command,
 .editor-wrap .cm-shell-constructor {
   color: var(--t-special);
 }

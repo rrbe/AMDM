@@ -8,7 +8,7 @@
  * errors, `failed` latches and every call resolves to null — the caller then
  * falls back to the regex completion source, so completion never breaks.
  */
-import { MONGO_BASE_DTS, buildCollectionDecls } from '@renderer/lib/tsAutocomplete/mongoBaseDts'
+import { buildCollectionDecls } from '@renderer/lib/tsAutocomplete/mongoBaseDts'
 import type { TsWorkerResponse, TsCompletionEntry } from '@renderer/lib/tsAutocomplete/protocol'
 
 export interface TsCompletionResult {
@@ -55,7 +55,7 @@ class TsAutocompleteClient {
       }
       this.worker.onerror = (): void => this.die()
       this.worker.onmessageerror = (): void => this.die()
-      this.worker.postMessage({ type: 'init', baseDts: MONGO_BASE_DTS })
+      this.worker.postMessage({ type: 'init' })
     } catch {
       this.die()
     }

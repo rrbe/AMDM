@@ -13,7 +13,7 @@ export interface TsCompletionEntry {
 }
 
 export type TsWorkerRequest =
-  | { type: 'init'; baseDts: string }
+  | { type: 'init' }
   | { type: 'decls'; text: string }
   | { type: 'complete'; seq: number; code: string; pos: number }
 

@@ -135,6 +135,7 @@ export function operatorGroups(ctx: OpContext | null): OperatorGroup[] {
 
 /** EJSON constructors / shell globals (also declared in the base d.ts). */
 export const SHELL_GLOBALS = [
+  'db', 'driverDb', 'rs', 'sh', 'config', 'EJSON',
   'ObjectId', 'ISODate', 'NumberLong', 'NumberInt', 'NumberDecimal', 'UUID', 'BinData',
   'Timestamp', 'MinKey', 'MaxKey', 'Date', 'RegExp'
 ]
