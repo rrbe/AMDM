@@ -3,7 +3,8 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
-import { cellValue, deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
+import { isPlainObject } from '@renderer/lib/tableShape'
+import { previewArrayCell, previewArrayColumns } from '@renderer/lib/previewArray'
 import { formatJsonPreview } from '@renderer/lib/resultCopy'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
@@ -15,7 +16,7 @@ const COLUMN_WIDTH = 200
 export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontSize: number }): React.JSX.Element {
   const { t } = useTranslation()
   const sort = useAppStore((state) => state.settings.collectionSort)
-  const columns = useMemo(() => deriveColumns(value, sort), [value, sort])
+  const columns = useMemo(() => previewArrayColumns(value, sort), [value, sort])
   const scrollRef = useRef<HTMLDivElement>(null)
   const rowHeight = fontSize + 11
   const virtualizer = useVirtualizer({
@@ -43,8 +44,8 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
         <div className="tbl-head" style={{ width, height: rowHeight }}>
           <div className="tbl-th idx" style={{ width: INDEX_WIDTH }}>#</div>
           {visibleColumns.map((item) => (
-            <div key={item.key} className="tbl-th" style={{ position: 'absolute', left: item.start, width: item.size, paddingLeft: 10 }} title={columns[item.index]}>
-              {columns[item.index]}
+            <div key={item.key} className="tbl-th" style={{ position: 'absolute', left: item.start, width: item.size, paddingLeft: 10 }} title={columns[item.index].label}>
+              {columns[item.index].label}
             </div>
           ))}
         </div>
@@ -57,13 +58,13 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
             <div className="tbl-td idx" style={{ width: INDEX_WIDTH }}>{row.index + 1}</div>
             {visibleColumns.map((item) => {
               const column = columns[item.index]
-              const cell = cellValue(value[row.index], column)
+              const cell = previewArrayCell(value[row.index], column)
               const nested = cell.present && (Array.isArray(cell.value) || (isPlainObject(cell.value) && !isExtended(cell.value)))
               const tokens = nested ? toInlineJsonTokens(cell.value) : null
               const scalar = cell.present && !nested ? formatScalar(cell.value) : null
               const content = (
                 <div
-                  key={column}
+                  key={item.key}
                   className="tbl-td"
                   style={{ position: 'absolute', left: item.start, width: item.size }}
                   title={scalar?.text}
@@ -79,7 +80,7 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
               )
               return nested ? (
                 <Tooltip
-                  key={column}
+                  key={item.key}
                   content={() => formatJsonPreview(cell.value).text}
                   variant="code"
                 >
