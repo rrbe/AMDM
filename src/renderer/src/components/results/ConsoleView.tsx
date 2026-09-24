@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ShellOutputLine } from '@shared/types'
-import { indentFor } from '@renderer/lib/format'
 import { consoleText, toConsoleLines } from '@renderer/lib/consoleOutput'
-import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { FoldableJsonLines } from './FoldableJsonLines'
 
 /**
  * Console output of a run: every print/printjson/console.* line, in call
@@ -23,58 +22,19 @@ interface ConsoleViewProps {
 
 export function ConsoleView({ output, fontSize, truncated }: ConsoleViewProps): React.JSX.Element {
   const { t } = useTranslation()
-  const parentRef = useRef<HTMLDivElement>(null)
-
   const lines = useMemo(() => toConsoleLines(output), [output])
-
-  const virtualizer = useVirtualizer({
-    count: lines.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => fontSize + 6,
-    overscan: 20
-  })
-
-  useEffect(() => virtualizer.measure(), [fontSize, virtualizer])
 
   useCopyHotkey(() => consoleText(output))
 
   return (
     <div className="console-view-wrap">
       {truncated && <div className="console-truncated">{t('result.consoleTruncated')}</div>}
-      <div
-        ref={parentRef}
-        className="virtual-scroller json-body"
-        // Focusable so a click claims the ⌘C hotkey (mirrors the other result
-        // views); a drag-selection of the console text still copies natively.
-        tabIndex={-1}
-        onMouseDown={() => claimCopyFocus(parentRef.current)}
-      >
-        <div className="virtual-inner" style={{ height: virtualizer.getTotalSize() }}>
-          {virtualizer.getVirtualItems().map((vi) => {
-            const line = lines[vi.index]
-            return (
-              <div
-                key={vi.index}
-                className={`vrow json-line console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
-                style={{ transform: `translateY(${vi.start}px)`, height: fontSize + 6 }}
-              >
-                <pre>
-                  {indentFor(line.depth)}
-                  {line.tokens ? (
-                    line.tokens.map((tk, i) => (
-                      <span key={i} className={tk.cls}>
-                        {tk.text}
-                      </span>
-                    ))
-                  ) : (
-                    line.text
-                  )}
-                </pre>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <FoldableJsonLines
+        lines={lines}
+        fontSize={fontSize}
+        includeRootInCollapseAll
+        rowClassName={(line) => `console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
+      />
     </div>
   )
 }

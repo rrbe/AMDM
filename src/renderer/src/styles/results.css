@@ -327,7 +327,64 @@
 }
 .json-line pre {
   margin: 0;
+  padding-left: 18px;
   white-space: pre;
+}
+.foldable-json-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  font-family: var(--font-mono);
+}
+.foldable-json-lines .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.json-fold-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--separator);
+  flex: 0 0 auto;
+}
+.json-fold-toolbar button {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.json-fold-toolbar button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--fg-1);
+}
+.json-fold-toolbar button:disabled {
+  opacity: 0.45;
+}
+.json-fold-toggle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-2);
+  text-align: center;
+}
+.json-fold-toggle:hover {
+  color: var(--fg-1);
+  background: var(--interaction-hover);
+}
+.json-fold-toggle:focus-visible,
+.json-fold-toolbar button:focus-visible {
+  outline: 2px solid var(--separator-strong);
+  outline-offset: -2px;
 }
 .json-key {
   color: var(--t-key);
@@ -650,11 +707,6 @@
   display: flex;
   flex-direction: column;
 }
-.json-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
 .json-body.all-selected .json-line {
   background: var(--accent-soft);
 }
@@ -665,11 +717,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.console-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
 }
 .console-line pre {
   color: var(--fg-1);

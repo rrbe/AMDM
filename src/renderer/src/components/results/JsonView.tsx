@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@renderer/i18n'
-import { indentFor, toJsonLines, type JsonLine } from '@renderer/lib/format'
+import { toJsonLines } from '@renderer/lib/format'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { copyText, toPlainJson, toShellText } from '@renderer/lib/resultCopy'
-import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import { jsonCopyMenuItems } from './documentFormatMenus'
+import { FoldableJsonLines } from './FoldableJsonLines'
 
 /**
  * Pretty-printed EJSON, virtualized BY LINE.
@@ -36,21 +36,11 @@ interface JsonViewProps {
 
 export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element {
   const { t } = useTranslation()
-  const parentRef = useRef<HTMLDivElement>(null)
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo<JsonLine[]>(() => toJsonLines(value), [value])
-
-  const virtualizer = useVirtualizer({
-    count: lines.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => fontSize + 6,
-    overscan: 20
-  })
-
-  useEffect(() => virtualizer.measure(), [fontSize, virtualizer])
+  const lines = useMemo(() => toJsonLines(value), [value])
 
   // A fresh result clears any lingering "all selected" state.
   useEffect(() => setAllSelected(false), [value])
@@ -94,42 +84,13 @@ export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element 
 
   return (
     <div className="json-view-wrap">
-      <div
-        ref={parentRef}
-        className={`virtual-scroller json-body${allSelected ? ' all-selected' : ''}`}
-        // Focusable so a click claims the ⌘C hotkey (mirrors the Tree/Table
-        // scrollers): claimCopyFocus moves focus off the query editor and
-        // clears a selection lingering there, while leaving a selection inside
-        // the JSON text (the user's own copy intent) untouched.
-        tabIndex={-1}
-        onMouseDown={() => {
-          if (allSelected) setAllSelected(false)
-          claimCopyFocus(parentRef.current)
-        }}
+      <FoldableJsonLines
+        lines={lines}
+        fontSize={fontSize}
+        allSelected={allSelected}
+        onMouseDown={() => setAllSelected(false)}
         onContextMenu={openMenu}
-      >
-        <div className="virtual-inner" style={{ height: virtualizer.getTotalSize() }}>
-          {virtualizer.getVirtualItems().map((vi) => {
-            const line = lines[vi.index]
-            return (
-              <div
-                key={vi.index}
-                className="vrow json-line"
-                style={{ transform: `translateY(${vi.start}px)`, height: fontSize + 6 }}
-              >
-                <pre>
-                  {indentFor(line.depth)}
-                  {line.tokens.map((t, i) => (
-                    <span key={i} className={t.cls}>
-                      {t.text}
-                    </span>
-                  ))}
-                </pre>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      />
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
       )}

@@ -217,7 +217,7 @@ export function ResultPanel({
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
-          <ExplainView plan={result.data} />
+          <ExplainView plan={result.data} fontSize={dataFontSize} />
         </div>
       </div>
     )

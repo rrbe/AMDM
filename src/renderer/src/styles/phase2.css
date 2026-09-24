@@ -278,16 +278,11 @@
   user-select: none;
 }
 .explain-raw-box {
-  max-height: 320px;
-  overflow: auto;
-  padding: 8px 12px;
+  overflow: hidden;
   border-top: 1px solid var(--border);
 }
-.explain-raw-line {
-  margin: 0;
-  white-space: pre;
-  line-height: 1.45;
-  color: var(--fg-1);
+.explain-raw-box .foldable-json-lines {
+  height: 100%;
 }
 
 /* ---- Document editor (DocEditor) ---- */

@@ -17,11 +17,13 @@
  */
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { indentFor, toJsonLines } from '@renderer/lib/format'
+import { toJsonLines } from '@renderer/lib/format'
 import { parseExplain, type StageTreeNode } from '@renderer/lib/explain'
+import { FoldableJsonLines } from './FoldableJsonLines'
 
 interface ExplainViewProps {
   plan: unknown
+  fontSize: number
 }
 
 /** Format a number for display, or '—' when unavailable. */
@@ -29,10 +31,12 @@ function fmtNum(v: number | undefined): string {
   return v === undefined ? '—' : v.toLocaleString()
 }
 
-export function ExplainView({ plan }: ExplainViewProps): React.JSX.Element {
+export function ExplainView({ plan, fontSize }: ExplainViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan), [plan])
+  const rawToolbarHeight = rawLines.some((line) => line.fold && line.depth > 0) ? 28 : 0
+  const rawHeight = Math.min(320, rawLines.length * (fontSize + 6) + rawToolbarHeight + 16)
 
   return (
     <div className="explain-view">
@@ -63,13 +67,8 @@ export function ExplainView({ plan }: ExplainViewProps): React.JSX.Element {
 
       <details className="explain-raw">
         <summary>{t('explain.rawJson')}</summary>
-        <div className="explain-raw-box">
-          {rawLines.map((line, i) => (
-            <pre key={i} className="explain-raw-line">
-              {indentFor(line.depth)}
-              {line.text}
-            </pre>
-          ))}
+        <div className="explain-raw-box" style={{ height: rawHeight }}>
+          <FoldableJsonLines lines={rawLines} fontSize={fontSize} />
         </div>
       </details>
     </div>
