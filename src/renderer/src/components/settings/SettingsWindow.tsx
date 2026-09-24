@@ -161,6 +161,7 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.keyboardShortcutsEnabled'),
         t('settings.shortcutNewConnection'),
         t('settings.shortcutNewQuery'),
+        t('settings.shortcutTabSearch'),
         t('settings.shortcutContextualTabs'),
         t('settings.shortcutResultView'),
         t('settings.shortcutOpenSettings'),
@@ -559,6 +560,12 @@ export function SettingsWindow(): React.JSX.Element {
                   keys={`${primaryKey} T`}
                   enabled={!settings.disabledKeyboardShortcuts.includes('newQuery')}
                   onEnabledChange={(enabled) => setShortcutEnabled('newQuery', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutTabSearch')}
+                  keys={`⇧ ${primaryKey} A`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('tabSearch')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('tabSearch', enabled)}
                 />
                 {isMacPlatform() && (
                   <ShortcutRow

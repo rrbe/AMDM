@@ -12,6 +12,7 @@ import {
   dbCollRef,
   indexDetailsQuery,
   isRunFailure,
+  matchesTabSearch,
   patchResult,
   patchTab,
   pickActiveAfterClose,
@@ -19,6 +20,7 @@ import {
   resultTabLabel,
   tabCollection,
   tabLabel,
+  tabSearchText,
   type ResultTab
 } from '../../../src/renderer/src/lib/tabs'
 import type { ShellResult } from '../../../src/shared/types'
@@ -203,6 +205,22 @@ describe('tabLabel', () => {
   it('ignores db helper methods and falls back to a numbered label', () => {
     expect(tabLabel(createTab('a', { code: 'db.runCommand({ ping: 1 })' }), 0)).toBe('查询 1')
     expect(tabLabel(createTab('a', { code: '' }), 2)).toBe('查询 3')
+  })
+})
+
+describe('query tab search', () => {
+  it('matches the label, connection, and database case-insensitively', () => {
+    const tab = createTab('a', {
+      code: 'db.orders.find({})',
+      activeDatabase: 'Sales'
+    })
+    const filterText = tabSearchText(tab, 0, 'Production')
+
+    expect(matchesTabSearch(filterText, 'orders')).toBe(true)
+    expect(matchesTabSearch(filterText, 'production')).toBe(true)
+    expect(matchesTabSearch(filterText, ' SALES ')).toBe(true)
+    expect(matchesTabSearch(filterText, '')).toBe(true)
+    expect(matchesTabSearch(filterText, 'customers')).toBe(false)
   })
 })
 

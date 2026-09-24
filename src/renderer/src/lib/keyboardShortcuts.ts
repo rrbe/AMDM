@@ -25,6 +25,14 @@ export function isPrimaryShortcut(event: ShortcutKeyEvent, key: string, isMac: b
   return hasPrimaryModifier(event, isMac) && event.key.toLowerCase() === key.toLowerCase()
 }
 
+/** Cmd+Shift on macOS, Ctrl+Shift elsewhere. */
+export function isPrimaryShiftShortcut(event: ShortcutKeyEvent, key: string, isMac: boolean): boolean {
+  const hasModifiers = isMac
+    ? event.metaKey && event.shiftKey && !event.ctrlKey && !event.altKey
+    : event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
+  return hasModifiers && event.key.toLowerCase() === key.toLowerCase()
+}
+
 function digitIndex(event: ShortcutKeyEvent): number | null {
   const match = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)
   return match ? Number(match[1]) - 1 : null

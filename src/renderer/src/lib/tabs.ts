@@ -297,3 +297,13 @@ export function tabCollection(tab: QueryTab): string | null {
 export function tabLabel(tab: QueryTab, index: number): string {
   return tabCollection(tab) ?? `查询 ${index + 1}`
 }
+
+/** Searchable text shown by the query-tab picker. */
+export function tabSearchText(tab: QueryTab, index: number, connectionName?: string): string {
+  return [tabLabel(tab, index), connectionName, tab.activeDatabase].filter(Boolean).join('\n')
+}
+
+export function matchesTabSearch(filterText: string, query: string): boolean {
+  const normalized = query.trim().toLocaleLowerCase()
+  return !normalized || filterText.toLocaleLowerCase().includes(normalized)
+}

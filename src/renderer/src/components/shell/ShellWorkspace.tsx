@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
-import { tabCollection, tabLabel } from '@renderer/lib/tabs'
+import { matchesTabSearch, tabCollection, tabLabel, tabSearchText } from '@renderer/lib/tabs'
 import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { Collapsible } from '@renderer/components/ui/Collapsible'
@@ -30,6 +30,7 @@ import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { Modal } from '@renderer/components/common/Modal'
 import { Select } from '@renderer/components/ui/Select'
+import { SearchableSelect, type SearchableSelectHandle } from '@renderer/components/ui/SearchableSelect'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
@@ -39,6 +40,7 @@ import {
   isContextualTabHintModifier,
   isMacPlatform,
   isPrimaryShortcut,
+  isPrimaryShiftShortcut,
   shortcutRegionFromTarget,
   type ShortcutRegion
 } from '@renderer/lib/keyboardShortcuts'
@@ -391,6 +393,7 @@ function TabBar({
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const stripRef = useRef<HTMLDivElement>(null)
+  const tabSearchRef = useRef<SearchableSelectHandle>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const moveQueryTab = useAppStore((s) => s.moveQueryTab)
   useTabReorder(stripRef, tabs, setActiveTab, moveQueryTab)
@@ -402,6 +405,15 @@ function TabBar({
   // Cmd/Ctrl+W closes the query first; an already empty workspace closes the window.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'tabSearch') &&
+        isPrimaryShiftShortcut(e, 'a', isMacPlatform())
+      ) {
+        e.preventDefault()
+        if (e.repeat || hasOpenShortcutLayer()) return
+        tabSearchRef.current?.open()
+        return
+      }
       if (isPrimaryShortcut(e, 'w', isMacPlatform())) {
         e.preventDefault()
         if (e.repeat || hasOpenShortcutLayer()) return
@@ -430,29 +442,41 @@ function TabBar({
 
   return (
     <div className="tab-bar app-drag" data-shortcut-region="query">
-      <Select
+      <SearchableSelect
+        ref={tabSearchRef}
         value={activeTabId}
         onChange={setActiveTab}
         options={tabs.map((tab, index) => ({
           value: tab.id,
+          filterText: tabSearchText(
+            tab,
+            index,
+            connections.find((connection) => connection.id === tab.connectionId)?.name
+          ),
           label: (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 <span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, index)}</span>
               </span>
-              <small className="shrink-0 text-[11px] text-muted-foreground">{tab.activeDatabase}</small>
+              <small className="max-w-[118px] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
+                {[
+                  connections.find((connection) => connection.id === tab.connectionId)?.name,
+                  tab.activeDatabase
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
             </span>
           )
         }))}
+        matches={matchesTabSearch}
         className="query-tab-picker"
         triggerContent={<ChevronDown size={15} aria-hidden />}
         popupClassName="w-[272px]"
-        popupHeader={
-          <div className="px-2 py-2 text-[11px] font-medium text-muted-foreground">
-            {t('shell.tabListLabel')} · {tabs.length}
-          </div>
-        }
-        aria-label={t('shell.tabListLabel')}
+        header={`${t('shell.openTabsLabel')} · ${tabs.length}`}
+        placeholder={t('shell.tabSearchPlaceholder')}
+        emptyMessage={t('shell.noMatchingTabs')}
+        aria-label={t('shell.tabSearchLabel')}
       />
       <DocumentTabStrip stripRef={stripRef} count={tabs.length} activeId={activeTabId} kind="query">
         {tabs.map((tab, i) => {

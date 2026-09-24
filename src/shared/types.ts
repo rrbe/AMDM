@@ -555,7 +555,8 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
  */
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
-export type KeyboardShortcutId = 'newConnection' | 'newQuery' | 'contextualTabs' | 'resultView' | 'openSettings'
+export type KeyboardShortcutId =
+  'newConnection' | 'newQuery' | 'tabSearch' | 'contextualTabs' | 'resultView' | 'openSettings'
 export type TableNestedDisplay = 'inline' | 'grouped' | 'auto'
 
 export interface AppSettings {
