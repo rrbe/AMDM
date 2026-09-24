@@ -14,10 +14,16 @@ interface FoldableLine {
   fold?: JsonLine['fold']
 }
 
+export interface JsonFoldingState {
+  collapsedLines: number[]
+  onChange: (lines: number[]) => void
+}
+
 interface Props<T extends FoldableLine> {
   lines: T[]
   fontSize: number
   controlsContainer: HTMLElement | null
+  folding?: JsonFoldingState
   rowClassName?: (line: T) => string
   allSelected?: boolean
   includeRootInCollapseAll?: boolean
@@ -32,6 +38,7 @@ export function FoldableJsonLines<T extends FoldableLine>({
   lines,
   fontSize,
   controlsContainer,
+  folding,
   rowClassName,
   allSelected = false,
   includeRootInCollapseAll = false,
@@ -44,7 +51,11 @@ export function FoldableJsonLines<T extends FoldableLine>({
     lines,
     collapsed: new Set()
   }))
-  const collapsed = foldState.lines === lines ? foldState.collapsed : EMPTY_COLLAPSED
+  const savedCollapsed = useMemo(
+    () => folding ? new Set(folding.collapsedLines) : null,
+    [folding?.collapsedLines]
+  )
+  const collapsed = savedCollapsed ?? (foldState.lines === lines ? foldState.collapsed : EMPTY_COLLAPSED)
   const foldable = useMemo(() => {
     const indexes: number[] = []
     lines.forEach((line, index) => {
@@ -65,7 +76,9 @@ export function FoldableJsonLines<T extends FoldableLine>({
   useEffect(() => virtualizer.measure(), [fontSize, virtualizer])
 
   const setCollapsed = (update: (current: Set<number>) => Set<number>): void => {
-    setFoldState((previous) => ({
+    if (folding) {
+      folding.onChange([...update(collapsed)])
+    } else setFoldState((previous) => ({
       lines,
       collapsed: update(previous.lines === lines ? previous.collapsed : new Set())
     }))

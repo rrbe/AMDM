@@ -19,11 +19,12 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toJsonLines } from '@renderer/lib/format'
 import { parseExplain, type StageTreeNode } from '@renderer/lib/explain'
-import { FoldableJsonLines } from './FoldableJsonLines'
+import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 interface ExplainViewProps {
   plan: unknown
   fontSize: number
+  folding?: JsonFoldingState
 }
 
 /** Format a number for display, or '—' when unavailable. */
@@ -31,7 +32,7 @@ function fmtNum(v: number | undefined): string {
   return v === undefined ? '—' : v.toLocaleString()
 }
 
-export function ExplainView({ plan, fontSize }: ExplainViewProps): React.JSX.Element {
+export function ExplainView({ plan, fontSize, folding }: ExplainViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan), [plan])
@@ -68,7 +69,7 @@ export function ExplainView({ plan, fontSize }: ExplainViewProps): React.JSX.Ele
       <details className="explain-raw">
         <summary>{t('explain.rawJson')}<span className="explain-fold-action" ref={setFoldControls} /></summary>
         <div className="explain-raw-box" style={{ height: rawHeight }}>
-          <FoldableJsonLines lines={rawLines} fontSize={fontSize} controlsContainer={foldControls} />
+          <FoldableJsonLines folding={folding} lines={rawLines} fontSize={fontSize} controlsContainer={foldControls} />
         </div>
       </details>
     </div>

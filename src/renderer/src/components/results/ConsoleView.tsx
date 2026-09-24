@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { ShellOutputLine } from '@shared/types'
 import { consoleText, toConsoleLines } from '@renderer/lib/consoleOutput'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
-import { FoldableJsonLines } from './FoldableJsonLines'
+import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 /**
  * Console output of a run: every print/printjson/console.* line, in call
@@ -16,12 +16,13 @@ import { FoldableJsonLines } from './FoldableJsonLines'
 interface ConsoleViewProps {
   output: ShellOutputLine[]
   fontSize: number
+  folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
   /** True when the engine dropped lines beyond the capture cap. */
   truncated?: boolean
 }
 
-export function ConsoleView({ output, fontSize, truncated, controlsContainer }: ConsoleViewProps): React.JSX.Element {
+export function ConsoleView({ output, fontSize, truncated, controlsContainer, folding }: ConsoleViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const lines = useMemo(() => toConsoleLines(output), [output])
 
@@ -33,6 +34,7 @@ export function ConsoleView({ output, fontSize, truncated, controlsContainer }: 
       <FoldableJsonLines
         lines={lines}
         fontSize={fontSize}
+        folding={folding}
         controlsContainer={controlsContainer}
         includeRootInCollapseAll
         rowClassName={(line) => `console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}

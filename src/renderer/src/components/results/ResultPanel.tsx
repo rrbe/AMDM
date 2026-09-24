@@ -3,7 +3,7 @@ import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lu
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
-import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
+import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
@@ -29,6 +29,8 @@ import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
 import { jsonCopyMenuItems } from './documentFormatMenus'
+
+const EMPTY_FOLDED_LINES: number[] = []
 
 const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
@@ -62,6 +64,11 @@ export function ResultPanel({
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const setView = useAppStore((s) => s.setResultView)
+  const setResultFoldedLines = useAppStore((s) => s.setResultFoldedLines)
+  const foldingFor = (view: ResultFoldView) => ({
+    collapsedLines: active?.foldedLines?.[view] ?? EMPTY_FOLDED_LINES,
+    onChange: (lines: number[]) => setResultFoldedLines(view, lines)
+  })
   const docCtx = docActionContext(result, active?.query ?? null)
   const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   // Anchor for the "copy all" format dropdown (null = closed).
@@ -199,7 +206,7 @@ export function ResultPanel({
         />
         {hasOutput && (
           <div className="result-body">
-            <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+            <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
           </div>
         )}
       </div>
@@ -219,7 +226,7 @@ export function ResultPanel({
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
-          <ExplainView plan={result.data} fontSize={dataFontSize} />
+          <ExplainView folding={foldingFor('explain')} plan={result.data} fontSize={dataFontSize} />
         </div>
       </div>
     )
@@ -303,7 +310,7 @@ export function ResultPanel({
 
       <div className="result-body">
         {showConsole ? (
-          <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+          <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
         ) : (
           <>
             {view === 'tree' && (
@@ -316,7 +323,7 @@ export function ResultPanel({
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}

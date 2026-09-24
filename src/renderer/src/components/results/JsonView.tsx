@@ -6,7 +6,7 @@ import { ContextMenu, type ContextMenuEntry } from '@renderer/components/Context
 import { copyText, toPlainJson, toShellText } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import { jsonCopyMenuItems } from './documentFormatMenus'
-import { FoldableJsonLines } from './FoldableJsonLines'
+import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 /**
  * Pretty-printed EJSON, virtualized BY LINE.
@@ -32,10 +32,11 @@ import { FoldableJsonLines } from './FoldableJsonLines'
 interface JsonViewProps {
   value: unknown
   fontSize: number
+  folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
 }
 
-export function JsonView({ value, fontSize, controlsContainer }: JsonViewProps): React.JSX.Element {
+export function JsonView({ value, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
@@ -88,6 +89,7 @@ export function JsonView({ value, fontSize, controlsContainer }: JsonViewProps):
       <FoldableJsonLines
         lines={lines}
         fontSize={fontSize}
+        folding={folding}
         controlsContainer={controlsContainer}
         allSelected={allSelected}
         onMouseDown={() => setAllSelected(false)}
