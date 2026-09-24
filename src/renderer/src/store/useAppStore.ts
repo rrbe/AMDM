@@ -39,7 +39,6 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellResult,
-  ShellRuntime,
   TestResult,
   UpdateState,
   UserInfo
@@ -71,7 +70,6 @@ import {
   type NotificationSource,
   type NotificationVariant
 } from '@renderer/lib/notifications'
-import { suggestShellRuntime } from '@renderer/lib/shellRuntimeSuggestion'
 import i18n from '@renderer/i18n'
 
 /** Shorthand for translating notification / error strings in the store. */
@@ -193,9 +191,6 @@ interface AppState {
 
   // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
-  setShellRuntime(runtime: ShellRuntime): void
-  dismissShellRuntimeSuggestion(): void
-  acceptShellRuntimeSuggestion(): Promise<void>
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
@@ -230,7 +225,7 @@ interface AppState {
   loadHistory(): Promise<void>
   clearHistory(): Promise<void>
   /** Load a query/history snippet into its connection-bound editor (never auto-runs). */
-  applyQuery(code: string, database?: string, connectionId?: string, runtime?: ShellRuntime): void
+  applyQuery(code: string, database?: string, connectionId?: string): void
 
   // ---- actions: autocomplete (Phase 2) ----
   /** Fetch (and cache) sampled field names for a collection. */
@@ -395,15 +390,7 @@ function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): 
 }
 
 /** The tab present at first render (so init can point activeTabId at it). */
-const INITIAL_TAB = createTab(newTabId(), { runtime: DEFAULT_SETTINGS.defaultShellRuntime })
-
-function createDefaultTab(
-  id: string,
-  settings: AppSettings,
-  init: Partial<QueryTab> = {}
-): QueryTab {
-  return createTab(id, { runtime: settings.defaultShellRuntime, ...init })
-}
+const INITIAL_TAB = createTab(newTabId())
 
 /** Concurrent callers share one session attempt instead of opening duplicate
     clients/tunnels for the same Connection. */
@@ -762,7 +749,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, active.id, { connectionId: id })
         }
       }
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: id })
+      const tab = createTab(newTabId(), { connectionId: id })
       return { activeConnectionId: id, tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
   },
@@ -1029,7 +1016,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const index = afterId ? s.tabs.findIndex((item) => item.id === afterId) : -1
       const connectionId = index < 0 ? s.activeConnectionId : s.tabs[index].connectionId
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId })
+      const tab = createTab(newTabId(), { connectionId })
       const tabs = [...s.tabs]
       tabs.splice(index < 0 ? tabs.length : index + 1, 0, tab)
       return { tabs, activeTabId: tab.id, activeConnectionId: connectionId }
@@ -1041,12 +1028,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const index = s.tabs.findIndex((tab) => tab.id === id)
       if (index < 0) return s
       const source = s.tabs[index]
-      const tab = createDefaultTab(newTabId(), s.settings, {
+      const tab = createTab(newTabId(), {
         connectionId: source.connectionId,
         activeDatabase: source.activeDatabase,
         code: source.code,
-        runtime: source.runtime,
-        runtimeSuggestion: source.runtimeSuggestion,
         pristine: !source.code.trim()
       })
       const tabs = [...s.tabs]
@@ -1084,7 +1069,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const remaining = s.tabs.filter((t) => !closingIds.has(t.id))
       if (remaining.length === s.tabs.length) return s
       if (remaining.length === 0) {
-        const fresh = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
+        const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id }
       }
       const activeIndex = s.tabs.findIndex((tab) => tab.id === s.activeTabId)
@@ -1122,44 +1107,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Only real user edits reach here (the editor skips external value syncs),
     // so typing permanently marks the tab as holding user work.
     set((s) => ({
-      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false, runtimeSuggestion: null })
+      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false })
     }))
-  },
-
-  setShellRuntime(runtime) {
-    set((s) => ({
-      tabs: patchTab(s.tabs, s.activeTabId, {
-        runtime,
-        runtimeSuggestion: null,
-        results: [],
-        activeResultId: null,
-        resultSeq: 0,
-        runFailed: false
-      })
-    }))
-    if (runtime === 'mongosh') {
-      void window.api.shell.prepare(runtime).catch((error) => {
-        get().notify(
-          appNotice(
-            'error',
-            tr('notify.prepareRuntimeFailed', { error: errMessage(error) }),
-            'query',
-            'query:prepareRuntime'
-          )
-        )
-      })
-    }
-  },
-
-  dismissShellRuntimeSuggestion() {
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { runtimeSuggestion: null }) }))
-  },
-
-  async acceptShellRuntimeSuggestion() {
-    const suggestion = getActiveTab(get()).runtimeSuggestion
-    if (!suggestion) return
-    get().setShellRuntime(suggestion.runtime)
-    await get().runShell(suggestion.code)
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
@@ -1227,7 +1176,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (focusId) return { activeTabId: focusId }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code: seed })
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1250,7 +1199,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code })
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1266,13 +1215,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (!code.trim()) return
-    const runtimeSuggestion = suggestShellRuntime(code, tab.runtime)
-    if (runtimeSuggestion) {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, { runtimeSuggestion: { ...runtimeSuggestion, code } })
-      }))
-      return
-    }
     const database = tab.activeDatabase || 'test'
     const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
     const execId = newExecId()
@@ -1284,7 +1226,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code, runtime: tab.runtime }
+    const query = { connectionId, database, code }
     let runFailed = false
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
@@ -1424,7 +1366,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code, runtime: tab.runtime }
+    const query = { connectionId, database, code }
     let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
@@ -1585,7 +1527,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyQuery(code, database, connectionId, runtime = 'legacy') {
+  applyQuery(code, database, connectionId) {
     // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
@@ -1601,7 +1543,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? active
           : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
       const activeDatabase = database || targetTab?.activeDatabase || ''
-      const match = { connectionId: targetConnectionId, database: activeDatabase, code, runtime }
+      const match = { connectionId: targetConnectionId, database: activeDatabase, code }
       const { focusId, reuseId } = pickFillTarget(s.tabs, targetTab?.id ?? s.activeTabId, match)
       if (focusId) {
         return { activeConnectionId: targetConnectionId, activeTabId: focusId }
@@ -1613,16 +1555,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, reuseId, {
             connectionId: targetConnectionId,
             code,
-            activeDatabase,
-            runtime
+            activeDatabase
           })
         }
       }
       const tab = createTab(newTabId(), {
         connectionId: targetConnectionId,
         code,
-        activeDatabase,
-        runtime
+        activeDatabase
       })
       return {
         activeConnectionId: targetConnectionId,
@@ -1987,14 +1927,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     subscribeToSettings()
     try {
       const settings = await window.api.settings.get()
-      set((s) => ({
-        settings,
-        tabs: s.tabs.map((tab) =>
-          tab.pristine && !tab.code && tab.results.length === 0
-            ? { ...tab, runtime: settings.defaultShellRuntime }
-            : tab
-        )
-      }))
+      set({ settings })
     } catch (e) {
       get().notify(appNotice('warn', tr('notify.loadSettingsFailed'), 'settings', 'settings:load', errMessage(e)))
     }

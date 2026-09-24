@@ -23,21 +23,18 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 ## Shell compatibility layer
 
-`src/main/mongo/shellEngine.ts` routes each execution to the runtime selected by its query tab. `shellCore.ts` owns the AMDM driver runtime, while `mongoshCore.ts` adapts the official evaluator, Shell API, and Node Driver provider to the same `ShellResult` contract. Runtime selection is explicit and is never used as an automatic retry or fallback after execution begins.
+All query execution goes through `src/main/mongo/shellEngine.ts` to `mongoshCore.ts`, which adapts the official evaluator, Shell API, and Node Driver provider to `ShellResult`. The runtime loads on first execution. Tabs, history, saved queries, and settings do not select an engine; persisted runtime fields from older versions are ignored.
 
-Selecting Mongosh asks main to prepare its lazy runtime before the first Run. Each execution owns its provider listeners, cursors, and sessions; cleanup ends sessions left open by the isolated script without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
+Each execution owns its provider listeners, cursors, and sessions; cleanup ends sessions left open by the isolated script without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
 
-Mongosh scripts that intentionally need the Node Driver API use the explicit `driverDb` global. It resolves to the selected database on the existing connection and follows `use <database>` changes; it never creates or owns another `MongoClient`.
+Scripts that need Node Driver method signatures use `driverDb`. It resolves to the selected database on the existing connection and follows `use <database>` changes. Use explicit `await` for intermediate Driver promises. Bare Driver cursors are bounded and closed; find cursors support paging. Explicit `toArray()` remains a full operation.
 
-Before execution, `shellRuntimeSuggestion.ts` uses the Renderer JavaScript syntax tree to identify only unambiguous runtime-specific calls. A mismatch blocks execution and presents an explicit switch-and-run confirmation; dismissing it leaves both the selected runtime and database untouched. This check is advisory routing before execution, never an error-triggered fallback.
+`shellSupport.ts` contains output collection, explicit top-level-await preparation, Driver access, cancellation of serialization waits, and best-effort collection detection. It does not modify Driver prototypes.
 
-Preserve these contracts when maintaining either runtime:
-
-- In AMDM driver, implement only the explicitly supported mongosh subset. Unknown helpers must fail clearly instead of being interpreted as collections or silently using incorrect semantics.
-- In Mongosh, preserve official positional arguments, completion values, and implicit-await behavior rather than replacing them with superficially similar Node Driver APIs.
-- In AMDM driver, preserve synthetic promise tagging across proxies and cursor patches; otherwise multi-statement scripts can observe unresolved promises.
-- Errors created inside `vm` come from another realm. Extract error details structurally instead of relying on `instanceof Error`.
-- Bound results by default. Materialize a complete cursor only when the user explicitly invokes a full-result API.
+- Preserve official positional arguments, completion values, and implicit-await behavior.
+- Errors created inside `vm` come from another realm. Extract details structurally.
+- Bound results by default. Materialize a complete cursor only when explicitly requested.
+- Never retry a failed script automatically: it may already have written data.
 
 ## Serialization and output
 

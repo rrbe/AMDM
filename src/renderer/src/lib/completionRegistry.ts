@@ -180,7 +180,7 @@ export const BOOLEAN_KEYS = new Set([
 ])
 
 // --------------------------------------------------------------------------
-// REPL commands (mongosh-style; require shellCore REPL support to run)
+// Mongosh REPL commands
 // --------------------------------------------------------------------------
 
 export interface CommandDef {

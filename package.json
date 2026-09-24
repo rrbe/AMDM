@@ -48,7 +48,6 @@
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@lezer/highlight": "^1.2.3",
     "@mongodb-js/mongodb-schema": "^12.7.3",
-    "@mongosh/async-rewriter2": "^2.4.19",
     "@mongosh/service-provider-node-driver": "5.2.0",
     "@mongosh/shell-api": "5.5.0",
     "@mongosh/shell-evaluator": "5.5.0",

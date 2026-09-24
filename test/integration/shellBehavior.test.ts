@@ -1,19 +1,8 @@
-/**
- * Shell-on-driver coverage. Runs the real `runShellOnDb` against a
- * real MongoDB (mongodb-memory-server) and asserts on the EJSON-canonical wire
- * shape the renderer actually receives.
- *
- * Execution-model note: user code is transpiled with mongosh's async-rewriter2
- * before running in the `vm`, so driver promises (tagged synthetic by the
- * proxies / cursor prototype patches) are IMPLICITLY awaited at every step —
- * `const ids = db.x.distinct('k')` yields the array, and
- * `db.x.insertOne(); db.x.find()` sequences naturally, exactly like mongosh.
- * The completion value keeps REPL semantics (the last expression).
- */
+/** Shell behavior validated through the official Mongosh evaluator. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Db } from 'mongodb'
-import { runShellOnDb, detectCollection } from '../../src/main/mongo/shellCore'
-import type { RunShellOptions } from '../../src/main/mongo/shellCore'
+import { runMongoshOnClient, type MongoshEvaluationOptions } from '../../src/main/mongo/mongoshCore'
+import { detectCollection } from '../../src/main/mongo/shellSupport'
 import type { ShellResult } from '../../src/shared/types'
 import { serializerPool } from '../../src/main/workers/serializerPool'
 import { startMongo, type MongoHarness } from '../helpers/mongo'
@@ -21,8 +10,8 @@ import { startMongo, type MongoHarness } from '../helpers/mongo'
 let harness: MongoHarness
 let db: Db
 
-const run = (code: string, opts?: RunShellOptions): Promise<ShellResult> =>
-  runShellOnDb(db, code, opts)
+const run = (code: string, opts?: MongoshEvaluationOptions): Promise<ShellResult> =>
+  runMongoshOnClient(harness.client, code, { database: db.databaseName, ...opts })
 
 beforeAll(async () => {
   // Force the serializer pool to its inline path: the worker bundle isn't built
@@ -109,7 +98,7 @@ describe('BSON constructors / EJSON helpers', () => {
 })
 
 // ---------------------------------------------------------------------------
-describe('db proxy + mongosh-only helpers', () => {
+describe('Mongosh database helpers', () => {
   it('db.runCommand(cmd) maps to a real command (not a "runCommand" collection)', async () => {
     const r = await run('db.runCommand({ ping: 1 })')
     expect(r.kind).toBe('value')
@@ -150,8 +139,8 @@ describe('db proxy + mongosh-only helpers', () => {
     expect((r.data as any).db).toBe('shelltest')
   })
 
-  it('db.listCollections().toArray() drains the cursor', async () => {
-    const r = await run('db.listCollections().toArray()')
+  it('await driverDb.listCollections().toArray() drains the cursor', async () => {
+    const r = await run('await driverDb.listCollections().toArray()')
     expect(r.kind).toBe('documents')
     expect((r.data as any[]).some((c) => c.name === 'nums')).toBe(true)
   })
@@ -213,8 +202,8 @@ describe('collection queries', () => {
     expect(r.data).toEqual({ g: 'b' })
   })
 
-  it('db.collection(name).find(q, projection) — driver-style accessor still shims projection', async () => {
-    const r = await run('db.collection("nums").find({}, { n: 1, _id: 0 })')
+  it('driverDb collection uses native projection options', async () => {
+    const r = await run('await driverDb.collection("nums").find({}, { projection: { n: 1, _id: 0 } }).toArray()')
     for (const d of r.data as Record<string, unknown>[]) {
       expect(Object.keys(d)).toEqual(['n'])
     }
@@ -228,10 +217,10 @@ describe('collection queries', () => {
     expect((skipped.data as any[]).map((d) => d.n.$numberInt)).toEqual(['4', '5'])
   })
 
-  it('cursor.projection(spec) alias and native project(spec) both work', async () => {
+  it('shell projection and explicit Driver project both work', async () => {
     for (const code of [
       'db.nums.find().projection({ n: 1, _id: 0 })',
-      'db.nums.find().project({ n: 1, _id: 0 })'
+      'await driverDb.collection("nums").find().project({ n: 1, _id: 0 }).toArray()'
     ]) {
       const r = await run(code)
       for (const d of r.data as Record<string, unknown>[]) {
@@ -355,7 +344,7 @@ describe('write operations return write-acknowledgements', () => {
   it('insertMany', async () => {
     const r = await run('db.w.insertMany([{ a: 1 }, { a: 2 }])')
     expect(r.kind).toBe('ack')
-    expect((r.data as any).insertedCount).toEqual({ $numberInt: '2' })
+    expect(Object.keys((r.data as any).insertedIds)).toHaveLength(2)
   })
 
   it('updateOne', async () => {
@@ -429,10 +418,10 @@ describe('index operations', () => {
     expect((r.data as any[])[0]).toMatchObject({ name: 'n_detail', unique: true })
   })
 
-  it('listIndexes().toArray() and indexes() both list indexes', async () => {
+  it('native Driver index APIs list indexes', async () => {
     await db.collection('nums').createIndex({ g: 1 })
-    expect((await run('db.nums.listIndexes().toArray()')).kind).toBe('documents')
-    expect((await run('db.nums.indexes()')).kind).toBe('documents')
+    expect((await run('await driverDb.collection("nums").listIndexes().toArray()')).kind).toBe('documents')
+    expect((await run('await driverDb.collection("nums").indexes()')).kind).toBe('documents')
   })
 
   it('dropIndex removes an index', async () => {
@@ -458,7 +447,7 @@ describe('explain', () => {
   it('errors when explain target is not a query', async () => {
     const r = await run('1 + 1', { explain: true })
     expect(r.kind).toBe('error')
-    expect(r.errorName).toBe('ExplainError')
+    expect(r.error).toMatch(/Explain is only supported/)
   })
 })
 
@@ -745,7 +734,7 @@ describe('implicit await (async-rewriter2)', () => {
 // whose callbacks hit the db again (the NoSQLBooster "collection report" idiom).
 // Without the patch the run "finishes" before the callbacks do (prints lost)
 // or map yields pending promises (JSON.stringify → `[{}, {}]`).
-describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
+describe('Mongosh async array and cursor iteration', () => {
   it('getCollectionNames().forEach with db.runCommand inside completes before the run ends', async () => {
     const r = await run(`
       db.getCollectionNames().forEach(function (name) {
@@ -810,8 +799,6 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
     expect(r.data).toEqual(['NUMS'])
   })
 
-  // The driver's own cursor.forEach fires callbacks without awaiting them —
-  // our AbstractCursor patch awaits each one, like mongosh's shell cursor.
   it('cursor forEach awaits db-touching callbacks before the run ends', async () => {
     const r = await run(`
       db.nums.find({ g: 'a' }).sort({ n: 1 }).forEach(function (doc) {
@@ -836,9 +823,7 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
     expect(r.data).toEqual([{ $numberInt: '1' }, { $numberInt: '2' }])
   })
 
-  // Regression: the replacement forEach must keep the DRIVER's early-exit
-  // semantics for plain sync callbacks too (stop on `=== false`).
-  it('cursor forEach keeps driver early-exit semantics for sync callbacks returning false', async () => {
+  it('cursor forEach keeps early-exit semantics for sync callbacks returning false', async () => {
     const r = await run(`
       const seen = [];
       db.nums.find().sort({ n: 1 }).forEach(function (doc) {
@@ -860,8 +845,7 @@ describe('async-aware array iteration (NoSQLBooster-style scripts)', () => {
     `)
     expect(r.kind).toBe('error')
     if (r.kind === 'error') {
-      expect(r.errorName).toBe('TypeError')
-      expect(r.error).toMatch(/comparator returned a Promise/)
+      expect(r.error).toMatch(/sort|async|promise/i)
     }
   })
 })
@@ -882,14 +866,14 @@ describe('REPL commands (show / use)', () => {
     expect((r.count ?? 0)).toBeGreaterThan(0)
   })
 
-  it('trailing semicolon / casing are tolerated', async () => {
-    const r = await run('SHOW Collections;')
+  it('REPL commands use official case-sensitive syntax', async () => {
+    const r = await run('show collections')
     expect(r.kind).toBe('documents')
   })
 
-  it('`use <db>` acks and signals a database switch (no query run)', async () => {
+  it('`use <db>` signals a database switch', async () => {
     const r = await run('use reporting')
-    expect(r.kind).toBe('ack')
+    expect(r.kind).toBe('value')
     expect(r.useDatabase).toBe('reporting')
   })
 

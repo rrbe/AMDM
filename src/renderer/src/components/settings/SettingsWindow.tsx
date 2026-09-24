@@ -9,7 +9,6 @@ import {
   type CollectionSort,
   type KeyboardShortcutId,
   type Language,
-  type ShellRuntime,
   type TableNestedDisplay,
   type ThemeMode
 } from '@shared/types'
@@ -109,10 +108,6 @@ export function SettingsWindow(): React.JSX.Element {
       icon: Search,
       keywords: [
         t('settings.sectionQuery'),
-        t('settings.defaultShellRuntime'),
-        t('settings.defaultShellRuntimeHint'),
-        t('shell.runtimeMongosh'),
-        t('shell.runtimeAmdmDriver'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
         t('settings.tableNestedDisplay'),
@@ -421,17 +416,6 @@ export function SettingsWindow(): React.JSX.Element {
                   aria-label={t('settings.tableNestedDisplay')}
                 />
                 <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
-              </Field>
-              <Field label={t('settings.defaultShellRuntime')} hint={t('settings.defaultShellRuntimeHint')}>
-                <Select<ShellRuntime>
-                  value={settings.defaultShellRuntime}
-                  onChange={(defaultShellRuntime) => void updateSettings({ defaultShellRuntime })}
-                  options={[
-                    { label: t('shell.runtimeMongosh'), value: 'mongosh' },
-                    { label: t('shell.runtimeAmdmDriver'), value: 'legacy' }
-                  ]}
-                  aria-label={t('settings.defaultShellRuntime')}
-                />
               </Field>
               <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
                 <Select<number>

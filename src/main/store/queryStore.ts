@@ -51,7 +51,6 @@ class QueryStore {
       code: input.code,
       connectionId: input.connectionId,
       database: input.database,
-      runtime: input.runtime,
       folder: folder || undefined,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
@@ -78,7 +77,6 @@ class QueryStore {
       code: string
       connectionId: string
       database: string
-      runtime?: HistoryEntry['runtime']
       ok: boolean
       summary?: string
     },

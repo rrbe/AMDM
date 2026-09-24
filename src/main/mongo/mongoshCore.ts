@@ -4,13 +4,14 @@ import { join } from 'node:path'
 import vm from 'node:vm'
 import { EventEmitter } from 'node:events'
 import type { ClientSession, MongoClient } from 'mongodb'
+import { AbstractCursor, FindCursor } from 'mongodb'
 import type { CompassServiceProvider, DevtoolsConnectOptions } from '@mongosh/service-provider-node-driver'
 import type { ShellInstanceState, ShellResult as MongoshResult } from '@mongosh/shell-api'
 import type { ShellEvaluator } from '@mongosh/shell-evaluator'
 import type { ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 import { classifyOperationFailure } from './errorCore'
-import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait } from './shellCore'
+import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait, withAbort } from './shellSupport'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
@@ -36,10 +37,6 @@ function loadMongoshRuntime(): MongoshRuntime {
   enableCompileCache()
   loadedRuntime = require(runtimePath) as MongoshRuntime
   return loadedRuntime
-}
-
-export function prepareMongoshRuntime(): void {
-  loadMongoshRuntime()
 }
 
 export function createMongoshServiceProvider(client: MongoClient): CompassServiceProvider {
@@ -148,6 +145,26 @@ export async function evaluateMongosh(
         throw new Error('Explain is only supported for find()/aggregate() queries.')
       }
       value = await (value as { explain(verbosity: string): Promise<unknown> }).explain('executionStats')
+    } else if (value instanceof AbstractCursor) {
+      const cursor = value
+      try {
+        if (options.skip && cursor instanceof FindCursor) cursor.skip(options.skip)
+        const documents: unknown[] = []
+        const limit = options.limit ?? DEFAULT_LIMIT
+        while (documents.length < limit && (await cursor.hasNext())) {
+          documents.push(await cursor.next())
+        }
+        return {
+          type: cursor instanceof FindCursor ? 'Cursor' : 'DriverCursor',
+          rawValue: cursor,
+          printable: { documents, cursorHasMore: await cursor.hasNext() },
+          ...(cursor.namespace.collection
+            ? { source: { namespace: { db: cursor.namespace.db, collection: cursor.namespace.collection } } }
+            : {})
+        }
+      } finally {
+        await cursor.close()
+      }
     } else if (options.skip && type === 'Cursor' && typeof (value as { skip?: unknown })?.skip === 'function') {
       const cursor = value as { skip(value: number): unknown }
       cursor.skip(options.skip)
@@ -276,7 +293,7 @@ export async function runMongoshOnClient(
     releaseSessions = trackExecutionSessions(provider)
     const evaluation = await evaluateMongosh(provider, options.database, code, { ...options, output })
     try {
-      return await adaptMongoshResult(evaluation, code, options, started, output)
+      return await withAbort(adaptMongoshResult(evaluation, code, options, started, output), options.signal)
     } finally {
       const rawValue = evaluation.result.rawValue as { close?: () => Promise<void> } | undefined
       if (typeof rawValue?.close === 'function') await rawValue.close().catch(() => {})

@@ -1,7 +1,6 @@
-import type { ShellRequest, ShellResult, ShellRuntime } from '../../shared/types'
+import type { ShellRequest, ShellResult } from '../../shared/types'
 import { sessionManager } from './sessionManager'
-import { amdmDriverShellBackend, mongoshShellBackend } from './shellBackends'
-import { prepareMongoshRuntime } from './mongoshCore'
+import { runMongoshOnClient } from './mongoshCore'
 
 /**
  * In-flight runs keyed by `execId`, so a slow find/aggregate can be cancelled
@@ -10,10 +9,6 @@ import { prepareMongoshRuntime } from './mongoshCore'
  * carried an `execId`; entries are removed in `finally` regardless of outcome.
  */
 const inFlight = new Map<string, AbortController>()
-
-export function prepareShellRuntime(runtime: ShellRuntime): void {
-  if (runtime === 'mongosh') prepareMongoshRuntime()
-}
 
 /** Error used as the abort reason; the driver throws this from cancelled ops. */
 class ShellAbortError extends Error {
@@ -25,8 +20,7 @@ class ShellAbortError extends Error {
 
 /**
  * Resolve the live MongoClient for this connection and route the user's shell
- * snippet to the runtime selected by the query tab. Backend implementations
- * have no Electron/session dependencies and remain independently testable.
+ * snippet to Mongosh. The evaluator has no Electron/session dependencies.
  *
  * When `req.execId` is set we register an AbortController for the run so
  * {@link abortShell} can cancel it; the controller's signal is threaded into the
@@ -40,8 +34,14 @@ export async function executeShell(req: ShellRequest): Promise<ShellResult> {
   const controller = req.execId ? new AbortController() : undefined
   if (req.execId && controller) inFlight.set(req.execId, controller)
   try {
-    const backend = req.runtime === 'mongosh' ? mongoshShellBackend : amdmDriverShellBackend
-    return await backend.execute(client, req, controller?.signal)
+    return await runMongoshOnClient(client, req.code, {
+      database: req.database,
+      limit: req.limit,
+      skip: req.skip,
+      explain: req.explain,
+      timeoutMS: req.timeoutMS,
+      signal: controller?.signal
+    })
   } finally {
     if (req.execId) inFlight.delete(req.execId)
   }

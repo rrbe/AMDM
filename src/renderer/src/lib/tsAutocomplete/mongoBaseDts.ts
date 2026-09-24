@@ -1,11 +1,8 @@
 /**
  * Hand-written base TypeScript declarations for the mongo shell, fed to the
  * in-worker TS language service to power type-aware chained completion
- * (`db.coll.find().sort().limit().`). Deliberately models the SAME subset our
- * `shellCore` sandbox actually implements — so completion never suggests driver
- * methods the shell can't run (the project's "fail loudly, no silent subset"
- * stance). Live collection names are layered on at runtime via
- * `buildCollectionDecls` (interface merging onto `Database`).
+ * (`db.coll.find().sort().limit().`). Models the official Mongosh API.
+ * Live collection names are layered on through `buildCollectionDecls`.
  *
  * Runs with `noLib`, so the minimal globals every shell script needs are baked
  * in here too (avoids bundling ~30 `lib.es*.d.ts` files into the worker).
@@ -72,14 +69,13 @@ type Partial<T> = { [P in keyof T]?: T[P] };
 type Readonly<T> = { readonly [P in keyof T]: T[P] };
 type Array_<T> = Array<T>;
 
-// ---- mongo shell API (subset mirrors shellCore shims) ----
+// ---- Mongosh API ----
 type Document = { [key: string]: any };
 
 interface Cursor {
   sort(spec: Document | string): Cursor;
   limit(value: number): Cursor;
   skip(value: number): Cursor;
-  project(spec: Document): Cursor;
   projection(spec: Document): Cursor;
   hint(index: Document | string): Cursor;
   collation(spec: Document): Cursor;
@@ -92,11 +88,11 @@ interface Cursor {
   showRecordId(value: boolean): Cursor;
   tailable(): Cursor;
   allowDiskUse(): Cursor;
-  addCursorFlag(flag: string, value: boolean): Cursor;
+  addOption(flag: number): Cursor;
   pretty(): Cursor;
   toArray(): Document[];
   forEach(fn: (doc: Document) => void): void;
-  map<U>(fn: (doc: Document) => U): U[];
+  map(fn: (doc: Document) => any): Cursor;
   hasNext(): boolean;
   next(): Document;
   count(): number;
@@ -106,10 +102,13 @@ interface Cursor {
 }
 
 interface AggregationCursor {
+  sort(spec: Document): AggregationCursor;
+  skip(value: number): AggregationCursor;
+  projection(spec: Document): AggregationCursor;
   pretty(): AggregationCursor;
   toArray(): Document[];
   forEach(fn: (doc: Document) => void): void;
-  map<U>(fn: (doc: Document) => U): U[];
+  map(fn: (doc: Document) => any): AggregationCursor;
   hasNext(): boolean;
   next(): Document;
   itcount(): number;
@@ -139,16 +138,15 @@ interface Collection {
   createIndexes(specs: Document[]): Document;
   dropIndex(index: string | Document): Document;
   dropIndexes(): Document;
-  indexes(): Document[];
   getIndexes(): Document[];
-  listIndexes(): Cursor;
   drop(): boolean;
-  rename(name: string, dropTarget?: boolean): Document;
+  renameCollection(name: string, dropTarget?: boolean): Document;
   watch(pipeline?: Document[], options?: Document): any;
   mapReduce(map: Function, reduce: Function, options: Document): Document;
 }
 
 interface Database {
+  getMongo(): Mongo;
   getCollection(name: string): Collection;
   getSiblingDB(name: string): Database;
   getCollectionNames(): string[];
@@ -159,14 +157,24 @@ interface Database {
   adminCommand(command: Document): Document;
   aggregate(pipeline?: Document[], options?: Document): AggregationCursor;
   stats(): Document;
-  listCollections(filter?: Document): Cursor;
   dropDatabase(): Document;
   createCollection(name: string, options?: Document): Document;
-  command(command: Document): Document;
-  admin(): Database;
   watch(pipeline?: Document[], options?: Document): any;
 }
 
+interface Mongo {
+  getDB(name: string): Database;
+  getDBNames(): string[];
+  startSession(options?: Document): Session;
+}
+interface Session {
+  getDatabase(name: string): Database;
+  startTransaction(options?: Document): void;
+  commitTransaction(): void;
+  abortTransaction(): void;
+  withTransaction<T>(fn: () => T, options?: Document): T;
+  endSession(): void;
+}
 declare const db: Database;
 
 // Explicit Node Driver escape hatch available in the Mongosh runtime.
@@ -197,7 +205,7 @@ interface DriverDatabase {
 }
 declare const driverDb: DriverDatabase;
 
-// ---- EJSON constructors (shellCore sandbox) ----
+// ---- BSON constructors and output ----
 declare function ObjectId(id?: string): any;
 declare function ISODate(s?: string): Date;
 declare function NumberLong(value: string | number): any;
@@ -216,9 +224,9 @@ declare function printjson(value: any): void;
  *  are skipped to avoid a property/method merge conflict that would break the
  *  whole interface (they still surface as db methods). */
 export const DATABASE_RESERVED = new Set([
-  'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'getName',
-  'version', 'runCommand', 'adminCommand', 'aggregate', 'stats', 'listCollections',
-  'dropDatabase', 'createCollection', 'command', 'admin', 'watch'
+  'getMongo', 'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'getName',
+  'version', 'runCommand', 'adminCommand', 'aggregate', 'stats',
+  'dropDatabase', 'createCollection', 'watch'
 ])
 
 const IDENT_RE = /^[A-Za-z_$][\w$]*$/

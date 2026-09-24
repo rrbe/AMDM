@@ -40,7 +40,6 @@ describe('connection-bound tabs', () => {
           connectionId: 'c2',
           activeDatabase: 'shop',
           code: 'db.orders.find({})',
-          runtime: 'mongosh',
           results: [
             {
               id: 'result',
@@ -72,7 +71,6 @@ describe('connection-bound tabs', () => {
       connectionId: 'c2',
       activeDatabase: 'shop',
       code: 'db.orders.find({})',
-      runtime: 'mongosh',
       pristine: false,
       results: [],
       running: false,
@@ -235,47 +233,7 @@ describe('connection-bound tabs', () => {
     expect(useAppStore.getState()).toBe(unchanged)
   })
 
-  it('keeps runtime per tab and clears results when it changes', () => {
-    const prepare = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('window', { api: { shell: { prepare } } })
-    useAppStore.setState({
-      tabs: [
-        createTab('c1-tab', {
-          connectionId: 'c1',
-          results: [
-            {
-              id: 'result-1',
-              seq: 1,
-              result: { kind: 'value', data: 1 },
-              executedAt: 1,
-              query: null,
-              skip: 0
-            }
-          ],
-          activeResultId: 'result-1',
-          resultSeq: 1
-        })
-      ]
-    })
 
-    useAppStore.getState().setShellRuntime('mongosh')
-
-    expect(useAppStore.getState().tabs[0]).toMatchObject({
-      runtime: 'mongosh',
-      results: [],
-      activeResultId: null,
-      resultSeq: 0
-    })
-    expect(prepare).toHaveBeenCalledWith('mongosh')
-  })
-
-  it('uses the configured runtime for new query tabs', () => {
-    useAppStore.setState({ settings: { ...DEFAULT_SETTINGS, defaultShellRuntime: 'legacy' } })
-
-    useAppStore.getState().newTab()
-
-    expect(useAppStore.getState().tabs.at(-1)?.runtime).toBe('legacy')
-  })
 
   it('loads a saved query into its bound connection without running it', () => {
     const execute = vi.fn()
@@ -811,7 +769,6 @@ describe('connection-bound tabs', () => {
         connectionId: 'c1',
         activeDatabase: 'test',
         code: `db.items.findOne({ index: ${index} })`,
-        runtime: 'mongosh'
       })
     )
     useAppStore.setState({
@@ -868,7 +825,6 @@ db.unselectedAfter.find({})`
           connectionId: 'c1',
           activeDatabase: 'shop',
           code: editorCode,
-          runtime: 'mongosh'
         })
       ],
       activeTabId: 'c1-tab'
@@ -876,55 +832,10 @@ db.unselectedAfter.find({})`
 
     await useAppStore.getState().runShell(selection)
 
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection, runtime: 'mongosh' }))
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ code: selection }))
     expect(useAppStore.getState().tabs[0].results[0].query?.code).toBe(selection)
-    expect(useAppStore.getState().tabs[0].results[0].query?.runtime).toBe('mongosh')
   })
 
-  it('asks before switching to the runtime required by an unambiguous construct', async () => {
-    const execute = vi.fn().mockResolvedValue({ kind: 'value', data: null } satisfies ShellResult)
-    const prepare = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('window', {
-      api: {
-        shell: { execute, prepare },
-        history: { list: vi.fn().mockResolvedValue([]) }
-      }
-    })
-    useAppStore.setState({
-      tabs: [
-        createTab('runtime-tab', {
-          connectionId: 'c1',
-          activeDatabase: 'test',
-          code: 'db.getMongo().startSession()',
-          runtime: 'legacy'
-        })
-      ],
-      activeTabId: 'runtime-tab'
-    })
-
-    await useAppStore.getState().runShell()
-
-    expect(execute).not.toHaveBeenCalled()
-    expect(useAppStore.getState().tabs[0]).toMatchObject({
-      runtime: 'legacy',
-      runtimeSuggestion: {
-        runtime: 'mongosh',
-        construct: 'db.getMongo()',
-        code: 'db.getMongo().startSession()'
-      }
-    })
-
-    useAppStore.getState().dismissShellRuntimeSuggestion()
-    expect(useAppStore.getState().tabs[0].runtimeSuggestion).toBeNull()
-    expect(execute).not.toHaveBeenCalled()
-
-    await useAppStore.getState().runShell()
-    await useAppStore.getState().acceptShellRuntimeSuggestion()
-
-    expect(useAppStore.getState().tabs[0].runtime).toBe('mongosh')
-    expect(prepare).toHaveBeenCalledWith('mongosh')
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'mongosh' }))
-  })
 })
 
 describe('result retention notice', () => {

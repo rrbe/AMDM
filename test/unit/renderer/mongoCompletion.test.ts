@@ -15,6 +15,14 @@ function complete(before: string, data: Partial<CompletionData> = {}): { from: n
 }
 
 describe('computeShellCompletion', () => {
+  it('offers official Mongosh methods in the fallback completer', () => {
+    expect(complete('db.').labels).toContain('getMongo')
+    expect(complete('db.').labels).not.toContain('listCollections')
+    expect(complete('db.items.').labels).toContain('getIndexes')
+    expect(complete('db.items.').labels).not.toContain('indexes')
+    expect(complete('db.items.find().').labels).toContain('projection')
+    expect(complete('db.items.find().').labels).not.toContain('project')
+  })
   it('db. → collection names + db methods', () => {
     const { labels, from } = complete('db.', { collections: ['users', 'orders'] })
     expect(labels).toContain('users')

@@ -7,7 +7,7 @@ import {
   evaluateMongosh,
   runMongoshOnClient,
 } from "../../src/main/mongo/mongoshCore";
-import { MAX_OUTPUT_LINES } from "../../src/main/mongo/shellCore";
+import { MAX_OUTPUT_LINES } from "../../src/main/mongo/shellSupport";
 
 let replicaSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -109,6 +109,32 @@ describe("official mongosh runtime compatibility", () => {
         { n: { $numberInt: "3" } },
       ],
     });
+  });
+
+  it("returns a bounded raw Driver cursor", async () => {
+    const result = await runMongoshOnClient(client,
+      'driverDb.collection("items").find().sort({ n: 1 })',
+      { database: "mongosh_spike", limit: 2 });
+    expect(result).toMatchObject({ kind: "documents", count: 2, truncated: true, pageable: true });
+    const next = await runMongoshOnClient(client,
+      'driverDb.collection("items").find().sort({ n: 1 })',
+      { database: "mongosh_spike", limit: 2, skip: 2 });
+    expect(next).toMatchObject({ kind: "documents", count: 1, truncated: false, skip: 2 });
+  });
+
+  it("bounds raw aggregation cursors without enabling paging", async () => {
+    const result = await runMongoshOnClient(client,
+      'driverDb.collection("items").aggregate([{ $sort: { n: 1 } }])',
+      { database: "mongosh_spike", limit: 2 });
+    expect(result).toMatchObject({ kind: "documents", count: 2, truncated: true, pageable: false });
+  });
+
+  it("supports explicit await for intermediate Driver calls", async () => {
+    const result = await runMongoshOnClient(client,
+      'const names = await driverDb.listCollections().toArray(); names.map(x => x.name)',
+      { database: "mongosh_spike" });
+    expect(result.kind).toBe("documents");
+    expect(result.data).toContain("items");
   });
 
   it("keeps driverDb reads inside the configured timeout", async () => {

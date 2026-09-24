@@ -41,20 +41,20 @@ import { methodCompletion, withCompletionInfo } from '@renderer/lib/completionIn
 // still works (less precisely) when the worker is unavailable.
 // --------------------------------------------------------------------------
 
-const DB_METHODS = ['getCollection', 'getSiblingDB', 'aggregate', 'runCommand', 'stats', 'listCollections']
+const DB_METHODS = ['getMongo', 'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'aggregate', 'runCommand', 'adminCommand', 'stats']
 
 const COLLECTION_METHODS = [
   'find', 'findOne', 'aggregate', 'countDocuments', 'estimatedDocumentCount', 'count', 'distinct',
   'insertOne', 'insertMany', 'updateOne', 'updateMany', 'replaceOne', 'deleteOne', 'deleteMany',
   'findOneAndUpdate', 'findOneAndReplace', 'findOneAndDelete', 'bulkWrite',
-  'createIndex', 'createIndexes', 'dropIndex', 'dropIndexes', 'indexes', 'listIndexes',
-  'drop', 'rename', 'watch', 'mapReduce'
+  'createIndex', 'createIndexes', 'dropIndex', 'dropIndexes', 'getIndexes',
+  'drop', 'renameCollection', 'watch', 'mapReduce'
 ]
 
 const CURSOR_METHODS = [
-  'sort', 'limit', 'skip', 'project', 'projection', 'count', 'toArray', 'forEach', 'map',
+  'sort', 'limit', 'skip', 'projection', 'count', 'toArray', 'forEach', 'map',
   'hasNext', 'next', 'explain', 'pretty', 'hint', 'collation', 'comment', 'batchSize', 'size',
-  'allowDiskUse', 'maxTimeMS', 'min', 'max', 'returnKey', 'showRecordId', 'tailable', 'addCursorFlag'
+  'allowDiskUse', 'maxTimeMS', 'min', 'max', 'returnKey', 'showRecordId', 'tailable', 'addOption'
 ]
 
 // --------------------------------------------------------------------------

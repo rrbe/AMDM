@@ -33,7 +33,6 @@ import type {
   SchemaTarget,
   ShellRequest,
   ShellResult,
-  ShellRuntime,
   TestResult,
   UpdateState,
   UserInfo
@@ -67,7 +66,6 @@ export const IPC = {
 
   shellExecute: 'shell:execute',
   shellAbort: 'shell:abort',
-  shellPrepare: 'shell:prepare',
 
   queriesList: 'queries:list',
   queriesSave: 'queries:save',
@@ -152,8 +150,6 @@ export interface Api {
     overwriteDraft(target: SchemaTarget): Promise<SchemaModel>
   }
   shell: {
-    /** Load runtime code before the first execution. */
-    prepare(runtime: ShellRuntime): Promise<void>
     execute(request: ShellRequest): Promise<ShellResult>
     /** Cancel an in-flight run by its `execId`. Resolves true if a matching
         run was found and signalled, false if it had already finished. */
