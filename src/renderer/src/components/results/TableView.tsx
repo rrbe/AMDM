@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
@@ -46,6 +46,8 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
  * VIRTUALIZATION APPROACH:
  *  - ROWS are virtualized with `useVirtualizer`; only visible rows (+ overscan)
  *    exist in the DOM, so a 100k-doc result renders the same handful of rows.
+ *  - Body columns are virtualized horizontally; the identity and focused column
+ *    stay mounted. Headers remain mounted for keyboard navigation and dragging.
  *  - Columns are derived ONCE (memoized on docs identity) by scanning every
  *    document for top-level field names, preserving first-seen order. We
  *    show nested values inline by default; grouped mode gives object fields
@@ -122,8 +124,13 @@ export function TableView({
   // Per-column widths (serialized field path → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const [tableSort, setTableSort] = useState<TableSortState | null>(null)
-  const widthOf = (col: TableColumn): number =>
-    colWidths[col.id] ?? (col.path[0] === '_id' ? Math.max(COL_WIDTH, Math.ceil(fontSize * 0.61 * 24) + 28) : COL_WIDTH)
+  const [draggingGroup, setDraggingGroup] = useState<string | null>(null)
+  const endColumnDrag = useCallback(() => setDraggingGroup(null), [])
+  const widthOf = useCallback(
+    (col: TableColumn): number =>
+      colWidths[col.id] ?? (col.path[0] === '_id' ? Math.max(COL_WIDTH, Math.ceil(fontSize * 0.61 * 24) + 28) : COL_WIDTH),
+    [colWidths, fontSize]
+  )
 
   // Selection: a set of whole rows, plus the one "focused" cell that gets an
   // extra overlay highlight on top of its (already selected) row. A single click
@@ -179,7 +186,7 @@ export function TableView({
     },
     [groups, setColumnOrder]
   )
-  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn)
+  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn, setDraggingGroup, endColumnDrag)
   const rows = useMemo(() => {
     const column = columns.find((column) => column.id === tableSort?.column)
     const sort = tableSort && column ? { ...tableSort, column: column.path } : null
@@ -196,6 +203,40 @@ export function TableView({
     estimateSize: () => fontSize + 11,
     overscan: 12
   })
+
+  const columnLayout = useMemo(
+    () => groups.flatMap((group, groupIndex) =>
+      group.columns.map((column) => ({ column, groupIndex, width: widthOf(column) }))
+    ),
+    [groups, widthOf]
+  )
+  const draggingColumnIndexes = useMemo(
+    () => columnLayout.flatMap((entry, index) => groups[entry.groupIndex].key === draggingGroup ? [index] : []),
+    [columnLayout, groups, draggingGroup]
+  )
+  const focusedColumnIndex = columns.findIndex((column) => column.id === (editing?.col.id ?? selectedCell?.col.id))
+  const columnVirtualizer = useVirtualizer({
+    horizontal: true,
+    count: columns.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => columnLayout[index].width,
+    getItemKey: (index) => columns[index].id,
+    paddingStart: INDEX_COL_WIDTH,
+    overscan: 2 + draggingColumnIndexes.length,
+    rangeExtractor: useCallback(
+      (range) => {
+        const indexes = new Set(defaultRangeExtractor(range))
+        if (hasPinnedId) indexes.add(0)
+        if (focusedColumnIndex >= 0) indexes.add(focusedColumnIndex)
+        for (const index of draggingColumnIndexes) indexes.add(index)
+        return [...indexes].sort((a, b) => a - b)
+      },
+      [hasPinnedId, focusedColumnIndex, draggingColumnIndexes]
+    )
+  })
+  const visibleColumns = columnVirtualizer.getVirtualItems()
+
+  useEffect(() => columnVirtualizer.measure(), [columnLayout, columnVirtualizer])
 
   useEffect(() => rowVirtualizer.measure(), [fontSize, headerHeight, rowVirtualizer])
 
@@ -434,13 +475,18 @@ export function TableView({
                   {vi.index + 1}
                 </div>
               </Tooltip>
-              {groups.flatMap((group, groupIndex) =>
-                group.columns.map((col) => (
+              {visibleColumns.map((item) => {
+                const { column: col, groupIndex } = columnLayout[item.index]
+                const style = groupStyle(item.size, groupIndex)
+                return (
                   <Cell
                     key={col.id}
                     doc={doc}
                     column={col}
-                    style={groupStyle(widthOf(col), groupIndex)}
+                    style={hasPinnedId && item.index === 0
+                      ? style
+                      : { ...style, position: 'absolute', left: item.start }
+                    }
                     selected={selectedCell?.row === sourceIndex && selectedCell?.col.id === col.id}
                     editing={editing?.row === sourceIndex && editing?.col.id === col.id}
                     editError={editError}
@@ -463,8 +509,8 @@ export function TableView({
                     }}
                     onContextMenu={(e) => openMenu(e, sourceIndex, col)}
                   />
-                ))
-              )}
+                )
+              })}
             </div>
           )
         })}

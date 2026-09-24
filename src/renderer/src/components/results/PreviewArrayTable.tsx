@@ -24,18 +24,27 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
     estimateSize: () => rowHeight,
     overscan: 12
   })
+  const columnVirtualizer = useVirtualizer({
+    horizontal: true,
+    count: columns.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => COLUMN_WIDTH,
+    paddingStart: INDEX_WIDTH,
+    overscan: 2
+  })
+  const visibleColumns = columnVirtualizer.getVirtualItems()
   const width = INDEX_WIDTH + columns.length * COLUMN_WIDTH
 
   if (value.length === 0) return <div className="center-msg muted">{t('table.noDocuments')}</div>
 
   return (
-    <div ref={scrollRef} className="table-scroller" style={{ fontSize, ['--data-font-size' as string]: `${fontSize}px` }}>
+    <div ref={scrollRef} className="table-scroller has-pinned-id" style={{ fontSize, ['--data-font-size' as string]: `${fontSize}px` }}>
       <div className="tbl" style={{ width, height: virtualizer.getTotalSize() + rowHeight }}>
         <div className="tbl-head" style={{ width, height: rowHeight }}>
           <div className="tbl-th idx" style={{ width: INDEX_WIDTH }}>#</div>
-          {columns.map((column) => (
-            <div key={column} className="tbl-th" style={{ width: COLUMN_WIDTH, paddingLeft: 10 }} title={column}>
-              {column}
+          {visibleColumns.map((item) => (
+            <div key={item.key} className="tbl-th" style={{ position: 'absolute', left: item.start, width: item.size, paddingLeft: 10 }} title={columns[item.index]}>
+              {columns[item.index]}
             </div>
           ))}
         </div>
@@ -46,7 +55,8 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
             style={{ width, transform: `translateY(${row.start + rowHeight}px)` }}
           >
             <div className="tbl-td idx" style={{ width: INDEX_WIDTH }}>{row.index + 1}</div>
-            {columns.map((column) => {
+            {visibleColumns.map((item) => {
+              const column = columns[item.index]
               const cell = cellValue(value[row.index], column)
               const nested = cell.present && (Array.isArray(cell.value) || (isPlainObject(cell.value) && !isExtended(cell.value)))
               const tokens = nested ? toInlineJsonTokens(cell.value) : null
@@ -55,7 +65,7 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
                 <div
                   key={column}
                   className="tbl-td"
-                  style={{ width: COLUMN_WIDTH }}
+                  style={{ position: 'absolute', left: item.start, width: item.size }}
                   title={scalar?.text}
                 >
                   {!cell.present ? (

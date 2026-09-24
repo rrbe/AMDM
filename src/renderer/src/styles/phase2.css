@@ -272,22 +272,28 @@
   background: var(--bg-1);
 }
 .explain-raw > summary {
+  position: relative;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 12px 48px 12px 12px;
   color: var(--fg-1);
   user-select: none;
 }
+.explain-fold-action {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  display: inline-flex;
+  transform: translateY(-50%);
+}
+.explain-raw:not([open]) .explain-fold-action {
+  display: none;
+}
 .explain-raw-box {
-  max-height: 320px;
-  overflow: auto;
-  padding: 8px 12px;
+  overflow: hidden;
   border-top: 1px solid var(--border);
 }
-.explain-raw-line {
-  margin: 0;
-  white-space: pre;
-  line-height: 1.45;
-  color: var(--fg-1);
+.explain-raw-box .foldable-json-lines {
+  height: 100%;
 }
 
 /* ---- Document editor (DocEditor) ---- */

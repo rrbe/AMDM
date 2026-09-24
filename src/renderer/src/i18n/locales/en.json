@@ -527,7 +527,11 @@
   },
   "json": {
     "noOutput": "No output.",
-    "copySelection": "Copy selection"
+    "copySelection": "Copy selection",
+    "collapseNode": "Collapse JSON value",
+    "expandNode": "Expand JSON value",
+    "collapseAll": "Collapse all",
+    "expandAll": "Expand all"
   },
   "table": {
     "noDocuments": "No documents.",

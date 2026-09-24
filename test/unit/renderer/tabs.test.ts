@@ -260,6 +260,17 @@ describe('appendResult', () => {
 })
 
 describe('patchResult', () => {
+  it('retains folding through view changes and clears it when the result changes', () => {
+    const tab = tabWithResults(2)
+    tab.results[0].foldedLines = { json: [1, 5], console: [0] }
+    const switched = patchResult(tab, 'r1', { resultView: 'table' }).results!
+    expect(switched[0].foldedLines).toEqual({ json: [1, 5], console: [0] })
+    expect(switched[1]).toBe(tab.results[1])
+    const refreshed = patchResult({ ...tab, results: switched }, 'r1', { result: docsResult() }).results!
+    expect(refreshed[0].foldedLines).toBeUndefined()
+    expect(refreshed[1]).toBe(tab.results[1])
+  })
+
   it('patches only the target result and keeps others by reference', () => {
     const tab = tabWithResults(2)
     const [a] = tab.results

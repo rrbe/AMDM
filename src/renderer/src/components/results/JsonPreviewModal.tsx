@@ -47,6 +47,7 @@ export function JsonPreviewModal({
   const [copied, setCopied] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [view, setView] = useState<'json' | 'table'>('json')
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   const copyTimer = useRef<number | null>(null)
   const refreshTask = useRef<string | null>(null)
   const canRefresh = source?.id !== undefined && onValueChange != null
@@ -159,6 +160,7 @@ export function JsonPreviewModal({
         ) : undefined
       }
       compactHeader
+      bodyClassName="p-3"
       className={documentView ? 'h-[560px] min-h-[420px]' : undefined}
       backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
       headerActions={
@@ -179,6 +181,7 @@ export function JsonPreviewModal({
               <span className="selection-indicator" aria-hidden="true" />
             </div>
           )}
+          <span className="inline-flex" ref={setFoldControls} />
           <Button
             variant="ghost"
             size="sm"
@@ -198,11 +201,11 @@ export function JsonPreviewModal({
       }
       onClose={close}
     >
-      <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
+      <div className="h-full min-h-0 overflow-hidden">
         {view === 'table' && Array.isArray(value) ? (
           <PreviewArrayTable value={value} fontSize={fontSize} />
         ) : (
-          <JsonView value={value} fontSize={fontSize} />
+          <JsonView value={value} fontSize={fontSize} controlsContainer={foldControls} />
         )}
       </div>
     </ResizableModal>

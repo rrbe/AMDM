@@ -8,6 +8,7 @@
 import type { ShellResult, ShellRuntime } from '@shared/types'
 
 export type ResultView = 'tree' | 'json' | 'table'
+export type ResultFoldView = 'json' | 'console' | 'explain'
 
 /** The query that produced a result (refresh / paging / doc-edit target). */
 export interface ResultQuery {
@@ -22,6 +23,7 @@ export interface ResultTab {
   id: string
   /** Selected Tree/JSON/Table view for this result tab. */
   resultView?: ResultView
+  foldedLines?: Partial<Record<ResultFoldView, number[]>>
   /** 1-based run sequence within its query tab (drives the "结果 N" label).
       Monotonic — eviction of old results never renumbers survivors. */
   seq: number
@@ -254,7 +256,11 @@ export function appendResult(
 /** Immutably patch one result tab by id (no-op shape when the id is absent —
     e.g. the tab was closed while its page load was in flight). */
 export function patchResult(tab: QueryTab, resultId: string, patch: Partial<ResultTab>): Partial<QueryTab> {
-  return { results: tab.results.map((r) => (r.id === resultId ? { ...r, ...patch } : r)) }
+  return {
+    results: tab.results.map((r) => r.id === resultId
+      ? { ...r, ...patch, foldedLines: patch.result && patch.result !== r.result ? undefined : patch.foldedLines ?? r.foldedLines }
+      : r)
+  }
 }
 
 /** Close one result tab, moving focus to a neighbor when it was active. */

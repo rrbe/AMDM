@@ -24,6 +24,8 @@ export interface JsonLine {
   text: string
   /** Same content split into colored segments, for the syntax-highlighted view. */
   tokens: JsonToken[]
+  /** Non-empty container: the matching closing line and its punctuation. */
+  fold?: { end: number; closeText: string }
 }
 
 const INDENT = '  '
@@ -156,6 +158,7 @@ function pushLines(
     return
   }
 
+  const start = out.length
   out.push({ depth, text: `${keyPrefix}${open}`, tokens: [...keyToks, punct(open)] })
   entries.forEach(([k, v], i) => {
     const last = i === entries.length - 1
@@ -163,6 +166,7 @@ function pushLines(
     pushLines(v, depth + 1, childKey, !last, out)
   })
   out.push({ depth, text: `${close}${comma}`, tokens: [punct(close), ...commaToks] })
+  out[start].fold = { end: out.length - 1, closeText: `${close}${comma}` }
 }
 
 /** Flatten any EJSON value into virtualizable lines. */
@@ -170,6 +174,17 @@ export function toJsonLines(value: unknown): JsonLine[] {
   const out: JsonLine[] = []
   pushLines(value, 0, null, false, out)
   return out
+}
+
+/** Project the full line array onto visible rows without visiting hidden subtrees. */
+export function visibleJsonLineIndexes(lines: readonly { fold?: JsonLine['fold'] }[], collapsed: ReadonlySet<number>): number[] {
+  const visible: number[] = []
+  for (let index = 0; index < lines.length; index++) {
+    visible.push(index)
+    const fold = lines[index].fold
+    if (fold && collapsed.has(index)) index = fold.end
+  }
+  return visible
 }
 
 /** Indentation string for a given depth (exported for the view to apply). */
