@@ -16,11 +16,12 @@ import { FoldableJsonLines } from './FoldableJsonLines'
 interface ConsoleViewProps {
   output: ShellOutputLine[]
   fontSize: number
+  controlsContainer: HTMLElement | null
   /** True when the engine dropped lines beyond the capture cap. */
   truncated?: boolean
 }
 
-export function ConsoleView({ output, fontSize, truncated }: ConsoleViewProps): React.JSX.Element {
+export function ConsoleView({ output, fontSize, truncated, controlsContainer }: ConsoleViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const lines = useMemo(() => toConsoleLines(output), [output])
 
@@ -32,6 +33,7 @@ export function ConsoleView({ output, fontSize, truncated }: ConsoleViewProps): 
       <FoldableJsonLines
         lines={lines}
         fontSize={fontSize}
+        controlsContainer={controlsContainer}
         includeRootInCollapseAll
         rowClassName={(line) => `console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
       />

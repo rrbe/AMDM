@@ -327,7 +327,7 @@
 }
 .json-line pre {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 28px;
   white-space: pre;
 }
 .foldable-json-lines {
@@ -341,48 +341,64 @@
   flex: 1;
   min-height: 0;
   height: auto;
+  padding: 12px;
 }
-.json-fold-toolbar {
-  display: flex;
+.json-fold-action {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
   height: 28px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--separator);
-  flex: 0 0 auto;
-}
-.json-fold-toolbar button {
-  padding: 2px 0;
+  padding: 0;
   border: 0;
+  border-radius: 4px;
   background: transparent;
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
+  color: var(--text-secondary);
 }
-.json-fold-toolbar button:hover:not(:disabled) {
-  background: transparent;
-  color: var(--fg-1);
-}
-.json-fold-toolbar button:disabled {
-  opacity: 0.45;
+.json-fold-action:hover:not(:disabled) {
+  background: var(--interaction-hover);
+  color: var(--text-primary);
 }
 .json-fold-toggle {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 18px;
-  height: 100%;
+  left: 3px;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: calc(100% - 4px);
   padding: 0;
   border: 0;
+  border-radius: 3px;
   background: transparent;
-  color: var(--fg-2);
-  text-align: center;
+  color: var(--text-secondary);
 }
-.json-fold-toggle:hover {
-  color: var(--fg-1);
+.json-fold-toggle[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.json-fold-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
   background: var(--interaction-hover);
 }
+.json-fold-summary {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  margin: 0 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 3px;
+  vertical-align: baseline;
+  background: var(--interaction-hover);
+  color: var(--text-secondary);
+  font: inherit;
+  line-height: 1;
+}
 .json-fold-toggle:focus-visible,
-.json-fold-toolbar button:focus-visible {
+.json-fold-summary:focus-visible,
+.json-fold-action:focus-visible {
   outline: 2px solid var(--separator-strong);
   outline-offset: -2px;
 }

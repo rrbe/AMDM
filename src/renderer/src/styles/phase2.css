@@ -272,10 +272,21 @@
   background: var(--bg-1);
 }
 .explain-raw > summary {
+  position: relative;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 12px 48px 12px 12px;
   color: var(--fg-1);
   user-select: none;
+}
+.explain-fold-action {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  display: inline-flex;
+  transform: translateY(-50%);
+}
+.explain-raw:not([open]) .explain-fold-action {
+  display: none;
 }
 .explain-raw-box {
   overflow: hidden;

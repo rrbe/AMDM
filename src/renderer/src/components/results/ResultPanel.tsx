@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
@@ -63,6 +63,7 @@ export function ResultPanel({
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const setView = useAppStore((s) => s.setResultView)
   const docCtx = docActionContext(result, active?.query ?? null)
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
   const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
@@ -190,6 +191,7 @@ export function ResultPanel({
         <ErrorView
           result={result}
           compact={hasOutput}
+          actions={<span className="inline-flex" ref={setFoldControls} />}
           copied={copied}
           onCopy={copyWithFeedback}
           expanded={expanded}
@@ -197,7 +199,7 @@ export function ResultPanel({
         />
         {hasOutput && (
           <div className="result-body">
-            <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
+            <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
           </div>
         )}
       </div>
@@ -277,6 +279,7 @@ export function ResultPanel({
         <span className="result-bar-spacer" />
         {result.kind === 'documents' && <PageSizeControl />}
         {result.kind === 'documents' && <ResultPager result={result} />}
+        <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
           className="ghost result-action"
@@ -300,7 +303,7 @@ export function ResultPanel({
 
       <div className="result-body">
         {showConsole ? (
-          <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
+          <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
         ) : (
           <>
             {view === 'tree' && (
@@ -313,7 +316,7 @@ export function ResultPanel({
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} />}
+            {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}
@@ -570,6 +573,7 @@ function PageSizeControl(): React.JSX.Element {
 }
 
 function ErrorView({
+  actions,
   result,
   compact,
   copied,
@@ -579,6 +583,7 @@ function ErrorView({
 }: {
   result: ShellResult
   compact?: boolean
+  actions?: ReactNode
   copied: boolean
   onCopy: (text: string) => void
   expanded: boolean
@@ -597,6 +602,7 @@ function ErrorView({
             <div className="error-name">{name}</div>
             <div className="error-msg">{message}</div>
           </div>
+          {actions}
           <button
             className="ghost result-action shrink-0"
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}

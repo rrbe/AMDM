@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import { indentFor, visibleJsonLineIndexes, type JsonLine, type JsonToken } from '@renderer/lib/format'
@@ -14,6 +17,7 @@ interface FoldableLine {
 interface Props<T extends FoldableLine> {
   lines: T[]
   fontSize: number
+  controlsContainer: HTMLElement | null
   rowClassName?: (line: T) => string
   allSelected?: boolean
   includeRootInCollapseAll?: boolean
@@ -27,6 +31,7 @@ const EMPTY_COLLAPSED = new Set<number>()
 export function FoldableJsonLines<T extends FoldableLine>({
   lines,
   fontSize,
+  controlsContainer,
   rowClassName,
   allSelected = false,
   includeRootInCollapseAll = false,
@@ -47,8 +52,9 @@ export function FoldableJsonLines<T extends FoldableLine>({
     })
     return indexes
   }, [lines, includeRootInCollapseAll])
+  const hasCollapsed = collapsed.size > 0
   const visible = useMemo(() => visibleJsonLineIndexes(lines, collapsed), [lines, collapsed])
-  const rowHeight = fontSize + 6
+  const rowHeight = Math.max(22, fontSize + 8)
   const virtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => scrollRef.current,
@@ -68,26 +74,24 @@ export function FoldableJsonLines<T extends FoldableLine>({
 
   return (
     <div className="foldable-json-lines" style={{ fontSize }}>
-      {foldable.length > 0 && (
-        <div className="json-fold-toolbar">
+      {foldable.length > 0 && controlsContainer && createPortal(
+        <Tooltip content={t(hasCollapsed ? 'json.expandAll' : 'json.collapseAll')}>
           <button
             type="button"
-            disabled={foldable.every((index) => collapsed.has(index))}
-            onClick={() => setCollapsed((current) => new Set([
-              ...foldable,
-              ...[...current].filter((index) => lines[index]?.depth === 0)
-            ]))}
+            className="json-fold-action"
+            aria-label={t(hasCollapsed ? 'json.expandAll' : 'json.collapseAll')}
+            aria-expanded={!hasCollapsed}
+            onClick={(event) => {
+              event.preventDefault()
+              setCollapsed(() => hasCollapsed ? new Set() : new Set(foldable))
+            }}
           >
-            {t('json.collapseAll')}
+            {hasCollapsed
+              ? <ChevronsUpDown size={14} aria-hidden="true" />
+              : <ChevronsDownUp size={14} aria-hidden="true" />}
           </button>
-          <button
-            type="button"
-            disabled={collapsed.size === 0}
-            onClick={() => setCollapsed(() => new Set())}
-          >
-            {t('json.expandAll')}
-          </button>
-        </div>
+        </Tooltip>,
+        controlsContainer
       )}
       <div
         ref={scrollRef}
@@ -106,9 +110,12 @@ export function FoldableJsonLines<T extends FoldableLine>({
             const line = lines[index]
             const fold = line.fold
             const isCollapsed = fold != null && collapsed.has(index)
-            const tokens = isCollapsed && fold
-              ? [...(line.tokens ?? []), { text: ' … ', cls: 'json-punct' }, { text: fold.closeText, cls: 'json-punct' }]
-              : line.tokens
+            const toggle = (): void => setCollapsed((current) => {
+              const next = new Set(current)
+              if (next.has(index)) next.delete(index)
+              else next.add(index)
+              return next
+            })
             return (
               <div
                 key={index}
@@ -119,24 +126,32 @@ export function FoldableJsonLines<T extends FoldableLine>({
                   <button
                     type="button"
                     className="json-fold-toggle"
-                    style={{ left: `${line.depth * 2}ch` }}
                     aria-label={t(isCollapsed ? 'json.expandNode' : 'json.collapseNode')}
                     aria-expanded={!isCollapsed}
-                    onClick={() => setCollapsed((current) => {
-                      const next = new Set(current)
-                      if (next.has(index)) next.delete(index)
-                      else next.add(index)
-                      return next
-                    })}
+                    onClick={toggle}
                   >
-                    {isCollapsed ? '▸' : '▾'}
+                    <ChevronRight size={12} aria-hidden="true" />
                   </button>
                 )}
                 <pre>
                   {indentFor(line.depth)}
-                  {tokens ? tokens.map((token, tokenIndex) => (
+                  {line.tokens ? line.tokens.map((token, tokenIndex) => (
                     <span key={tokenIndex} className={token.cls}>{token.text}</span>
                   )) : line.text}
+                  {isCollapsed && fold && (
+                    <>
+                      <button
+                        type="button"
+                        className="json-fold-summary"
+                        aria-label={t('json.expandNode')}
+                        onClick={(event) => {
+                          event.currentTarget.closest('.json-line')?.querySelector<HTMLButtonElement>('.json-fold-toggle')?.focus()
+                          toggle()
+                        }}
+                      >…</button>
+                      <span className="json-punct">{fold.closeText}</span>
+                    </>
+                  )}
                 </pre>
               </div>
             )

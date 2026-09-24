@@ -32,9 +32,10 @@ import { FoldableJsonLines } from './FoldableJsonLines'
 interface JsonViewProps {
   value: unknown
   fontSize: number
+  controlsContainer: HTMLElement | null
 }
 
-export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element {
+export function JsonView({ value, fontSize, controlsContainer }: JsonViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
@@ -87,6 +88,7 @@ export function JsonView({ value, fontSize }: JsonViewProps): React.JSX.Element 
       <FoldableJsonLines
         lines={lines}
         fontSize={fontSize}
+        controlsContainer={controlsContainer}
         allSelected={allSelected}
         onMouseDown={() => setAllSelected(false)}
         onContextMenu={openMenu}

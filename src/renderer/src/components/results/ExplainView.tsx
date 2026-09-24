@@ -15,7 +15,7 @@
  * just presentation. Unknown shapes yield an empty tree and fall back to the
  * raw JSON — nothing here throws.
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toJsonLines } from '@renderer/lib/format'
 import { parseExplain, type StageTreeNode } from '@renderer/lib/explain'
@@ -35,8 +35,8 @@ export function ExplainView({ plan, fontSize }: ExplainViewProps): React.JSX.Ele
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan), [plan])
-  const rawToolbarHeight = rawLines.some((line) => line.fold && line.depth > 0) ? 28 : 0
-  const rawHeight = Math.min(320, rawLines.length * (fontSize + 6) + rawToolbarHeight + 16)
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
+  const rawHeight = Math.min(320, rawLines.length * Math.max(22, fontSize + 8) + 24)
 
   return (
     <div className="explain-view">
@@ -66,9 +66,9 @@ export function ExplainView({ plan, fontSize }: ExplainViewProps): React.JSX.Ele
       </div>
 
       <details className="explain-raw">
-        <summary>{t('explain.rawJson')}</summary>
+        <summary>{t('explain.rawJson')}<span className="explain-fold-action" ref={setFoldControls} /></summary>
         <div className="explain-raw-box" style={{ height: rawHeight }}>
-          <FoldableJsonLines lines={rawLines} fontSize={fontSize} />
+          <FoldableJsonLines lines={rawLines} fontSize={fontSize} controlsContainer={foldControls} />
         </div>
       </details>
     </div>

@@ -157,6 +157,7 @@ export function JsonPreviewModal({
         ) : undefined
       }
       compactHeader
+      bodyClassName="p-3"
       className={documentView ? 'h-[560px] min-h-[420px]' : undefined}
       backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
       headerActions={
@@ -180,8 +181,8 @@ export function JsonPreviewModal({
       }
       onClose={close}
     >
-      <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
-        <JsonView value={value} fontSize={fontSize} />
+      <div className="h-full min-h-0 overflow-hidden">
+        <JsonView value={value} fontSize={fontSize} controlsContainer={null} />
       </div>
     </ResizableModal>
   )
