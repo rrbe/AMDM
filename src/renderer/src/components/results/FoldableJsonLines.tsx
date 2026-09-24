@@ -6,6 +6,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import { indentFor, visibleJsonLineIndexes, type JsonLine, type JsonToken } from '@renderer/lib/format'
 import { claimCopyFocus } from '@renderer/lib/useCopyHotkey'
+import { useJsonSelection } from '@renderer/lib/useJsonSelection'
 
 interface FoldableLine {
   depth: number
@@ -47,6 +48,7 @@ export function FoldableJsonLines<T extends FoldableLine>({
 }: Props<T>): React.JSX.Element {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
+  useJsonSelection(scrollRef)
   const [foldState, setFoldState] = useState<{ lines: T[]; collapsed: Set<number> }>(() => ({
     lines,
     collapsed: new Set()

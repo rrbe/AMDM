@@ -318,17 +318,38 @@
 
 /* ------------------------------------------------------------- json result */
 .json-line {
+  --json-gutter-width: 28px;
+  isolation: isolate;
   cursor: text;
   padding-right: 12px;
   font-family: var(--font-mono);
 }
-.json-line:hover {
+.json-line:hover::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: 0 0 0 var(--json-gutter-width);
   background: var(--interaction-hover);
 }
 .json-line pre {
   margin: 0;
-  padding-left: 28px;
+  padding-left: var(--json-gutter-width);
   white-space: pre;
+}
+.json-custom-selection ::selection {
+  background: transparent;
+}
+.json-text-selected::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  left: var(--json-selection-left);
+  width: var(--json-selection-width);
+  background: var(--code-selection);
 }
 .foldable-json-lines {
   display: flex;
