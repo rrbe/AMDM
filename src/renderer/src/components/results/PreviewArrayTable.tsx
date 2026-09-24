@@ -13,8 +13,16 @@ const INDEX_WIDTH = 56
 const COLUMN_WIDTH = 200
 
 /** Read-only, virtualized table for an array already loaded in a value preview. */
-export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontSize: number }): React.JSX.Element {
+interface PreviewArrayTableProps {
+  value: unknown[]
+  fontSize: number
+  onOpen: (value: unknown, label: string, trigger: HTMLElement) => void
+}
+
+export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTableProps): React.JSX.Element {
   const { t } = useTranslation()
+  const openLabel = t('result.previewOpen')
+  const openHint = t('result.previewOpenHint')
   const sort = useAppStore((state) => state.settings.collectionSort)
   const columns = useMemo(() => previewArrayColumns(value, sort), [value, sort])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -62,10 +70,21 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
               const nested = cell.present && (Array.isArray(cell.value) || (isPlainObject(cell.value) && !isExtended(cell.value)))
               const tokens = nested ? toInlineJsonTokens(cell.value) : null
               const scalar = cell.present && !nested ? formatScalar(cell.value) : null
+              const path = `[${row.index}]${column.field === null ? '' : `[${JSON.stringify(column.field)}]`}`
               const content = (
                 <div
                   key={item.key}
-                  className="tbl-td"
+                  className={`tbl-td${nested ? ' cursor-pointer hover:bg-[var(--interaction-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--separator-strong)] focus-visible:-outline-offset-1' : ''}`}
+                  role={nested ? 'button' : undefined}
+                  tabIndex={nested ? 0 : undefined}
+                  aria-label={nested ? `${openLabel}: ${path}` : undefined}
+                  onClick={nested ? (event) => onOpen(cell.value, path, event.currentTarget) : undefined}
+                  onKeyDown={nested ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.currentTarget.click()
+                    }
+                  } : undefined}
                   style={{ position: 'absolute', left: item.start, width: item.size }}
                   title={scalar?.text}
                 >
@@ -83,6 +102,7 @@ export function PreviewArrayTable({ value, fontSize }: { value: unknown[]; fontS
                   key={item.key}
                   content={() => formatJsonPreview(cell.value).text}
                   variant="code"
+                  footer={openHint}
                 >
                   {content}
                 </Tooltip>
