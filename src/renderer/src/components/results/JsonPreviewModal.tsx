@@ -8,6 +8,7 @@ import { docHasId } from '@renderer/lib/docActions'
 import { cellValue, type TableColumnPath } from '@renderer/lib/tableShape'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { JsonView } from './JsonView'
+import { PreviewArrayTable } from './PreviewArrayTable'
 
 export interface JsonPreviewSource {
   connectionId: string
@@ -45,6 +46,7 @@ export function JsonPreviewModal({
   const notify = useAppStore((state) => state.notify)
   const [copied, setCopied] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [view, setView] = useState<'json' | 'table'>('json')
   const copyTimer = useRef<number | null>(null)
   const refreshTask = useRef<string | null>(null)
   const canRefresh = source?.id !== undefined && onValueChange != null
@@ -161,6 +163,22 @@ export function JsonPreviewModal({
       backdropClassName="fixed inset-0 z-[1000] bg-[var(--backdrop-dialog)]"
       headerActions={
         <>
+          {Array.isArray(value) && (
+            <div className="view-switch sliding-selection" role="group" aria-label={t('result.dataMenu.view')}>
+              {(['json', 'table'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={view === mode ? 'active is-selected' : ''}
+                  aria-pressed={view === mode}
+                  onClick={() => setView(mode)}
+                >
+                  {mode === 'json' ? 'JSON' : t('result.view.table')}
+                </button>
+              ))}
+              <span className="selection-indicator" aria-hidden="true" />
+            </div>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -181,7 +199,11 @@ export function JsonPreviewModal({
       onClose={close}
     >
       <div className="h-full min-h-0 overflow-hidden rounded-md border border-[var(--separator)] p-3">
-        <JsonView value={value} fontSize={fontSize} />
+        {view === 'table' && Array.isArray(value) ? (
+          <PreviewArrayTable value={value} fontSize={fontSize} />
+        ) : (
+          <JsonView value={value} fontSize={fontSize} />
+        )}
       </div>
     </ResizableModal>
   )
