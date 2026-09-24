@@ -453,6 +453,10 @@
     }
   },
   "result": {
+    "previewOpen": "開啟",
+    "previewOpenHint": "點擊或按 Enter 查看完整內容",
+    "previewPath": "預覽路徑",
+    "previewBack": "返回上一層",
     "noResults": "執行查詢以查看結果。",
     "closeTab": "關閉結果",
     "explainTag": "Explain",

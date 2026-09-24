@@ -453,6 +453,10 @@
     }
   },
   "result": {
+    "previewOpen": "打开",
+    "previewOpenHint": "点击或按 Enter 查看完整内容",
+    "previewPath": "预览路径",
+    "previewBack": "返回上一级",
     "noResults": "运行查询以查看结果。",
     "closeTab": "关闭结果",
     "explainTag": "Explain",

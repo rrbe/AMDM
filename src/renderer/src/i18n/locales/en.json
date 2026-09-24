@@ -453,6 +453,10 @@
     }
   },
   "result": {
+    "previewOpen": "Open",
+    "previewOpenHint": "Click or press Enter to inspect",
+    "previewPath": "Preview path",
+    "previewBack": "Back to parent",
     "noResults": "Run a query to see results.",
     "closeTab": "Close result",
     "explainTag": "Explain",
