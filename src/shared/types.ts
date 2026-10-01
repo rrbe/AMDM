@@ -113,6 +113,8 @@ export interface ConnectionInput extends Omit<
   ConnectionConfig,
   'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
 > {
+  /** Create a new connection, inheriting unchanged secrets from this saved connection. */
+  copyFromId?: string
   password?: string
   sshPassword?: string
   sshPassphrase?: string

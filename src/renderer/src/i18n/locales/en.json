@@ -185,10 +185,12 @@
     "schemaOverwritten": "Draft replaced with the analysis result"
   },
   "connection": {
+    "copyName": "{{name}} (copy)",
     "menu": {
       "connect": "Connect",
       "disconnect": "Disconnect",
       "edit": "Edit",
+      "duplicate": "Duplicate",
       "delete": "Delete Connection",
       "deleteConfirm": "Delete connection “{{name}}”?"
     },

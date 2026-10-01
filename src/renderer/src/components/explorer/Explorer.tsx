@@ -215,6 +215,7 @@ export function Explorer({
   const [connForm, setConnForm] = useState<{
     open: boolean
     editing?: ConnectionConfig
+    copyFromId?: string
   }>({
     open: false
   })
@@ -268,6 +269,21 @@ export function Explorer({
           label: t('connection.menu.edit'),
           icon: <Pencil size={14} />,
           onClick: () => setConnForm({ open: true, editing: row.conn })
+        },
+        {
+          label: t('connection.menu.duplicate'),
+          icon: <Copy size={14} />,
+          onClick: () => {
+            const baseName = t('connection.copyName', { name: row.conn.name })
+            const names = new Set(connections.map((c) => c.name))
+            let name = baseName
+            for (let suffix = 2; names.has(name); suffix++) name = `${baseName} ${suffix}`
+            setConnForm({
+              open: true,
+              editing: { ...row.conn, id: '', name },
+              copyFromId: row.id
+            })
+          }
         },
         {
           label: t('connection.menu.delete'),
@@ -683,7 +699,13 @@ export function Explorer({
         </Tooltip>
       </div>
 
-      {connForm.open && <ConnectionForm editing={connForm.editing} onClose={() => setConnForm({ open: false })} />}
+      {connForm.open && (
+        <ConnectionForm
+          editing={connForm.editing}
+          copyFromId={connForm.copyFromId}
+          onClose={() => setConnForm({ open: false })}
+        />
+      )}
 
       {ioModal && ioModal.mode === 'export' && (
         <ExportModal

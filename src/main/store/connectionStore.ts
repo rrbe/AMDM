@@ -95,9 +95,15 @@ class ConnectionStore {
   }
 
   saveConnection(input: ConnectionInput): ConnectionConfig {
+    const source = input.copyFromId
+      ? this.data.connections.find((c) => c.id === input.copyFromId)
+      : undefined
+    if (input.copyFromId && !source) throw new Error('Source connection not found')
+
     const now = Date.now()
-    const id = input.id || randomUUID()
+    const id = input.copyFromId ? randomUUID() : input.id || randomUUID()
     const existing = this.data.connections.find((c) => c.id === id)
+    const secrets = source ?? existing
 
     const stored: StoredConnection = {
       id,
@@ -112,10 +118,10 @@ class ConnectionStore {
       auth: input.auth,
       ssh: input.ssh,
       tls: input.tls,
-      encPassword: this.nextSecret(existing?.encPassword, input.password),
-      encSshPassword: this.nextSecret(existing?.encSshPassword, input.sshPassword),
-      encSshPassphrase: this.nextSecret(existing?.encSshPassphrase, input.sshPassphrase),
-      encJumpSshPassphrase: this.nextSecret(existing?.encJumpSshPassphrase, input.jumpSshPassphrase),
+      encPassword: this.nextSecret(secrets?.encPassword, input.password),
+      encSshPassword: this.nextSecret(secrets?.encSshPassword, input.sshPassword),
+      encSshPassphrase: this.nextSecret(secrets?.encSshPassphrase, input.sshPassphrase),
+      encJumpSshPassphrase: this.nextSecret(secrets?.encJumpSshPassphrase, input.jumpSshPassphrase),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
     }

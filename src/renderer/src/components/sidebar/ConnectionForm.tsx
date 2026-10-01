@@ -52,6 +52,7 @@ function optionRows(options: ConnectionOption[]): OptionRow[] {
 
 interface ConnectionFormProps {
   editing?: ConnectionConfig
+  copyFromId?: string
   onClose: () => void
 }
 
@@ -142,7 +143,7 @@ function DiagnoseControl({
  * exports the current fields OUT as a connection string. They never share a
  * live field, so neither drives the other.
  */
-export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React.JSX.Element {
+export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormProps): React.JSX.Element {
   const { t: tFn } = useTranslation()
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
@@ -359,6 +360,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
     () => (): ConnectionInput => {
       const input: ConnectionInput = {
         id: editing?.id ?? genId(),
+        copyFromId,
         name: name.trim() || 'Untitled',
         color: color || undefined,
         useSrv,
@@ -412,6 +414,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
     },
     [
       editing,
+      copyFromId,
       name,
       color,
       useSrv,
@@ -482,7 +485,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
 
   return (
     <Modal
-      title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
+      title={tFn(copyFromId ? 'connection.menu.duplicate' : editing ? 'connection.title.edit' : 'connection.title.new')}
       description={tFn('connection.description')}
       onClose={handleModalClose}
       size="lg"

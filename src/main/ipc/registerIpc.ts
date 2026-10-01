@@ -63,7 +63,7 @@ function historySummary(kind: string, count?: number, elapsedMs?: number, errorN
  * the stored values so "Test" works after editing without re-typing secrets.
  */
 function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
-  const { password, sshPassword, sshPassphrase, jumpSshPassphrase, ...rest } = input
+  const { password, sshPassword, sshPassphrase, jumpSshPassphrase, copyFromId, ...rest } = input
   const config: ConnectionConfig = {
     ...rest,
     hasPassword: !!password,
@@ -78,8 +78,9 @@ function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
   let sshPw = sshPassword
   let sshPp = sshPassphrase
   let jumpPp = jumpSshPassphrase
-  if (input.id) {
-    const stored = connectionStore.getDecrypted(input.id)
+  const secretId = copyFromId || input.id
+  if (secretId) {
+    const stored = connectionStore.getDecrypted(secretId)
     if (stored) {
       if (!pw) pw = stored.password
       if (!sshPw) sshPw = stored.sshPassword
@@ -104,7 +105,8 @@ function buildConnectionUri(input: ConnectionInput, includePassword: boolean): s
   let encodePassword = true
   if (scram) {
     if (includePassword) {
-      password = input.password || (input.id ? connectionStore.getDecrypted(input.id)?.password : undefined)
+      const secretId = input.copyFromId || input.id
+      password = input.password || (secretId ? connectionStore.getDecrypted(secretId)?.password : undefined)
     } else {
       password = PASSWORD_PLACEHOLDER
       encodePassword = false
