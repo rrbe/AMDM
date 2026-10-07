@@ -223,7 +223,19 @@ function SavedTab({
   onDelete: (id: string) => void
   onMove: (q: SavedQuery, folder: string | undefined) => void
 }): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
+    [i18n.resolvedLanguage]
+  )
   // Collapsed folder names (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   // Right-click action menu, anchored to a specific query.
@@ -284,7 +296,10 @@ function SavedTab({
       >
         <div className="sq-name">{q.name}</div>
         <SyntaxCodePreview code={q.code} />
-        <div className="sq-sub muted">{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</div>
+        <div className="sq-sub sq-sub--saved muted">
+          <span>{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</span>
+          <span className="sq-saved-time">{dateFormatter.format(q.createdAt)}</span>
+        </div>
         <Tooltip content={t('savedQueries.menuDelete')}>
           <button
             className="ghost sq-del"

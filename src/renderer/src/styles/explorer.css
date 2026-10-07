@@ -394,6 +394,20 @@
   margin-top: 2px;
   font-size: var(--fs-xs, 11px);
 }
+.sq-sub--saved {
+  justify-content: space-between;
+  gap: 2px 8px;
+}
+.sq-sub--saved > span:first-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-saved-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .sq-sub .lib-ok {
   color: var(--ok);
 }

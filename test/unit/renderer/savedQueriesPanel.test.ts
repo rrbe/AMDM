@@ -38,8 +38,8 @@ describe('saved query previews', () => {
           code,
           connectionId: 'c1',
           database: 'ezze',
-          createdAt: 1,
-          updatedAt: 1
+          createdAt: new Date(2026, 9, 1, 9, 5).getTime(),
+          updatedAt: new Date(2027, 9, 1, 9, 5).getTime()
         }
       ],
       history: [
@@ -75,6 +75,14 @@ describe('saved query previews', () => {
     expectSyntaxHighlighting(
       renderToStaticMarkup(createElement(SavedQueriesView, { onLoad: vi.fn() }))
     )
+  })
+
+  it('shows the original saved date and local time', () => {
+    seedStoredQueries()
+
+    const markup = renderToStaticMarkup(createElement(SavedQueriesView, { onLoad: vi.fn() }))
+    expect(markup).toMatch(/db: ezze<\/span><span class="sq-saved-time">[^<]*2026[^<]*09:05/)
+    expect(markup).not.toContain('2027')
   })
 
   it('uses the same syntax highlighting for query history', () => {
