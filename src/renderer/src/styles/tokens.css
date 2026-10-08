@@ -53,6 +53,7 @@
   --interaction-pressed: rgba(22, 24, 29, 0.11);
   --focus-soft: rgba(22, 24, 29, 0.08);
   --code-selection: var(--interaction-pressed);
+  --search-match-background: rgba(217, 163, 25, 0.24);
   --backdrop-dialog: rgba(30, 31, 35, 0.2);
   --backdrop-nested: rgba(0, 0, 0, 0.32);
 
@@ -150,6 +151,7 @@
   --interaction-pressed: rgba(255, 255, 255, 0.13);
   --focus-soft: rgba(255, 255, 255, 0.18);
   --code-selection: var(--interaction-pressed);
+  --search-match-background: rgba(230, 180, 56, 0.3);
   --backdrop-dialog: rgba(0, 0, 0, 0.55);
   --backdrop-nested: rgba(0, 0, 0, 0.55);
 
