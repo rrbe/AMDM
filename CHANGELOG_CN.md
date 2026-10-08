@@ -4,6 +4,25 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.1](https://github.com/rrbe/AMDM/releases/tag/v26.10.1) — 2026-10-08
+
+### 新功能
+
+- 已保存查询显示创建时间，适配界面语言和窄侧栏布局
+- 支持将现有连接复制为可编辑草稿，点击保存后才创建副本
+- Shell 自动补全和语法高亮与 Mongosh API 对齐
+- 支持搜索并切换已打开的查询标签页
+- 数组预览支持表格视图，可逐层查看嵌套对象和数组（\#25）
+- 支持折叠 JSON 对象和数组、保留各结果的折叠状态，并为表格增加列虚拟化（\#26）
+
+### 修复
+
+- 改善 JSON 文本选择和行悬停背景
+
+### 其他更新
+
+- 查询统一使用 Mongosh，移除运行时切换；旧 Driver 写法需要调整，例如将 db\.collection\(\) 改为 db\.getCollection\(\)
+
 ## [v26.9.4](https://github.com/rrbe/AMDM/releases/tag/v26.9.4) — 2026-09-20
 
 ### 新功能

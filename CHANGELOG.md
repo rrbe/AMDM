@@ -4,6 +4,25 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.1](https://github.com/rrbe/AMDM/releases/tag/v26.10.1) — 2026-10-08
+
+### Features
+
+- Show saved query creation times with localized formatting and narrow\-sidebar layout support
+- Duplicate an existing connection as an editable draft, creating the copy only after saving
+- Align Shell completion and syntax highlighting with the Mongosh API
+- Search and switch between open query tabs
+- Add a table view to array previews with navigation into nested objects and arrays \(\#25\)
+- Add JSON object and array folding with per\-result state, and virtualize table columns \(\#26\)
+
+### Fixes
+
+- Improve JSON text selection and row hover backgrounds
+
+### Other Updates
+
+- Use Mongosh for all queries and remove runtime switching; update older Driver\-style scripts, such as db\.collection\(\) to db\.getCollection\(\)
+
 ## [v26.9.4](https://github.com/rrbe/AMDM/releases/tag/v26.9.4) — 2026-09-20
 
 ### Features
