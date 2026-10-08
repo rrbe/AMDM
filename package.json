@@ -71,6 +71,7 @@
     "electron-vite": "6.0.0-beta.1",
     "esbuild": "0.27.7",
     "exceljs": "^4.4.0",
+    "fuse.js": "7.5.0",
     "i18next": "^26.3.6",
     "lucide-react": "^1.31.0",
     "mongodb-memory-server": "^11.2.0",

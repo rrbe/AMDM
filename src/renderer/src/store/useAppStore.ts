@@ -71,6 +71,7 @@ import {
   type NotificationVariant
 } from '@renderer/lib/notifications'
 import i18n from '@renderer/i18n'
+import { catalogSearchSnapshot, type CatalogSearchSnapshot } from '@renderer/lib/catalogSearch'
 
 /** Shorthand for translating notification / error strings in the store. */
 const tr = i18n.t.bind(i18n)
@@ -112,6 +113,8 @@ interface AppState {
 
   // ---- catalog (per connection) ----
   catalogs: Record<string, CatalogState>
+  /** Namespace-only snapshots retained for offline search until reconnect/delete. */
+  catalogSearchSnapshots: Record<string, CatalogSearchSnapshot>
   /** Connection ids whose database subtree is expanded in the unified explorer. */
   expandedConnections: Set<string>
 
@@ -454,6 +457,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeConnectionId: null,
 
   catalogs: {},
+  catalogSearchSnapshots: {},
   expandedConnections: new Set(),
 
   tabs: [INITIAL_TAB],
@@ -517,12 +521,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.connections.delete(id)
       set((s) => {
         const { [id]: _removedCatalog, ...catalogs } = s.catalogs
+        const { [id]: _removedSnapshot, ...catalogSearchSnapshots } = s.catalogSearchSnapshots
         const { [id]: _removedStatus, ...statuses } = s.statuses
         const expandedConnections = new Set(s.expandedConnections)
         expandedConnections.delete(id)
         const tabs = s.tabs.map((tab) => (tab.connectionId === id ? { ...tab, connectionId: null } : tab))
         return {
           catalogs,
+          catalogSearchSnapshots,
           statuses,
           tabs,
           expandedConnections,
@@ -593,6 +599,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           statuses: { ...s.statuses, [id]: { id, state: 'connecting' } },
           catalogs,
+          catalogSearchSnapshots: _removed
+            ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
+            : s.catalogSearchSnapshots,
           expandedConnections
         }
       })
@@ -604,9 +613,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           // Auto-expand the connection in the explorer so its databases appear.
           const expandedConnections = new Set(s.expandedConnections)
           if (status.state === 'connected') expandedConnections.add(id)
+          const { [id]: _snapshot, ...remainingSnapshots } = s.catalogSearchSnapshots
           return {
             statuses: { ...s.statuses, [id]: status },
             catalogs: status.state === 'connected' ? { ...s.catalogs, [id]: emptyCatalog() } : s.catalogs,
+            catalogSearchSnapshots: status.state === 'connected' ? remainingSnapshots : s.catalogSearchSnapshots,
             expandedConnections
           }
         })
@@ -685,6 +696,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       return {
         statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
         catalogs,
+        catalogSearchSnapshots: _removed
+          ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
+          : s.catalogSearchSnapshots,
         expandedConnections
       }
     })

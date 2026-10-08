@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
@@ -35,6 +36,7 @@ import type { CollectionSort, ConnectionConfig, ConnectionState, SchemaTarget } 
 import { useAppStore, type CatalogState, type NodeKind, type NodePayload } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
+import { createCatalogSearch, type CatalogSearchMatch, type MatchRange } from '@renderer/lib/catalogSearch'
 import { formatBytes } from '@renderer/lib/formatBytes'
 import { copyText } from '@renderer/lib/resultCopy'
 import { applyConnectionOrder, reorderConnectionIds, type DropEdge } from '@renderer/lib/connectionOrder'
@@ -113,6 +115,7 @@ interface TreeRow {
   collection?: { db: string; name: string; type: 'collection' | 'view' | 'timeseries' }
   /** Optional tooltip override; unlike ordinary catalog labels, it is always shown. */
   tooltip?: string
+  cached?: boolean
   /** Present on index rows: enables index-specific actions. */
   indexName?: string
   /** Present on the Indexes folder: scopes refresh to its owning collection. */
@@ -134,6 +137,38 @@ interface ConnRow {
 }
 
 type Row = ConnRow | TreeRow
+
+function connectionSubtitle(conn: ConnectionConfig): string {
+  return conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
+}
+
+function searchEntries(rows: Row[]): { id: string; text: string; detail?: string }[] {
+  return rows.map((row) =>
+    row.type === 'connection'
+      ? { id: row.id, text: row.conn.name, detail: connectionSubtitle(row.conn) }
+      : { id: row.id, text: row.label }
+  )
+}
+
+export function filterExplorerRows(
+  rows: Row[],
+  search: string,
+  matches = createCatalogSearch(searchEntries(rows))(search)
+): Row[] {
+  if (!search.trim()) return rows
+
+  const visibleIds = new Set<string>()
+  const ancestors: Row[] = []
+  for (const row of rows) {
+    const depth = row.type === 'connection' ? 0 : row.depth
+    ancestors.length = depth
+    ancestors.push(row)
+    if (matches.has(row.id)) {
+      for (const ancestor of ancestors) visibleIds.add(ancestor.id)
+    }
+  }
+  return rows.filter((row) => visibleIds.has(row.id))
+}
 
 export function canDisconnectConnection(state: ConnectionState): boolean {
   return state !== 'disconnected'
@@ -176,6 +211,7 @@ export function Explorer({
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
   const catalogs = useAppStore((s) => s.catalogs)
+  const catalogSearchSnapshots = useAppStore((s) => s.catalogSearchSnapshots)
   const expandedConnections = useAppStore((s) => s.expandedConnections)
   const connectionOrder = useAppStore((s) => s.settings.connectionOrder)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
@@ -206,6 +242,16 @@ export function Explorer({
     if (view === 'connections' && searchOpen) searchInputRef.current?.focus({ preventScroll: true })
   }, [view, searchOpen])
   const [search, setSearch] = useState('')
+  const searching = search.trim().length > 0
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const originalScroll = useRef(0)
+  const changeSearch = (value: string): void => {
+    if (!searching && value.trim()) originalScroll.current = bodyRef.current?.scrollTop ?? 0
+    setSearch(value)
+  }
+  useLayoutEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = searching ? 0 : originalScroll.current
+  }, [searching, search])
   const closeSearch = (): void => {
     setSearch('')
     setSearchOpen(false)
@@ -423,8 +469,8 @@ export function Explorer({
     })
   }
 
-  // Build the flat visible-row list. Connections sit at depth 0; each connected
-  // + expanded connection contributes its database subtree starting at depth 1.
+  // Connections sit at depth 0. Search includes loaded descendants even when
+  // collapsed or offline; normal browsing keeps the user's expansion state.
   // zustand action refs are stable, so listing them as deps is free.
   const rows = useMemo<Row[]>(() => {
     const actions: RowActions = {
@@ -438,7 +484,18 @@ export function Explorer({
       const state = statuses[conn.id]?.state ?? 'disconnected'
       const connected = state === 'connected'
       const expanded = connected && expandedConnections.has(conn.id)
-      const catalog = catalogs[conn.id]
+      const snapshot = searching ? catalogSearchSnapshots[conn.id] : undefined
+      const catalog =
+        catalogs[conn.id] ??
+        (snapshot
+          ? {
+              ...snapshot,
+              indexes: {},
+              users: {},
+              expanded: new Set<string>(),
+              loading: new Set<string>()
+            }
+          : undefined)
       const dbsLoading = catalog?.loading.has(`${conn.id}:databases`) ?? false
       out.push({
         type: 'connection',
@@ -446,12 +503,40 @@ export function Explorer({
         conn,
         state,
         error: statuses[conn.id]?.error,
-        expandable: connected,
+        expandable: connected && !searching,
         expanded,
         loading: connected && (dbsLoading || catalog?.databases === undefined)
       })
-      if (expanded && catalog) {
-        out.push(...flattenCatalog(conn.id, catalog, actions, collectionSort))
+      if ((expanded || searching) && catalog) {
+        const flattened = flattenCatalog(conn.id, catalog, actions, collectionSort, searching)
+        const children = searching
+          ? flattened.map((row) => ({
+              ...row,
+              expandable: false,
+              onClick: undefined,
+              onToggle: undefined
+            }))
+          : flattened
+        out.push(
+          ...(connected
+            ? children
+            : children.map((row) => ({
+                ...row,
+                cached: true,
+                tooltip: `${row.label} — ${t('explorer.cachedCatalog')}`,
+                expandable: false,
+                loading: false,
+                onClick: undefined,
+                onToggle: undefined,
+                onDoubleClick: row.collection
+                  ? async () => {
+                      await connect(conn.id)
+                      if (useAppStore.getState().statuses[conn.id]?.state === 'connected')
+                        row.onDoubleClick?.()
+                    }
+                  : undefined
+              })))
+        )
       }
     }
     return out
@@ -459,22 +544,69 @@ export function Explorer({
     orderedConnections,
     statuses,
     catalogs,
+    catalogSearchSnapshots,
+    searching,
+    connect,
     expandedConnections,
     collectionSort,
     toggleNode,
     setActiveConnection,
     browseCollection,
-    inspectIndex
+    inspectIndex,
+    t
   ])
-  const visibleRows = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase()
-    if (!query) return rows
-    return rows.filter((row) =>
-      row.type === 'connection'
-        ? `${row.conn.name} ${row.conn.host}`.toLocaleLowerCase().includes(query)
-        : row.label.toLocaleLowerCase().includes(query)
+  const searchIndex = useMemo(
+    () => createCatalogSearch(searching ? searchEntries(rows) : []),
+    [rows, searching]
+  )
+  const matches = useMemo(() => searchIndex(search), [searchIndex, search])
+  const visibleRows = useMemo(() => filterExplorerRows(rows, search, matches), [rows, search, matches])
+  const connectionIndices = useMemo(
+    () => visibleRows.flatMap((row, index) => (row.type === 'connection' ? [index] : [])),
+    [visibleRows]
+  )
+  const stickyIndex = useRef(0)
+  const virtualizer = useVirtualizer({
+    count: searching ? visibleRows.length : 0,
+    getScrollElement: () => bodyRef.current,
+    getItemKey: (index) => visibleRows[index].id,
+    estimateSize: (index) => (visibleRows[index].type === 'connection' ? 44 : 28),
+    overscan: 8,
+    enabled: searching && view === 'connections',
+    rangeExtractor: (range) => {
+      stickyIndex.current = 0
+      for (const index of connectionIndices) {
+        if (index > range.startIndex) break
+        stickyIndex.current = index
+      }
+      return [...new Set([stickyIndex.current, ...defaultRangeExtractor(range)])].sort((a, b) => a - b)
+    }
+  })
+  const renderRow = (row: Row): React.JSX.Element =>
+    row.type === 'connection' ? (
+      <ConnectionRow
+        key={row.id}
+        row={row}
+        match={matches.get(row.id)}
+        isActive={selectedRowId === row.id}
+        onActivate={() => setSelectedRowId(row.id)}
+        onToggle={() => {
+          if (!searching) toggleConnectionExpanded(row.id)
+        }}
+        onConnect={() => void connect(row.id)}
+        onMove={moveConnection}
+        onContextMenu={(e) => openConnMenu(e, row)}
+      />
+    ) : (
+      <CatalogRow
+        key={row.id}
+        row={row}
+        match={matches.get(row.id)}
+        isActive={selectedRowId === row.id}
+        onActivate={() => setSelectedRowId(row.id)}
+        onContextMenu={openCatalogMenu}
+      />
     )
-  }, [rows, search])
   const moveConnection = (sourceId: string, targetId: string, edge: DropEdge): void => {
     const ids = orderedConnections.map((connection) => connection.id)
     const next = reorderConnectionIds(ids, sourceId, targetId, edge)
@@ -548,7 +680,7 @@ export function Explorer({
                   <input
                     ref={searchInputRef}
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={(event) => changeSearch(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
                         event.preventDefault()
@@ -583,7 +715,7 @@ export function Explorer({
                 </button>
               </Tooltip>
             </div>
-            <div className="explorer-body">
+            <div className="explorer-body" ref={bodyRef}>
               {connections.length === 0 && (
                 <div className="explorer-empty">No connections. Click "New" to add one.</div>
               )}
@@ -592,27 +724,29 @@ export function Explorer({
                 <div className="explorer-empty">{t('explorer.noSearchResults')}</div>
               )}
 
-              {visibleRows.map((row) =>
-                row.type === 'connection' ? (
-                  <ConnectionRow
-                    key={row.id}
-                    row={row}
-                    isActive={selectedRowId === row.id}
-                    onActivate={() => setSelectedRowId(row.id)}
-                    onToggle={() => toggleConnectionExpanded(row.id)}
-                    onConnect={() => void connect(row.id)}
-                    onMove={moveConnection}
-                    onContextMenu={(e) => openConnMenu(e, row)}
-                  />
-                ) : (
-                  <CatalogRow
-                    key={row.id}
-                    row={row}
-                    isActive={selectedRowId === row.id}
-                    onActivate={() => setSelectedRowId(row.id)}
-                    onContextMenu={openCatalogMenu}
-                  />
-                )
+              {searching ? (
+                <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+                  {virtualizer.getVirtualItems().map((item) => (
+                    <div
+                      key={item.key}
+                      ref={virtualizer.measureElement}
+                      data-index={item.index}
+                      className="explorer-search-row"
+                      style={{
+                        position: item.index === stickyIndex.current ? 'sticky' : 'absolute',
+                        top: 0,
+                        width: '100%',
+                        zIndex: item.index === stickyIndex.current ? 4 : undefined,
+                        transform:
+                          item.index === stickyIndex.current ? undefined : `translateY(${item.start}px)`
+                      }}
+                    >
+                      {renderRow(visibleRows[item.index])}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                visibleRows.map(renderRow)
               )}
             </div>
           </div>
@@ -734,6 +868,7 @@ export function Explorer({
 
 function ConnectionRow({
   row,
+  match,
   isActive,
   onActivate,
   onToggle,
@@ -742,6 +877,7 @@ function ConnectionRow({
   onContextMenu
 }: {
   row: ConnRow
+  match?: CatalogSearchMatch
   isActive: boolean
   onActivate: () => void
   onToggle: () => void
@@ -754,7 +890,7 @@ function ConnectionRow({
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
   const { conn, state, error, expandable, expanded } = row
   const isConnected = state === 'connected'
-  const sub = conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
+  const sub = connectionSubtitle(conn)
 
   // The lone surviving piece of chrome: a single status signal whose color +
   // glow carry the live state. Actions stay in the right-click menu.
@@ -807,17 +943,27 @@ function ConnectionRow({
           }
         }}
       >
-        {expandable ? <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} /> : null}
+        {expandable ? (
+          <ChevronRight size={14} className={expanded ? 'twisty-icon open' : 'twisty-icon'} />
+        ) : null}
       </span>
       <div className="conn-text">
         <div
           className="conn-name"
-          style={{ color: conn.color ? `color-mix(in srgb, ${conn.color} 60%, var(--text-secondary))` : undefined }}
+          style={{
+            color: conn.color ? `color-mix(in srgb, ${conn.color} 60%, var(--text-secondary))` : undefined
+          }}
         >
-          {conn.name}
+          {match ? (
+            <SearchLabel text={conn.name} ranges={match.text} approximate={match.approximate} />
+          ) : (
+            conn.name
+          )}
         </div>
         <Tooltip content={sub} overflowOnly>
-          <div className="conn-sub">{sub}</div>
+          <div className="conn-sub">
+            {match ? <SearchLabel text={sub} ranges={match.detail} approximate={match.approximate} /> : sub}
+          </div>
         </Tooltip>
       </div>
       <Tooltip content={statusLabel}>
@@ -831,11 +977,13 @@ function ConnectionRow({
 
 function CatalogRow({
   row,
+  match,
   isActive,
   onActivate,
   onContextMenu
 }: {
   row: TreeRow
+  match?: CatalogSearchMatch
   isActive: boolean
   onActivate: () => void
   onContextMenu: (e: MouseEvent, row: TreeRow) => void
@@ -858,7 +1006,7 @@ function CatalogRow({
       onClick={row.onClick}
       onDoubleClick={row.onDoubleClick}
       onContextMenu={
-        row.kind === 'database' || row.kind === 'indexes' || row.kind === 'index' || coll
+        !row.cached && (row.kind === 'database' || row.kind === 'indexes' || row.kind === 'index' || coll)
           ? (e) => onContextMenu(e, row)
           : undefined
       }
@@ -881,8 +1029,14 @@ function CatalogRow({
           <TreeIcon name={row.icon} />
         </span>
       )}
-      <Tooltip content={tooltipContent} overflowOnly={!isNote && !row.empty && !row.tooltip}>
-        <span className="tree-label">{row.label}</span>
+      <Tooltip content={tooltipContent} overflowOnly={!isNote && !row.empty && !row.tooltip && !row.cached}>
+        <span className="tree-label">
+          {match ? (
+            <SearchLabel text={row.label} ranges={match.text} approximate={match.approximate} />
+          ) : (
+            row.label
+          )}
+        </span>
       </Tooltip>
       {typeof row.count === 'number' && (
         <span className="tree-count">
@@ -898,6 +1052,36 @@ function CatalogRow({
       )}
     </div>
   )
+}
+
+function SearchLabel({
+  text,
+  ranges = [],
+  approximate
+}: {
+  text: string
+  ranges?: MatchRange[]
+  approximate?: boolean
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const parts: React.ReactNode[] = []
+  let offset = 0
+  for (const [start, end] of ranges) {
+    parts.push(text.slice(offset, start))
+    parts.push(
+      <mark
+        key={start}
+        className="search-match"
+        data-approximate={approximate || undefined}
+        title={approximate ? t('explorer.approximateMatch') : undefined}
+      >
+        {text.slice(start, end + 1)}
+      </mark>
+    )
+    offset = end + 1
+  }
+  parts.push(text.slice(offset))
+  return <>{parts}</>
 }
 
 /** Browse a collection (seed its tab), making its connection active first. */
@@ -921,7 +1105,13 @@ function openDatabase(a: RowActions, connId: string, db: string, nodeId: string)
  * Flatten one connection's expanded catalog into ordered rows (depth ≥ 1).
  * Mirrors the old CatalogTree builder, offset one level under the connection.
  */
-function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: CollectionSort): TreeRow[] {
+export function flattenCatalog(
+  connId: string,
+  cat: CatalogState,
+  a: RowActions,
+  sort: CollectionSort,
+  includeCollapsed = false
+): TreeRow[] {
   const byName = (x: { name: string }, y: { name: string }): number => x.name.localeCompare(y.name)
   const rows: TreeRow[] = []
   const dbsRaw = cat.databases ?? []
@@ -929,7 +1119,7 @@ function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: 
 
   for (const db of dbs) {
     const dbNodeId = `${connId}:db:${db.name}`
-    const dbExpanded = cat.expanded.has(dbNodeId)
+    const dbExpanded = includeCollapsed || cat.expanded.has(dbNodeId)
     rows.push({
       type: 'tree',
       id: dbNodeId,
@@ -959,7 +1149,7 @@ function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: 
 
     for (const coll of colls) {
       const collNodeId = `${connId}:coll:${db.name}/${coll.name}`
-      const collExpanded = cat.expanded.has(collNodeId)
+      const collExpanded = includeCollapsed || cat.expanded.has(collNodeId)
       rows.push({
         type: 'tree',
         id: collNodeId,
@@ -987,6 +1177,7 @@ function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: 
 
       const idxKey = `${db.name}/${coll.name}`
       const idxList = cat.indexes[idxKey]
+      if (includeCollapsed && idxList === undefined) continue
       // Initial metadata loading updates the count and indexes atomically. Keep
       // the subtree closed until both are ready so an empty Indexes folder does
       // not flash briefly before its count appears.
@@ -994,7 +1185,7 @@ function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: 
 
       // Indexes folder
       const idxNodeId = `${connId}:idx:${db.name}/${coll.name}`
-      const idxExpanded = cat.expanded.has(idxNodeId)
+      const idxExpanded = includeCollapsed || cat.expanded.has(idxNodeId)
       rows.push({
         type: 'tree',
         id: idxNodeId,
@@ -1052,8 +1243,9 @@ function flattenCatalog(connId: string, cat: CatalogState, a: RowActions, sort: 
 
     // Users are a database concept, shown after the database's collections.
     const usersNodeId = `${connId}:users:${db.name}`
-    const usersExpanded = cat.expanded.has(usersNodeId)
+    const usersExpanded = includeCollapsed || cat.expanded.has(usersNodeId)
     const usersList = cat.users[db.name]
+    if (includeCollapsed && usersList === undefined) continue
     rows.push({
       type: 'tree',
       id: usersNodeId,

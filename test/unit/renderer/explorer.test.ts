@@ -1,14 +1,18 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { canDisconnectConnection, Explorer } from '../../../src/renderer/src/components/explorer/Explorer'
+import {
+  canDisconnectConnection,
+  Explorer,
+  filterExplorerRows,
+  flattenCatalog
+} from '../../../src/renderer/src/components/explorer/Explorer'
 import type { CatalogState } from '../../../src/renderer/src/store/useAppStore'
 
 const testStore = vi.hoisted(() => ({ state: {} as Record<string, unknown> }))
 
 vi.mock('@renderer/store/useAppStore', () => ({
-  useAppStore: (selector: (state: Record<string, unknown>) => unknown): unknown =>
-    selector(testStore.state)
+  useAppStore: (selector: (state: Record<string, unknown>) => unknown): unknown => selector(testStore.state)
 }))
 
 const connection = {
@@ -24,7 +28,106 @@ const connection = {
   updatedAt: 1
 }
 
+describe('explorer search grouping', () => {
+  type Row = Parameters<typeof filterExplorerRows>[0][number]
+  const connectionRow = (id: string, name: string): Row => ({
+    type: 'connection',
+    id,
+    conn: { ...connection, id, name },
+    state: 'connected',
+    expandable: true,
+    expanded: true,
+    loading: false
+  })
+  const treeRow = (connId: string, label: string, depth: number, path = label): Row => ({
+    type: 'tree',
+    id: `${connId}:${depth}:${path}`,
+    connId,
+    label,
+    depth,
+    icon: depth === 1 ? 'database' : 'collection',
+    kind: depth === 1 ? 'database' : 'collection',
+    expandable: true,
+    expanded: true,
+    loading: false
+  })
+  const rows = [
+    connectionRow('c1', 'Development'),
+    treeRow('c1', 'shop', 1),
+    treeRow('c1', 'orders', 2, 'shop/orders'),
+    treeRow('c1', 'products', 2),
+    treeRow('c1', 'archive', 1),
+    treeRow('c1', 'orders', 2, 'archive/orders'),
+    connectionRow('c2', 'Production'),
+    treeRow('c2', 'shop', 1),
+    treeRow('c2', 'orders', 2),
+    connectionRow('c3', 'Other'),
+    treeRow('c3', 'shop', 1),
+    treeRow('c3', 'products', 2)
+  ]
+
+  it('keeps each matching collection under its connection and database in the original order', () => {
+    expect(filterExplorerRows(rows, ' Orders ')).toEqual([
+      rows[0],
+      rows[1],
+      rows[2],
+      rows[4],
+      rows[5],
+      rows[6],
+      rows[7],
+      rows[8]
+    ])
+  })
+
+  it('keeps the ancestor path for a matching nested index', () => {
+    const nestedRows = [
+      ...rows.slice(0, 3),
+      { ...treeRow('c1', 'Indexes', 3), kind: 'indexes' as const },
+      { ...treeRow('c1', 'orderId_1', 4), kind: 'index' as const }
+    ]
+    expect(filterExplorerRows(nestedRows, 'orderId')).toEqual(nestedRows)
+  })
+
+  it('preserves connection name and host search, empty search, and no results', () => {
+    expect(filterExplorerRows(rows, 'archive')).toEqual([rows[0], rows[4]])
+    expect(filterExplorerRows(rows, 'Production')).toEqual([rows[6]])
+    expect(filterExplorerRows(rows, 'LOCALHOST')).toEqual([rows[0], rows[6], rows[9]])
+    expect(filterExplorerRows(rows, '   ')).toBe(rows)
+    expect(filterExplorerRows(rows, 'missing')).toEqual([])
+  })
+})
+
 describe('explorer catalog rows', () => {
+  it('searches loaded descendants of collapsed databases without fetching or changing expansion', () => {
+    const catalog: CatalogState = {
+      databases: [{ name: 'shop' }, { name: 'unloaded' }],
+      collections: { shop: [{ name: 'orders', type: 'collection' }] },
+      indexes: { 'shop/orders': [{ name: 'orderId_1', key: { orderId: 1 } }] },
+      users: {},
+      expanded: new Set(),
+      loading: new Set()
+    }
+    const actions = {
+      toggleNode: vi.fn(),
+      setActiveConnection: vi.fn(),
+      browseCollection: vi.fn(),
+      inspectIndex: vi.fn()
+    }
+    expect(flattenCatalog('c1', catalog, actions, 'alpha').map((row) => row.label)).toEqual([
+      'shop',
+      'unloaded'
+    ])
+    expect(flattenCatalog('c1', catalog, actions, 'alpha', true).map((row) => row.label)).toEqual([
+      'shop',
+      'orders',
+      'Indexes',
+      'orderId_1 { orderId: 1 }',
+      'unloaded'
+    ])
+    expect(catalog.expanded.size).toBe(0)
+    expect(actions.toggleNode).not.toHaveBeenCalled()
+  })
+
   it('allows an errored connection to be explicitly disconnected', () => {
     expect(canDisconnectConnection('connected')).toBe(true)
     expect(canDisconnectConnection('connecting')).toBe(true)
