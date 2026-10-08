@@ -18,6 +18,12 @@ import { cn } from '@renderer/lib/utils'
 const FOCUSABLE =
   'input:not([type="hidden"]), textarea, select, button, [href], [tabindex]:not([tabindex="-1"])'
 
+type ModalSizeKey = 'json-preview' | 'document-preview' | 'document-editor' | 'schema-model'
+
+// Native CSS resizing writes inline dimensions. Keep only those user overrides
+// for this renderer's lifetime, with one entry per modal type.
+const modalSizes = new Map<ModalSizeKey, { width: string; height: string }>()
+
 interface ModalProps {
   title: string
   titleMeta?: ReactNode
@@ -39,9 +45,11 @@ interface ModalProps {
   movable?: boolean
   /** Keep the opening top edge fixed while body content changes height. */
   lockTop?: boolean
+  /** Remember native resize dimensions until the application exits. */
+  sizeKey?: ModalSizeKey
 }
 
-type ResizableModalProps = Omit<ModalProps, 'movable'>
+type ResizableModalProps = Omit<ModalProps, 'movable' | 'sizeKey'> & { sizeKey: ModalSizeKey }
 
 interface ModalDrag {
   pointerId: number
@@ -74,7 +82,8 @@ export function Modal({
   bodyClassName,
   backdropClassName,
   movable = false,
-  lockTop = false
+  lockTop = false,
+  sizeKey
 }: ModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const titleId = useId()
@@ -86,7 +95,16 @@ export function Modal({
   const sheet = !compactHeader && (description != null || headerActions != null || navigation != null)
   const popupRef = useCallback(
     (popup: HTMLDivElement | null) => {
+      const previousPopup = popupElementRef.current
+      if (!popup && previousPopup && sizeKey) {
+        const { width, height } = previousPopup.style
+        if (width || height) modalSizes.set(sizeKey, { width, height })
+      }
       popupElementRef.current = popup
+      if (popup && sizeKey) {
+        const rememberedSize = modalSizes.get(sizeKey)
+        if (rememberedSize) Object.assign(popup.style, rememberedSize)
+      }
       if (movable && popup) {
         const rect = popup.getBoundingClientRect()
         popup.style.left = `${rect.left}px`
@@ -98,7 +116,7 @@ export function Modal({
         setOpeningHalfHeight((current) => current ?? popup.getBoundingClientRect().height / 2)
       }
     },
-    [lockTop, movable]
+    [lockTop, movable, sizeKey]
   )
 
   // React 19 can mount a controlled, already-open dialog before Base UI's

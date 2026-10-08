@@ -395,8 +395,9 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
 
   return (
     <ResizableModal
+      sizeKey="schema-model"
       title={t('schema.title', { collection: target.collection })}
-      className="h-[min(720px,calc(100vh-48px))] w-[min(1100px,calc(100vw-48px))] max-w-none"
+      className="h-[min(720px,calc(100vh-48px))] w-[min(1100px,calc(100vw-48px))] max-w-[calc(100vw-48px)]"
       bodyClassName="flex flex-col gap-3"
       onClose={close}
       headerActions={

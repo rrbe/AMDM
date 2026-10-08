@@ -70,6 +70,7 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
 
   return (
     <ResizableModal
+      sizeKey="document-editor"
       title={t('docEditor.title', { collection })}
       className="h-[560px] min-h-[420px]"
       bodyClassName="flex flex-col gap-2"

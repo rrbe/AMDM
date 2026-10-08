@@ -170,6 +170,7 @@ export function JsonPreviewModal({
 
   return (
     <ResizableModal
+      sizeKey={documentView ? 'document-preview' : 'json-preview'}
       title={title}
       titleMeta={
         source || idText !== undefined ? (
