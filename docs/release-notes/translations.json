@@ -1,4 +1,36 @@
 {
+  "fold JSON objects and arrays in result views (#26)": {
+    "en": "Add JSON object and array folding with per-result state, and virtualize table columns (#26)",
+    "zh": "支持折叠 JSON 对象和数组、保留各结果的折叠状态，并为表格增加列虚拟化（#26）"
+  },
+  "add table view to array previews (#25)": {
+    "en": "Add a table view to array previews with navigation into nested objects and arrays (#25)",
+    "zh": "数组预览支持表格视图，可逐层查看嵌套对象和数组（#25）"
+  },
+  "improve JSON text selection and row hover backgrounds": {
+    "en": "Improve JSON text selection and row hover backgrounds",
+    "zh": "改善 JSON 文本选择和行悬停背景"
+  },
+  "add query tab search": {
+    "en": "Search and switch between open query tabs",
+    "zh": "支持搜索并切换已打开的查询标签页"
+  },
+  "unify query execution on mongosh": {
+    "en": "Use Mongosh for all queries and remove runtime switching; update older Driver-style scripts, such as db.collection() to db.getCollection()",
+    "zh": "查询统一使用 Mongosh，移除运行时切换；旧 Driver 写法需要调整，例如将 db.collection() 改为 db.getCollection()"
+  },
+  "align shell completion and highlighting with mongosh": {
+    "en": "Align Shell completion and syntax highlighting with the Mongosh API",
+    "zh": "Shell 自动补全和语法高亮与 Mongosh API 对齐"
+  },
+  "add connection duplication": {
+    "en": "Duplicate an existing connection as an editable draft, creating the copy only after saving",
+    "zh": "支持将现有连接复制为可编辑草稿，点击保存后才创建副本"
+  },
+  "show saved query creation time": {
+    "en": "Show saved query creation times with localized formatting and narrow-sidebar layout support",
+    "zh": "已保存查询显示创建时间，适配界面语言和窄侧栏布局"
+  },
   "pin document IDs in tables and improve preview headers (#24)": {
     "en": "Pin document IDs in tables and improve preview headers (#24)",
     "zh": "固定表格中的文档 ID 列，并改进预览标题（#24）"
