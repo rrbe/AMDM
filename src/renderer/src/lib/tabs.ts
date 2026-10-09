@@ -86,7 +86,7 @@ export function dbCollRef(collection: string): string {
 /** Shell query for the complete server-side definition of one named index. */
 export function indexDetailsQuery(collection: string, indexName: string): string {
   const name = JSON.stringify(indexName)
-  return `(await ${dbCollRef(collection)}.getIndexes()).filter((index) => index.name === ${name})`
+  return `${dbCollRef(collection)}.getIndexes().filter((index) => index.name === ${name})`
 }
 
 export interface QueryTab {

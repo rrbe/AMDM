@@ -18,7 +18,7 @@ const METHOD_SNIPPETS: Record<string, string> = {
   project: 'project({ ${field}: ${1} })',
   projection: 'projection({ ${field}: ${1} })',
   countDocuments: 'countDocuments({ ${} })',
-  distinct: 'distinct(${field})',
+  distinct: 'distinct("${field}")',
   insertOne: 'insertOne({ ${} })',
   insertMany: 'insertMany([ ${} ])',
   updateOne: 'updateOne({ ${filter} }, { $set: { ${} } })',
@@ -27,8 +27,8 @@ const METHOD_SNIPPETS: Record<string, string> = {
   deleteOne: 'deleteOne({ ${} })',
   deleteMany: 'deleteMany({ ${} })',
   createIndex: 'createIndex({ ${field}: ${1} })',
-  getSiblingDB: 'getSiblingDB(${db})',
-  getCollection: 'getCollection(${name})',
+  getSiblingDB: 'getSiblingDB("${db}")',
+  getCollection: 'getCollection("${name}")',
   runCommand: 'runCommand({ ${} })'
 }
 

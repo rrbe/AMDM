@@ -600,7 +600,7 @@ describe('connection-bound tabs', () => {
     expect(execute).toHaveBeenCalledOnce()
   })
 
-  it('runs and refreshes one index detail query without duplicating an in-flight run', async () => {
+  it('runs a new index detail query and only focuses it on repeated opens', async () => {
     const finishes: ((result: ShellResult) => void)[] = []
     const execute = vi.fn(
       () =>
@@ -620,7 +620,7 @@ describe('connection-bound tabs', () => {
       expect.objectContaining({
         connectionId: 'c1',
         database: 'shop',
-        code: '(await db.orders.getIndexes()).filter((index) => index.name === "status_1_createdAt_-1")',
+        code: 'db.orders.getIndexes().filter((index) => index.name === "status_1_createdAt_-1")',
         skip: 0
       })
     )
@@ -631,11 +631,22 @@ describe('connection-bound tabs', () => {
     finishes[0]({ kind: 'documents', data: [], count: 0, truncated: false })
     await vi.waitFor(() => expect(useAppStore.getState().tabs[0].running).toBe(false))
 
+    const indexTabId = useAppStore.getState().activeTabId
+    useAppStore.setState((s) => ({
+      tabs: [...s.tabs, createTab('other-tab', { connectionId: 'c1' })],
+      activeTabId: 'other-tab'
+    }))
     useAppStore.getState().inspectIndex('shop', 'orders', 'status_1_createdAt_-1')
+    expect(execute).toHaveBeenCalledOnce()
+    expect(useAppStore.getState().activeTabId).toBe(indexTabId)
+    expect(useAppStore.getState().tabs).toHaveLength(2)
+    expect(useAppStore.getState().tabs[0].results).toHaveLength(1)
+
+    const refresh = useAppStore.getState().runShell()
     expect(execute).toHaveBeenCalledTimes(2)
-    expect(useAppStore.getState().tabs).toHaveLength(1)
     finishes[1]({ kind: 'documents', data: [], count: 0, truncated: false })
-    await vi.waitFor(() => expect(useAppStore.getState().tabs[0].running).toBe(false))
+    await refresh
+    expect(useAppStore.getState().tabs[0].results).toHaveLength(2)
   })
 
   it('shows running, keeps real failures red, and clears a stopped run', async () => {

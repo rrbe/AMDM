@@ -38,13 +38,13 @@ describe('dbCollRef', () => {
 describe('indexDetailsQuery', () => {
   it('queries one complete index definition by name', () => {
     expect(indexDetailsQuery('orders', 'status_1_createdAt_-1')).toBe(
-      '(await db.orders.getIndexes()).filter((index) => index.name === "status_1_createdAt_-1")'
+      'db.orders.getIndexes().filter((index) => index.name === "status_1_createdAt_-1")'
     )
   })
 
   it('quotes unsafe collection and index names', () => {
     expect(indexDetailsQuery('order.items', 'sku_"quoted"\n')).toBe(
-      '(await db.getCollection("order.items").getIndexes()).filter((index) => index.name === "sku_\\"quoted\\"\\n")'
+      'db.getCollection("order.items").getIndexes().filter((index) => index.name === "sku_\\"quoted\\"\\n")'
     )
   })
 })

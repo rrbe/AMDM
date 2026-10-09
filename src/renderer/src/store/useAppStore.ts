@@ -1207,10 +1207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         database: db,
         code
       })
-      if (focusId) {
-        shouldRun = s.tabs.find((tab) => tab.id === focusId)?.running !== true
-        return { activeTabId: focusId }
-      }
+      if (focusId) return { activeTabId: focusId }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
       const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })

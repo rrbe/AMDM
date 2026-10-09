@@ -411,7 +411,7 @@ describe('index operations', () => {
   it('filters one complete index definition by name', async () => {
     await db.collection('nums').createIndex({ n: 1 }, { name: 'n_detail', unique: true })
     const r = await run(
-      '(await db.nums.getIndexes()).filter((index) => index.name === "n_detail")'
+      'db.nums.getIndexes().filter((index) => index.name === "n_detail")'
     )
     expect(r.kind).toBe('documents')
     expect(r.data).toHaveLength(1)
