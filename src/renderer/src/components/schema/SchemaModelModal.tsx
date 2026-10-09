@@ -23,6 +23,7 @@ import {
   type FlatSchemaNode
 } from '@renderer/lib/schemaEdit'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { schemaPanelKey } from '@renderer/lib/schemaPanel'
 
 interface Props {
   target: SchemaTarget
@@ -286,6 +287,8 @@ function parseDraft(text: string): MongoJsonSchema {
 
 export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element {
   const { t } = useTranslation()
+  const connected = useAppStore((state) => state.statuses[target.connectionId]?.state === 'connected')
+  const analysisBusy = useAppStore((state) => state.schemaPanels[schemaPanelKey(target)]?.analyzing ?? false)
   const loadSchemaModel = useAppStore((state) => state.loadSchemaModel)
   const analyzeSchema = useAppStore((state) => state.analyzeSchema)
   const saveSchemaDraft = useAppStore((state) => state.saveSchemaDraft)
@@ -311,6 +314,7 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
     let active = true
     const load = async (): Promise<void> => {
       let loaded = await loadSchemaModel(target)
+      if (!active) return
       if (!loaded) loaded = await analyzeSchema(target)
       if (!active) return
       if (loaded) {
@@ -401,7 +405,7 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
       bodyClassName="flex flex-col gap-3"
       onClose={close}
       headerActions={
-        <Button size="sm" busy={analyzing} disabled={loading} onClick={() => void updateAnalysis()}>
+        <Button size="sm" busy={analyzing || analysisBusy} disabled={loading || !connected} onClick={() => void updateAnalysis()}>
           <RefreshCw /> {t('schema.updateAnalysis')}
         </Button>
       }

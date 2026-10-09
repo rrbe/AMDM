@@ -72,6 +72,7 @@ import {
 } from '@renderer/lib/notifications'
 import i18n from '@renderer/i18n'
 import { catalogSearchSnapshot, type CatalogSearchSnapshot } from '@renderer/lib/catalogSearch'
+import { patchSchemaPanel, releaseSchemaPanels, schemaPanelKey, type SchemaPanelState } from '@renderer/lib/schemaPanel'
 
 /** Shorthand for translating notification / error strings in the store. */
 const tr = i18n.t.bind(i18n)
@@ -130,6 +131,8 @@ interface AppState {
   history: HistoryEntry[]
   /** Sampled field names for autocomplete, keyed `${connId}:${db}.${coll}`. */
   fieldCache: Record<string, string[]>
+  /** Bounded session cache shared by the Schema sidebar and model editor. */
+  schemaPanels: Record<string, SchemaPanelState>
 
   // ---- preferences ----
   settings: AppSettings
@@ -237,6 +240,7 @@ interface AppState {
   getFields(connId: string, db: string, coll: string): string[]
 
   // ---- actions: Schema analysis / local model ----
+  updateSchemaPanel(target: SchemaTarget, patch: Pick<Partial<SchemaPanelState>, 'search' | 'expanded' | 'scrollTop'>): void
   loadSchemaModel(target: SchemaTarget): Promise<SchemaModel | null>
   analyzeSchema(target: SchemaTarget): Promise<SchemaModel | null>
   saveSchemaDraft(target: SchemaTarget, draft: MongoJsonSchema): Promise<SchemaModel | null>
@@ -466,6 +470,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   savedQueries: [],
   history: [],
   fieldCache: {},
+  schemaPanels: {},
 
   settings: DEFAULT_SETTINGS,
   updateState: EMPTY_UPDATE_STATE,
@@ -528,6 +533,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const tabs = s.tabs.map((tab) => (tab.connectionId === id ? { ...tab, connectionId: null } : tab))
         return {
           catalogs,
+          schemaPanels: releaseSchemaPanels(s.schemaPanels, id),
           catalogSearchSnapshots,
           statuses,
           tabs,
@@ -695,6 +701,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       expandedConnections.delete(id)
       return {
         statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
+        schemaPanels: releaseSchemaPanels(s.schemaPanels, id),
         catalogs,
         catalogSearchSnapshots: _removed
           ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
@@ -718,7 +725,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   syncSessionStatus(status) {
     const previous = get().statuses[status.id]
-    set((s) => ({ statuses: { ...s.statuses, [status.id]: status } }))
+    set((s) => ({
+      statuses: { ...s.statuses, [status.id]: status },
+      ...(status.state === 'disconnected' || status.state === 'error'
+        ? { schemaPanels: releaseSchemaPanels(s.schemaPanels, status.id) }
+        : {})
+    }))
     if (previous?.state === status.state) return
     const key = `connection:${status.id}:status`
     if (status.state === 'error') {
@@ -890,8 +902,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => {
         const fieldCache = { ...s.fieldCache }
         delete fieldCache[`${connId}:${db}.${coll}`]
+        const schemaPanels = { ...s.schemaPanels }
+        delete schemaPanels[schemaPanelKey({ connectionId: connId, database: db, collection: coll })]
         const catalog = s.catalogs[connId]
-        if (!catalog) return { fieldCache }
+        if (!catalog) return { fieldCache, schemaPanels }
         const indexes = { ...catalog.indexes }
         delete indexes[`${db}/${coll}`]
         const expanded = new Set(catalog.expanded)
@@ -899,6 +913,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         expanded.delete(`${connId}:idx:${db}/${coll}`)
         return {
           fieldCache,
+          schemaPanels,
           catalogs: {
             ...s.catalogs,
             [connId]: {
@@ -1602,10 +1617,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // -------------------------------------------------------------- Schema model
+  updateSchemaPanel(target, patch) {
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, patch) }))
+  },
+
   async loadSchemaModel(target) {
+    const key = schemaPanelKey(target)
+    const cached = get().schemaPanels[key]
+    if (cached?.model !== undefined) return cached.model
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: null }) }))
+    const owner = get().schemaPanels[key].owner
     try {
-      return await window.api.schemas.get(target)
+      const model = await window.api.schemas.get(target)
+      if (get().schemaPanels[key]?.owner !== owner) return null
+      // An explicit analysis may have completed while the local snapshot was loading.
+      if (get().schemaPanels[key].model !== undefined) return get().schemaPanels[key].model ?? null
+      set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      return model
     } catch (e) {
+      if (get().schemaPanels[key]?.owner !== owner) return null
+      set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: errMessage(e) }) }))
       get().notify(
         appNotice('error', tr('notify.loadSchemaFailed', { error: errMessage(e) }), 'document', 'schema:load')
       )
@@ -1613,20 +1644,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  async analyzeSchema(target) {
-    try {
-      const model = await window.api.schemas.analyze(target)
-      get().notify(appNotice('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }), 'document'))
-      return model
-    } catch (e) {
-      get().notify(appNotice('error', tr('notify.analyzeSchemaFailed', { error: errMessage(e) }), 'document'))
-      return null
-    }
+  analyzeSchema(target) {
+    const key = schemaPanelKey(target)
+    const pending = get().schemaPanels[key]?.analysisRequest
+    if (pending) return pending
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analyzing: true, error: null }) }))
+    const owner = get().schemaPanels[key].owner
+    const analysisRequest = Promise.resolve().then(async () => {
+      try {
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        const model = await window.api.schemas.analyze(target)
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+        get().notify(appNotice('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }), 'document'))
+        return model
+      } catch (e) {
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: errMessage(e) }) }))
+        get().notify(appNotice('error', tr('notify.analyzeSchemaFailed', { error: errMessage(e) }), 'document'))
+        return null
+      } finally {
+        if (get().schemaPanels[key]?.owner === owner) {
+          set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analyzing: false, analysisRequest: undefined }) }))
+        }
+      }
+    })
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analysisRequest }) }))
+    return analysisRequest
   },
 
   async saveSchemaDraft(target, draft) {
+    const key = schemaPanelKey(target)
+    const owner = get().schemaPanels[key]?.owner
     try {
       const model = await window.api.schemas.saveDraft(target, draft)
+      if (owner && get().schemaPanels[key]?.owner === owner) {
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      }
       get().notify(appNotice('success', tr('notify.schemaSaved'), 'document'))
       return model
     } catch (e) {
@@ -1636,8 +1690,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async overwriteSchemaDraft(target) {
+    const key = schemaPanelKey(target)
+    const owner = get().schemaPanels[key]?.owner
     try {
       const model = await window.api.schemas.overwriteDraft(target)
+      if (owner && get().schemaPanels[key]?.owner === owner) {
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      }
       get().notify(appNotice('success', tr('notify.schemaOverwritten'), 'document'))
       return model
     } catch (e) {

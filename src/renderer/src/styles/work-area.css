@@ -34,6 +34,11 @@
   background: var(--surface-sidebar);
   overflow: hidden;
 }
+.context-rail .explorer-nav {
+  min-height: 53px;
+  flex-basis: 53px;
+  padding: 15px 10px 4px;
+}
 
 /* ---- query tab strip (multi-tab workspace) ---- */
 .tab-bar {
