@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Table } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
@@ -317,11 +317,12 @@ export function ResultPanel({
       <div className="result-bar">
         <div className="view-switch sliding-selection">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
+            const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : 'Table'
+            const Icon = v === 'tree' ? Network : v === 'json' ? Braces : Table
             return (
               <button
                 key={v}
-                className={!showConsole && view === v ? 'active is-selected' : ''}
+                className={`group/result-view flex items-center justify-center ${!showConsole && view === v ? 'active is-selected' : ''}`}
                 aria-label={label}
                 aria-pressed={!showConsole && view === v}
                 onClick={() => {
@@ -329,19 +330,22 @@ export function ResultPanel({
                   setView(v)
                 }}
               >
-                {label}
+                <span className="inline-flex items-center gap-1">
+                  <Icon size={12} aria-hidden="true" />
+                  {label}
+                </span>
                 {showViewShortcutHints && <ViewShortcutHint number={i + 1} />}
               </button>
             )
           })}
           {hasOutput && (
             <button
-              className={showConsole ? 'active is-selected' : ''}
-              aria-label={t('result.view.console')}
+              className={`group/result-view flex items-center justify-center ${showConsole ? 'active is-selected' : ''}`}
+              aria-label="Console"
               aria-pressed={showConsole}
               onClick={() => chooseConsole(true)}
             >
-              {t('result.view.console')}
+              Console
               {showViewShortcutHints && <ViewShortcutHint number={4} />}
             </button>
           )}
