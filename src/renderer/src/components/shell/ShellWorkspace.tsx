@@ -11,7 +11,8 @@ import {
   Plus,
   Save,
   ScanSearch,
-  Unplug
+  Unplug,
+  WandSparkles
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
@@ -233,6 +234,16 @@ export function ShellWorkspace(): React.JSX.Element {
                   aria-label={t('shell.explainBtn')}
                 >
                   <ScanSearch size={15} />
+                </button>
+              </Tooltip>
+              <Tooltip content={`${t('shell.menu.format')} · ${isMacPlatform() ? '⌘⇧F' : 'Ctrl+Shift+F'}`}>
+                <button
+                  className="work-icon-btn"
+                  aria-disabled={!code.trim()}
+                  onClick={() => void formatCode()}
+                  aria-label={t('shell.menu.format')}
+                >
+                  <WandSparkles size={15} aria-hidden />
                 </button>
               </Tooltip>
               <Tooltip content={t('shell.saveQueryTip')}>
