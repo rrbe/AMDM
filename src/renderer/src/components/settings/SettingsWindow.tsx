@@ -571,6 +571,7 @@ export function SettingsWindow(): React.JSX.Element {
                   enabled={!settings.disabledKeyboardShortcuts.includes('openSettings')}
                   onEnabledChange={(enabled) => setShortcutEnabled('openSettings', enabled)}
                 />
+                <ShortcutRow label={t('shell.menu.format')} keys={`${primaryKey} ⇧ F`} />
               </div>
             </>
           )}
@@ -584,13 +585,13 @@ export function SettingsWindow(): React.JSX.Element {
 function ShortcutRow({
   label,
   keys,
-  enabled,
+  enabled = true,
   onEnabledChange
 }: {
   label: string
   keys: string
-  enabled: boolean
-  onEnabledChange: (enabled: boolean) => void
+  enabled?: boolean
+  onEnabledChange?: (enabled: boolean) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
@@ -606,14 +607,16 @@ function ShortcutRow({
         ) : (
           <span className="px-2 py-1 text-[12px] text-muted-foreground">{t('settings.shortcutUnassigned')}</span>
         )}
-        <button
-          type="button"
-          className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
-          onClick={() => onEnabledChange(!enabled)}
-          aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
-        >
-          {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
-        </button>
+        {onEnabledChange && (
+          <button
+            type="button"
+            className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+            onClick={() => onEnabledChange(!enabled)}
+            aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
+          >
+            {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
+          </button>
+        )}
       </div>
     </div>
   )
