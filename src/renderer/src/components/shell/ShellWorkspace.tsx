@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
   LoaderCircle,
@@ -11,6 +10,7 @@ import {
   Play,
   Plus,
   Save,
+  ScanSearch,
   Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -232,7 +232,7 @@ export function ShellWorkspace(): React.JSX.Element {
                   }}
                   aria-label={t('shell.explainBtn')}
                 >
-                  <ChartNoAxesCombined size={15} />
+                  <ScanSearch size={15} />
                 </button>
               </Tooltip>
               <Tooltip content={t('shell.saveQueryTip')}>
