@@ -4,6 +4,28 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.2](https://github.com/rrbe/AMDM/releases/tag/v26.10.2) — 2026-10-10
+
+### 新功能
+
+- 详情侧栏支持查看集合 Schema，可采样分析、展开嵌套字段、搜索字段和类型，并打开完整 Schema 视图
+- 查询工具栏新增格式化按钮
+- 按住 Command 或 Ctrl 时显示结果视图快捷键提示
+- 支持跨连接搜索数据库和集合，并高亮匹配内容
+
+### 修复
+
+- 修正补全片段中的字符串参数和生成的索引查询，复用已打开的索引标签页时不再重复执行查询
+- 查询格式化快捷键改为 macOS 的 Command\-Shift\-F，以及 Windows 和 Linux 的 Ctrl\-Shift\-F
+- 隐藏未连接状态的连接指示点
+- 在应用运行期间记住调整后的弹窗尺寸
+
+### 其他更新
+
+- 调整执行计划操作图标
+- 调整结果视图图标和名称
+- 搜索匹配项使用琥珀色高亮
+
 ## [v26.10.1](https://github.com/rrbe/AMDM/releases/tag/v26.10.1) — 2026-10-08
 
 ### 新功能

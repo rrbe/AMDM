@@ -4,6 +4,28 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.2](https://github.com/rrbe/AMDM/releases/tag/v26.10.2) — 2026-10-10
+
+### Features
+
+- Inspect collection schemas in the Details sidebar, with sampling, nested fields, field and type search, and access to the full Schema view
+- Add a query formatting button to the toolbar
+- Show result view shortcut hints when holding Command or Ctrl
+- Search databases and collections across connections with highlighted matches
+
+### Fixes
+
+- Fix string arguments in completion snippets and generated index queries, and reuse open index tabs without rerunning queries
+- Use Command\-Shift\-F on macOS and Ctrl\-Shift\-F on Windows and Linux to format queries
+- Hide status dots for disconnected connections
+- Remember resized dialog dimensions while the app is running
+
+### Other Updates
+
+- Update the Explain action icon
+- Update result view icons and labels
+- Use amber highlights for search matches
+
 ## [v26.10.1](https://github.com/rrbe/AMDM/releases/tag/v26.10.1) — 2026-10-08
 
 ### Features
