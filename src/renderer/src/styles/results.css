@@ -810,6 +810,22 @@
   background: var(--primary);
   border-radius: 0;
 }
+.result-view-shortcut {
+  isolation: isolate;
+}
+.result-view-shortcut::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0 -4px -4px;
+  z-index: 0;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+  mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
+}
+.result-view-shortcut > .document-tab-shortcut {
+  position: relative;
+  z-index: 1;
+}
 .copy-feedback {
   display: grid;
   width: 14px;

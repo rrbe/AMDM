@@ -39,11 +39,10 @@ import {
   isMacPlatform,
   isPrimaryShortcut,
   isPrimaryShiftShortcut,
+  SHORTCUT_HINT_DELAY_MS,
   shortcutRegionFromTarget,
   type ShortcutRegion
 } from '@renderer/lib/keyboardShortcuts'
-
-const TAB_SHORTCUT_HINT_DELAY_MS = 500
 
 /**
  * The main work area: a tab strip, header (active connection + database +
@@ -135,7 +134,7 @@ export function ShellWorkspace(): React.JSX.Element {
             if (!modifierHeld || hasOpenShortcutLayer()) return
             hintVisible = true
             setShortcutHintRegion(lastShortcutRegion.current)
-          }, TAB_SHORTCUT_HINT_DELAY_MS)
+          }, SHORTCUT_HINT_DELAY_MS)
         }
         return
       }

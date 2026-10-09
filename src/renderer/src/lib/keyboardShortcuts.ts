@@ -2,6 +2,8 @@ import type { KeyboardShortcutId } from '@shared/types'
 
 export type ShortcutRegion = 'query' | 'result'
 
+export const SHORTCUT_HINT_DELAY_MS = 500
+
 interface ShortcutKeyEvent {
   key: string
   code: string
@@ -41,6 +43,10 @@ function digitIndex(event: ShortcutKeyEvent): number | null {
 /** Cmd+number on macOS, Ctrl+number elsewhere. */
 export function primaryDigitIndex(event: ShortcutKeyEvent, isMac: boolean): number | null {
   return hasPrimaryModifier(event, isMac) ? digitIndex(event) : null
+}
+
+export function isPrimaryHintModifier(event: ShortcutKeyEvent, isMac: boolean): boolean {
+  return event.key === (isMac ? 'Meta' : 'Control') && hasPrimaryModifier(event, isMac)
 }
 
 /** macOS-only Ctrl+number, kept distinct from the primary Cmd+number binding. */

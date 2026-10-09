@@ -21,7 +21,9 @@ import {
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
   isMacPlatform,
-  primaryDigitIndex
+  isPrimaryHintModifier,
+  primaryDigitIndex,
+  SHORTCUT_HINT_DELAY_MS
 } from '@renderer/lib/keyboardShortcuts'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
@@ -36,6 +38,20 @@ const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
   value
 }))
+
+function ViewShortcutHint({ number }: { number: number }): React.JSX.Element {
+  return (
+    <span
+      className="result-view-shortcut absolute inset-y-0 right-0 my-auto inline-flex h-fit"
+      data-view-shortcut-number={number}
+      aria-hidden="true"
+    >
+      <span className="document-tab-shortcut bg-muted!">
+        {isMacPlatform() ? '⌘' : 'Ctrl'}{number}
+      </span>
+    </span>
+  )
+}
 
 /**
  * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
@@ -71,6 +87,7 @@ export function ResultPanel({
   })
   const docCtx = docActionContext(result, active?.query ?? null)
   const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
+  const [showViewShortcutHints, setShowViewShortcutHints] = useState(false)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
   const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
@@ -138,11 +155,43 @@ export function ResultPanel({
   // while the switcher is showing (a documents/value result, not error/explain).
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
+    setShowViewShortcutHints(false)
     if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
+    const isMac = isMacPlatform()
+    let hintTimer: number | null = null
+    let modifierHeld = false
+    let hintVisible = false
+    const cancelHintTimer = (): void => {
+      if (hintTimer === null) return
+      window.clearTimeout(hintTimer)
+      hintTimer = null
+    }
+    const hideShortcutHints = (): void => {
+      modifierHeld = false
+      hintVisible = false
+      cancelHintTimer()
+      setShowViewShortcutHints(false)
+    }
     const views: ResultView[] = ['tree', 'json', 'table']
     const onKey = (e: KeyboardEvent): void => {
-      if (hasOpenShortcutLayer()) return
-      const index = primaryDigitIndex(e, isMacPlatform())
+      if (hasOpenShortcutLayer()) {
+        hideShortcutHints()
+        return
+      }
+      if (isPrimaryHintModifier(e, isMac)) {
+        modifierHeld = true
+        if (!e.repeat && hintTimer === null && !hintVisible) {
+          hintTimer = window.setTimeout(() => {
+            hintTimer = null
+            if (!modifierHeld || hasOpenShortcutLayer()) return
+            hintVisible = true
+            setShowViewShortcutHints(true)
+          }, SHORTCUT_HINT_DELAY_MS)
+        }
+        return
+      }
+      cancelHintTimer()
+      const index = primaryDigitIndex(e, isMac)
       if (index === 3) {
         if (!hasOutput) return
         e.preventDefault()
@@ -155,8 +204,23 @@ export function ResultPanel({
       chooseConsole(false)
       setView(target)
     }
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === (isMac ? 'Meta' : 'Control') || !(isMac ? e.metaKey : e.ctrlKey)) hideShortcutHints()
+    }
+    const onVisibilityChange = (): void => {
+      if (document.hidden) hideShortcutHints()
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', hideShortcutHints)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      cancelHintTimer()
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', hideShortcutHints)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [switchable, hasOutput, active?.id, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   useEffect(() => {
@@ -258,6 +322,7 @@ export function ResultPanel({
               <button
                 key={v}
                 className={!showConsole && view === v ? 'active is-selected' : ''}
+                aria-label={label}
                 aria-pressed={!showConsole && view === v}
                 onClick={() => {
                   chooseConsole(false)
@@ -265,20 +330,20 @@ export function ResultPanel({
                 }}
               >
                 {label}
-                <span className="text-[0.8em] leading-none font-normal text-muted-foreground">(⌘{i + 1})</span>
+                {showViewShortcutHints && <ViewShortcutHint number={i + 1} />}
               </button>
             )
           })}
           {hasOutput && (
-            <Tooltip content="Console (⌘4)">
-              <button
-                className={showConsole ? 'active is-selected' : ''}
-                aria-pressed={showConsole}
-                onClick={() => chooseConsole(true)}
-              >
-                {t('result.view.console')}
-              </button>
-            </Tooltip>
+            <button
+              className={showConsole ? 'active is-selected' : ''}
+              aria-label={t('result.view.console')}
+              aria-pressed={showConsole}
+              onClick={() => chooseConsole(true)}
+            >
+              {t('result.view.console')}
+              {showViewShortcutHints && <ViewShortcutHint number={4} />}
+            </button>
           )}
           <span className="selection-indicator" aria-hidden="true" />
         </div>
