@@ -1,4 +1,48 @@
 {
+  "add schema inspection to the details sidebar": {
+    "en": "Inspect collection schemas in the Details sidebar, with sampling, nested fields, field and type search, and access to the full Schema view",
+    "zh": "详情侧栏支持查看集合 Schema，可采样分析、展开嵌套字段、搜索字段和类型，并打开完整 Schema 视图"
+  },
+  "add query format toolbar button": {
+    "en": "Add a query formatting button to the toolbar",
+    "zh": "查询工具栏新增格式化按钮"
+  },
+  "improve generated queries and index tab reuse": {
+    "en": "Fix string arguments in completion snippets and generated index queries, and reuse open index tabs without rerunning queries",
+    "zh": "修正补全片段中的字符串参数和生成的索引查询，复用已打开的索引标签页时不再重复执行查询"
+  },
+  "use primary shift F to format queries": {
+    "en": "Use Command-Shift-F on macOS and Ctrl-Shift-F on Windows and Linux to format queries",
+    "zh": "查询格式化快捷键改为 macOS 的 Command-Shift-F，以及 Windows 和 Linux 的 Ctrl-Shift-F"
+  },
+  "use scan search icon for explain": {
+    "en": "Update the Explain action icon",
+    "zh": "调整执行计划操作图标"
+  },
+  "hide disconnected connection status dots": {
+    "en": "Hide status dots for disconnected connections",
+    "zh": "隐藏未连接状态的连接指示点"
+  },
+  "update result view icons and labels": {
+    "en": "Update result view icons and labels",
+    "zh": "调整结果视图图标和名称"
+  },
+  "reveal result view shortcuts on modifier hold": {
+    "en": "Show result view shortcut hints when holding Command or Ctrl",
+    "zh": "按住 Command 或 Ctrl 时显示结果视图快捷键提示"
+  },
+  "use amber search highlights": {
+    "en": "Use amber highlights for search matches",
+    "zh": "搜索匹配项使用琥珀色高亮"
+  },
+  "add highlighted catalog search across connections": {
+    "en": "Search databases and collections across connections with highlighted matches",
+    "zh": "支持跨连接搜索数据库和集合，并高亮匹配内容"
+  },
+  "remember modal sizes during app runtime": {
+    "en": "Remember resized dialog dimensions while the app is running",
+    "zh": "在应用运行期间记住调整后的弹窗尺寸"
+  },
   "fold JSON objects and arrays in result views (#26)": {
     "en": "Add JSON object and array folding with per-result state, and virtualize table columns (#26)",
     "zh": "支持折叠 JSON 对象和数组、保留各结果的折叠状态，并为表格增加列虚拟化（#26）"
