@@ -966,11 +966,13 @@ function ConnectionRow({
           </div>
         </Tooltip>
       </div>
-      <Tooltip content={statusLabel}>
-        <span className="conn-status" role="status" aria-label={statusLabel}>
-          <span className={signalClass} />
-        </span>
-      </Tooltip>
+      {state !== 'disconnected' && (
+        <Tooltip content={statusLabel}>
+          <span className="conn-status" role="status" aria-label={statusLabel}>
+            <span className={signalClass} />
+          </span>
+        </Tooltip>
+      )}
     </div>
   )
 }
