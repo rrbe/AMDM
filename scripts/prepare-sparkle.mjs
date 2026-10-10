@@ -70,7 +70,7 @@ execFileSync(
     "arm64",
     "-arch",
     "x86_64",
-    "-mmacosx-version-min=12.0",
+    "-mmacosx-version-min=13.0",
     "-I",
     join(root, "node_modules", "node-api-headers", "include"),
     "-F",

@@ -19,7 +19,7 @@ Integration tests prefer a locally cached `mongod` binary and may need to downlo
 
 ## Local macOS installation
 
-The minimum supported macOS version is 12 Monterey for both arm64 and x64. The app bundle declares `minimumSystemVersion: "12.0"` in `electron-builder.yml`, and the native Sparkle addon uses `-mmacosx-version-min=12.0` for both architectures, matching Electron 43's minimum requirement.
+The minimum supported macOS version is 13 Ventura for both arm64 and x64. The app bundle declares `minimumSystemVersion: "13.0"` in `electron-builder.yml`, and the native Sparkle addon uses `-mmacosx-version-min=13.0` for both architectures, matching Electron 44's minimum requirement.
 
 `pnpm install:mac` builds and installs the arm64 app using the Electron distribution already installed in `node_modules/electron/dist`. Install dependencies first with `pnpm install` on an Apple Silicon Mac. This local command avoids Electron archive downloads and online checksum requests during packaging; it still builds the app and signs the bundle. Sparkle is downloaded only when its prepared framework is missing or its pinned version changes.
 

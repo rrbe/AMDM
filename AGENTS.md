@@ -18,7 +18,7 @@ This file contains only repository-level non-negotiable rules. Read the relevant
 
 AMDM is a performance-first MongoDB desktop GUI built with Electron, React, TypeScript, and Vite.
 
-The current Electron capability baseline is Electron 43 (`electron@^43.4.0`). Keep this line synchronized with Electron upgrades.
+The current Electron capability baseline is Electron 44 (`electron@^44.7.0`). Keep this line synchronized with Electron upgrades.
 
 Read the documentation relevant to the task:
 

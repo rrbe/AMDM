@@ -27,7 +27,7 @@ type Op = 'serialize' | 'fields' | 'schema'
 
 interface Pending {
   resolve: (value: unknown) => void
-  reject: (reason: Error) => void
+  reject: (reason: unknown) => void
 }
 
 interface WorkerResponse {
@@ -71,7 +71,7 @@ class SerializerPool {
   }
 
   /** Worker died: reject everything in flight and degrade to inline forever. */
-  private onFatal(err: Error): void {
+  private onFatal(err: unknown): void {
     this.broken = true
     this.worker = null
     for (const p of this.pending.values()) p.reject(err)
