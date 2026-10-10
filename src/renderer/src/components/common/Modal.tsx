@@ -257,11 +257,16 @@ export function Modal({
       )}
       <div
         className={cn(
-          'min-h-0 overflow-y-auto',
+          'min-h-0 overflow-y-auto scroll-p-[3px] [&_button]:scroll-m-[3px] [&_input]:scroll-m-[3px] [&_textarea]:scroll-m-[3px]',
           sheet ? 'px-[26px] pb-2 pt-[22px]' : 'px-6 py-5',
           bodyClassName
         )}
         ref={bodyRef}
+        onFocusCapture={(event) => {
+          if (event.target.matches('input, textarea, button')) {
+            event.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+          }
+        }}
       >
         {children}
       </div>

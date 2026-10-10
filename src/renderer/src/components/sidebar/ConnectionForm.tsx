@@ -720,7 +720,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
             ) : (
               <div>
                 <div className="overflow-visible">
-                  <div className="max-h-[151px] overflow-y-auto">
+                  <div className="-m-[3px] max-h-[157px] overflow-y-auto scroll-pb-[3px] scroll-pt-7 p-[3px]">
                     {members.length > 0 && (
                       <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
                         <span>{tFn('connection.general.memberHost')}</span>
@@ -848,7 +848,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
                 </Button>
               </div>
               <div className="overflow-visible">
-                <div className="max-h-[151px] overflow-y-auto">
+                <div className="-m-[3px] max-h-[157px] overflow-y-auto scroll-pb-[3px] scroll-pt-7 p-[3px]">
                   {customOptions.length > 0 && (
                     <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
                       <span>{tFn('connection.general.optionKey')}</span>

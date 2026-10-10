@@ -244,7 +244,7 @@
 }
 /* Per-doc edit/delete, revealed on row hover at the right edge. */
 /* Inline cell editor (Tree value cell + Table data cell). Fills the cell,
-   monospace, accent ring; red ring when the last commit failed validation. */
+   monospace, accent border; red border when the last commit failed validation. */
 .cell-edit-input {
   width: 100%;
   box-sizing: border-box;
@@ -257,6 +257,8 @@
   border: 1px solid var(--primary);
   border-radius: var(--radius-control);
   outline: none;
+  /* The border carries focus without clipping a global input shadow in the cell. */
+  box-shadow: none;
   /* Opt back into text selection: the grid row/table disables it, but you must
      be able to select/edit text while inline-editing a cell. */
   user-select: text;
