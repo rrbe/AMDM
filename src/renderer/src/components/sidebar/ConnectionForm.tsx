@@ -22,6 +22,7 @@ import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { ConnectionPermissions } from './ConnectionPermissions'
 import {
   buildConnectionOptions,
@@ -147,6 +148,11 @@ function DiagnoseControl({
  */
 export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormProps): React.JSX.Element {
   const { t: tFn } = useTranslation()
+  const passwordStoragePlatform = isMacPlatform()
+    ? 'mac'
+    : navigator.platform.toLowerCase().startsWith('win')
+      ? 'windows'
+      : 'linux'
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
   const readConnectionAuthorization = useAppStore((s) => s.readConnectionAuthorization)
@@ -687,7 +693,22 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
           </section>
 
           <section className="connection-form-section">
-            <h2>{tFn('connection.section.server')}</h2>
+            <div className="mb-3.5 flex items-center justify-between gap-3">
+              <h2 className="m-0 text-[13px] font-[620] text-[var(--text-primary)]">
+                {tFn('connection.section.server')}
+              </h2>
+              {!useSrv && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
+                >
+                  <Plus size={14} />
+                  {tFn('connection.general.addMember')}
+                </Button>
+              )}
+            </div>
             <div className="form-row">
               <Checkbox checked={useSrv} onCheckedChange={setUseSrv} label={tFn('connection.general.useSrv')} />
             </div>
@@ -698,26 +719,15 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
               </Field>
             ) : (
               <div>
-                <div className="mb-1.5 flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-medium text-muted-foreground">{tFn('connection.general.hosts')}</div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
-                  >
-                    <Plus size={14} />
-                    {tFn('connection.general.addMember')}
-                  </Button>
-                </div>
-
                 <div className="overflow-visible">
                   <div className="max-h-[151px] overflow-y-auto">
-                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
-                      <span>{tFn('connection.general.memberHost')}</span>
-                      <span>{tFn('connection.general.memberPort')}</span>
-                      <span />
-                    </div>
+                    {members.length > 0 && (
+                      <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                        <span>{tFn('connection.general.memberHost')}</span>
+                        <span>{tFn('connection.general.memberPort')}</span>
+                        <span />
+                      </div>
+                    )}
                     {members.length === 0 ? (
                       <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noMembers')}</div>
                     ) : (
@@ -814,9 +824,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
                   placeholder={tFn('connection.optional')}
                 />
               </Field>
-              <Field label={tFn('connection.auth.authSource')}>
-                <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
-              </Field>
             </div>
 
             {sshEnabled && replicaSet.trim() && (
@@ -825,12 +832,11 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
           </section>
 
           <section className="connection-form-section">
-            <h2>{tFn('connection.section.options')}</h2>
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-medium text-muted-foreground">
+                <h2 className="m-0 text-[13px] font-[620] text-[var(--text-primary)]">
                   {tFn('connection.general.customOptions')}
-                </div>
+                </h2>
                 <Button
                   type="button"
                   variant="ghost"
@@ -843,11 +849,13 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
               </div>
               <div className="overflow-visible">
                 <div className="max-h-[151px] overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
-                    <span>{tFn('connection.general.optionKey')}</span>
-                    <span>{tFn('connection.general.optionValue')}</span>
-                    <span />
-                  </div>
+                  {customOptions.length > 0 && (
+                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                      <span>{tFn('connection.general.optionKey')}</span>
+                      <span>{tFn('connection.general.optionValue')}</span>
+                      <span />
+                    </div>
+                  )}
                   {customOptions.length === 0 ? (
                     <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noOptions')}</div>
                   ) : (
@@ -908,7 +916,9 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
 
       {tab === 'auth' && (
         <>
-          <div className="mb-3 text-[11px] text-[var(--fg-3)]">{tFn('connection.auth.emptyMeansNone')}</div>
+          <div className="mb-3 text-[11px] text-[var(--fg-3)]">
+            {tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
+          </div>
           <div className="form-grid">
             <Field label={tFn('connection.auth.username')} error={authError}>
               <Input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -925,17 +935,22 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
               />
             </Field>
           </div>
-          <Field className="w-[calc(50%-8px)]" label={tFn('connection.auth.mechanism')}>
-            <Select<ScramMechanism>
-              value={mechanism}
-              onChange={setMechanism}
-              options={[
-                { label: 'DEFAULT', value: 'DEFAULT' },
-                { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
-                { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
-              ]}
-            />
-          </Field>
+          <div className="form-grid">
+            <Field label={tFn('connection.auth.authSource')}>
+              <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
+            </Field>
+            <Field label={tFn('connection.auth.mechanism')}>
+              <Select<ScramMechanism>
+                value={mechanism}
+                onChange={setMechanism}
+                options={[
+                  { label: 'DEFAULT', value: 'DEFAULT' },
+                  { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
+                  { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
+                ]}
+              />
+            </Field>
+          </div>
           <ConnectionPermissions key={inputKey} result={authorization} busy={testing || readingAuthorization} />
         </>
       )}

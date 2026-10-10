@@ -275,7 +275,11 @@
       "next": "Next"
     },
     "auth": {
-      "emptyMeansNone": "Leave the username, password, and auth source blank to connect without authentication.",
+      "passwordStorage": {
+        "mac": "Passwords are encrypted locally and protected by the system Keychain. If prompted when connecting, allow AMDM to access the Keychain.",
+        "windows": "Passwords are encrypted locally and protected by Windows Data Protection. Connecting requires access under the current Windows user account.",
+        "linux": "Passwords are stored locally. If prompted when connecting, allow AMDM to access the system password store."
+      },
       "usernameRequired": "Enter a username, or clear the password and auth source.",
       "username": "Username",
       "password": "Password",
