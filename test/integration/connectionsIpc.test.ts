@@ -40,6 +40,7 @@ import { registerIpc } from '../../src/main/ipc/registerIpc'
 import { connectionStore } from '../../src/main/store/connectionStore'
 import { sessionManager } from '../../src/main/mongo/sessionManager'
 import * as electron from '../helpers/electron-mock'
+import { startMongo } from '../helpers/mongo'
 
 let dir = ''
 const input: ConnectionInput = {
@@ -169,6 +170,64 @@ describe('connection duplication through IPC', () => {
       sshPassphrase: input.sshPassphrase,
       jumpSshPassphrase: input.jumpSshPassphrase
     })
+  })
+
+  it('returns the authenticated account permissions through test and live-session IPC without persisting them', async () => {
+    const harness = await startMongo()
+    try {
+      await harness.client.db('ezze').command({
+        createUser: 'ezze', pwd: 'test-password', roles: [{ role: 'readWrite', db: 'ezze' }]
+      })
+      const api = bridge.api!
+      const uri = new URL(harness.server.getUri())
+      const onDisk = readFileSync(join(dir, 'connections.json'), 'utf8')
+      const testInput: ConnectionInput = {
+        id: '', name: 'Permission test', host: uri.hostname, port: Number(uri.port), useSrv: false,
+        auth: { type: 'scram', username: 'ezze', authSource: 'ezze' }, password: 'test-password',
+        ssh: { enabled: false }, tls: { enabled: false }
+      }
+      const result = await api.connections.test(testInput)
+      expect(result.ok).toBe(true)
+      expect(result.authorizationError).toBeUndefined()
+      expect(result.authorization?.users).toEqual([{ user: 'ezze', db: 'ezze' }])
+      expect(result.authorization?.roles).toEqual([{ role: 'readWrite', db: 'ezze' }])
+      expect(result.authorization?.privileges).toContainEqual({
+        resource: { db: 'ezze', collection: '' }, actions: expect.arrayContaining(['find', 'insert', 'update', 'remove'])
+      })
+      const wire = JSON.stringify(result)
+      expect(wire).not.toContain('test-password')
+      expect(wire).not.toContain('clusterTime')
+      expect(wire).not.toContain('credentials')
+      expect(readFileSync(join(dir, 'connections.json'), 'utf8')).toBe(onDisk)
+
+      expect(await api.connections.cachedAuthorization({ ...testInput, name: 'Renamed' })).toEqual({ authorization: result.authorization })
+      expect(await api.connections.cachedAuthorization({ ...testInput, password: 'other-password' })).toBeNull()
+      expect(await api.connections.cachedAuthorization({ ...testInput, auth: { ...testInput.auth, username: 'other' } })).toBeNull()
+      expect(await api.connections.list()).toEqual([])
+
+      const saved = await api.connections.save(testInput)
+      expect(await api.connections.cachedAuthorization(saved)).toEqual({ authorization: result.authorization })
+      const now = Date.now()
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 5 * 60 * 1000)
+      expect(await api.connections.cachedAuthorization(saved)).toBeNull()
+      clock.mockRestore()
+      try {
+        await api.session.connect(saved.id)
+        expect(await api.session.authorization(saved.id, saved)).toEqual({ authorization: result.authorization })
+        const db = vi.spyOn(sessionManager.getClient(saved.id), 'db')
+        expect(await api.session.authorization(saved.id, saved)).toEqual({ authorization: result.authorization })
+        expect(await api.session.authorization(saved.id, {
+          ...saved, auth: { ...saved.auth, username: 'different-user' }
+        })).toEqual({})
+        expect(db).not.toHaveBeenCalled()
+        await api.session.disconnect(saved.id)
+        expect(await api.connections.cachedAuthorization(saved)).toEqual({ authorization: result.authorization })
+      } finally {
+        await api.session.disconnect(saved.id)
+      }
+    } finally {
+      await harness.stop()
+    }
   })
 
   it('rejects a missing source without creating a connection', async () => {

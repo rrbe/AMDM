@@ -5,6 +5,7 @@
  */
 import type {
   AppSettings,
+  AuthorizationResult,
   CollectionInfo,
   ConnectionConfig,
   ConnectionInput,
@@ -43,12 +44,14 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsCachedAuthorization: 'connections:cachedAuthorization',
   connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
 
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
   sessionStatus: 'session:status',
+  sessionAuthorization: 'session:authorization',
   sessionStatusChanged: 'session:statusChanged',
 
   catalogDatabases: 'catalog:databases',
@@ -113,6 +116,7 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    cachedAuthorization(input: ConnectionInput): Promise<AuthorizationResult | null>
     /** Single-hop SSH connectivity check (`scope`: the target host or the jump host). */
     diagnose(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
     /**
@@ -128,6 +132,7 @@ export interface Api {
     connect(connectionId: string): Promise<ConnectionStatus>
     disconnect(connectionId: string): Promise<void>
     status(connectionId: string): Promise<ConnectionStatus>
+    authorization(connectionId: string, input: ConnectionInput): Promise<AuthorizationResult>
     /** Driver topology monitoring reports unexpected disconnects and recovery here. */
     onStatusChanged(listener: (status: ConnectionStatus) => void): () => void
   }

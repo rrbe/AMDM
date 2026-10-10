@@ -1,10 +1,12 @@
 import { MongoClient, type TopologyDescriptionChangedEvent } from 'mongodb'
-import type { ConnectionStatus, FailureKind, TestResult } from '../../shared/types'
+import type { AuthorizationResult, ConnectionStatus, FailureKind, TestResult } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { SshTunnel } from '../ssh/tunnel'
 import { buildTunnelOptions, classifyConnError } from '../ssh/tunnelCore'
 import { buildClientArgs, type DecryptedConnection } from './uri'
 import { classifyOperationFailure } from './errorCore'
+import { readAuthorization } from './authorization'
+import { AuthorizationCache, authorizationCacheKey } from './authorizationCache'
 
 function classifyConnectionFailure(error: unknown): FailureKind {
   const connectionKind = classifyConnError(error).kind
@@ -15,6 +17,7 @@ function classifyConnectionFailure(error: unknown): FailureKind {
 
 interface Session {
   client: MongoClient
+  authorizationKey: string
   tunnel?: SshTunnel
   status: ConnectionStatus
   stopMonitoring: () => void
@@ -28,6 +31,7 @@ interface PendingSession {
 /** Owns all live MongoClient connections and their SSH tunnels. */
 export class SessionManager {
   private sessions = new Map<string, Session>()
+  private authorizationCache = new AuthorizationCache()
   private pending = new Map<string, PendingSession>()
   private statusListeners = new Set<(status: ConnectionStatus) => void>()
 
@@ -57,6 +61,21 @@ export class SessionManager {
       throw new Error('Connection is not open. Connect first.')
     }
     return s.client
+  }
+
+  cachedAuthorization(dec: DecryptedConnection): AuthorizationResult | null {
+    return this.authorizationCache.get(authorizationCacheKey(dec))
+  }
+
+  async authorization(id: string, expected: DecryptedConnection): Promise<AuthorizationResult> {
+    const client = this.getClient(id)
+    const key = this.sessions.get(id)!.authorizationKey
+    if (key !== authorizationCacheKey(expected)) return {}
+    const cached = this.authorizationCache.get(key)
+    if (cached) return cached
+    const result = await readAuthorization(client)
+    this.authorizationCache.set(key, result)
+    return result
   }
 
   /** Local forwarded port if this connection runs over an SSH tunnel. */
@@ -128,7 +147,9 @@ export class SessionManager {
         serverVersion: info.serverVersion
       }
       this.pending.delete(id)
-      const session: Session = { client: connectedClient, tunnel, status, stopMonitoring: () => {} }
+      const session: Session = {
+        client: connectedClient, authorizationKey: authorizationCacheKey(dec), tunnel, status, stopMonitoring: () => {}
+      }
       const onTopologyChanged = (event: TopologyDescriptionChangedEvent): void => {
         if (this.sessions.get(id) !== session) return
         const available = event.newDescription.hasKnownServers
@@ -195,6 +216,7 @@ export class SessionManager {
   }
 
   async test(dec: DecryptedConnection): Promise<TestResult> {
+    const key = authorizationCacheKey(dec)
     let tunnel: SshTunnel | undefined
     let client: MongoClient | undefined
     try {
@@ -207,8 +229,11 @@ export class SessionManager {
       client = new MongoClient(uri, options)
       await client.connect()
       const info = await this.probe(client)
-      return { ok: true, topology: info.topology, serverVersion: info.serverVersion }
+      const authorization = await readAuthorization(client)
+      this.authorizationCache.set(key, authorization)
+      return { ok: true, topology: info.topology, serverVersion: info.serverVersion, ...authorization }
     } catch (err) {
+      this.authorizationCache.set(key, {})
       return {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
@@ -223,6 +248,7 @@ export class SessionManager {
   async closeAll(): Promise<void> {
     const ids = new Set([...this.pending.keys(), ...this.sessions.keys()])
     await Promise.all([...ids].map((id) => this.disconnect(id)))
+    this.authorizationCache.clear()
   }
 }
 

@@ -254,6 +254,26 @@
       "removeOption": "Remove Option",
       "noOptions": "No custom options added yet."
     },
+    "permissions": {
+      "title": "Roles & Permissions",
+      "loading": "Reading permissions…",
+      "failed": "Could not read permissions: {{error}}",
+      "testHint": "Test the connection to view roles and permissions.",
+      "noUser": "No authenticated user on this connection.",
+      "noRoles": "No roles returned.",
+      "noPrivileges": "No privileges returned.",
+      "database": "Database",
+      "role": "Role",
+      "collection": "Collection Scope",
+      "actions": "Allowed Actions",
+      "details": "Detailed Permissions",
+      "allResources": "All resources",
+      "cluster": "Cluster",
+      "allDatabases": "All databases",
+      "nonSystemCollections": "Non-system collections",
+      "previous": "Previous",
+      "next": "Next"
+    },
     "auth": {
       "emptyMeansNone": "Leave the username, password, and auth source blank to connect without authentication.",
       "usernameRequired": "Enter a username, or clear the password and auth source.",

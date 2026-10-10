@@ -13,6 +13,7 @@ import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/types'
 import type {
   AppSettings,
+  AuthorizationResult,
   CollectionInfo,
   ConnectionConfig,
   ConnectionInput,
@@ -150,6 +151,8 @@ interface AppState {
   saveConnection(input: ConnectionInput): Promise<ConnectionConfig | null>
   deleteConnection(id: string): Promise<void>
   testConnection(input: ConnectionInput): Promise<TestResult>
+  readConnectionAuthorization(id: string, input: ConnectionInput): Promise<AuthorizationResult>
+  cachedConnectionAuthorization(input: ConnectionInput): Promise<AuthorizationResult | null>
   /** Build a connection string from the current form fields ("To URL"). */
   buildConnectionUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string | null>
   /** Open a native file picker (e.g. SSH private key); resolves the path or null. */
@@ -561,6 +564,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       const error = errMessage(e)
       get().notify(appNotice('error', tr('notify.testConnectionFailed'), 'connection', 'connection:test', error))
       return { ok: false, error, failureKind: 'ipc' }
+    }
+  },
+
+  async cachedConnectionAuthorization(input) {
+    try {
+      return await window.api.connections.cachedAuthorization(input)
+    } catch (error) {
+      return { authorizationError: errMessage(error) }
+    }
+  },
+
+  async readConnectionAuthorization(id, input) {
+    try {
+      return await window.api.session.authorization(id, input)
+    } catch (error) {
+      return { authorizationError: errMessage(error) }
     }
   },
 

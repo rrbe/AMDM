@@ -254,6 +254,26 @@
       "removeOption": "刪除選項",
       "noOptions": "尚未加入選項。"
     },
+    "permissions": {
+      "title": "角色與權限",
+      "loading": "正在讀取權限…",
+      "failed": "無法讀取權限：{{error}}",
+      "testHint": "測試連線後查看角色與權限。",
+      "noUser": "目前連線沒有已驗證使用者。",
+      "noRoles": "未傳回角色。",
+      "noPrivileges": "未傳回權限。",
+      "database": "資料庫",
+      "role": "角色",
+      "collection": "集合範圍",
+      "actions": "允許操作",
+      "details": "詳細權限",
+      "allResources": "所有資源",
+      "cluster": "叢集",
+      "allDatabases": "所有資料庫",
+      "nonSystemCollections": "非系統集合",
+      "previous": "上一頁",
+      "next": "下一頁"
+    },
     "auth": {
       "emptyMeansNone": "使用者名稱、密碼和驗證資料庫均留空時不使用身份驗證。",
       "usernameRequired": "請輸入使用者名稱，或清空密碼和驗證資料庫。",

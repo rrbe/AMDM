@@ -151,6 +151,9 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
   )
+  ipcMain.handle(IPC.connectionsCachedAuthorization, (_e, input: ConnectionInput) =>
+    sessionManager.cachedAuthorization(inputToDecrypted(input))
+  )
   ipcMain.handle(IPC.connectionsDiagnose, (_e, input: ConnectionInput, scope: DiagnoseScope) =>
     diagnoseConnection(inputToDecrypted(input), scope)
   )
@@ -179,6 +182,9 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.sessionConnect, (_e, id: string) => sessionManager.connect(id))
   ipcMain.handle(IPC.sessionDisconnect, (_e, id: string) => sessionManager.disconnect(id))
   ipcMain.handle(IPC.sessionStatus, (_e, id: string) => sessionManager.getStatus(id))
+  ipcMain.handle(IPC.sessionAuthorization, (_e, id: string, input: ConnectionInput) =>
+    sessionManager.authorization(id, inputToDecrypted(input))
+  )
 
   // catalog
   ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id))

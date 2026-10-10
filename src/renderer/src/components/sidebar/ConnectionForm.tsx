@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ClipboardPaste, Link, MessageSquareText, Plus, Trash2 } from 'lucide-react'
 import type {
+  AuthorizationResult,
   ConnectionConfig,
   ConnectionInput,
   DiagnoseStage,
@@ -21,6 +22,7 @@ import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
+import { ConnectionPermissions } from './ConnectionPermissions'
 import {
   buildConnectionOptions,
   connectionMembersAreValid,
@@ -147,6 +149,9 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   const { t: tFn } = useTranslation()
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
+  const readConnectionAuthorization = useAppStore((s) => s.readConnectionAuthorization)
+  const cachedConnectionAuthorization = useAppStore((s) => s.cachedConnectionAuthorization)
+  const connected = useAppStore((s) => !!editing && s.statuses[editing.id]?.state === 'connected')
   const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
   const pickFile = useAppStore((s) => s.pickFile)
   const diagnoseConnection = useAppStore((s) => s.diagnoseConnection)
@@ -158,6 +163,8 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [test, setTest] = useState<TestResult | null>(null)
+  const [authorization, setAuthorization] = useState<AuthorizationResult | null>(null)
+  const [readingAuthorization, setReadingAuthorization] = useState(false)
 
   // ---- URL popups (From URL / To URL) ----
   const [urlPanel, setUrlPanel] = useState<'from' | 'to' | null>(null)
@@ -452,6 +459,47 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
     ]
   )
 
+  // Presentation-only edits do not change which account the permission result describes.
+  const { id: _id, name: _name, color: _color, ...connectionFields } = buildInput()
+  const inputKey = JSON.stringify(connectionFields)
+  const initialInputKey = useRef(inputKey)
+  const currentInputKey = useRef(inputKey)
+  currentInputKey.current = inputKey
+  const requestVersion = useRef(0)
+
+  useEffect(() => {
+    requestVersion.current += 1
+    setTest(null)
+    setAuthorization(null)
+    return () => {
+      requestVersion.current += 1
+    }
+  }, [inputKey])
+
+  useEffect(() => {
+    if (tab !== 'auth' || authorization || testing) {
+      return
+    }
+    let active = true
+    const version = requestVersion.current
+    setReadingAuthorization(true)
+    void (async () => {
+      let result = await cachedConnectionAuthorization(buildInput())
+      if (!active || version !== requestVersion.current || inputKey !== currentInputKey.current) return
+      if (!result && editing && connected && inputKey === initialInputKey.current) {
+        result = await readConnectionAuthorization(editing.id, buildInput())
+      }
+      if (active && version === requestVersion.current && inputKey === currentInputKey.current) {
+        setAuthorization(result)
+        setReadingAuthorization(false)
+      }
+    })()
+    return () => {
+      active = false
+      setReadingAuthorization(false)
+    }
+  }, [tab, editing, connected, inputKey, authorization, testing, readConnectionAuthorization, cachedConnectionAuthorization])
+
   const submit = async (): Promise<void> => {
     setSaving(true)
     const saved = await saveConnection(buildInput())
@@ -462,8 +510,14 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   const runTest = async (): Promise<void> => {
     setTesting(true)
     setTest(null)
+    setAuthorization(null)
+    const version = ++requestVersion.current
+    const key = inputKey
     const r = await testConnection(buildInput())
-    setTest(r)
+    if (version === requestVersion.current && key === currentInputKey.current) {
+      setTest(r)
+      if (r.ok) setAuthorization(r)
+    }
     setTesting(false)
   }
 
@@ -882,6 +936,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
               ]}
             />
           </Field>
+          <ConnectionPermissions key={inputKey} result={authorization} busy={testing || readingAuthorization} />
         </>
       )}
 

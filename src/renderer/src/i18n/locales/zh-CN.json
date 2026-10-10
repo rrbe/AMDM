@@ -254,6 +254,26 @@
       "removeOption": "删除选项",
       "noOptions": "尚未添加选项。"
     },
+    "permissions": {
+      "title": "角色与权限",
+      "loading": "正在读取权限…",
+      "failed": "无法读取权限：{{error}}",
+      "testHint": "测试连接后查看角色与权限。",
+      "noUser": "当前连接没有已认证用户。",
+      "noRoles": "未返回角色。",
+      "noPrivileges": "未返回权限。",
+      "database": "数据库",
+      "role": "角色",
+      "collection": "集合范围",
+      "actions": "允许操作",
+      "details": "详细权限",
+      "allResources": "所有资源",
+      "cluster": "集群",
+      "allDatabases": "所有数据库",
+      "nonSystemCollections": "非系统集合",
+      "previous": "上一页",
+      "next": "下一页"
+    },
     "auth": {
       "emptyMeansNone": "用户名、密码和认证数据库均留空时不使用身份认证。",
       "usernameRequired": "请输入用户名，或清空密码和认证数据库。",

@@ -9,6 +9,7 @@ const fake = vi.hoisted(() => {
       close: ReturnType<typeof vi.fn>
       emit: (event: string, payload: unknown) => void
     }>,
+    command: vi.fn(),
     connect: vi.fn(
       () =>
         new Promise<void>((resolve, reject) => {
@@ -29,6 +30,10 @@ vi.mock('mongodb', () => ({
 
     constructor() {
       fake.clients.push(this)
+    }
+
+    db(): { command: typeof fake.command } {
+      return { command: fake.command }
     }
 
     connect(): Promise<void> {
@@ -80,6 +85,7 @@ describe('SessionManager', () => {
   beforeEach(() => {
     fake.clients.length = 0
     fake.connect.mockClear()
+    fake.command.mockReset()
   })
 
   it('disconnects an in-flight connection attempt without publishing an error', async () => {
@@ -110,6 +116,21 @@ describe('SessionManager', () => {
       state: 'error',
       failureKind: 'timeout'
     })
+  })
+
+  it('keeps a successful connection test successful when permission inspection fails, and closes the client', async () => {
+    fake.command.mockImplementation(async (command: Record<string, unknown>) => {
+      if (command.connectionStatus) throw new Error('command not supported')
+      return {}
+    })
+    const testing = new SessionManager().test({ config })
+    await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
+    fake.finishConnect()
+    await expect(testing).resolves.toMatchObject({ ok: true, authorizationError: 'command not supported' })
+    expect(fake.command).toHaveBeenCalledWith(
+      { connectionStatus: 1, showPrivileges: true }, { timeoutMS: 5_000 }
+    )
+    expect(fake.clients[0].close).toHaveBeenCalledOnce()
   })
 
   it('publishes driver topology loss and recovery without discarding the client', async () => {

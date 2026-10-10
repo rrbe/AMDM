@@ -167,7 +167,21 @@ export interface ConnectionStatus {
   serverVersion?: string
 }
 
-export interface TestResult {
+export interface ConnectionAuthorization {
+  users: { user: string; db: string }[]
+  roles: { role: string; db: string }[]
+  privileges: {
+    resource: { db?: string; collection?: string; cluster?: boolean; anyResource?: boolean }
+    actions: string[]
+  }[]
+}
+
+export interface AuthorizationResult {
+  authorization?: ConnectionAuthorization
+  authorizationError?: string
+}
+
+export interface TestResult extends AuthorizationResult {
   ok: boolean
   error?: string
   failureKind?: FailureKind
