@@ -153,11 +153,13 @@ function searchEntries(rows: Row[]): { id: string; text: string; detail?: string
 export function filterExplorerRows(
   rows: Row[],
   search: string,
-  matches = createCatalogSearch(searchEntries(rows))(search)
+  matches = createCatalogSearch(searchEntries(rows))(search),
+  expansion: ReadonlyMap<string, boolean> = new Map()
 ): Row[] {
   if (!search.trim()) return rows
 
   const visibleIds = new Set<string>()
+  const ancestorIds = new Set<string>()
   const ancestors: Row[] = []
   for (const row of rows) {
     const depth = row.type === 'connection' ? 0 : row.depth
@@ -165,9 +167,27 @@ export function filterExplorerRows(
     ancestors.push(row)
     if (matches.has(row.id)) {
       for (const ancestor of ancestors) visibleIds.add(ancestor.id)
+      for (const ancestor of ancestors.slice(0, -1)) ancestorIds.add(ancestor.id)
     }
   }
-  return rows.filter((row) => visibleIds.has(row.id))
+  // Matching ancestors reveal the path; a matching node's expanded subtree
+  // remains usable even when its children do not contain the search text.
+  const result: Row[] = []
+  const branch: { expanded: boolean; subtree: boolean }[] = []
+  for (const row of rows) {
+    const depth = row.type === 'connection' ? 0 : row.depth
+    branch.length = depth
+    const parent = branch[depth - 1]
+    const visible = (!parent || parent.expanded) && (visibleIds.has(row.id) || parent?.subtree)
+    const subtree = matches.has(row.id) || (parent?.subtree ?? false)
+    const expanded = expansion.get(row.id) ?? (row.expanded || ancestorIds.has(row.id))
+    branch.push({
+      expanded: !!visible && expanded,
+      subtree: !!visible && subtree
+    })
+    if (visible) result.push({ ...row, expanded })
+  }
+  return result
 }
 
 export function canDisconnectConnection(state: ConnectionState): boolean {
@@ -242,18 +262,21 @@ export function Explorer({
     if (view === 'connections' && searchOpen) searchInputRef.current?.focus({ preventScroll: true })
   }, [view, searchOpen])
   const [search, setSearch] = useState('')
+  const [searchExpansion, setSearchExpansion] = useState<Map<string, boolean>>(() => new Map())
   const searching = search.trim().length > 0
   const bodyRef = useRef<HTMLDivElement>(null)
   const originalScroll = useRef(0)
   const changeSearch = (value: string): void => {
     if (!searching && value.trim()) originalScroll.current = bodyRef.current?.scrollTop ?? 0
     setSearch(value)
+    setSearchExpansion(new Map())
   }
   useLayoutEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = searching ? 0 : originalScroll.current
   }, [searching, search])
   const closeSearch = (): void => {
     setSearch('')
+    setSearchExpansion(new Map())
     setSearchOpen(false)
     searchToggleRef.current?.focus({ preventScroll: true })
   }
@@ -503,20 +526,12 @@ export function Explorer({
         conn,
         state,
         error: statuses[conn.id]?.error,
-        expandable: connected && !searching,
+        expandable: connected,
         expanded,
         loading: connected && (dbsLoading || catalog?.databases === undefined)
       })
       if ((expanded || searching) && catalog) {
-        const flattened = flattenCatalog(conn.id, catalog, actions, collectionSort, searching)
-        const children = searching
-          ? flattened.map((row) => ({
-              ...row,
-              expandable: false,
-              onClick: undefined,
-              onToggle: undefined
-            }))
-          : flattened
+        const children = flattenCatalog(conn.id, catalog, actions, collectionSort, searching)
         out.push(
           ...(connected
             ? children
@@ -560,7 +575,25 @@ export function Explorer({
     [rows, searching]
   )
   const matches = useMemo(() => searchIndex(search), [searchIndex, search])
-  const visibleRows = useMemo(() => filterExplorerRows(rows, search, matches), [rows, search, matches])
+  const visibleRows = useMemo(
+    () => filterExplorerRows(rows, search, matches, searchExpansion),
+    [rows, search, matches, searchExpansion]
+  )
+  const toggleRow = (row: Row): void => {
+    if (searching) {
+      const expanded = !row.expanded
+      setSearchExpansion((current) => new Map(current).set(row.id, expanded))
+      // Search can reveal collapsed ancestors without querying. Only explicit
+      // expansion loads children, through the same action as ordinary browsing.
+      const storedExpanded =
+        row.type === 'connection'
+          ? expandedConnections.has(row.id)
+          : (catalogs[row.connId]?.expanded.has(row.id) ?? false)
+      if (storedExpanded === expanded) return
+    }
+    if (row.type === 'connection') toggleConnectionExpanded(row.id)
+    else row.onToggle?.()
+  }
   const connectionIndices = useMemo(
     () => visibleRows.flatMap((row, index) => (row.type === 'connection' ? [index] : [])),
     [visibleRows]
@@ -590,9 +623,7 @@ export function Explorer({
         match={matches.get(row.id)}
         isActive={selectedRowId === row.id}
         onActivate={() => setSelectedRowId(row.id)}
-        onToggle={() => {
-          if (!searching) toggleConnectionExpanded(row.id)
-        }}
+        onToggle={() => toggleRow(row)}
         onConnect={() => void connect(row.id)}
         onMove={moveConnection}
         onContextMenu={(e) => openConnMenu(e, row)}
@@ -600,7 +631,15 @@ export function Explorer({
     ) : (
       <CatalogRow
         key={row.id}
-        row={row}
+        row={
+          searching && !row.cached
+            ? {
+                ...row,
+                onToggle: row.onToggle ? () => toggleRow(row) : undefined,
+                onClick: row.onClick ? () => toggleRow(row) : undefined
+              }
+            : row
+        }
         match={matches.get(row.id)}
         isActive={selectedRowId === row.id}
         onActivate={() => setSelectedRowId(row.id)}
@@ -1121,7 +1160,7 @@ export function flattenCatalog(
 
   for (const db of dbs) {
     const dbNodeId = `${connId}:db:${db.name}`
-    const dbExpanded = includeCollapsed || cat.expanded.has(dbNodeId)
+    const dbExpanded = cat.expanded.has(dbNodeId)
     rows.push({
       type: 'tree',
       id: dbNodeId,
@@ -1140,7 +1179,7 @@ export function flattenCatalog(
       onClick: () => openDatabase(a, connId, db.name, dbNodeId)
     })
 
-    if (!dbExpanded) continue
+    if (!includeCollapsed && !dbExpanded) continue
 
     const collsRaw = cat.collections[db.name]
     // Do not render the trailing Users folder before collection loading finishes.
@@ -1151,7 +1190,7 @@ export function flattenCatalog(
 
     for (const coll of colls) {
       const collNodeId = `${connId}:coll:${db.name}/${coll.name}`
-      const collExpanded = includeCollapsed || cat.expanded.has(collNodeId)
+      const collExpanded = cat.expanded.has(collNodeId)
       rows.push({
         type: 'tree',
         id: collNodeId,
@@ -1175,11 +1214,11 @@ export function flattenCatalog(
         onDoubleClick: () => browseCollection(a, connId, db.name, coll.name)
       })
 
-      if (!collExpanded) continue
+      if (!includeCollapsed && !collExpanded) continue
 
       const idxKey = `${db.name}/${coll.name}`
       const idxList = cat.indexes[idxKey]
-      if (includeCollapsed && idxList === undefined) continue
+      if (includeCollapsed && !collExpanded && idxList === undefined) continue
       // Initial metadata loading updates the count and indexes atomically. Keep
       // the subtree closed until both are ready so an empty Indexes folder does
       // not flash briefly before its count appears.
@@ -1187,7 +1226,7 @@ export function flattenCatalog(
 
       // Indexes folder
       const idxNodeId = `${connId}:idx:${db.name}/${coll.name}`
-      const idxExpanded = includeCollapsed || cat.expanded.has(idxNodeId)
+      const idxExpanded = cat.expanded.has(idxNodeId)
       rows.push({
         type: 'tree',
         id: idxNodeId,
@@ -1212,7 +1251,7 @@ export function flattenCatalog(
             coll: coll.name
           })
       })
-      if (idxExpanded && idxList) {
+      if ((includeCollapsed || idxExpanded) && idxList) {
         for (const ix of idxList) {
           const keySpec = Object.entries(ix.key)
             .map(([k, v]) => `${k}: ${formatScalar(v).text}`)
@@ -1245,9 +1284,9 @@ export function flattenCatalog(
 
     // Users are a database concept, shown after the database's collections.
     const usersNodeId = `${connId}:users:${db.name}`
-    const usersExpanded = includeCollapsed || cat.expanded.has(usersNodeId)
+    const usersExpanded = cat.expanded.has(usersNodeId)
     const usersList = cat.users[db.name]
-    if (includeCollapsed && usersList === undefined) continue
+    if (includeCollapsed && !dbExpanded && usersList === undefined) continue
     rows.push({
       type: 'tree',
       id: usersNodeId,
@@ -1263,7 +1302,7 @@ export function flattenCatalog(
       onToggle: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name }),
       onClick: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name })
     })
-    if (usersExpanded && usersList) {
+    if ((includeCollapsed || usersExpanded) && usersList) {
       for (const u of usersList) {
         rows.push({
           type: 'tree',

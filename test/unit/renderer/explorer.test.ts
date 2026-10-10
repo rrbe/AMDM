@@ -89,11 +89,104 @@ describe('explorer search grouping', () => {
   })
 
   it('preserves connection name and host search, empty search, and no results', () => {
-    expect(filterExplorerRows(rows, 'archive')).toEqual([rows[0], rows[4]])
-    expect(filterExplorerRows(rows, 'Production')).toEqual([rows[6]])
-    expect(filterExplorerRows(rows, 'LOCALHOST')).toEqual([rows[0], rows[6], rows[9]])
+    expect(filterExplorerRows(rows, 'archive')).toEqual([rows[0], rows[4], rows[5]])
+    expect(filterExplorerRows(rows, 'Production')).toEqual(rows.slice(6, 9))
+    expect(filterExplorerRows(rows, 'LOCALHOST')).toEqual(rows)
     expect(filterExplorerRows(rows, '   ')).toBe(rows)
     expect(filterExplorerRows(rows, 'missing')).toEqual([])
+  })
+
+  it('keeps expanded collection tools visible and permits collapsing the revealed path', () => {
+    const catalog: CatalogState = {
+      databases: [{ name: 'shop' }],
+      collections: {
+        shop: [
+          { name: 'orders', type: 'collection' },
+          { name: 'products', type: 'collection' }
+        ]
+      },
+      indexes: {
+        'shop/orders': [{ name: 'customer_1', key: { customer: 1 } }]
+      },
+      users: {},
+      expanded: new Set(['c1:coll:shop/orders']),
+      loading: new Set()
+    }
+    const actions = {
+      toggleNode: vi.fn(),
+      setActiveConnection: vi.fn(),
+      browseCollection: vi.fn(),
+      inspectIndex: vi.fn()
+    }
+    const rows = [
+      { ...connectionRow('c1', 'Development'), expanded: false },
+      ...flattenCatalog('c1', catalog, actions, 'alpha', true)
+    ]
+    const visible = (): Row[] => filterExplorerRows(rows, 'orders')
+    expect(visible().map((row) => (row.type === 'connection' ? row.conn.name : row.label))).toEqual([
+      'Development',
+      'shop',
+      'orders',
+      'Indexes'
+    ])
+    expect(visible().map((row) => row.expanded)).toEqual([true, true, true, false])
+    expect(filterExplorerRows(rows, 'orders', undefined, new Map([['c1', false]]))).toHaveLength(1)
+    expect(
+      filterExplorerRows(rows, 'orders', undefined, new Map([['c1:coll:shop/orders', false]]))
+    ).toHaveLength(3)
+    expect(
+      filterExplorerRows(rows, 'orders', undefined, new Map([['c1:idx:shop/orders', true]])).at(-1)?.id
+    ).toBe('c1:idx:shop/orders:customer_1')
+    expect(actions.toggleNode).not.toHaveBeenCalled()
+    expect(catalog.expanded).toEqual(new Set(['c1:coll:shop/orders']))
+    const collectionRow = visible()[2]
+    const indexesRow = visible()[3]
+    if (collectionRow.type !== 'tree' || indexesRow.type !== 'tree') throw new Error('Expected catalog rows')
+    collectionRow.onToggle?.()
+    indexesRow.onClick?.()
+    collectionRow.onDoubleClick?.()
+    expect(actions.toggleNode.mock.calls).toEqual([
+      ['c1', 'c1:coll:shop/orders', 'collection', { db: 'shop', coll: 'orders' }],
+      ['c1', 'c1:idx:shop/orders', 'indexes', { db: 'shop', coll: 'orders' }]
+    ])
+    expect(actions.browseCollection).toHaveBeenCalledWith('shop', 'orders')
+  })
+
+  it('reveals a matching index without opening unrelated indexes or collections', () => {
+    const nested = [
+      { ...connectionRow('c1', 'Development'), expanded: false },
+      { ...treeRow('c1', 'shop', 1), expanded: false },
+      { ...treeRow('c1', 'orders', 2), expanded: false },
+      {
+        ...treeRow('c1', 'Indexes', 3),
+        kind: 'indexes' as const,
+        expanded: false
+      },
+      {
+        ...treeRow('c1', 'customer_1', 4),
+        kind: 'index' as const,
+        expandable: false
+      },
+      {
+        ...treeRow('c1', '_id_', 4),
+        kind: 'index' as const,
+        expandable: false
+      }
+    ]
+    expect(filterExplorerRows(nested, 'customer').map((row) => row.id)).toEqual(
+      nested.slice(0, 5).map((row) => row.id)
+    )
+    expect(
+      filterExplorerRows(nested, 'customer')
+        .slice(0, 4)
+        .every((row) => row.expanded)
+    ).toBe(true)
+    const matchingAncestor = nested.map((row) =>
+      row.id === nested[2].id ? { ...row, label: 'customer_orders' } : row
+    )
+    expect(filterExplorerRows(matchingAncestor, 'customer').map((row) => row.id)).toEqual(
+      nested.map((row) => row.id)
+    )
   })
 })
 
