@@ -107,10 +107,13 @@ try {
   await mongo.db('esm_ci').collection('items').insertMany(
     Array.from({ length: 5 }, (_, n) => ({ n, nested: { tags: ['esm', 'bson'] } }))
   )
+  const environment = { ...process.env }
+  // On Windows, even an empty variable switches Electron into Node mode.
+  delete environment.ELECTRON_RUN_AS_NODE
   application = spawn(executable, [
     `--user-data-dir=${profile}`, '--remote-debugging-port=9336', '--inspect=9337',
     ...(process.platform === 'linux' ? ['--no-sandbox'] : [])
-  ], { cwd: root, env: { ...process.env, ELECTRON_RUN_AS_NODE: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
+  ], { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] })
   exit = new Promise(resolve => {
     application.once('exit', resolve)
     application.once('error', resolve)
