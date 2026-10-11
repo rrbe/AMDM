@@ -544,11 +544,6 @@ function ResultMeta({
   const parts = useMemo(() => {
     const out: { text: string; cls?: string }[] = []
     if (result.kind === 'documents') {
-      const n = result.count ?? docCount
-      out.push({ text: t('result.docCount', { count: n }) })
-      // For pageable results the pager shows the range + a next button, so the
-      // "truncated" badge would be redundant. Keep it for non-pageable cursors
-      // (aggregate / scripts), where raising the page size is the only way on.
       if (result.truncated && !result.pageable) {
         out.push({ text: t('result.truncated'), cls: 'truncated' })
       }
@@ -580,44 +575,44 @@ function ResultMeta({
   )
 }
 
-/**
- * Prev/next pager. Only a FindCursor is pageable (the engine injects skip);
- * aggregation/script results render no pager (the page-size control is their
- * way to see more). Next is enabled only while the page is truncated.
- */
+/** Display range and total for this execution; pages never rerun its script. */
 function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | null {
   const { t } = useTranslation()
   const skip = useAppStore((s) => getActiveResult(s)?.skip ?? 0)
-  const limit = useAppStore((s) => s.settings.queryLimit)
+  const pageSize = result.pageSize ?? 50
   const running = useAppStore((s) => getActiveTab(s).running)
   const loadPage = useAppStore((s) => s.loadPage)
 
-  if (!result.pageable) return null
-
   const count = result.count ?? 0
   const from = count === 0 ? 0 : skip + 1
-  const to = skip + count
+  const to = count === 0 ? 0 : skip + count
   return (
     <div className="result-pager">
+      <span className="result-range" aria-live="polite">
+        {from}–{to} / {t('result.totalCount', {
+          count: result.totalCount,
+          value: typeof result.totalCount === 'number'
+            ? result.totalCount.toLocaleString()
+            : t(result.totalStatus === 'counting' ? 'result.totalCounting'
+              : result.totalStatus === 'unavailable' ? 'result.totalUnavailable' : 'result.totalUnknown')
+        })}
+      </span>
       <Tooltip content={t('result.prevPage')}>
         <button
           className="ghost"
-          disabled={skip === 0 || running}
+          disabled={!result.pageable || skip === 0 || running}
           aria-label={t('result.prevPage')}
-          onClick={() => void loadPage(Math.max(0, skip - limit))}
+          onClick={() => void loadPage(Math.max(0, skip - pageSize))}
         >
           <ChevronLeft size={15} />
         </button>
       </Tooltip>
-      <span className="result-range">
-        {from}–{to}
-      </span>
       <Tooltip content={t('result.nextPage')}>
         <button
           className="ghost"
-          disabled={!result.truncated || running}
+          disabled={!result.pageable || !result.truncated || running}
           aria-label={t('result.nextPage')}
-          onClick={() => void loadPage(skip + limit)}
+          onClick={() => void loadPage(skip + pageSize)}
         >
           <ChevronRight size={15} />
         </button>
@@ -626,21 +621,21 @@ function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | n
   )
 }
 
-/** Query limit control; changing it re-runs the focused result from page one. */
+/** Display page size belongs to the focused result, independent of query limits. */
 function PageSizeControl(): React.JSX.Element {
   const { t } = useTranslation()
-  const limit = useAppStore((s) => s.settings.queryLimit)
-  const setQueryLimit = useAppStore((s) => s.setQueryLimit)
+  const pageSize = useAppStore((s) => getActiveResult(s)?.result.pageSize ?? s.settings.queryLimit)
+  const setResultPageSize = useAppStore((s) => s.setResultPageSize)
   const running = useAppStore((s) => getActiveTab(s).running)
 
   return (
     <div className="page-size">
       <span>{t('result.pageSizeLabel')}</span>
       <Select<number>
-        value={limit}
+        value={pageSize}
         options={QUERY_LIMIT_OPTIONS}
         disabled={running}
-        onChange={(n) => void setQueryLimit(n)}
+        onChange={(n) => void setResultPageSize(n)}
         className="h-6 w-[72px] px-2 text-xs"
         aria-label={t('result.pageSizeLabel')}
       />

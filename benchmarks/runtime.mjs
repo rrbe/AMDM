@@ -121,7 +121,7 @@ async function sampleLaunch(uri, phase, iteration) {
       connectionId: 'benchmark',
       database: 'amdm_benchmark',
       code: 'db.items.find().sort({n:1})',
-      limit: 50,
+      pageSize: 50,
     }
     async function query() {
       const started = performance.now()

@@ -33,7 +33,9 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellRequest,
+  ShellPageRequest,
   ShellResult,
+  ShellResultTotal,
   TestResult,
   UpdateState,
   UserInfo
@@ -69,6 +71,9 @@ export const IPC = {
 
   shellExecute: 'shell:execute',
   shellAbort: 'shell:abort',
+  shellPage: 'shell:page',
+  shellTotal: 'shell:total',
+  shellRelease: 'shell:release',
 
   queriesList: 'queries:list',
   queriesSave: 'queries:save',
@@ -156,6 +161,9 @@ export interface Api {
   }
   shell: {
     execute(request: ShellRequest): Promise<ShellResult>
+    page(request: ShellPageRequest): Promise<ShellResult>
+    total(resultId: string): Promise<ShellResultTotal>
+    release(resultId: string): Promise<void>
     /** Cancel an in-flight run by its `execId`. Resolves true if a matching
         run was found and signalled, false if it had already finished. */
     abort(execId: string): Promise<boolean>

@@ -54,6 +54,9 @@ const api: Api = {
   },
   shell: {
     execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request),
+    page: (request) => ipcRenderer.invoke(IPC.shellPage, request),
+    total: (resultId) => ipcRenderer.invoke(IPC.shellTotal, resultId),
+    release: (resultId) => ipcRenderer.invoke(IPC.shellRelease, resultId),
     abort: (execId) => ipcRenderer.invoke(IPC.shellAbort, execId)
   },
   queries: {

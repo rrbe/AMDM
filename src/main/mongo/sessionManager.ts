@@ -7,6 +7,7 @@ import { buildClientArgs, type DecryptedConnection } from './uri'
 import { classifyOperationFailure } from './errorCore'
 import { readAuthorization } from './authorization'
 import { AuthorizationCache, authorizationCacheKey } from './authorizationCache'
+import { shellResults } from './shellResults'
 
 function classifyConnectionFailure(error: unknown): FailureKind {
   const connectionKind = classifyConnError(error).kind
@@ -206,6 +207,7 @@ export class SessionManager {
     const s = this.sessions.get(id)
     this.sessions.delete(id)
     s?.stopMonitoring()
+    await shellResults.closeConnection(id)
     pending?.tunnel?.close()
     s?.tunnel?.close()
     try {

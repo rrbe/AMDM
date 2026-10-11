@@ -13,6 +13,7 @@ import type { ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 import { classifyOperationFailure } from './errorCore'
 import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait, withAbort } from './shellSupport'
+import type { ShellResultSession } from './shellResults'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
@@ -82,6 +83,7 @@ export interface MongoshEvaluationOptions {
   timeoutMS?: number
   signal?: AbortSignal
   output?: OutputCollector
+  resultSession?: ShellResultSession
 }
 
 export interface MongoshEvaluation {
@@ -146,6 +148,22 @@ export async function evaluateMongosh(
         throw new Error('Explain is only supported for find()/aggregate() queries.')
       }
       value = await (value as { explain(verbosity: string): Promise<unknown> }).explain('executionStats')
+    } else if (options.resultSession && (
+      Array.isArray(value) || value instanceof AbstractCursor || type === 'Cursor' || type === 'AggregationCursor'
+    )) {
+      const native = value instanceof AbstractCursor
+        ? value
+        : (value as { _cursor?: unknown })._cursor
+      await options.resultSession.capture(value, native instanceof FindCursor ? native : undefined)
+      const page = await options.resultSession.page(0, options.limit ?? DEFAULT_LIMIT)
+      return {
+        type: 'AMDMResultPage',
+        rawValue: undefined,
+        printable: page,
+        ...(native instanceof AbstractCursor && native.namespace.collection
+          ? { source: { namespace: { db: native.namespace.db, collection: native.namespace.collection } } }
+          : {})
+      }
     } else if (value instanceof AbstractCursor) {
       const cursor = value
       try {
@@ -229,6 +247,8 @@ async function adaptMongoshResult(
   const elapsedMs = Date.now() - started
   const common = { collection, elapsedMs, ...(await outputFields(output)) }
 
+  if (result.type === 'AMDMResultPage') return { ...result.printable as ShellResult, ...common }
+
   if (options.explain) {
     return {
       kind: 'explain',
@@ -301,11 +321,12 @@ export async function runMongoshOnClient(
     }
   } catch (error) {
     if (options.signal?.aborted) {
+      const timedOut = classifyOperationFailure(options.signal.reason) === 'timeout'
       return {
         kind: 'error',
-        error: '执行已停止',
-        errorName: 'Aborted',
-        failureKind: 'cancelled',
+        error: timedOut ? '查询读取超时' : '执行已停止',
+        errorName: timedOut ? 'TimeoutError' : 'Aborted',
+        failureKind: timedOut ? 'timeout' : 'cancelled',
         collection: detectCollection(code),
         elapsedMs: Date.now() - started,
         ...(await outputFields(output))
@@ -321,7 +342,11 @@ export async function runMongoshOnClient(
       ...(await outputFields(output))
     }
   } finally {
-    await releaseSessions?.()
-    if (provider) releaseMongoshServiceProvider(provider)
+    const cleanup = async (): Promise<void> => {
+      await releaseSessions?.()
+      if (provider) releaseMongoshServiceProvider(provider)
+    }
+    if (options.resultSession?.retainsCursor) options.resultSession.retainCleanup(cleanup)
+    else await cleanup()
   }
 }

@@ -730,7 +730,7 @@
   text-align: center;
   color: var(--fg-1);
 }
-/* Query limit. */
+/* Display page size. */
 .page-size {
   display: inline-flex;
   align-items: center;

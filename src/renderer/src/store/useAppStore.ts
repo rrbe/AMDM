@@ -216,13 +216,12 @@ interface AppState {
   /** Cancel the in-flight run (the Stop button / menu item). No-op when idle. */
   stopShell(): Promise<void>
   runExplain(): Promise<void>
-  /** Re-run the active result tab's query in place (same page offset). */
+  /** Refresh the active result with a new execution, starting on page one. */
   refreshResult(): Promise<void>
-  /** Re-run the active result tab's query at a new page offset (prev/next),
-      patching that result tab in place. Only meaningful when `pageable`. */
-  loadPage(skip: number): Promise<void>
-  /** Change the page size and re-run the current query from the first page. */
-  setQueryLimit(n: number): Promise<void>
+  /** Browse the existing execution without evaluating its script again. */
+  loadPage(skip: number, pageSize?: number): Promise<void>
+  /** Change only the focused result's display page size. */
+  setResultPageSize(n: number): Promise<void>
   notify(input: NotificationInput): void
   dismissNotification(id: string): void
   clearNotifications(): void
@@ -1261,7 +1260,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (!code.trim()) return
     const database = tab.activeDatabase || 'test'
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const { queryLimit: pageSize, queryTimeoutMS: timeoutMS } = get().settings
     const execId = newExecId()
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
@@ -1276,9 +1275,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
       // earlier results stay around for side-by-side comparison.
-      const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
+      const result = await window.api.shell.execute({ ...query, pageSize, timeoutMS, execId })
       runFailed = isRunFailure(result)
+      if (!ownsExecution(get(), tabId, execId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
       set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      updateResultTotal(tabId, result)
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
       // `use <db>` REPL command: switch only the tab that still owns this run.
@@ -1330,64 +1334,56 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  async loadPage(skip) {
+  async loadPage(skip, requestedPageSize) {
     const tab = getActiveTab(get())
     const tabId = tab.id
     const rt = activeResult(tab)
-    if (!rt?.query || skip < 0) return
-    // Paging mutates the focused result tab IN PLACE (a page flip is the same
-    // result, not a new run). Capture its id so a tab switched mid-flight (or
-    // closed — patchResult no-ops then) still lands on the right result.
+    if (!rt?.result.resultId || tab.running || skip < 0) return
     const resultId = rt.id
-    const query = rt.query
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const pageSize = requestedPageSize ?? rt.result.pageSize ?? get().settings.queryLimit
     const execId = newExecId()
+    const ownsPage = (): boolean => ownsExecution(get(), tabId, execId) &&
+      !!get().tabs.find((t) => t.id === tabId)?.results.some((r) => r.id === resultId && r.result.resultId === rt.result.resultId)
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
-        running: true,
-        stopping: false,
-        runFailed: false,
-        runningExecId: execId
+        running: true, stopping: false, runFailed: false, runningExecId: execId
       })
     }))
     let runFailed = false
     try {
-      const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
-      runFailed = isRunFailure(result)
-      set((s) =>
-        patchCurrentExecution(s, tabId, execId, (t) =>
-          patchResult(t, resultId, { result, executedAt: Date.now(), skip })
-        )
-      )
-      const notification = shellFailureNotice(result, tabId)
-      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
+      const page = await window.api.shell.page({ resultId: rt.result.resultId, skip, pageSize, execId })
+      runFailed = isRunFailure(page)
+      if (page.kind !== 'error') {
+        set((s) => patchCurrentExecution(s, tabId, execId, (t) => {
+          const current = t.results.find((r) => r.id === resultId)
+          if (!current || current.result.resultId !== rt.result.resultId) return {}
+          return patchResult(t, resultId, {
+            result: {
+              ...current.result, ...page,
+              ...(page.totalStatus === 'counting' && current.result.totalStatus !== 'counting'
+                ? { totalStatus: current.result.totalStatus, totalCount: current.result.totalCount }
+                : {})
+            }, skip: page.skip ?? skip, foldedLines: {}
+          })
+        }))
+      }
+      const notification = shellFailureNotice(page, tabId)
+      if (notification && ownsPage()) get().notify(notification)
     } catch (e) {
       runFailed = true
-      const result: ShellResult = {
-        kind: 'error',
-        error: errMessage(e),
-        errorName: 'IPCError',
-        failureKind: 'ipc'
+      if (ownsPage()) {
+        get().notify(shellFailureNotice({ kind: 'error', error: errMessage(e), errorName: 'IPCError', failureKind: 'ipc' }, tabId)!)
       }
-      set((s) => patchCurrentExecution(s, tabId, execId, (t) => patchResult(t, resultId, { result })))
-      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) =>
-        patchCurrentExecution(s, tabId, execId, () => ({
-          running: false,
-          stopping: false,
-          runFailed,
-          runningExecId: null
-        }))
-      )
+      set((s) => patchCurrentExecution(s, tabId, execId, () => ({
+        running: false, stopping: false, runFailed, runningExecId: null
+      })))
     }
   },
 
-  async setQueryLimit(n) {
-    const limit = Math.min(2000, Math.max(1, Math.floor(n) || 1))
-    await get().updateSettings({ queryLimit: limit })
-    // Re-run the focused result's query from the first page with the new size.
-    if (getActiveResult(get())?.query) await get().loadPage(0)
+  async setResultPageSize(n) {
+    const pageSize = Math.min(2000, Math.max(1, Math.floor(n) || 1))
+    await get().loadPage(0, pageSize)
   },
 
   async runExplain() {
@@ -1416,7 +1412,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
+      if (!ownsExecution(get(), tabId, execId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
       set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      updateResultTotal(tabId, result)
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
@@ -1448,7 +1449,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rt = activeResult(tab)
     if (!rt?.query) return
     const resultId = rt.id
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const pageSize = rt.result.pageSize ?? get().settings.queryLimit
+    const timeoutMS = get().settings.queryTimeoutMS
     const execId = newExecId()
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
@@ -1460,20 +1462,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
     let runFailed = false
     try {
-      // Refresh the focused result tab in place — keep its page offset and size.
+      // Refresh is an explicit new execution. Display size stays with this result.
       const result = await window.api.shell.execute({
         ...rt.query,
-        limit,
+        pageSize,
         timeoutMS,
-        skip: rt.skip,
         execId
       })
       runFailed = isRunFailure(result)
+      if (!ownsExecution(get(), tabId, execId) || !get().tabs.find((t) => t.id === tabId)?.results.some((r) => r.id === resultId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
       set((s) =>
         patchCurrentExecution(s, tabId, execId, (t) =>
-          patchResult(t, resultId, { result, executedAt: Date.now() })
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip: 0, foldedLines: {} })
         )
       )
+      updateResultTotal(tabId, result)
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
@@ -1486,7 +1492,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set((s) =>
         patchCurrentExecution(s, tabId, execId, (t) =>
-          patchResult(t, resultId, { result, executedAt: Date.now() })
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip: 0, foldedLines: {} })
         )
       )
       if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
@@ -2036,6 +2042,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }
 }))
+
+// Result ownership follows the tab/result lifecycle, including automatic eviction.
+useAppStore.subscribe((state, previous) => {
+  if (state.tabs === previous.tabs) return
+  for (const tab of previous.tabs) {
+    const next = state.tabs.find((item) => item.id === tab.id)
+    if (next?.results === tab.results) continue
+    for (const result of tab.results) {
+      const id = result.result.resultId
+      if (id && !next?.results.some((item) => item.result.resultId === id)) {
+        void window.api.shell.release(id).catch(() => {})
+      }
+    }
+  }
+})
+
+function updateResultTotal(tabId: string, result: ShellResult): void {
+  const id = result.resultId
+  if (!id || result.totalStatus !== 'counting') return
+  void window.api.shell.total(id).then(
+    (total) => useAppStore.setState((state) => patchTabResults(state, tabId, (tab) => ({
+      results: tab.results.map((item) => item.result.resultId === id && item.result.totalStatus === 'counting'
+        ? { ...item, result: { ...item.result, ...total } }
+        : item)
+    }))),
+    () => useAppStore.setState((state) => patchTabResults(state, tabId, (tab) => ({
+      results: tab.results.map((item) => item.result.resultId === id && item.result.totalStatus === 'counting'
+        ? { ...item, result: { ...item.result, totalStatus: 'unavailable' } }
+        : item)
+    })))
+  )
+}
 
 /** Helper to flip a node's loading flag immutably. */
 function withLoading(s: AppState, connId: string, nodeId: string, on: boolean): Pick<AppState, 'catalogs'> {

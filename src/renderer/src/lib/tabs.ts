@@ -10,7 +10,7 @@ import type { ShellResult } from '@shared/types'
 export type ResultView = 'tree' | 'json' | 'table'
 export type ResultFoldView = 'json' | 'console' | 'explain'
 
-/** The query that produced a result (refresh / paging / doc-edit target). */
+/** The query that produced a result (refresh / doc-edit target). */
 export interface ResultQuery {
   connectionId: string
   database: string
@@ -29,7 +29,7 @@ export interface ResultTab {
   result: ShellResult
   /** Local wall-clock time when this result was received. */
   executedAt: number
-  /** Query that produced `result`; refresh/paging/doc edits re-run this. */
+  /** Query that produced `result`; explicit refresh/doc edits re-run this. */
   query: ResultQuery | null
   /** Page offset of the current result page (0 = first page). */
   skip: number

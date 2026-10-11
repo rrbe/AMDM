@@ -131,7 +131,7 @@ describe('connection-bound tabs', () => {
     await useAppStore.getState().runShell()
     expect(useAppStore.getState().tabs[0].activeResultId).not.toBe(firstResultId)
     await useAppStore.getState().loadPage(0)
-    expect(execute).toHaveBeenCalledTimes(3)
+    expect(execute).toHaveBeenCalledTimes(2)
     useAppStore.getState().setActiveResultTab(firstResultId!)
     useAppStore.getState().setResultView('json')
     useAppStore.getState().setResultView('table')
@@ -592,7 +592,7 @@ describe('connection-bound tabs', () => {
         connectionId: 'c1',
         database: 'shop',
         code: 'db.orders.find({}).sort({ _id: -1 }).limit(100)',
-        skip: 0
+        pageSize: 50
       })
     )
 
@@ -621,7 +621,7 @@ describe('connection-bound tabs', () => {
         connectionId: 'c1',
         database: 'shop',
         code: 'db.orders.getIndexes().filter((index) => index.name === "status_1_createdAt_-1")',
-        skip: 0
+        pageSize: 50
       })
     )
 

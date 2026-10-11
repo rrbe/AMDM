@@ -278,11 +278,8 @@ export interface ShellRequest {
   connectionId: string
   database: string
   code: string
-  /** Default page size applied to bare cursors so results remain bounded. */
-  limit?: number
-  /** Page offset injected into a `find()` cursor for prev/next paging. Only
-      honored when the script's result is a FindCursor (see `pageable`). */
-  skip?: number
+  /** Documents displayed per page; never overrides the query's limit/skip. */
+  pageSize?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
   /** Default server-side limit for read operations. Explicit query options win. */
@@ -293,6 +290,18 @@ export interface ShellRequest {
 }
 
 export type ShellResultKind = 'documents' | 'value' | 'ack' | 'explain' | 'error'
+
+export interface ShellResultTotal {
+  totalCount?: number
+  totalStatus: 'known' | 'counting' | 'unknown' | 'unavailable'
+}
+
+export interface ShellPageRequest {
+  resultId: string
+  skip: number
+  pageSize: number
+  execId: string
+}
 
 /**
  * One captured shell-output line (print / printjson / console.*). Text lines
@@ -321,12 +330,17 @@ export interface ShellResult {
   data?: unknown
   /** Number of docs in `data` when kind === 'documents'. */
   count?: number
-  /** True if a default limit was auto-applied to a cursor (more may exist). */
+  /** Main-owned execution result; pages are read from its cursor/cache. */
+  resultId?: string
+  pageSize?: number
+  /** Full query result cardinality, including the query's own skip/limit. */
+  totalCount?: number
+  totalStatus?: ShellResultTotal['totalStatus']
+  /** True when additional result documents can be displayed on later pages. */
   truncated?: boolean
-  /** True when the result is a FindCursor, so prev/next paging (skip) is
-      supported. Aggregation cursors and arrays are not pageable. */
+  /** True when this execution has cached pages or a retained cursor. */
   pageable?: boolean
-  /** Page offset that produced this result (echoes the request's skip). */
+  /** Display offset within this execution, separate from the query's skip. */
   skip?: number
   /** Target collection parsed from the code (enables doc edit/delete). */
   collection?: string
@@ -582,8 +596,7 @@ export interface AppSettings {
   sidebarWidth: number
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
   editorHeight: number
-  /** Page size for query results — how many docs a cursor fetches per page
-      (bounded; never the whole collection). */
+  /** Initial display page size for new results; does not change query limits. */
   queryLimit: number
   /** Default MongoDB maxTimeMS for read operations; 0 disables the limit. */
   queryTimeoutMS: number

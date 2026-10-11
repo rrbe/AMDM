@@ -56,7 +56,7 @@ try {
   }
   await renderer.evaluate(`window.api.connections.save(${JSON.stringify(connection)})`)
   await renderer.evaluate('window.api.session.connect("esm-ci")')
-  const request = code => ({ connectionId: 'esm-ci', database: 'esm_ci', code, limit: 2 })
+  const request = code => ({ connectionId: 'esm-ci', database: 'esm_ci', code, pageSize: 2 })
   const run = code => renderer.evaluate(`window.api.shell.execute(${JSON.stringify(request(code))})`)
   // These are the first Shell calls: both await the same lazy ESM runtime load.
   const first = await renderer.evaluate(`Promise.all([
