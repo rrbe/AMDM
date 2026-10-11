@@ -17,7 +17,7 @@ beforeAll(async () => {
   replicaSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   client = new MongoClient(replicaSet.getUri());
   await client.connect();
-  provider = createMongoshServiceProvider(client);
+  provider = await createMongoshServiceProvider(client);
 }, 120_000);
 
 afterAll(async () => {

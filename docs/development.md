@@ -17,6 +17,14 @@ Test files are outside the application tsconfig includes, so `pnpm typecheck` do
 
 Integration tests prefer a locally cached `mongod` binary and may need to download one when no cache exists. Worker artifacts are generally not built during tests, so worker-backed modules must support an inline path through the same core.
 
+CI runs type checking, unit/contract tests, integration tests, and a production
+build on macOS, Windows, and Linux. It caches MongoDB 8.2.1 and packages the host
+architecture using the installed Electron distribution. `pnpm test:packaged`
+then launches that unpacked application with isolated user data and uses Electron
+CDP to verify both window bridges, concurrent first queries, transactions, BSON,
+the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
+diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
+
 ## Local macOS installation
 
 The minimum supported macOS version is 13 Ventura for both arm64 and x64. The app bundle declares `minimumSystemVersion: "13.0"` in `electron-builder.yml`, and the native Sparkle addon uses `-mmacosx-version-min=13.0` for both architectures, matching Electron 44's minimum requirement.
@@ -24,6 +32,12 @@ The minimum supported macOS version is 13 Ventura for both arm64 and x64. The ap
 `pnpm install:mac` builds and installs the arm64 app using the Electron distribution already installed in `node_modules/electron/dist`. Install dependencies first with `pnpm install` on an Apple Silicon Mac. This local command avoids Electron archive downloads and online checksum requests during packaging; it still builds the app and signs the bundle. Sparkle is downloaded only when its prepared framework is missing or its pinned version changes.
 
 ## Main-process dependency packaging
+
+The package uses `type: module`. Electron Vite emits ESM for main and workers,
+and `out/preload/index.mjs` for preload (Electron requires `.mjs` for ESM
+preloads). Application TypeScript uses `ESNext` with `Bundler` resolution.
+Use `import.meta.dirname` or file URLs for runtime paths. Native Sparkle loading
+and the official mongosh dependencies use `createRequire` at their boundaries.
 
 When electron-builder reconstructs the dependency tree from a pnpm lockfile, it can omit leaf runtime dependencies of pure JavaScript packages. If a packaged app reports `Cannot find module`:
 
@@ -33,7 +47,7 @@ When electron-builder reconstructs the dependency tree from a pnpm lockfile, it 
 
 Do not treat packages with native bindings as pure JavaScript dependencies. Confirm their ABI, target architecture, and electron-builder collection behavior first.
 
-`pnpm build:mongosh-runtime` manually rebuilds the bundled official mongosh runtime in `out/main`. Because the official Compass provider rejects explicit new connections such as `new Mongo(uri)`, the build excludes its unreachable connection/OIDC/SSH stack. The main Electron Vite build invokes the same script from its `closeBundle` hook after writing `out/main`; this ordering applies to production and development builds and prevents Electron Vite's output cleanup from removing the companion artifact. Integration tests build it from their pre-script before importing the runtime.
+`pnpm build:mongosh-runtime` manually rebuilds `out/main/mongosh-runtime.mjs` as an ESM bundle. Its `createRequire` banner supports dynamic Node built-in imports in the official CommonJS dependencies. Because the official Compass provider rejects explicit new connections such as `new Mongo(uri)`, the build excludes its unreachable connection/OIDC/SSH stack. The main Electron Vite build invokes the same script from its `closeBundle` hook after writing `out/main`; this ordering applies to production and development builds and prevents Electron Vite's output cleanup from removing the companion artifact. Integration tests build it from their pre-script before importing the runtime.
 
 ## Update artifacts
 

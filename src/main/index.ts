@@ -36,7 +36,7 @@ function openSettingsWindow(owner: BrowserWindow): void {
     backgroundColor: '#edece8',
     icon: appIcon,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(import.meta.dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -81,7 +81,7 @@ function createWindow(): void {
     // Window/taskbar icon for Windows + Linux (macOS uses the .app bundle icon).
     icon: appIcon,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(import.meta.dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -159,7 +159,7 @@ function createWindow(): void {
   if (devUrl) {
     win.loadURL(devUrl)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
   }
 }
 

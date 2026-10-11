@@ -23,7 +23,7 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 ## Shell compatibility layer
 
-All query execution goes through `src/main/mongo/shellEngine.ts` to `mongoshCore.ts`, which adapts the official evaluator, Shell API, and Node Driver provider to `ShellResult`. The runtime loads on first execution. Tabs, history, saved queries, and settings do not select an engine; persisted runtime fields from older versions are ignored.
+All query execution goes through `src/main/mongo/shellEngine.ts` to `mongoshCore.ts`, which adapts the official evaluator, Shell API, and Node Driver provider to `ShellResult`. The ESM runtime loads through a cached dynamic-import promise on first execution; concurrent executions share that load. Tabs, history, saved queries, and settings do not select an engine; persisted runtime fields from older versions are ignored.
 
 Each execution owns its provider listeners, cursors, and sessions; cleanup ends sessions left open by the isolated script without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
 

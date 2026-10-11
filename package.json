@@ -5,7 +5,7 @@
   "main": "./out/main/index.js",
   "author": "shawn",
   "license": "GPL-3.0-only",
-  "type": "commonjs",
+  "type": "module",
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "predev": "install-electron",
@@ -19,7 +19,8 @@
     "test:unit": "vitest run test/unit test/contract",
     "pretest:integration": "pnpm build:mongosh-runtime",
     "test:integration": "vitest run test/integration",
-    "clean": "node -e \"for (const path of ['out', 'dist', 'coverage', 'tsconfig.node.tsbuildinfo', 'tsconfig.web.tsbuildinfo']) require('node:fs').rmSync(path, { recursive: true, force: true })\"",
+    "test:packaged": "node scripts/test-packaged-runtime.mjs",
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; for (const path of ['out', 'dist', 'coverage', 'tsconfig.node.tsbuildinfo', 'tsconfig.web.tsbuildinfo']) rmSync(path, { recursive: true, force: true })\"",
     "prepare:sparkle": "node scripts/prepare-sparkle.mjs",
     "generate:sparkle-appcast": "node scripts/generate-sparkle-appcast.mjs",
     "dist:prepare": "pnpm clean && pnpm build && pnpm prepare:sparkle",
