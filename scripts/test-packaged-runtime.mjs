@@ -131,6 +131,8 @@ try {
   )
   debuggers.push(main)
   await main.call('NodeWorker.enable', { waitForDebuggerOnStart: false })
+  await main.call('Profiler.enable')
+  await main.call('Profiler.startPreciseCoverage', { callCount: true, detailed: true })
   await renderer.evaluate(`new Promise((resolve, reject) => {
     const deadline = Date.now() + 10000;
     function check() {
@@ -183,6 +185,14 @@ try {
   report.workers = main.events.filter(event => event.method === 'NodeWorker.attachedToWorker')
     .map(event => event.params.workerInfo.url)
   assert.ok(report.workers.some(url => url.includes('serializer.worker.js')), 'Serializer worker did not start')
+  const coverage = await main.call('Profiler.takePreciseCoverage')
+  await main.call('Profiler.stopPreciseCoverage')
+  const serializerCore = coverage.result.find(script => script.url.includes('/chunks/schema-analysis-core-'))
+  assert.ok(serializerCore, 'Main serializer coverage missing')
+  report.inlineSerializationCalls = serializerCore.functions
+    .filter(fn => fn.functionName === 'serializeValue')
+    .reduce((count, fn) => count + fn.ranges[0].count, 0)
+  assert.equal(report.inlineSerializationCalls, 0, 'Serialization fell back to the main process')
 
   await renderer.evaluate('window.api.app.openSettings()')
   const settings = await DebuggerClient.connect(
