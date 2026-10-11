@@ -196,6 +196,7 @@
   color: var(--text-primary);
 }
 .document-tab-shortcut {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -203,13 +204,23 @@
   height: 18px;
   flex: 0 0 18px;
   border-radius: 5px;
-  background: var(--interaction-selected);
   color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: 10px;
   font-weight: var(--fw-semibold);
   line-height: 1;
   animation: document-tab-shortcut-in var(--motion-fast) var(--ease-standard);
+}
+.document-tab-shortcut > span {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 3px;
+  border-radius: inherit;
+  background: var(--interaction-selected);
+  white-space: nowrap;
 }
 @keyframes document-tab-shortcut-in {
   from {

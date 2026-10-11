@@ -35,12 +35,14 @@ import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
   dataTabDigitIndex,
+  dataTabDirection,
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
   isMacPlatform,
   isPrimaryShortcut,
-  primaryDigitIndex,
+  queryTabDigitIndex,
   queryTabDirection,
+  tabShortcutLabel,
   type ShortcutHintModifier
 } from '@renderer/lib/keyboardShortcuts'
 
@@ -106,25 +108,27 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
     const onKey = (event: KeyboardEvent): void => {
       if (hasOpenShortcutLayer()) return
       const state = useAppStore.getState()
-      const queryIndex = primaryDigitIndex(event, isMac)
+      const queryIndex = queryTabDigitIndex(event, isMac)
       const dataIndex = dataTabDigitIndex(event, isMac)
-      const direction = queryTabDirection(event)
-      if (queryIndex == null && dataIndex == null && direction == null) return
+      const queryDirection = queryTabDirection(event)
+      const dataDirection = dataTabDirection(event, isMac)
+      if (queryIndex == null && dataIndex == null && queryDirection == null && dataDirection == null) return
+      const resultShortcut = dataIndex != null || dataDirection != null
+      const tabs = resultShortcut ? getActiveTab(state).results : state.tabs
+      const activeId = resultShortcut ? getActiveTab(state).activeResultId : state.activeTabId
+      if (!tabs.length) return
+      const digit = dataIndex ?? queryIndex
+      const direction = dataDirection ?? queryDirection
+      const index =
+        digit === 8
+          ? tabs.length - 1
+          : (digit ?? (tabs.findIndex((tab) => tab.id === activeId) + direction! + tabs.length) % tabs.length)
+      const tab = tabs[index]
+      if (!tab) return
       event.preventDefault()
       event.stopPropagation()
-
-      if (dataIndex != null) {
-        const resultTab = getActiveTab(state).results[dataIndex]
-        if (resultTab) state.setActiveResultTab(resultTab.id)
-        return
-      }
-
-      const index =
-        queryIndex ??
-        (state.tabs.findIndex((tab) => tab.id === state.activeTabId) + direction! + state.tabs.length) %
-          state.tabs.length
-      const queryTab = state.tabs[index]
-      if (queryTab) state.setActiveTab(queryTab.id)
+      if (resultShortcut) state.setActiveResultTab(tab.id)
+      else state.setActiveTab(tab.id)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -133,7 +137,7 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
   return (
     <div className="work">
       <TabBar
-        showShortcutHints={shortcutHints === 'primary'}
+        showShortcutHints={shortcutHints === 'query-tabs'}
         contextOpen={contextOpen}
         onContextToggle={() => setContextOpen((open) => !open)}
       />
@@ -269,7 +273,7 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
           <ResultPanel
             expanded={resultsExpanded}
             onExpandedChange={(expanded) => setExpandedRegion(expanded ? 'results' : null)}
-            showTabShortcutHints={shortcutHints === 'control'}
+            showTabShortcutHints={shortcutHints === 'result-tabs'}
           />
         </main>
 
@@ -345,7 +349,7 @@ function TabBar({
     'contextualTabs'
   )
   const tabShortcut = (index: number): string | undefined =>
-    tabShortcutsEnabled && index < 9 ? `${isMacPlatform() ? '⌘' : 'Ctrl+'}${index + 1}` : undefined
+    tabShortcutsEnabled ? tabShortcutLabel(index, tabs.length, false, isMacPlatform()) : undefined
   const stripRef = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const moveQueryTab = useAppStore((s) => s.moveQueryTab)

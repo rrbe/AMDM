@@ -35,7 +35,7 @@ export function useShortcutHints(enabled: boolean): ShortcutHintModifier | null 
         hide()
         return
       }
-      if (event.key !== 'Control' && event.key !== 'Meta') {
+      if (event.key !== 'Control' && event.key !== 'Meta' && event.key !== 'Alt') {
         cancelTimer()
         return
       }

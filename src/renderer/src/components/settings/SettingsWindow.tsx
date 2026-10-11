@@ -25,7 +25,7 @@ import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNestedDisplayPreview'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
-import { isMacPlatform, resultViewShortcutLabel } from '@renderer/lib/keyboardShortcuts'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { cn } from '@renderer/lib/utils'
 
 type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
@@ -562,13 +562,17 @@ export function SettingsWindow(): React.JSX.Element {
                 />
                 <ShortcutRow
                   label={t('settings.shortcutTabs')}
-                  keys={isMacPlatform() ? '⌘ 1–9 · ⌃ 1–9 · ⌃ Tab / ⌃ ⇧ Tab' : 'Ctrl+1–9 · Ctrl+Tab / Ctrl+Shift+Tab'}
+                  keys={
+                    isMacPlatform()
+                      ? `${t('settings.shortcutQueryTabs')}: ⌘⌥ 1–8 / 9 · ⌃ Tab / ⌃⇧ Tab\n${t('settings.shortcutDataTabs')}: ⌘⌃ 1–8 / 9 · ⌘⌃ Tab / ⌘⌃⇧ Tab`
+                      : 'Ctrl+Alt+1–8 / 9 · Ctrl+Tab / Ctrl+Shift+Tab'
+                  }
                   enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
                   onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
                 />
                 <ShortcutRow
                   label={t('settings.shortcutResultView')}
-                  keys={resultViewShortcutLabel(isMacPlatform())}
+                  keys={`${primaryKey} 1–4`}
                   enabled={!settings.disabledKeyboardShortcuts.includes('resultView')}
                   onEnabledChange={(enabled) => setShortcutEnabled('resultView', enabled)}
                 />
@@ -607,7 +611,7 @@ function ShortcutRow({
       </span>
       <div className="flex shrink-0 items-center gap-2">
         {enabled ? (
-          <kbd className="rounded-md border border-[var(--separator-strong)] bg-[var(--surface-control)] px-2 py-1 font-mono text-[12px] text-muted-foreground shadow-[0_1px_0_var(--separator-strong)]">
+          <kbd className="whitespace-pre-line rounded-md border border-[var(--separator-strong)] bg-[var(--surface-control)] px-2 py-1 font-mono text-[12px] text-muted-foreground shadow-[0_1px_0_var(--separator-strong)]">
             {keys}
           </kbd>
         ) : (

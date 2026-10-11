@@ -97,7 +97,7 @@ export function DocumentTab({
         </button>
       ) : (
         <span className="document-tab-shortcut" data-shortcut={shortcut} aria-hidden="true">
-          {shortcut}
+          <span>{shortcut}</span>
         </span>
       )}
     </div>

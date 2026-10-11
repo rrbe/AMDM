@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 
-/** Reveal a primary-key shortcut over its icon without moving the control. */
+/** Reveal a primary-key shortcut over its label or icon without moving the control. */
 export function ShortcutHint({ shortcut, children }: { shortcut?: string; children: ReactNode }): React.JSX.Element {
   return (
-    <span className="relative inline-flex shrink-0 items-center justify-center">
-      {children}
+    <span className="relative inline-flex shrink-0 items-center justify-center whitespace-nowrap">
+      <span className={shortcut ? 'inline-flex items-center [[data-shortcut-hints=primary]_&]:invisible' : 'inline-flex items-center'}>
+        {children}
+      </span>
       {shortcut && (
         <span
           aria-hidden="true"
