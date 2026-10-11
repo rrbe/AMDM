@@ -7,12 +7,12 @@ import {
   CircleQuestionMark,
   Clock,
   Database,
+  FlaskConical,
   KeyRound,
-  Maximize2,
-  Network,
+  ListTree,
   Plug,
-  RefreshCw,
   Search,
+  Table,
   Table2
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -66,7 +66,7 @@ export function ContextPanel(): React.JSX.Element {
             aria-current={view === 'schema' ? 'page' : undefined}
             onClick={() => setView('schema')}
           >
-            <Network size={16} />
+            <FlaskConical size={16} />
             <span className="explorer-nav-label" aria-hidden="true">
               <span>{t('context.schema.label')}</span>
             </span>
@@ -139,7 +139,7 @@ function CollectionInfo(): React.JSX.Element {
             <PropertyRow icon={<Plug />} label={t('context.connection')} value={connection?.name || '—'} />
             <PropertyRow icon={<Database />} label={t('context.deployment')} value={deployment} mono />
             <PropertyRow icon={<Database />} label={t('context.database')} value={database || '—'} mono />
-            <PropertyRow icon={<Table2 />} label={t('context.collection')} value={collection || '—'} mono />
+            <PropertyRow icon={<Table />} label={t('context.collection')} value={collection || '—'} mono />
           </dl>
         </section>
 
@@ -148,7 +148,7 @@ function CollectionInfo(): React.JSX.Element {
             <h2 className="m-0 mb-2.5 text-[12px] font-medium text-muted-foreground">{t('context.collection')}</h2>
             <dl className="m-0 grid gap-1">
               <PropertyRow
-                icon={<Table2 />}
+                icon={<Table />}
                 label={t('context.type')}
                 value={collectionInfo ? t(`context.collectionType.${collectionInfo.type}`) : t('context.notLoaded')}
               />
@@ -269,7 +269,7 @@ function CollectionSchema({
           disabled={!canAnalyze || loading || panel?.analyzing || !model}
           onClick={analyze}
         >
-          <RefreshCw size={14} className={panel?.analyzing ? 'animate-spin motion-reduce:animate-none' : ''} />
+          <ListTree size={14} className={panel?.analyzing ? 'animate-spin motion-reduce:animate-none' : ''} />
         </button>
         <button
           type="button"
@@ -279,7 +279,7 @@ function CollectionSchema({
           disabled={!model || panel?.analyzing}
           onClick={() => setShowModel(true)}
         >
-          <Maximize2 size={14} />
+          <ListTree size={14} />
         </button>
       </div>
       {model && model.analysis.fields.length > 0 && (
@@ -397,7 +397,7 @@ function CollectionSchema({
             <span>{isView ? t('context.schema.viewUnsupported') : t('context.schema.notAnalyzed')}</span>
             {!isView && (
               <Button size="sm" busy={panel?.analyzing} disabled={!canAnalyze} onClick={analyze}>
-                {t('context.schema.analyze')}
+                <ListTree /> {t('context.schema.analyze')}
               </Button>
             )}
           </EmptyState>

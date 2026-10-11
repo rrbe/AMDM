@@ -24,6 +24,7 @@ import { selectionCode } from '@renderer/lib/shellSelection'
 import { queryRunGutter, updateQueryRunBusy } from '@renderer/lib/queryRunGutter'
 import { shellStatementAt } from '@renderer/lib/shellStatement'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 
 /**
  * CodeMirror is heavy, so we lazy-load it — it stays out of
@@ -233,8 +234,8 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
           { key: 'F6', run: () => runStatementIfReady() },
           // Cmd/Ctrl+S saves; preventDefault stops the browser "save page" dialog.
           { key: 'Mod-s', preventDefault: true, run: () => saveIfReady() },
-          // Cmd/Ctrl+E runs explain().
-          { key: 'Mod-e', run: () => explainIfReady() },
+          // Cmd/Ctrl+Shift+E runs explain().
+          { key: 'Mod-Shift-e', preventDefault: true, run: () => explainIfReady() },
           // Cmd/Ctrl+Shift+F formats the script.
           { key: 'Mod-Shift-f', preventDefault: true, run: () => formatNow() },
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
@@ -361,7 +362,12 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
         disabled: isBusy,
         onClick: () => runStatementIfReady()
       },
-      { label: t('shell.menu.explain'), shortcut: '⌘E', disabled: isBusy, onClick: () => explainIfReady() },
+      {
+        label: t('shell.menu.explain'),
+        shortcut: isMacPlatform() ? '⌘⇧E' : 'Ctrl+Shift+E',
+        disabled: isBusy,
+        onClick: () => explainIfReady()
+      },
       // Enabled only mid-run; cancels the in-flight find/aggregate server-side.
       { label: t('shell.menu.stop'), disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',

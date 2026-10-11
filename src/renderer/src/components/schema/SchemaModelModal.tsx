@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { AlertTriangle, Plus, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ListTree, Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { MongoJsonSchema, SchemaFieldStat, SchemaModel, SchemaTarget, SchemaTypeStat } from '@shared/types'
 import { Button } from '@renderer/components/common/Button'
@@ -406,7 +406,7 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
       onClose={close}
       headerActions={
         <Button size="sm" busy={analyzing || analysisBusy} disabled={loading || !connected} onClick={() => void updateAnalysis()}>
-          <RefreshCw /> {t('schema.updateAnalysis')}
+          <ListTree /> {t('schema.updateAnalysis')}
         </Button>
       }
       footer={

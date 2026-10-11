@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Brush,
   ChevronDown,
   ChevronRight,
+  FlaskConical,
   LoaderCircle,
   Maximize2,
   Minimize2,
@@ -10,9 +12,7 @@ import {
   Play,
   Plus,
   Save,
-  ScanSearch,
-  Unplug,
-  WandSparkles
+  Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
@@ -224,7 +224,7 @@ export function ShellWorkspace(): React.JSX.Element {
                   </Button>
                 </Tooltip>
               )}
-              <Tooltip content={t('shell.explainBtn')}>
+              <Tooltip content={`${t('shell.explainBtn')} · ${isMacPlatform() ? '⌘⇧E' : 'Ctrl+Shift+E'}`}>
                 <button
                   className="work-icon-btn"
                   aria-disabled={busy}
@@ -233,7 +233,7 @@ export function ShellWorkspace(): React.JSX.Element {
                   }}
                   aria-label={t('shell.explainBtn')}
                 >
-                  <ScanSearch size={15} />
+                  <FlaskConical size={15} />
                 </button>
               </Tooltip>
               <Tooltip content={`${t('shell.menu.format')} · ${isMacPlatform() ? '⌘⇧F' : 'Ctrl+Shift+F'}`}>
@@ -243,7 +243,7 @@ export function ShellWorkspace(): React.JSX.Element {
                   onClick={() => void formatCode()}
                   aria-label={t('shell.menu.format')}
                 >
-                  <WandSparkles size={15} aria-hidden />
+                  <Brush size={15} aria-hidden />
                 </button>
               </Tooltip>
               <Tooltip content={t('shell.saveQueryTip')}>

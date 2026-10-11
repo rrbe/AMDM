@@ -571,6 +571,7 @@ export function SettingsWindow(): React.JSX.Element {
                   enabled={!settings.disabledKeyboardShortcuts.includes('openSettings')}
                   onEnabledChange={(enabled) => setShortcutEnabled('openSettings', enabled)}
                 />
+                <ShortcutRow label={t('shell.menu.explain')} keys={`${primaryKey} ⇧ E`} />
                 <ShortcutRow label={t('shell.menu.format')} keys={`${primaryKey} ⇧ F`} />
               </div>
             </>

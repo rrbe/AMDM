@@ -3,7 +3,6 @@ import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
-  ChartNoAxesColumnIncreasing,
   ChevronRight,
   Clock,
   Clock3,
@@ -13,6 +12,7 @@ import {
   Eye,
   Key,
   KeyRound,
+  ListTree,
   Loader2,
   Monitor,
   Moon,
@@ -24,7 +24,7 @@ import {
   Search,
   Settings,
   Sun,
-  Table2,
+  Table,
   Trash2,
   Unplug,
   Upload,
@@ -64,7 +64,7 @@ function TreeIcon({ name }: { name: string }): React.JSX.Element | null {
     case 'user':
       return <UserIcon size={14} />
     case 'collection':
-      return <Table2 size={15} />
+      return <Table size={15} />
     case 'view':
       return <Eye size={15} />
     case 'timeseries':
@@ -435,7 +435,7 @@ export function Explorer({
         'separator',
         {
           label: t('schema.menu'),
-          icon: <ChartNoAxesColumnIncreasing size={14} />,
+          icon: <ListTree size={14} />,
           disabled: coll.type === 'view',
           onClick: () =>
             setSchemaTarget({
