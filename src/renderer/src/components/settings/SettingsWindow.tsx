@@ -157,7 +157,7 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.shortcutNewConnection'),
         t('settings.shortcutNewQuery'),
         t('settings.shortcutTabSearch'),
-        t('settings.shortcutContextualTabs'),
+        t('settings.shortcutTabs'),
         t('settings.shortcutResultView'),
         t('settings.shortcutOpenSettings'),
         t('settings.shortcutClear'),
@@ -551,14 +551,16 @@ export function SettingsWindow(): React.JSX.Element {
                   enabled={!settings.disabledKeyboardShortcuts.includes('tabSearch')}
                   onEnabledChange={(enabled) => setShortcutEnabled('tabSearch', enabled)}
                 />
-                {isMacPlatform() && (
-                  <ShortcutRow
-                    label={t('settings.shortcutContextualTabs')}
-                    keys="⌃ 1–9"
-                    enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
-                    onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
-                  />
-                )}
+                <ShortcutRow
+                  label={t('settings.shortcutTabs')}
+                  keys={
+                    isMacPlatform()
+                      ? `${t('settings.shortcutQueryTabs')}: ⌘⌥ 1–8 / 9 · ⌃ Tab / ⌃⇧ Tab\n${t('settings.shortcutDataTabs')}: ⌘⌃ 1–8 / 9 · ⌘⌃ Tab / ⌘⌃⇧ Tab`
+                      : 'Ctrl+Alt+1–8 / 9 · Ctrl+Tab / Ctrl+Shift+Tab'
+                  }
+                  enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
+                />
                 <ShortcutRow
                   label={t('settings.shortcutResultView')}
                   keys={`${primaryKey} 1–4`}
@@ -602,7 +604,7 @@ function ShortcutRow({
       </span>
       <div className="flex shrink-0 items-center gap-2">
         {enabled ? (
-          <kbd className="rounded-md border border-[var(--separator-strong)] bg-[var(--surface-control)] px-2 py-1 font-mono text-[12px] text-muted-foreground shadow-[0_1px_0_var(--separator-strong)]">
+          <kbd className="whitespace-pre-line rounded-md border border-[var(--separator-strong)] bg-[var(--surface-control)] px-2 py-1 font-mono text-[12px] text-muted-foreground shadow-[0_1px_0_var(--separator-strong)]">
             {keys}
           </kbd>
         ) : (

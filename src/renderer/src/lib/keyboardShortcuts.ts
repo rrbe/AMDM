@@ -1,7 +1,5 @@
 import type { KeyboardShortcutId } from '@shared/types'
 
-export type ShortcutRegion = 'query' | 'result'
-
 export const SHORTCUT_HINT_DELAY_MS = 500
 
 interface ShortcutKeyEvent {
@@ -45,25 +43,50 @@ export function primaryDigitIndex(event: ShortcutKeyEvent, isMac: boolean): numb
   return hasPrimaryModifier(event, isMac) ? digitIndex(event) : null
 }
 
-export function isPrimaryHintModifier(event: ShortcutKeyEvent, isMac: boolean): boolean {
-  return event.key === (isMac ? 'Meta' : 'Control') && hasPrimaryModifier(event, isMac)
+/** Cmd+Option+number on macOS, Ctrl+Alt+number elsewhere. */
+export function queryTabDigitIndex(event: ShortcutKeyEvent, isMac: boolean): number | null {
+  return shortcutHintModifier(event, isMac) === 'query-tabs' ? digitIndex(event) : null
 }
 
-/** macOS-only Ctrl+number, kept distinct from the primary Cmd+number binding. */
-export function contextualTabDigitIndex(event: ShortcutKeyEvent, isMac: boolean): number | null {
-  if (!isMac || !event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return null
-  return digitIndex(event)
+/** macOS-only Cmd+Ctrl+number selects a result within the current query. */
+export function dataTabDigitIndex(event: ShortcutKeyEvent, isMac: boolean): number | null {
+  return shortcutHintModifier(event, isMac) === 'result-tabs' ? digitIndex(event) : null
 }
 
-/** Holding Control on macOS reveals the contextual tab-number hints. */
-export function isContextualTabHintModifier(event: ShortcutKeyEvent, isMac: boolean): boolean {
-  return isMac && event.key === 'Control' && event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+export type ShortcutHintModifier = 'primary' | 'query-tabs' | 'result-tabs'
+
+/** Match the modifier families used by the active platform's shortcuts. */
+export function shortcutHintModifier(event: ShortcutKeyEvent, isMac: boolean): ShortcutHintModifier | null {
+  if (hasPrimaryModifier(event, isMac)) return 'primary'
+  if (event.shiftKey) return null
+  if (isMac) {
+    if (event.metaKey && event.altKey && !event.ctrlKey) return 'query-tabs'
+    if (event.metaKey && event.ctrlKey && !event.altKey) return 'result-tabs'
+  } else if (event.ctrlKey && event.altKey && !event.metaKey) {
+    return 'query-tabs'
+  }
+  return null
 }
 
-export function shortcutRegionFromTarget(target: EventTarget | null): ShortcutRegion | null {
-  if (!(target instanceof Element)) return null
-  const region = target.closest<HTMLElement>('[data-shortcut-region]')?.dataset.shortcutRegion
-  return region === 'query' || region === 'result' ? region : null
+/** Ctrl+Tab cycles query tabs independently of focus. */
+export function queryTabDirection(event: ShortcutKeyEvent): number | null {
+  if (event.key !== 'Tab' || !event.ctrlKey || event.metaKey || event.altKey) return null
+  return event.shiftKey ? -1 : 1
+}
+
+/** Cmd+Ctrl+Tab cycles results independently of focus on macOS. */
+export function dataTabDirection(event: ShortcutKeyEvent, isMac: boolean): number | null {
+  if (!isMac || event.key !== 'Tab' || !event.metaKey || !event.ctrlKey || event.altKey) return null
+  return event.shiftKey ? -1 : 1
+}
+
+/** Digits 1–8 select by position; 9 always selects the last tab. */
+export function tabShortcutLabel(index: number, count: number, resultTab: boolean, isMac: boolean): string | undefined {
+  if (resultTab && !isMac) return undefined
+  const number = index < 8 ? index + 1 : index === count - 1 ? 9 : null
+  if (number == null) return undefined
+  const modifier = isMac ? (resultTab ? '⌘⌃' : '⌘⌥') : 'Ctrl+Alt+'
+  return `${modifier}${number}`
 }
 
 /** Dialogs and popovers own the keyboard while open; do not act behind them. */

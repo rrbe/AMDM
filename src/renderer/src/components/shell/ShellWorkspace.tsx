@@ -24,6 +24,7 @@ import { ContextPanel } from './ContextPanel'
 import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
+import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
 import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
 import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
@@ -33,16 +34,17 @@ import { SearchableSelect, type SearchableSelectHandle } from '@renderer/compone
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
-  contextualTabDigitIndex,
+  dataTabDigitIndex,
+  dataTabDirection,
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
-  isContextualTabHintModifier,
   isMacPlatform,
   isPrimaryShortcut,
   isPrimaryShiftShortcut,
-  SHORTCUT_HINT_DELAY_MS,
-  shortcutRegionFromTarget,
-  type ShortcutRegion
+  queryTabDigitIndex,
+  queryTabDirection,
+  tabShortcutLabel,
+  type ShortcutHintModifier
 } from '@renderer/lib/keyboardShortcuts'
 
 /**
@@ -50,7 +52,7 @@ import {
  * Run), the lazy CodeMirror editor, and the result panel below. Each tab owns
  * its own code/result/db/run state (see the store's `tabs`).
  */
-export function ShellWorkspace(): React.JSX.Element {
+export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintModifier | null }): React.JSX.Element {
   const { t } = useTranslation()
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connections = useAppStore((s) => s.connections)
@@ -73,12 +75,12 @@ export function ShellWorkspace(): React.JSX.Element {
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const updateSettings = useAppStore((s) => s.updateSettings)
 
+  const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
+
   const [showSave, setShowSave] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
   const [expandedRegion, setExpandedRegion] = useState<'query' | 'results' | null>(null)
-  const [shortcutHintRegion, setShortcutHintRegion] = useState<ShortcutRegion | null>(null)
   const editorRef = useRef<ShellEditorHandle>(null)
-  const lastShortcutRegion = useRef<ShortcutRegion>('query')
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
@@ -91,108 +93,53 @@ export function ShellWorkspace(): React.JSX.Element {
   }
 
   useEffect(() => {
-    const contextualTabsEnabled = isAppShortcutEnabled(
+    const tabShortcutsEnabled = isAppShortcutEnabled(
       keyboardShortcutsEnabled,
       disabledKeyboardShortcuts,
       'contextualTabs'
     )
-    if (!contextualTabsEnabled) {
-      setShortcutHintRegion(null)
-      return
-    }
+    if (!tabShortcutsEnabled) return
 
     const isMac = isMacPlatform()
-    let hintTimer: number | null = null
-    let modifierHeld = false
-    let hintVisible = false
-
-    const cancelHintTimer = (): void => {
-      if (hintTimer === null) return
-      window.clearTimeout(hintTimer)
-      hintTimer = null
-    }
-    const hideShortcutHints = (): void => {
-      modifierHeld = false
-      hintVisible = false
-      cancelHintTimer()
-      setShortcutHintRegion(null)
-    }
-    const rememberRegion = (event: Event): void => {
-      lastShortcutRegion.current = shortcutRegionFromTarget(event.target) ?? 'query'
-      if (hintVisible) setShortcutHintRegion(lastShortcutRegion.current)
-    }
     const onKey = (event: KeyboardEvent): void => {
-      if (hasOpenShortcutLayer()) {
-        hideShortcutHints()
-        return
-      }
-
-      if (isContextualTabHintModifier(event, isMac)) {
-        modifierHeld = true
-        if (!event.repeat && hintTimer === null && !hintVisible) {
-          hintTimer = window.setTimeout(() => {
-            hintTimer = null
-            if (!modifierHeld || hasOpenShortcutLayer()) return
-            hintVisible = true
-            setShortcutHintRegion(lastShortcutRegion.current)
-          }, SHORTCUT_HINT_DELAY_MS)
-        }
-        return
-      }
-
-      if (hintTimer !== null) cancelHintTimer()
-      const index = contextualTabDigitIndex(event, isMac)
-      if (index == null) return
-
+      if (hasOpenShortcutLayer()) return
       const state = useAppStore.getState()
-      const region = lastShortcutRegion.current
-      if (region === 'result') {
-        const resultTab = getActiveTab(state).results[index]
-        if (!resultTab) return
-        event.preventDefault()
-        state.setActiveResultTab(resultTab.id)
-        return
-      }
-
-      const queryTab = state.tabs[index]
-      if (!queryTab) return
+      const queryIndex = queryTabDigitIndex(event, isMac)
+      const dataIndex = dataTabDigitIndex(event, isMac)
+      const queryDirection = queryTabDirection(event)
+      const dataDirection = dataTabDirection(event, isMac)
+      if (queryIndex == null && dataIndex == null && queryDirection == null && dataDirection == null) return
+      const resultShortcut = dataIndex != null || dataDirection != null
+      const tabs = resultShortcut ? getActiveTab(state).results : state.tabs
+      const activeId = resultShortcut ? getActiveTab(state).activeResultId : state.activeTabId
+      if (!tabs.length) return
+      const digit = dataIndex ?? queryIndex
+      const direction = dataDirection ?? queryDirection
+      const index =
+        digit === 8
+          ? tabs.length - 1
+          : (digit ?? (tabs.findIndex((tab) => tab.id === activeId) + direction! + tabs.length) % tabs.length)
+      const tab = tabs[index]
+      if (!tab) return
       event.preventDefault()
-      state.setActiveTab(queryTab.id)
+      event.stopPropagation()
+      if (resultShortcut) state.setActiveResultTab(tab.id)
+      else state.setActiveTab(tab.id)
     }
-    const onKeyUp = (event: KeyboardEvent): void => {
-      if (event.key === 'Control' || !event.ctrlKey) hideShortcutHints()
-    }
-    const onVisibilityChange = (): void => {
-      if (document.hidden) hideShortcutHints()
-    }
-
-    window.addEventListener('pointerdown', rememberRegion, true)
-    window.addEventListener('focusin', rememberRegion, true)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('keyup', onKeyUp)
-    window.addEventListener('blur', hideShortcutHints)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      cancelHintTimer()
-      window.removeEventListener('pointerdown', rememberRegion, true)
-      window.removeEventListener('focusin', rememberRegion, true)
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keyup', onKeyUp)
-      window.removeEventListener('blur', hideShortcutHints)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   return (
     <div className="work">
       <TabBar
-        showShortcutHints={shortcutHintRegion === 'query'}
+        showShortcutHints={shortcutHints === 'query-tabs'}
         contextOpen={contextOpen}
         onContextToggle={() => setContextOpen((open) => !open)}
       />
       <div className="shell-body">
         <main className={`shell-main${expandedRegion ? ` ${expandedRegion}-expanded` : ''}`}>
-          <div className="work-header" data-shortcut-region="query">
+          <div className="work-header">
             <div className="work-breadcrumb">
               <span className="conn-title">{conn?.name ?? t('shell.fallbackConnTitle')}</span>
               <ChevronRight size={13} aria-hidden />
@@ -220,7 +167,10 @@ export function ShellWorkspace(): React.JSX.Element {
                       if (!busy) runEditor()
                     }}
                   >
-                    <Play aria-hidden /> {t('shell.runBtn')}
+                    <ShortcutHint shortcut={busy ? undefined : `${primaryKey}↵`}>
+                      <Play aria-hidden />
+                    </ShortcutHint>{' '}
+                    {t('shell.runBtn')}
                   </Button>
                 </Tooltip>
               )}
@@ -233,7 +183,9 @@ export function ShellWorkspace(): React.JSX.Element {
                   }}
                   aria-label={t('shell.explainBtn')}
                 >
-                  <FlaskConical size={15} />
+                  <ShortcutHint shortcut={busy ? undefined : `${primaryKey}⇧E`}>
+                    <FlaskConical size={15} />
+                  </ShortcutHint>
                 </button>
               </Tooltip>
               <Tooltip content={`${t('shell.menu.format')} · ${isMacPlatform() ? '⌘⇧F' : 'Ctrl+Shift+F'}`}>
@@ -243,7 +195,9 @@ export function ShellWorkspace(): React.JSX.Element {
                   onClick={() => void formatCode()}
                   aria-label={t('shell.menu.format')}
                 >
-                  <Brush size={15} aria-hidden />
+                  <ShortcutHint shortcut={!code.trim() ? undefined : `${primaryKey}⇧F`}>
+                    <Brush size={15} aria-hidden />
+                  </ShortcutHint>
                 </button>
               </Tooltip>
               <Tooltip content={`${t('shell.saveQueryTip')} · ${isMacPlatform() ? '⌘S' : 'Ctrl+S'}`}>
@@ -255,7 +209,9 @@ export function ShellWorkspace(): React.JSX.Element {
                   }}
                   aria-label={t('shell.saveBtn')}
                 >
-                  <Save size={15} />
+                  <ShortcutHint shortcut={contentBusy ? undefined : `${primaryKey}S`}>
+                    <Save size={15} />
+                  </ShortcutHint>
                 </button>
               </Tooltip>
               <Tooltip content={t(queryExpanded ? 'shell.restoreQuery' : 'shell.expandQuery')}>
@@ -273,7 +229,7 @@ export function ShellWorkspace(): React.JSX.Element {
 
           {/* Key the editor by tab id so each tab gets its own CodeMirror
               instance (isolated undo history / selection). */}
-          <div className="editor-row" data-shortcut-region="query">
+          <div className="editor-row">
             <ShellEditor
               ref={editorRef}
               key={activeTabId}
@@ -306,7 +262,8 @@ export function ShellWorkspace(): React.JSX.Element {
           <ResultPanel
             expanded={resultsExpanded}
             onExpandedChange={(expanded) => setExpandedRegion(expanded ? 'results' : null)}
-            showTabShortcutHints={shortcutHintRegion === 'result'}
+            showViewShortcutHints={shortcutHints === 'primary'}
+            showTabShortcutHints={shortcutHints === 'result-tabs'}
           />
         </main>
 
@@ -348,6 +305,13 @@ function TabBar({
   const connect = useAppStore((s) => s.connect)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
+  const tabShortcutsEnabled = isAppShortcutEnabled(
+    keyboardShortcutsEnabled,
+    disabledKeyboardShortcuts,
+    'contextualTabs'
+  )
+  const tabShortcut = (index: number): string | undefined =>
+    tabShortcutsEnabled ? tabShortcutLabel(index, tabs.length, false, isMacPlatform()) : undefined
   const stripRef = useRef<HTMLDivElement>(null)
   const tabSearchRef = useRef<SearchableSelectHandle>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
@@ -397,7 +361,7 @@ function TabBar({
   }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   return (
-    <div className="tab-bar app-drag" data-shortcut-region="query">
+    <div className="tab-bar app-drag">
       <SearchableSelect
         ref={tabSearchRef}
         value={activeTabId}
@@ -422,6 +386,7 @@ function TabBar({
                   .filter(Boolean)
                   .join(' · ')}
               </small>
+              {tabShortcut(index) && <span className="ctx-shortcut">{tabShortcut(index)}</span>}
             </span>
           )
         }))}
@@ -507,12 +472,21 @@ function TabBar({
                   <span className="qtab-error-dot" />
                 ) : null
               }
-              shortcutNumber={showShortcutHints && i < 9 ? i + 1 : undefined}
+              shortcut={tabShortcut(i)}
+              showShortcutHint={showShortcutHints}
             />
           )
         })}
         <button className="qtab-new" aria-label={t('shell.newTabLabel')} onClick={() => newTab()}>
-          <Plus size={14} />
+          <ShortcutHint
+            shortcut={
+              isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newQuery')
+                ? `${isMacPlatform() ? '⌘' : 'Ctrl+'}T`
+                : undefined
+            }
+          >
+            <Plus size={14} />
+          </ShortcutHint>
         </button>
       </DocumentTabStrip>
       <button

@@ -45,6 +45,8 @@ import { ContextMenu, type ContextMenuEntry } from '@renderer/components/Context
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
 import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
+import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
+import { isAppShortcutEnabled, isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import {
   HistoryView,
@@ -238,6 +240,9 @@ export function Explorer({
   const theme = useAppStore((s) => s.settings.theme)
   const updateState = useAppStore((s) => s.updateState)
   const availableVersion = updateState.availableVersion
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
+  const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -792,7 +797,15 @@ export function Explorer({
 
           <div className="explorer-create">
             <button className="btn-new-conn" onClick={() => setConnForm({ open: true })}>
-              <Plus size={15} />
+              <ShortcutHint
+                shortcut={
+                  isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newConnection')
+                    ? `${primaryKey}N`
+                    : undefined
+                }
+              >
+                <Plus size={15} />
+              </ShortcutHint>
               <span>{t('explorer.newConnection')}</span>
             </button>
           </div>
@@ -867,7 +880,15 @@ export function Explorer({
         )}
         <Tooltip content={t('common.settings')}>
           <button className="theme-cycle" aria-label={t('common.settings')} onClick={onSettings}>
-            <Settings size={16} />
+            <ShortcutHint
+              shortcut={
+                isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'openSettings')
+                  ? `${primaryKey},`
+                  : undefined
+              }
+            >
+              <Settings size={16} />
+            </ShortcutHint>
           </button>
         </Tooltip>
       </div>

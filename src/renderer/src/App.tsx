@@ -12,6 +12,7 @@ import { Collapsible } from '@renderer/components/ui/Collapsible'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
+import { useShortcutHints } from '@renderer/lib/useShortcutHints'
 import { useIsDark } from '@renderer/lib/useIsDark'
 import {
   hasOpenShortcutLayer,
@@ -57,6 +58,7 @@ export default function App(): React.JSX.Element {
   const updateSettings = useAppStore((s) => s.updateSettings)
   const { t } = useTranslation()
   const isDark = useIsDark()
+  const shortcutHints = useShortcutHints(keyboardShortcutsEnabled)
 
   const [view, setView] = useState<ExplorerView>('connections')
   const [explorerOpen, setExplorerOpen] = useState(true)
@@ -206,7 +208,11 @@ export default function App(): React.JSX.Element {
   }
 
   return (
-    <div className="app" style={{ '--data-font-size': `${dataFontSize}px` } as CSSProperties}>
+    <div
+      className="app"
+      data-shortcut-hints={shortcutHints ?? undefined}
+      style={{ '--data-font-size': `${dataFontSize}px` } as CSSProperties}
+    >
       <div ref={appBodyRef} className={explorerOpen ? 'app-body' : 'app-body explorer-collapsed'}>
         <Collapsible open={explorerOpen} axis="horizontal" className="explorer-disclosure">
           <Explorer
@@ -232,7 +238,7 @@ export default function App(): React.JSX.Element {
             ariaLabel={t('app.resizeSidebar')}
           />
         )}
-        <ShellWorkspace />
+        <ShellWorkspace shortcutHints={shortcutHints} />
         {!explorerOpen && (
           <div className="sidebar-toggle-slot">
             <button
