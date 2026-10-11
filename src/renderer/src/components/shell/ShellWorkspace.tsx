@@ -212,7 +212,7 @@ export function ShellWorkspace(): React.JSX.Element {
                   {t(stopping ? 'shell.stopping' : 'shell.stopTip')}
                 </Button>
               ) : (
-                <Tooltip content={t('shell.runTip')}>
+                <Tooltip content={`${t('shell.runTip')} · ${isMacPlatform() ? '⌘Enter' : 'Ctrl+Enter'}`}>
                   <Button
                     variant="primary"
                     aria-disabled={busy}
@@ -246,7 +246,7 @@ export function ShellWorkspace(): React.JSX.Element {
                   <Brush size={15} aria-hidden />
                 </button>
               </Tooltip>
-              <Tooltip content={t('shell.saveQueryTip')}>
+              <Tooltip content={`${t('shell.saveQueryTip')} · ${isMacPlatform() ? '⌘S' : 'Ctrl+S'}`}>
                 <button
                   className="work-icon-btn"
                   aria-disabled={contentBusy}
