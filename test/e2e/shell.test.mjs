@@ -129,7 +129,7 @@ test(
       await enterQuery('db.items.find({n:{$lt:2}}).sort({n:1})')
       await clickElement(
         renderer,
-        '[...document.querySelectorAll(".work-actions button")].find(button => button.textContent.trim() === "Run")',
+        '[...document.querySelectorAll(".work-actions button")].find(button => button.innerText.trim() === "Run")',
       )
       await waitForExpression(
         renderer,
