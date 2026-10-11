@@ -18,6 +18,12 @@ import { cn } from '@renderer/lib/utils'
 const FOCUSABLE =
   'input:not([type="hidden"]), textarea, select, button, [href], [tabindex]:not([tabindex="-1"])'
 
+type ModalSizeKey = 'json-preview' | 'document-preview' | 'document-editor' | 'schema-model'
+
+// Native CSS resizing writes inline dimensions. Keep only those user overrides
+// for this renderer's lifetime, with one entry per modal type.
+const modalSizes = new Map<ModalSizeKey, { width: string; height: string }>()
+
 interface ModalProps {
   title: string
   titleMeta?: ReactNode
@@ -39,9 +45,11 @@ interface ModalProps {
   movable?: boolean
   /** Keep the opening top edge fixed while body content changes height. */
   lockTop?: boolean
+  /** Remember native resize dimensions until the application exits. */
+  sizeKey?: ModalSizeKey
 }
 
-type ResizableModalProps = Omit<ModalProps, 'movable'>
+type ResizableModalProps = Omit<ModalProps, 'movable' | 'sizeKey'> & { sizeKey: ModalSizeKey }
 
 interface ModalDrag {
   pointerId: number
@@ -74,7 +82,8 @@ export function Modal({
   bodyClassName,
   backdropClassName,
   movable = false,
-  lockTop = false
+  lockTop = false,
+  sizeKey
 }: ModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const titleId = useId()
@@ -86,7 +95,16 @@ export function Modal({
   const sheet = !compactHeader && (description != null || headerActions != null || navigation != null)
   const popupRef = useCallback(
     (popup: HTMLDivElement | null) => {
+      const previousPopup = popupElementRef.current
+      if (!popup && previousPopup && sizeKey) {
+        const { width, height } = previousPopup.style
+        if (width || height) modalSizes.set(sizeKey, { width, height })
+      }
       popupElementRef.current = popup
+      if (popup && sizeKey) {
+        const rememberedSize = modalSizes.get(sizeKey)
+        if (rememberedSize) Object.assign(popup.style, rememberedSize)
+      }
       if (movable && popup) {
         const rect = popup.getBoundingClientRect()
         popup.style.left = `${rect.left}px`
@@ -98,7 +116,7 @@ export function Modal({
         setOpeningHalfHeight((current) => current ?? popup.getBoundingClientRect().height / 2)
       }
     },
-    [lockTop, movable]
+    [lockTop, movable, sizeKey]
   )
 
   // React 19 can mount a controlled, already-open dialog before Base UI's
@@ -189,7 +207,7 @@ export function Modal({
           'flex shrink-0 justify-between',
           sheet
             ? 'items-start gap-4 px-[26px] pb-1 pt-6'
-            : 'items-center border-b border-[var(--separator)] px-6 py-4 text-[15px] font-semibold',
+            : 'items-center gap-2 border-b border-[var(--separator)] px-6 py-4 text-[15px] font-semibold',
           movable && 'cursor-move touch-none select-none'
         )}
         onPointerDown={startMove}
@@ -197,19 +215,24 @@ export function Modal({
         onPointerUp={endMove}
         onPointerCancel={endMove}
       >
-        <div className={cn('min-w-0 flex-1', !sheet && titleMeta != null && 'flex items-baseline gap-2')}>
+        <div className={cn('min-w-0 flex-1', !sheet && titleMeta != null && 'flex flex-col gap-1.5')}>
           <DialogTitle
             id={titleId}
             render={
               <span
-                className={sheet ? 'text-[20px] font-semibold tracking-[-0.02em]' : undefined}
+                className={
+                  sheet
+                    ? 'text-[20px] font-semibold tracking-[-0.02em]'
+                    : 'block min-w-0 truncate'
+                }
+                title={title}
               />
             }
           >
             {title}
           </DialogTitle>
           {!sheet && titleMeta != null && (
-            <span className="min-w-0 truncate text-[12px] font-normal text-muted-foreground">{titleMeta}</span>
+            <span className="min-w-0 text-[12px] font-normal text-muted-foreground">{titleMeta}</span>
           )}
           {description != null && (
             <div className="mt-1.5 text-[12px] font-normal text-muted-foreground">
@@ -221,7 +244,7 @@ export function Modal({
           <div className="flex shrink-0 items-center gap-1">{headerActions}</div>
         )}
         <DialogClose
-          className="-mr-1.5 inline-flex size-7 items-center justify-center rounded-[var(--radius-control)] border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-[var(--interaction-hover)] hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          className="-mr-1.5 inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-control)] border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-[var(--interaction-hover)] hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           aria-label={t('common.close')}
         >
           ✕
@@ -234,11 +257,16 @@ export function Modal({
       )}
       <div
         className={cn(
-          'min-h-0 overflow-y-auto',
+          'min-h-0 overflow-y-auto scroll-p-[3px] [&_button]:scroll-m-[3px] [&_input]:scroll-m-[3px] [&_textarea]:scroll-m-[3px]',
           sheet ? 'px-[26px] pb-2 pt-[22px]' : 'px-6 py-5',
           bodyClassName
         )}
         ref={bodyRef}
+        onFocusCapture={(event) => {
+          if (event.target.matches('input, textarea, button')) {
+            event.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+          }
+        }}
       >
         {children}
       </div>

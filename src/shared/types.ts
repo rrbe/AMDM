@@ -113,6 +113,8 @@ export interface ConnectionInput extends Omit<
   ConnectionConfig,
   'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
 > {
+  /** Create a new connection, inheriting unchanged secrets from this saved connection. */
+  copyFromId?: string
   password?: string
   sshPassword?: string
   sshPassphrase?: string
@@ -165,7 +167,21 @@ export interface ConnectionStatus {
   serverVersion?: string
 }
 
-export interface TestResult {
+export interface ConnectionAuthorization {
+  users: { user: string; db: string }[]
+  roles: { role: string; db: string }[]
+  privileges: {
+    resource: { db?: string; collection?: string; cluster?: boolean; anyResource?: boolean }
+    actions: string[]
+  }[]
+}
+
+export interface AuthorizationResult {
+  authorization?: ConnectionAuthorization
+  authorizationError?: string
+}
+
+export interface TestResult extends AuthorizationResult {
   ok: boolean
   error?: string
   failureKind?: FailureKind
@@ -258,20 +274,12 @@ export interface SchemaModel {
 // Shell execution
 // ---------------------------------------------------------------------------
 
-export type ShellRuntime = 'legacy' | 'mongosh'
-
 export interface ShellRequest {
   connectionId: string
   database: string
   code: string
-  /** Execution engine selected by the query tab. Missing means AMDM driver for
-      compatibility with callers and persisted data created before 26.8.17. */
-  runtime?: ShellRuntime
-  /** Default page size applied to bare cursors so results remain bounded. */
-  limit?: number
-  /** Page offset injected into a `find()` cursor for prev/next paging. Only
-      honored when the script's result is a FindCursor (see `pageable`). */
-  skip?: number
+  /** Documents displayed per page; never overrides the query's limit/skip. */
+  pageSize?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
   /** Default server-side limit for read operations. Explicit query options win. */
@@ -282,6 +290,18 @@ export interface ShellRequest {
 }
 
 export type ShellResultKind = 'documents' | 'value' | 'ack' | 'explain' | 'error'
+
+export interface ShellResultTotal {
+  totalCount?: number
+  totalStatus: 'known' | 'counting' | 'unknown' | 'unavailable'
+}
+
+export interface ShellPageRequest {
+  resultId: string
+  skip: number
+  pageSize: number
+  execId: string
+}
 
 /**
  * One captured shell-output line (print / printjson / console.*). Text lines
@@ -310,12 +330,17 @@ export interface ShellResult {
   data?: unknown
   /** Number of docs in `data` when kind === 'documents'. */
   count?: number
-  /** True if a default limit was auto-applied to a cursor (more may exist). */
+  /** Main-owned execution result; pages are read from its cursor/cache. */
+  resultId?: string
+  pageSize?: number
+  /** Full query result cardinality, including the query's own skip/limit. */
+  totalCount?: number
+  totalStatus?: ShellResultTotal['totalStatus']
+  /** True when additional result documents can be displayed on later pages. */
   truncated?: boolean
-  /** True when the result is a FindCursor, so prev/next paging (skip) is
-      supported. Aggregation cursors and arrays are not pageable. */
+  /** True when this execution has cached pages or a retained cursor. */
   pageable?: boolean
-  /** Page offset that produced this result (echoes the request's skip). */
+  /** Display offset within this execution, separate from the query's skip. */
   skip?: number
   /** Target collection parsed from the code (enables doc edit/delete). */
   collection?: string
@@ -346,7 +371,6 @@ export interface SavedQuery {
   /** Optional binding to a connection + database. */
   connectionId?: string
   database?: string
-  runtime?: ShellRuntime
   /** Optional folder name for two-level organization in the sidebar. Empty /
       undefined = ungrouped. */
   folder?: string
@@ -361,7 +385,6 @@ export interface SavedQueryInput {
   code: string
   connectionId?: string
   database?: string
-  runtime?: ShellRuntime
   folder?: string
 }
 
@@ -370,7 +393,6 @@ export interface HistoryEntry {
   code: string
   connectionId: string
   database: string
-  runtime?: ShellRuntime
   ranAt: number
   ok: boolean
   /** Short summary, e.g. "12 docs · 8ms" or an error name. */
@@ -555,7 +577,8 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
  */
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
-export type KeyboardShortcutId = 'newConnection' | 'newQuery' | 'contextualTabs' | 'resultView' | 'openSettings'
+export type KeyboardShortcutId =
+  'newConnection' | 'newQuery' | 'tabSearch' | 'contextualTabs' | 'resultView' | 'openSettings'
 export type TableNestedDisplay = 'inline' | 'grouped' | 'auto'
 
 export interface AppSettings {
@@ -573,15 +596,12 @@ export interface AppSettings {
   sidebarWidth: number
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
   editorHeight: number
-  /** Page size for query results — how many docs a cursor fetches per page
-      (bounded; never the whole collection). */
+  /** Initial display page size for new results; does not change query limits. */
   queryLimit: number
   /** Default MongoDB maxTimeMS for read operations; 0 disables the limit. */
   queryTimeoutMS: number
   /** Maximum number of executed queries retained in History. */
   historyLimit: number
-  /** Runtime selected for newly created query tabs. */
-  defaultShellRuntime: ShellRuntime
   /** Shell editor font size in px (CodeMirror; ⌘+/⌘−/⌘0 or right-click menu). */
   editorFontSize: number
   /** Data result views font size in px (Tree / JSON / Table / Console). */
@@ -647,7 +667,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   queryLimit: 50,
   queryTimeoutMS: 30_000,
   historyLimit: 200,
-  defaultShellRuntime: 'mongosh',
   editorFontSize: 13,
   dataFontSize: 13,
   tableNestedDisplay: 'inline',

@@ -2,6 +2,7 @@
  * SSH tunnel option assembly — auth-method decision + host-key TOFU + diagnosis plan.
  */
 import { describe, it, expect } from 'vitest'
+import { normalize } from 'node:path'
 import {
   buildTunnelOptions,
   classifyConnError,
@@ -40,7 +41,7 @@ describe('expandHome', () => {
     expect(expandHome('~', '/home/u')).toBe('/home/u')
   })
   it('expands a leading ~/ to home/...', () => {
-    expect(expandHome('~/.ssh/id_ed25519', '/home/u')).toBe('/home/u/.ssh/id_ed25519')
+    expect(expandHome('~/.ssh/id_ed25519', '/home/u')).toBe(normalize('/home/u/.ssh/id_ed25519'))
   })
   it('leaves absolute and ~user paths untouched', () => {
     expect(expandHome('/keys/id', '/home/u')).toBe('/keys/id')

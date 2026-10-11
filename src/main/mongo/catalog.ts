@@ -1,4 +1,5 @@
 import type { MongoClient } from 'mongodb'
+import { readAuthorization } from './authorization'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import { sessionManager } from './sessionManager'
 import {
@@ -75,30 +76,17 @@ export async function listDatabases(connectionId: string): Promise<DatabaseInfo[
  * `showPrivileges: true` flattens every granted role into concrete privileges,
  * so a `readWrite@somedb` grant surfaces `somedb` even when it has no data.
  * Cluster-wide privileges (`resource.db === ''`) are skipped — they target "any
- * database", not a specific one. Never throws: a probe failure (e.g. a user
- * without permission to read its own status) just yields no extra databases.
+ * database", not a specific one. Never throws: a probe failure (e.g. an
+ * unsupported command on a compatible server) just yields no extra databases.
  */
 async function authorizedDatabaseNames(client: MongoClient): Promise<string[]> {
-  try {
-    const status = (await client
-      .db('admin')
-      .command({ connectionStatus: 1, showPrivileges: true })) as ConnectionStatus
-    const privileges = status.authInfo?.authenticatedUserPrivileges ?? []
-    const names = new Set<string>()
-    for (const p of privileges) {
-      const db = p.resource?.db
-      if (typeof db === 'string' && db !== '') names.add(db)
-    }
-    return [...names]
-  } catch {
-    return []
+  const { authorization } = await readAuthorization(client)
+  const names = new Set<string>()
+  for (const p of authorization?.privileges ?? []) {
+    const db = p.resource.db
+    if (typeof db === 'string' && db !== '') names.add(db)
   }
-}
-
-interface ConnectionStatus {
-  authInfo?: {
-    authenticatedUserPrivileges?: { resource?: { db?: string } }[]
-  }
+  return [...names]
 }
 
 export async function listCollections(

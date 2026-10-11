@@ -244,7 +244,7 @@
 }
 /* Per-doc edit/delete, revealed on row hover at the right edge. */
 /* Inline cell editor (Tree value cell + Table data cell). Fills the cell,
-   monospace, accent ring; red ring when the last commit failed validation. */
+   monospace, accent border; red border when the last commit failed validation. */
 .cell-edit-input {
   width: 100%;
   box-sizing: border-box;
@@ -257,6 +257,8 @@
   border: 1px solid var(--primary);
   border-radius: var(--radius-control);
   outline: none;
+  /* The border carries focus without clipping a global input shadow in the cell. */
+  box-shadow: none;
   /* Opt back into text selection: the grid row/table disables it, but you must
      be able to select/edit text while inline-editing a cell. */
   user-select: text;
@@ -318,16 +320,110 @@
 
 /* ------------------------------------------------------------- json result */
 .json-line {
+  --json-gutter-width: 28px;
+  isolation: isolate;
   cursor: text;
   padding-right: 12px;
   font-family: var(--font-mono);
 }
-.json-line:hover {
+.json-line:hover::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: 0 0 0 var(--json-gutter-width);
   background: var(--interaction-hover);
 }
 .json-line pre {
   margin: 0;
+  padding-left: var(--json-gutter-width);
   white-space: pre;
+}
+.json-custom-selection ::selection {
+  background: transparent;
+}
+.json-text-selected::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  left: var(--json-selection-left);
+  width: var(--json-selection-width);
+  background: var(--code-selection);
+}
+.foldable-json-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  font-family: var(--font-mono);
+}
+.foldable-json-lines .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  padding: 12px;
+}
+.json-fold-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.json-fold-action:hover:not(:disabled) {
+  background: var(--interaction-hover);
+  color: var(--text-primary);
+}
+.json-fold-toggle {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: calc(100% - 4px);
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.json-fold-toggle[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.json-fold-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--interaction-hover);
+}
+.json-fold-summary {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  margin: 0 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 3px;
+  vertical-align: baseline;
+  background: var(--interaction-hover);
+  color: var(--text-secondary);
+  font: inherit;
+  line-height: 1;
+}
+.json-fold-toggle:focus-visible,
+.json-fold-summary:focus-visible,
+.json-fold-action:focus-visible {
+  outline: 2px solid var(--separator-strong);
+  outline-offset: -2px;
 }
 .json-key {
   color: var(--t-key);
@@ -549,6 +645,45 @@
   background: var(--interaction-hover);
 }
 
+/* Opaque pinned cells keep scrolled data out of the identity column, including
+   the translucent hover and selection treatments used by the rest of the row. */
+.has-pinned-id .tbl-row {
+  --tbl-row-overlay: transparent;
+}
+.has-pinned-id .tbl-row:hover {
+  --tbl-row-overlay: var(--interaction-hover);
+}
+.has-pinned-id .tbl-row.selected {
+  --tbl-row-overlay: var(--accent-soft-strong);
+}
+.has-pinned-id .idx,
+.has-pinned-id .tbl-pinned-id {
+  position: sticky;
+  z-index: 3;
+  background: var(--surface-content);
+}
+.has-pinned-id .idx {
+  left: 0;
+}
+.has-pinned-id .tbl-pinned-id {
+  border-right: 1px solid var(--separator-strong);
+}
+.has-pinned-id .tbl-pinned-id .tbl-sort-trigger {
+  cursor: pointer;
+}
+.has-pinned-id .tbl-row > .idx,
+.has-pinned-id .tbl-row > .tbl-pinned-id {
+  background: linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+.has-pinned-id .tbl-row > .tbl-pinned-id.selected {
+  background: linear-gradient(var(--accent-soft-strong), var(--accent-soft-strong)),
+    linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+.has-pinned-id .tbl-row > .idx-select:hover {
+  background: linear-gradient(var(--interaction-hover), var(--interaction-hover)),
+    linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+
 /* Icon actions in the result bar. */
 .result-bar-spacer {
   flex: 1;
@@ -595,7 +730,7 @@
   text-align: center;
   color: var(--fg-1);
 }
-/* Query limit. */
+/* Display page size. */
 .page-size {
   display: inline-flex;
   align-items: center;
@@ -611,11 +746,6 @@
   display: flex;
   flex-direction: column;
 }
-.json-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
 .json-body.all-selected .json-line {
   background: var(--accent-soft);
 }
@@ -626,11 +756,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.console-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
 }
 .console-line pre {
   color: var(--fg-1);
@@ -686,6 +811,22 @@
 .view-switch .selection-indicator {
   background: var(--primary);
   border-radius: 0;
+}
+.result-view-shortcut {
+  isolation: isolate;
+}
+.result-view-shortcut::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0 -4px -4px;
+  z-index: 0;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+  mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
+}
+.result-view-shortcut > .document-tab-shortcut {
+  position: relative;
+  z-index: 1;
 }
 .copy-feedback {
   display: grid;

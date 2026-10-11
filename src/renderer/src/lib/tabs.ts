@@ -5,16 +5,16 @@
  * outcomes can be compared side by side.
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
-import type { ShellResult, ShellRuntime } from '@shared/types'
+import type { ShellResult } from '@shared/types'
 
 export type ResultView = 'tree' | 'json' | 'table'
+export type ResultFoldView = 'json' | 'console' | 'explain'
 
-/** The query that produced a result (refresh / paging / doc-edit target). */
+/** The query that produced a result (refresh / doc-edit target). */
 export interface ResultQuery {
   connectionId: string
   database: string
   code: string
-  runtime: ShellRuntime
 }
 
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
@@ -22,13 +22,14 @@ export interface ResultTab {
   id: string
   /** Selected Tree/JSON/Table view for this result tab. */
   resultView?: ResultView
+  foldedLines?: Partial<Record<ResultFoldView, number[]>>
   /** 1-based run sequence within its query tab (drives the "结果 N" label).
       Monotonic — eviction of old results never renumbers survivors. */
   seq: number
   result: ShellResult
   /** Local wall-clock time when this result was received. */
   executedAt: number
-  /** Query that produced `result`; refresh/paging/doc edits re-run this. */
+  /** Query that produced `result`; explicit refresh/doc edits re-run this. */
   query: ResultQuery | null
   /** Page offset of the current result page (0 = first page). */
   skip: number
@@ -85,7 +86,7 @@ export function dbCollRef(collection: string): string {
 /** Shell query for the complete server-side definition of one named index. */
 export function indexDetailsQuery(collection: string, indexName: string): string {
   const name = JSON.stringify(indexName)
-  return `(await ${dbCollRef(collection)}.getIndexes()).filter((index) => index.name === ${name})`
+  return `${dbCollRef(collection)}.getIndexes().filter((index) => index.name === ${name})`
 }
 
 export interface QueryTab {
@@ -95,10 +96,6 @@ export interface QueryTab {
   /** Per-tab active database shown in the workspace breadcrumb. */
   activeDatabase: string
   code: string
-  /** Query language/runtime selected for this tab. */
-  runtime: ShellRuntime
-  /** An execution-blocking suggestion for code owned by the other runtime. */
-  runtimeSuggestion: { runtime: ShellRuntime; construct: string; code: string } | null
   /** True while `code` is blank or a programmatic fill (browse seed, loaded
       query) the user hasn't edited. Only pristine tabs may be refilled in
       place; anything the user typed gets a tab of its own. Cleared by the
@@ -129,8 +126,6 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     connectionId: null,
     activeDatabase: '',
     code: '',
-    runtime: 'mongosh',
-    runtimeSuggestion: null,
     pristine: true,
     results: [],
     activeResultId: null,
@@ -160,15 +155,14 @@ export function isRunFailure(result: ShellResult): boolean {
 export function pickFillTarget(
   tabs: QueryTab[],
   activeTabId: string,
-  match?: { connectionId: string; database: string; code: string; runtime?: ShellRuntime }
+  match?: { connectionId: string; database: string; code: string }
 ): { focusId?: string; reuseId?: string } {
   if (match) {
     const existing = tabs.find(
       (t) =>
         t.connectionId === match.connectionId &&
         t.activeDatabase === match.database &&
-        t.code === match.code &&
-        t.runtime === (match.runtime ?? 'mongosh')
+        t.code === match.code
     )
     if (existing) return { focusId: existing.id }
   }
@@ -254,7 +248,11 @@ export function appendResult(
 /** Immutably patch one result tab by id (no-op shape when the id is absent —
     e.g. the tab was closed while its page load was in flight). */
 export function patchResult(tab: QueryTab, resultId: string, patch: Partial<ResultTab>): Partial<QueryTab> {
-  return { results: tab.results.map((r) => (r.id === resultId ? { ...r, ...patch } : r)) }
+  return {
+    results: tab.results.map((r) => r.id === resultId
+      ? { ...r, ...patch, foldedLines: patch.result && patch.result !== r.result ? undefined : patch.foldedLines ?? r.foldedLines }
+      : r)
+  }
 }
 
 /** Close one result tab, moving focus to a neighbor when it was active. */
@@ -290,4 +288,14 @@ export function tabCollection(tab: QueryTab): string | null {
 /** Short display label for a tab: the targeted collection, else "查询 N". */
 export function tabLabel(tab: QueryTab, index: number): string {
   return tabCollection(tab) ?? `查询 ${index + 1}`
+}
+
+/** Searchable text shown by the query-tab picker. */
+export function tabSearchText(tab: QueryTab, index: number, connectionName?: string): string {
+  return [tabLabel(tab, index), connectionName, tab.activeDatabase].filter(Boolean).join('\n')
+}
+
+export function matchesTabSearch(filterText: string, query: string): boolean {
+  const normalized = query.trim().toLocaleLowerCase()
+  return !normalized || filterText.toLocaleLowerCase().includes(normalized)
 }

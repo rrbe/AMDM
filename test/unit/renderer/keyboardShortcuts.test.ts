@@ -7,6 +7,7 @@ import {
   shortcutHintModifier,
   isMacPlatform,
   isPrimaryShortcut,
+  isPrimaryShiftShortcut,
   primaryDigitIndex,
   queryTabDigitIndex,
   queryTabDirection,
@@ -37,6 +38,15 @@ describe('keyboard shortcuts', () => {
     expect(isPrimaryShortcut(event({ key: 'n', metaKey: true }), 'n', true)).toBe(true)
     expect(isPrimaryShortcut(event({ key: 'n', ctrlKey: true }), 'n', true)).toBe(false)
     expect(isPrimaryShortcut(event({ key: 'N', ctrlKey: true }), 'n', false)).toBe(true)
+  })
+
+  it('uses Cmd+Shift on macOS and Ctrl+Shift elsewhere', () => {
+    expect(isPrimaryShiftShortcut(event({ key: 'a', metaKey: true, shiftKey: true }), 'a', true)).toBe(true)
+    expect(isPrimaryShiftShortcut(event({ key: 'A', ctrlKey: true, shiftKey: true }), 'a', false)).toBe(true)
+    expect(isPrimaryShiftShortcut(event({ key: 'a', metaKey: true }), 'a', true)).toBe(false)
+    expect(
+      isPrimaryShiftShortcut(event({ key: 'a', metaKey: true, shiftKey: true, altKey: true }), 'a', true)
+    ).toBe(false)
   })
 
   it('keeps view, query-tab, and result-tab digits distinct on macOS', () => {

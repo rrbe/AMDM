@@ -155,7 +155,7 @@ export default function App(): React.JSX.Element {
   }, [activeEditorColorSchemeId, editorColorSchemes, isDark, palettePreview])
 
   const finishQueryLoad = (query: StoredQuerySelection, connectionId: string): void => {
-    applyQuery(query.code, query.database, connectionId, query.runtime)
+    applyQuery(query.code, query.database, connectionId)
     setQueryPrompt(null)
   }
 

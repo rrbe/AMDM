@@ -1,5 +1,7 @@
 import type { KeyboardShortcutId } from '@shared/types'
 
+export const SHORTCUT_HINT_DELAY_MS = 500
+
 interface ShortcutKeyEvent {
   key: string
   code: string
@@ -21,6 +23,14 @@ function hasPrimaryModifier(event: ShortcutKeyEvent, isMac: boolean): boolean {
 
 export function isPrimaryShortcut(event: ShortcutKeyEvent, key: string, isMac: boolean): boolean {
   return hasPrimaryModifier(event, isMac) && event.key.toLowerCase() === key.toLowerCase()
+}
+
+/** Cmd+Shift on macOS, Ctrl+Shift elsewhere. */
+export function isPrimaryShiftShortcut(event: ShortcutKeyEvent, key: string, isMac: boolean): boolean {
+  const hasModifiers = isMac
+    ? event.metaKey && event.shiftKey && !event.ctrlKey && !event.altKey
+    : event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
+  return hasModifiers && event.key.toLowerCase() === key.toLowerCase()
 }
 
 function digitIndex(event: ShortcutKeyEvent): number | null {

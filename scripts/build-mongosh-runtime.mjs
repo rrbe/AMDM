@@ -5,7 +5,11 @@ import { build } from "esbuild";
 const outputDirectory = resolve("out/main");
 const common = {
   bundle: true,
-  format: "cjs",
+  format: "esm",
+  // Official mongosh packages use dynamic require() for Node built-ins.
+  banner: {
+    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+  },
   platform: "node",
   target: "node22",
   minify: true,
@@ -29,7 +33,7 @@ await mkdir(outputDirectory, { recursive: true });
 await build({
   ...common,
   entryPoints: [resolve("src/main/mongo/mongoshVendor.ts")],
-  outfile: resolve(outputDirectory, "mongosh-runtime.cjs"),
+  outfile: resolve(outputDirectory, "mongosh-runtime.mjs"),
   plugins: [
     {
       name: "exclude-unreachable-mongosh-connect",

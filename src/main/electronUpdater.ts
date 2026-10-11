@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { autoUpdater, CancellationToken } from 'electron-updater'
+import electronUpdater, { type CancellationToken } from 'electron-updater'
 import type { UpdateState } from '../shared/types'
 import { canUseElectronUpdater, nextElectronUpdateState } from './electronUpdaterCore'
 import { settingsStore } from './store/settingsStore'
@@ -7,6 +7,7 @@ import { settingsStore } from './store/settingsStore'
 const FIRST_CHECK_DELAY_MS = 30_000
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 
+const { autoUpdater } = electronUpdater
 const stateListeners = new Set<(state: UpdateState) => void>()
 let state: UpdateState = {
   available: false,
@@ -128,7 +129,7 @@ export function showAvailableElectronUpdate(): Promise<boolean> {
   if (state.phase !== 'available' || !state.availableVersion) return Promise.resolve(false)
   if (downloadInFlight) return downloadInFlight
 
-  downloadToken = new CancellationToken()
+  downloadToken = new electronUpdater.CancellationToken()
   setState({
     phase: 'downloading',
     downloadProgress: { percent: 0, transferred: 0, total: 0, bytesPerSecond: 0 }

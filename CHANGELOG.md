@@ -4,6 +4,61 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.2](https://github.com/rrbe/AMDM/releases/tag/v26.10.2) — 2026-10-10
+
+### Features
+
+- Inspect collection schemas in the Details sidebar, with sampling, nested fields, field and type search, and access to the full Schema view
+- Add a query formatting button to the toolbar
+- Show result view shortcut hints when holding Command or Ctrl
+- Search databases and collections across connections with highlighted matches
+
+### Fixes
+
+- Fix string arguments in completion snippets and generated index queries, and reuse open index tabs without rerunning queries
+- Use Command\-Shift\-F on macOS and Ctrl\-Shift\-F on Windows and Linux to format queries
+- Hide status dots for disconnected connections
+- Remember resized dialog dimensions while the app is running
+
+### Other Updates
+
+- Update the Explain action icon
+- Update result view icons and labels
+- Use amber highlights for search matches
+
+## [v26.10.1](https://github.com/rrbe/AMDM/releases/tag/v26.10.1) — 2026-10-08
+
+### Features
+
+- Show saved query creation times with localized formatting and narrow\-sidebar layout support
+- Duplicate an existing connection as an editable draft, creating the copy only after saving
+- Align Shell completion and syntax highlighting with the Mongosh API
+- Search and switch between open query tabs
+- Add a table view to array previews with navigation into nested objects and arrays \(\#25\)
+- Add JSON object and array folding with per\-result state, and virtualize table columns \(\#26\)
+
+### Fixes
+
+- Improve JSON text selection and row hover backgrounds
+
+### Other Updates
+
+- Use Mongosh for all queries and remove runtime switching; update older Driver\-style scripts, such as db\.collection\(\) to db\.getCollection\(\)
+
+## [v26.9.4](https://github.com/rrbe/AMDM/releases/tag/v26.9.4) — 2026-09-20
+
+### Features
+
+- Pin document IDs in tables and improve preview headers \(\#24\)
+- Manage query tabs from the context menu
+
+### Fixes
+
+- Reuse local Electron for installation and set macOS 12 as the minimum supported version
+- Keep the query tab highlighted while its context menu is open
+- Clarify query toolbar actions and disabled states
+- Show only the app version in the sidebar
+
 ## [v26.9.3](https://github.com/rrbe/AMDM/releases/tag/v26.9.3) — 2026-09-15
 
 ### Features

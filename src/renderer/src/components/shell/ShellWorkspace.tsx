@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ChartNoAxesCombined,
+  Brush,
   ChevronDown,
   ChevronRight,
+  FlaskConical,
   LoaderCircle,
   Maximize2,
   Minimize2,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
-import { tabCollection, tabLabel } from '@renderer/lib/tabs'
+import { matchesTabSearch, tabCollection, tabLabel, tabSearchText } from '@renderer/lib/tabs'
 import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { Collapsible } from '@renderer/components/ui/Collapsible'
@@ -29,8 +30,7 @@ import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
-import { Modal } from '@renderer/components/common/Modal'
-import { Select } from '@renderer/components/ui/Select'
+import { SearchableSelect, type SearchableSelectHandle } from '@renderer/components/ui/SearchableSelect'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
@@ -40,6 +40,7 @@ import {
   isAppShortcutEnabled,
   isMacPlatform,
   isPrimaryShortcut,
+  isPrimaryShiftShortcut,
   queryTabDigitIndex,
   queryTabDirection,
   tabShortcutLabel,
@@ -57,8 +58,6 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
   const connections = useAppStore((s) => s.connections)
   const activeDatabase = useAppStore((s) => getActiveTab(s).activeDatabase)
   const code = useAppStore((s) => getActiveTab(s).code)
-  const runtime = useAppStore((s) => getActiveTab(s).runtime)
-  const runtimeSuggestion = useAppStore((s) => getActiveTab(s).runtimeSuggestion)
   const running = useAppStore((s) => getActiveTab(s).running)
   const stopping = useAppStore((s) => getActiveTab(s).stopping)
   const activeConnectionState = useAppStore((s) => {
@@ -67,9 +66,6 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
   })
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setCode = useAppStore((s) => s.setCode)
-  const setShellRuntime = useAppStore((s) => s.setShellRuntime)
-  const dismissShellRuntimeSuggestion = useAppStore((s) => s.dismissShellRuntimeSuggestion)
-  const acceptShellRuntimeSuggestion = useAppStore((s) => s.acceptShellRuntimeSuggestion)
   const formatCode = useAppStore((s) => s.formatCode)
   const runShell = useAppStore((s) => s.runShell)
   const stopShell = useAppStore((s) => s.stopShell)
@@ -157,32 +153,13 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
             </div>
 
             <div className="work-actions">
-              <Select
-                value={runtime}
-                disabled={running}
-                onChange={setShellRuntime}
-                aria-label={t('shell.runtime')}
-                className="h-7 w-[112px] px-2"
-                options={[
-                  {
-                    value: 'legacy',
-                    label: t('shell.runtimeAmdmDriver'),
-                    description: t('shell.runtimeAmdmDriverDescription')
-                  },
-                  {
-                    value: 'mongosh',
-                    label: t('shell.runtimeMongosh'),
-                    description: t('shell.runtimeMongoshDescription')
-                  }
-                ]}
-              />
               {running ? (
                 <Button variant="danger" disabled={stopping} onClick={() => void stopShell()}>
                   <LoaderCircle className="animate-spin" aria-hidden />
                   {t(stopping ? 'shell.stopping' : 'shell.stopTip')}
                 </Button>
               ) : (
-                <Tooltip content={t('shell.runTip')}>
+                <Tooltip content={`${t('shell.runTip')} · ${isMacPlatform() ? '⌘Enter' : 'Ctrl+Enter'}`}>
                   <Button
                     variant="primary"
                     aria-disabled={busy}
@@ -197,7 +174,7 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
                   </Button>
                 </Tooltip>
               )}
-              <Tooltip content={t('shell.explainBtn')}>
+              <Tooltip content={`${t('shell.explainBtn')} · ${isMacPlatform() ? '⌘⇧E' : 'Ctrl+Shift+E'}`}>
                 <button
                   className="work-icon-btn"
                   aria-disabled={busy}
@@ -206,12 +183,24 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
                   }}
                   aria-label={t('shell.explainBtn')}
                 >
-                  <ShortcutHint shortcut={busy ? undefined : `${primaryKey}E`}>
-                    <ChartNoAxesCombined size={15} />
+                  <ShortcutHint shortcut={busy ? undefined : `${primaryKey}⇧E`}>
+                    <FlaskConical size={15} />
                   </ShortcutHint>
                 </button>
               </Tooltip>
-              <Tooltip content={t('shell.saveQueryTip')}>
+              <Tooltip content={`${t('shell.menu.format')} · ${isMacPlatform() ? '⌘⇧F' : 'Ctrl+Shift+F'}`}>
+                <button
+                  className="work-icon-btn"
+                  aria-disabled={!code.trim()}
+                  onClick={() => void formatCode()}
+                  aria-label={t('shell.menu.format')}
+                >
+                  <ShortcutHint shortcut={!code.trim() ? undefined : `${primaryKey}⇧F`}>
+                    <Brush size={15} aria-hidden />
+                  </ShortcutHint>
+                </button>
+              </Tooltip>
+              <Tooltip content={`${t('shell.saveQueryTip')} · ${isMacPlatform() ? '⌘S' : 'Ctrl+S'}`}>
                 <button
                   className="work-icon-btn"
                   aria-disabled={contentBusy}
@@ -273,6 +262,7 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
           <ResultPanel
             expanded={resultsExpanded}
             onExpandedChange={(expanded) => setExpandedRegion(expanded ? 'results' : null)}
+            showViewShortcutHints={shortcutHints === 'primary'}
             showTabShortcutHints={shortcutHints === 'result-tabs'}
           />
         </main>
@@ -285,34 +275,6 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
       </div>
 
       {showSave && <SaveQueryModal onClose={() => setShowSave(false)} />}
-      {runtimeSuggestion && (
-        <Modal
-          title={t('shell.runtimeSuggestionTitle')}
-          onClose={dismissShellRuntimeSuggestion}
-          size="sm"
-          footer={
-            <>
-              <Button onClick={dismissShellRuntimeSuggestion}>{t('common.cancel')}</Button>
-              <Button variant="primary" onClick={() => void acceptShellRuntimeSuggestion()}>
-                {t('shell.switchRuntime', {
-                  runtime: t(
-                    runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeAmdmDriver'
-                  )
-                })}
-              </Button>
-            </>
-          }
-        >
-          <p>
-            {t('shell.runtimeSuggestion', {
-              construct: runtimeSuggestion.construct,
-              runtime: t(
-                runtimeSuggestion.runtime === 'mongosh' ? 'shell.runtimeMongosh' : 'shell.runtimeAmdmDriver'
-              )
-            })}
-          </p>
-        </Modal>
-      )}
     </div>
   )
 }
@@ -351,6 +313,7 @@ function TabBar({
   const tabShortcut = (index: number): string | undefined =>
     tabShortcutsEnabled ? tabShortcutLabel(index, tabs.length, false, isMacPlatform()) : undefined
   const stripRef = useRef<HTMLDivElement>(null)
+  const tabSearchRef = useRef<SearchableSelectHandle>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const moveQueryTab = useAppStore((s) => s.moveQueryTab)
   useTabReorder(stripRef, tabs, setActiveTab, moveQueryTab)
@@ -362,6 +325,15 @@ function TabBar({
   // Cmd/Ctrl+W closes the query first; an already empty workspace closes the window.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'tabSearch') &&
+        isPrimaryShiftShortcut(e, 'a', isMacPlatform())
+      ) {
+        e.preventDefault()
+        if (e.repeat || hasOpenShortcutLayer()) return
+        tabSearchRef.current?.open()
+        return
+      }
       if (isPrimaryShortcut(e, 'w', isMacPlatform())) {
         e.preventDefault()
         if (e.repeat || hasOpenShortcutLayer()) return
@@ -390,30 +362,42 @@ function TabBar({
 
   return (
     <div className="tab-bar app-drag">
-      <Select
+      <SearchableSelect
+        ref={tabSearchRef}
         value={activeTabId}
         onChange={setActiveTab}
         options={tabs.map((tab, index) => ({
           value: tab.id,
+          filterText: tabSearchText(
+            tab,
+            index,
+            connections.find((connection) => connection.id === tab.connectionId)?.name
+          ),
           label: (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 <span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, index)}</span>
               </span>
-              <small className="shrink-0 text-[11px] text-muted-foreground">{tab.activeDatabase}</small>
+              <small className="max-w-[118px] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
+                {[
+                  connections.find((connection) => connection.id === tab.connectionId)?.name,
+                  tab.activeDatabase
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
               {tabShortcut(index) && <span className="ctx-shortcut">{tabShortcut(index)}</span>}
             </span>
           )
         }))}
+        matches={matchesTabSearch}
         className="query-tab-picker"
         triggerContent={<ChevronDown size={15} aria-hidden />}
         popupClassName="w-[272px]"
-        popupHeader={
-          <div className="px-2 py-2 text-[11px] font-medium text-muted-foreground">
-            {t('shell.tabListLabel')} · {tabs.length}
-          </div>
-        }
-        aria-label={t('shell.tabListLabel')}
+        header={`${t('shell.openTabsLabel')} · ${tabs.length}`}
+        placeholder={t('shell.tabSearchPlaceholder')}
+        emptyMessage={t('shell.noMatchingTabs')}
+        aria-label={t('shell.tabSearchLabel')}
       />
       <DocumentTabStrip stripRef={stripRef} count={tabs.length} activeId={activeTabId} kind="query">
         {tabs.map((tab, i) => {

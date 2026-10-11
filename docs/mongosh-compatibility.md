@@ -2,7 +2,7 @@
 
 This matrix records behavior verified against a real single-node MongoDB replica set. The authoritative executable cases live in `test/integration/mongoshCore.test.ts`; this document describes product-visible compatibility rather than duplicating every assertion.
 
-## Verified in both runtimes
+## Verified Mongosh behavior
 
 | Area        | Examples                                                         | AMDM result behavior                                                               |
 | ----------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -18,23 +18,22 @@ This matrix records behavior verified against a real single-node MongoDB replica
 
 The compatibility suite also executes an AI-style four-collection cleanup transaction using `db.getMongo().startSession()`, `session.getDatabase()`, conditional result-count checks, and `withTransaction()`.
 
-## Intentional differences
+## Moving older scripts to Mongosh
 
-| Construct                       | AMDM driver                | Mongosh                         | Classification                                            |
-| ------------------------------- | -------------------------- | ------------------------------- | --------------------------------------------------------- |
-| `db.getMongo()` and Session API | Unsupported                | Official behavior               | Mongosh-only                                              |
-| `db.collection(name)`           | Driver-style alias         | Unsupported                     | AMDM driver-only extension; use `db.getCollection(name)`  |
-| `cursor.project(spec)`          | Driver-style alias         | Unsupported                     | AMDM driver-only extension; use `cursor.projection(spec)` |
-| `collection.indexes()`          | Driver-style alias         | Unsupported                     | AMDM driver-only extension; use `collection.getIndexes()` |
-| `db.listCollections()`          | Driver cursor escape hatch | Unsupported                     | AMDM driver-only extension; use `db.getCollectionInfos()` |
-| `new Mongo(uri)`                | Unsupported                | Unsupported by Compass provider | Use AMDM connection management                            |
-| `show collections`              | String rows                | Official `{ name, badge }` rows | Normalized-output difference                              |
+Saved query and history text is preserved; all executions use Mongosh. Update Driver-style expressions explicitly:
 
-Mongosh exposes `driverDb` for scripts that intentionally require raw Node Driver method signatures, for example `driverDb.collection(name)` or `driverDb.listCollections()`. It always uses the selected AMDM connection and database; standard scripts should continue to use the official `db` API.
+| Older expression | Mongosh expression |
+| --- | --- |
+| `db.collection(name)` | `db.getCollection(name)` |
+| `cursor.project(spec)` | `cursor.projection(spec)` |
+| `collection.indexes()` | `collection.getIndexes()` |
+| `db.listCollections().toArray()` | `db.getCollectionInfos()` |
 
-The runtime router never retries a failed script in the other engine. These differences therefore surface as explicit errors instead of risking a duplicate write.
+For native Node Driver signatures use `driverDb.collection(name)` or `driverDb.listCollections()`, with explicit `await` for intermediate promises. Find options belong in the Driver's second argument, for example `await driverDb.collection("items").find({}, { projection: { _id: 0 } }).toArray()`.
 
-For the unambiguous constructs in this table, AMDM offers to switch runtime before execution. The prompt requires explicit confirmation; cancelling keeps the current runtime and does not execute the query. Detection uses the JavaScript syntax tree, so matching text in comments, strings, or methods on unrelated objects does not trigger it.
+Mongosh supports `db.getMongo()` and the Session API. `new Mongo(uri)` is unavailable through the Compass provider; use AMDM connection management. REPL commands use official case-sensitive syntax. `show collections` returns official name/badge objects; `insertMany` returns acknowledgement and inserted IDs.
+
+The regression suites in `test/integration/shellBehavior.test.ts` and `test/integration/mongoshCore.test.ts` cover Shell behavior, Driver cursor bounds/paging, serialization cancellation, and transactions.
 
 ## Environment-dependent coverage
 

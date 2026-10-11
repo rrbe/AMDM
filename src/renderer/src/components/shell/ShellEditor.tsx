@@ -24,6 +24,7 @@ import { selectionCode } from '@renderer/lib/shellSelection'
 import { queryRunGutter, updateQueryRunBusy } from '@renderer/lib/queryRunGutter'
 import { shellStatementAt } from '@renderer/lib/shellStatement'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 
 /**
  * CodeMirror is heavy, so we lazy-load it — it stays out of
@@ -102,7 +103,7 @@ interface ShellEditorProps {
   onRunStatement: (code: string) => void
   onSave: () => void
   onExplain: () => void
-  /** Pretty-print the editor (Shift+Alt+F) — independent of `busy`. */
+  /** Pretty-print the editor (Cmd/Ctrl+Shift+F) — independent of `busy`. */
   onFormat: () => void
   /** Cancel the in-flight run (the "停止执行" menu item / toolbar Stop). */
   onStop: () => void
@@ -233,11 +234,10 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
           { key: 'F6', run: () => runStatementIfReady() },
           // Cmd/Ctrl+S saves; preventDefault stops the browser "save page" dialog.
           { key: 'Mod-s', preventDefault: true, run: () => saveIfReady() },
-          // Cmd/Ctrl+E runs explain().
-          { key: 'Mod-e', run: () => explainIfReady() },
-          // Shift+Alt+F formats the script (VS Code's convention). preventDefault
-          // stops macOS Option+F from inserting a stray "ƒ" glyph.
-          { key: 'Shift-Alt-f', preventDefault: true, run: () => formatNow() },
+          // Cmd/Ctrl+Shift+E runs explain().
+          { key: 'Mod-Shift-e', preventDefault: true, run: () => explainIfReady() },
+          // Cmd/Ctrl+Shift+F formats the script.
+          { key: 'Mod-Shift-f', preventDefault: true, run: () => formatNow() },
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
           // here so it works regardless of basicSetup defaults).
           { key: 'Mod-/', run: (view) => toggleComment(view) },
@@ -362,11 +362,16 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
         disabled: isBusy,
         onClick: () => runStatementIfReady()
       },
-      { label: t('shell.menu.explain'), shortcut: '⌘E', disabled: isBusy, onClick: () => explainIfReady() },
+      {
+        label: t('shell.menu.explain'),
+        shortcut: isMacPlatform() ? '⌘⇧E' : 'Ctrl+Shift+E',
+        disabled: isBusy,
+        onClick: () => explainIfReady()
+      },
       // Enabled only mid-run; cancels the in-flight find/aggregate server-side.
       { label: t('shell.menu.stop'), disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',
-      { label: t('shell.menu.format'), shortcut: '⌥⇧F', onClick: () => formatNow() },
+      { label: t('shell.menu.format'), shortcut: '⌘⇧F', onClick: () => formatNow() },
       'separator',
       { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       'separator',

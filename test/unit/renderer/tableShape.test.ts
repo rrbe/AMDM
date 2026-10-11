@@ -45,15 +45,16 @@ describe('deriveColumns', () => {
 })
 
 describe('orderTableColumns', () => {
-  it('uses the configured field order until columns are manually arranged', () => {
-    const columns = ['name', '_id']
-    expect(orderTableColumns(columns, [])).toBe(columns)
+  it('pins _id ahead of natural field order without changing the derived columns', () => {
+    const columns = ['name', '_id', 'age']
+    expect(orderTableColumns(columns, [])).toEqual(['_id', 'name', 'age'])
+    expect(columns).toEqual(['name', '_id', 'age'])
   })
 
   it('keeps arranged fields in place and appends new fields in their derived order', () => {
     expect(orderTableColumns(['_id', 'age', 'name', 'status'], ['name', '_id'])).toEqual([
-      'name',
       '_id',
+      'name',
       'age',
       'status'
     ])
@@ -61,14 +62,21 @@ describe('orderTableColumns', () => {
 
   it('remembers missing fields across sparse and empty results', () => {
     const order = ['name', 'age', '_id']
-    expect(orderTableColumns(['_id', 'name'], order)).toEqual(['name', '_id'])
+    expect(orderTableColumns(['_id', 'name'], order)).toEqual(['_id', 'name'])
     expect(orderTableColumns([], order)).toEqual([])
-    expect(orderTableColumns(['_id', 'age', 'name'], order)).toEqual(['name', 'age', '_id'])
+    expect(orderTableColumns(['_id', 'age', 'name'], order)).toEqual(['_id', 'name', 'age'])
+    expect(orderTableColumns(['age', 'name', 'status'], order)).toEqual(['name', 'age', 'status'])
     expect(order).toEqual(['name', 'age', '_id'])
   })
 })
 
 describe('deriveTableColumnGroups', () => {
+  it('keeps a compound _id in one identity column in every nested display mode', () => {
+    for (const display of ['inline', 'grouped', 'auto'] as const) {
+      const groups = deriveTableColumnGroups([{ _id: { tenant: 'a', number: 1 } }], display)
+      expect(groups[0].columns.map((column) => column.path)).toEqual([['_id']])
+    }
+  })
   const docs = [
     { orderNo: 1001, notified: { shipped: false, transit: true }, tags: ['new'], id: { $oid: OID } },
     { orderNo: 1002, notified: { delivered: false, details: { attempts: 2 } }, tags: [], id: { $oid: OID } }

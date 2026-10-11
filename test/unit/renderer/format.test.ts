@@ -2,7 +2,7 @@
  * JSON-line builder for the virtualized JSON view (shell-style scalars).
  */
 import { describe, it, expect } from 'vitest'
-import { toInlineJsonTokens, toJsonLines, indentFor } from '@renderer/lib/format'
+import { toInlineJsonTokens, toJsonLines, visibleJsonLineIndexes, indentFor } from '@renderer/lib/format'
 
 const OID = '64b7f0f0f0f0f0f0f0f0f0f0'
 const texts = (v: unknown): string[] => toJsonLines(v).map((l) => l.text)
@@ -38,6 +38,22 @@ describe('toJsonLines', () => {
       [1, '}'],
       [0, '}']
     ])
+  })
+
+  it('tracks nested array objects and keeps the closing comma when folded', () => {
+    const lines = toJsonLines([{ a: [1, 2] }, { b: 3 }])
+    expect(lines[0].fold).toEqual({ end: 10, closeText: ']' })
+    expect(lines[1].fold).toEqual({ end: 6, closeText: '},' })
+    expect(lines[2].fold).toEqual({ end: 5, closeText: ']' })
+    expect(visibleJsonLineIndexes(lines, new Set([1]))).toEqual([0, 1, 7, 8, 9, 10])
+    expect(visibleJsonLineIndexes(lines, new Set([1, 7]))).toEqual([0, 1, 7, 10])
+  })
+
+  it('does not mark empty containers or EJSON scalar wrappers as foldable', () => {
+    const lines = toJsonLines({ empty: {}, ids: [{ $oid: OID }] })
+    expect(lines.find((line) => line.text === '"empty": {}')?.fold).toBeUndefined()
+    expect(lines.find((line) => line.text.includes('ObjectId('))?.fold).toBeUndefined()
+    expect(lines.find((line) => line.text === '"ids": [')?.fold).toBeDefined()
   })
 })
 

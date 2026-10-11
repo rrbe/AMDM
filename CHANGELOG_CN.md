@@ -4,6 +4,61 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.2](https://github.com/rrbe/AMDM/releases/tag/v26.10.2) — 2026-10-10
+
+### 新功能
+
+- 详情侧栏支持查看集合 Schema，可采样分析、展开嵌套字段、搜索字段和类型，并打开完整 Schema 视图
+- 查询工具栏新增格式化按钮
+- 按住 Command 或 Ctrl 时显示结果视图快捷键提示
+- 支持跨连接搜索数据库和集合，并高亮匹配内容
+
+### 修复
+
+- 修正补全片段中的字符串参数和生成的索引查询，复用已打开的索引标签页时不再重复执行查询
+- 查询格式化快捷键改为 macOS 的 Command\-Shift\-F，以及 Windows 和 Linux 的 Ctrl\-Shift\-F
+- 隐藏未连接状态的连接指示点
+- 在应用运行期间记住调整后的弹窗尺寸
+
+### 其他更新
+
+- 调整执行计划操作图标
+- 调整结果视图图标和名称
+- 搜索匹配项使用琥珀色高亮
+
+## [v26.10.1](https://github.com/rrbe/AMDM/releases/tag/v26.10.1) — 2026-10-08
+
+### 新功能
+
+- 已保存查询显示创建时间，适配界面语言和窄侧栏布局
+- 支持将现有连接复制为可编辑草稿，点击保存后才创建副本
+- Shell 自动补全和语法高亮与 Mongosh API 对齐
+- 支持搜索并切换已打开的查询标签页
+- 数组预览支持表格视图，可逐层查看嵌套对象和数组（\#25）
+- 支持折叠 JSON 对象和数组、保留各结果的折叠状态，并为表格增加列虚拟化（\#26）
+
+### 修复
+
+- 改善 JSON 文本选择和行悬停背景
+
+### 其他更新
+
+- 查询统一使用 Mongosh，移除运行时切换；旧 Driver 写法需要调整，例如将 db\.collection\(\) 改为 db\.getCollection\(\)
+
+## [v26.9.4](https://github.com/rrbe/AMDM/releases/tag/v26.9.4) — 2026-09-20
+
+### 新功能
+
+- 固定表格中的文档 ID 列，并改进预览标题（\#24）
+- 通过右键菜单管理查询标签页
+
+### 修复
+
+- 本地安装复用已下载的 Electron，最低支持 macOS 12
+- 右键菜单打开时保持对应查询标签页高亮
+- 改进查询工具栏操作提示和禁用状态
+- 侧边栏仅显示应用版本号
+
 ## [v26.9.3](https://github.com/rrbe/AMDM/releases/tag/v26.9.3) — 2026-09-15
 
 ### 新功能

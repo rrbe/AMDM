@@ -19,7 +19,7 @@ import type {
   SavedQueryInput,
   SchemaTarget,
   ShellRequest,
-  ShellRuntime
+  ShellPageRequest
 } from '../../shared/types'
 import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
@@ -37,7 +37,8 @@ import {
   listUsers,
   sampleFields
 } from '../mongo/catalog'
-import { executeShell, abortShell, prepareShellRuntime } from '../mongo/shellEngine'
+import { executeShell, abortShell, readShellPage, readShellTotal, releaseShellResult } from '../mongo/shellEngine'
+import { shellResults } from '../mongo/shellResults'
 import { cancelDocumentRead, deleteDocument, readDocument, setDocumentField, updateDocument } from '../mongo/docOps'
 import { analyzeCollectionSchema } from '../mongo/schemaAnalysis'
 import {
@@ -64,7 +65,7 @@ function historySummary(kind: string, count?: number, elapsedMs?: number, errorN
  * the stored values so "Test" works after editing without re-typing secrets.
  */
 function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
-  const { password, sshPassword, sshPassphrase, jumpSshPassphrase, ...rest } = input
+  const { password, sshPassword, sshPassphrase, jumpSshPassphrase, copyFromId, ...rest } = input
   const config: ConnectionConfig = {
     ...rest,
     hasPassword: !!password,
@@ -79,8 +80,9 @@ function inputToDecrypted(input: ConnectionInput): DecryptedConnection {
   let sshPw = sshPassword
   let sshPp = sshPassphrase
   let jumpPp = jumpSshPassphrase
-  if (input.id) {
-    const stored = connectionStore.getDecrypted(input.id)
+  const secretId = copyFromId || input.id
+  if (secretId) {
+    const stored = connectionStore.getDecrypted(secretId)
     if (stored) {
       if (!pw) pw = stored.password
       if (!sshPw) sshPw = stored.sshPassword
@@ -105,7 +107,8 @@ function buildConnectionUri(input: ConnectionInput, includePassword: boolean): s
   let encodePassword = true
   if (scram) {
     if (includePassword) {
-      password = input.password || (input.id ? connectionStore.getDecrypted(input.id)?.password : undefined)
+      const secretId = input.copyFromId || input.id
+      password = input.password || (secretId ? connectionStore.getDecrypted(secretId)?.password : undefined)
     } else {
       password = PASSWORD_PLACEHOLDER
       encodePassword = false
@@ -150,6 +153,9 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.connectionsTest, (_e, input: ConnectionInput) =>
     sessionManager.test(inputToDecrypted(input))
   )
+  ipcMain.handle(IPC.connectionsCachedAuthorization, (_e, input: ConnectionInput) =>
+    sessionManager.cachedAuthorization(inputToDecrypted(input))
+  )
   ipcMain.handle(IPC.connectionsDiagnose, (_e, input: ConnectionInput, scope: DiagnoseScope) =>
     diagnoseConnection(inputToDecrypted(input), scope)
   )
@@ -178,6 +184,9 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.sessionConnect, (_e, id: string) => sessionManager.connect(id))
   ipcMain.handle(IPC.sessionDisconnect, (_e, id: string) => sessionManager.disconnect(id))
   ipcMain.handle(IPC.sessionStatus, (_e, id: string) => sessionManager.getStatus(id))
+  ipcMain.handle(IPC.sessionAuthorization, (_e, id: string, input: ConnectionInput) =>
+    sessionManager.authorization(id, inputToDecrypted(input))
+  )
 
   // catalog
   ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id))
@@ -218,15 +227,19 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.schemasOverwriteDraft, (_e, target: SchemaTarget) => schemaStore.overwriteDraft(target))
 
   // shell — run, then record an automatic history entry
-  ipcMain.handle(IPC.shellPrepare, (_e, runtime: ShellRuntime) => prepareShellRuntime(runtime))
-  ipcMain.handle(IPC.shellExecute, async (_e, req: ShellRequest) => {
-    const result = await executeShell(req)
+  const shellOwners = new WeakSet<Electron.WebContents>()
+  ipcMain.handle(IPC.shellExecute, async (event, req: ShellRequest) => {
+    if (!shellOwners.has(event.sender)) {
+      shellOwners.add(event.sender)
+      const ownerId = event.sender.id
+      event.sender.once('destroyed', () => { void shellResults.closeOwner(ownerId) })
+    }
+    const result = await executeShell(req, event.sender.id)
     queryStore.addHistory(
       {
         code: req.code,
         connectionId: req.connectionId,
         database: req.database,
-        runtime: req.runtime,
         ok: result.kind !== 'error',
         summary: historySummary(result.kind, result.count, result.elapsedMs, result.errorName)
       },
@@ -237,6 +250,9 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   // Cancel an in-flight run (slow find/aggregate). Returns false if it already
   // finished — the renderer just clears its spinner either way.
   ipcMain.handle(IPC.shellAbort, (_e, execId: string) => abortShell(execId))
+  ipcMain.handle(IPC.shellPage, (event, req: ShellPageRequest) => readShellPage(req, event.sender.id))
+  ipcMain.handle(IPC.shellTotal, (event, resultId: string) => readShellTotal(resultId, event.sender.id))
+  ipcMain.handle(IPC.shellRelease, (event, resultId: string) => releaseShellResult(resultId, event.sender.id))
 
   // saved queries
   ipcMain.handle(IPC.queriesList, () => queryStore.listQueries())

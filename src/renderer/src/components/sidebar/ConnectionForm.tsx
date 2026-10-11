@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ClipboardPaste, Link, MessageSquareText, Plus, Trash2 } from 'lucide-react'
 import type {
+  AuthorizationResult,
   ConnectionConfig,
   ConnectionInput,
   DiagnoseStage,
@@ -21,6 +22,8 @@ import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { ConnectionPermissions } from './ConnectionPermissions'
 import {
   buildConnectionOptions,
   connectionMembersAreValid,
@@ -52,6 +55,7 @@ function optionRows(options: ConnectionOption[]): OptionRow[] {
 
 interface ConnectionFormProps {
   editing?: ConnectionConfig
+  copyFromId?: string
   onClose: () => void
 }
 
@@ -142,10 +146,18 @@ function DiagnoseControl({
  * exports the current fields OUT as a connection string. They never share a
  * live field, so neither drives the other.
  */
-export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React.JSX.Element {
+export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormProps): React.JSX.Element {
   const { t: tFn } = useTranslation()
+  const passwordStoragePlatform = isMacPlatform()
+    ? 'mac'
+    : navigator.platform.toLowerCase().startsWith('win')
+      ? 'windows'
+      : 'linux'
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
+  const readConnectionAuthorization = useAppStore((s) => s.readConnectionAuthorization)
+  const cachedConnectionAuthorization = useAppStore((s) => s.cachedConnectionAuthorization)
+  const connected = useAppStore((s) => !!editing && s.statuses[editing.id]?.state === 'connected')
   const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
   const pickFile = useAppStore((s) => s.pickFile)
   const diagnoseConnection = useAppStore((s) => s.diagnoseConnection)
@@ -157,6 +169,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [test, setTest] = useState<TestResult | null>(null)
+  const [authorization, setAuthorization] = useState<AuthorizationResult | null>(null)
+  const [readingAuthorization, setReadingAuthorization] = useState(false)
 
   // ---- URL popups (From URL / To URL) ----
   const [urlPanel, setUrlPanel] = useState<'from' | 'to' | null>(null)
@@ -359,6 +373,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
     () => (): ConnectionInput => {
       const input: ConnectionInput = {
         id: editing?.id ?? genId(),
+        copyFromId,
         name: name.trim() || 'Untitled',
         color: color || undefined,
         useSrv,
@@ -412,6 +427,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
     },
     [
       editing,
+      copyFromId,
       name,
       color,
       useSrv,
@@ -449,6 +465,47 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
     ]
   )
 
+  // Presentation-only edits do not change which account the permission result describes.
+  const { id: _id, name: _name, color: _color, ...connectionFields } = buildInput()
+  const inputKey = JSON.stringify(connectionFields)
+  const initialInputKey = useRef(inputKey)
+  const currentInputKey = useRef(inputKey)
+  currentInputKey.current = inputKey
+  const requestVersion = useRef(0)
+
+  useEffect(() => {
+    requestVersion.current += 1
+    setTest(null)
+    setAuthorization(null)
+    return () => {
+      requestVersion.current += 1
+    }
+  }, [inputKey])
+
+  useEffect(() => {
+    if (tab !== 'auth' || authorization || testing) {
+      return
+    }
+    let active = true
+    const version = requestVersion.current
+    setReadingAuthorization(true)
+    void (async () => {
+      let result = await cachedConnectionAuthorization(buildInput())
+      if (!active || version !== requestVersion.current || inputKey !== currentInputKey.current) return
+      if (!result && editing && connected && inputKey === initialInputKey.current) {
+        result = await readConnectionAuthorization(editing.id, buildInput())
+      }
+      if (active && version === requestVersion.current && inputKey === currentInputKey.current) {
+        setAuthorization(result)
+        setReadingAuthorization(false)
+      }
+    })()
+    return () => {
+      active = false
+      setReadingAuthorization(false)
+    }
+  }, [tab, editing, connected, inputKey, authorization, testing, readConnectionAuthorization, cachedConnectionAuthorization])
+
   const submit = async (): Promise<void> => {
     setSaving(true)
     const saved = await saveConnection(buildInput())
@@ -459,8 +516,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
   const runTest = async (): Promise<void> => {
     setTesting(true)
     setTest(null)
+    setAuthorization(null)
+    const version = ++requestVersion.current
+    const key = inputKey
     const r = await testConnection(buildInput())
-    setTest(r)
+    if (version === requestVersion.current && key === currentInputKey.current) {
+      setTest(r)
+      if (r.ok) setAuthorization(r)
+    }
     setTesting(false)
   }
 
@@ -482,7 +545,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
 
   return (
     <Modal
-      title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
+      title={tFn(copyFromId ? 'connection.menu.duplicate' : editing ? 'connection.title.edit' : 'connection.title.new')}
       description={tFn('connection.description')}
       onClose={handleModalClose}
       size="lg"
@@ -630,7 +693,22 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
           </section>
 
           <section className="connection-form-section">
-            <h2>{tFn('connection.section.server')}</h2>
+            <div className="mb-3.5 flex items-center justify-between gap-3">
+              <h2 className="m-0 text-[13px] font-[620] text-[var(--text-primary)]">
+                {tFn('connection.section.server')}
+              </h2>
+              {!useSrv && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
+                >
+                  <Plus size={14} />
+                  {tFn('connection.general.addMember')}
+                </Button>
+              )}
+            </div>
             <div className="form-row">
               <Checkbox checked={useSrv} onCheckedChange={setUseSrv} label={tFn('connection.general.useSrv')} />
             </div>
@@ -641,26 +719,15 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
               </Field>
             ) : (
               <div>
-                <div className="mb-1.5 flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-medium text-muted-foreground">{tFn('connection.general.hosts')}</div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
-                  >
-                    <Plus size={14} />
-                    {tFn('connection.general.addMember')}
-                  </Button>
-                </div>
-
                 <div className="overflow-visible">
-                  <div className="max-h-[151px] overflow-y-auto">
-                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
-                      <span>{tFn('connection.general.memberHost')}</span>
-                      <span>{tFn('connection.general.memberPort')}</span>
-                      <span />
-                    </div>
+                  <div className="-m-[3px] max-h-[157px] overflow-y-auto scroll-pb-[3px] scroll-pt-7 p-[3px]">
+                    {members.length > 0 && (
+                      <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                        <span>{tFn('connection.general.memberHost')}</span>
+                        <span>{tFn('connection.general.memberPort')}</span>
+                        <span />
+                      </div>
+                    )}
                     {members.length === 0 ? (
                       <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noMembers')}</div>
                     ) : (
@@ -757,9 +824,6 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
                   placeholder={tFn('connection.optional')}
                 />
               </Field>
-              <Field label={tFn('connection.auth.authSource')}>
-                <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
-              </Field>
             </div>
 
             {sshEnabled && replicaSet.trim() && (
@@ -768,12 +832,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
           </section>
 
           <section className="connection-form-section">
-            <h2>{tFn('connection.section.options')}</h2>
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-medium text-muted-foreground">
+                <h2 className="m-0 text-[13px] font-[620] text-[var(--text-primary)]">
                   {tFn('connection.general.customOptions')}
-                </div>
+                </h2>
                 <Button
                   type="button"
                   variant="ghost"
@@ -785,12 +848,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
                 </Button>
               </div>
               <div className="overflow-visible">
-                <div className="max-h-[151px] overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
-                    <span>{tFn('connection.general.optionKey')}</span>
-                    <span>{tFn('connection.general.optionValue')}</span>
-                    <span />
-                  </div>
+                <div className="-m-[3px] max-h-[157px] overflow-y-auto scroll-pb-[3px] scroll-pt-7 p-[3px]">
+                  {customOptions.length > 0 && (
+                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                      <span>{tFn('connection.general.optionKey')}</span>
+                      <span>{tFn('connection.general.optionValue')}</span>
+                      <span />
+                    </div>
+                  )}
                   {customOptions.length === 0 ? (
                     <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noOptions')}</div>
                   ) : (
@@ -851,7 +916,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
 
       {tab === 'auth' && (
         <>
-          <div className="mb-3 text-[11px] text-[var(--fg-3)]">{tFn('connection.auth.emptyMeansNone')}</div>
+          <div className="mb-3 text-[11px] text-[var(--fg-3)]">
+            {tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
+          </div>
           <div className="form-grid">
             <Field label={tFn('connection.auth.username')} error={authError}>
               <Input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -868,17 +935,23 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): React
               />
             </Field>
           </div>
-          <Field className="w-[calc(50%-8px)]" label={tFn('connection.auth.mechanism')}>
-            <Select<ScramMechanism>
-              value={mechanism}
-              onChange={setMechanism}
-              options={[
-                { label: 'DEFAULT', value: 'DEFAULT' },
-                { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
-                { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
-              ]}
-            />
-          </Field>
+          <div className="form-grid">
+            <Field label={tFn('connection.auth.authSource')}>
+              <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
+            </Field>
+            <Field label={tFn('connection.auth.mechanism')}>
+              <Select<ScramMechanism>
+                value={mechanism}
+                onChange={setMechanism}
+                options={[
+                  { label: 'DEFAULT', value: 'DEFAULT' },
+                  { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
+                  { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
+                ]}
+              />
+            </Field>
+          </div>
+          <ConnectionPermissions key={inputKey} result={authorization} busy={testing || readingAuthorization} />
         </>
       )}
 

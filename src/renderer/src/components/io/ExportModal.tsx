@@ -400,10 +400,10 @@ export function ExportModal({
 
         <div className="form-row mb-0">
           <label htmlFor="export-file-name">{t('io.exportFileName')}</label>
-          <div className="flex min-w-0 items-center">
+          <div className="group flex min-w-0 items-center rounded-[var(--radius-control)] border border-transparent bg-[var(--surface-control)] transition-[border-color,background-color,box-shadow] hover:bg-[var(--surface-chrome)] focus-within:border-[var(--separator-strong)] focus-within:bg-[var(--surface-elevated)] focus-within:shadow-[0_0_0_3px_var(--focus-soft)]">
             <Input
               id="export-file-name"
-              className="min-w-0 flex-1 rounded-r-none"
+              className="h-9 min-w-0 flex-1 border-0 bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:[outline:none] focus-visible:shadow-none"
               value={fileName}
               disabled={running}
               onChange={(event) => {
@@ -412,7 +412,7 @@ export function ExportModal({
               }}
               onBlur={() => setFileName(sanitizeExportBaseName(fileName))}
             />
-            <span className="flex h-[38px] shrink-0 items-center rounded-r-[var(--radius-control)] border-l border-[var(--separator)] bg-[var(--surface-control)] px-3 font-mono text-xs text-muted-foreground">
+            <span className="flex h-9 shrink-0 items-center border-l border-[var(--separator)] px-3 font-mono text-xs text-muted-foreground group-has-[:disabled]:opacity-55">
               .{extension}
             </span>
           </div>

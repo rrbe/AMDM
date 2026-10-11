@@ -5,6 +5,7 @@
  */
 import type {
   AppSettings,
+  AuthorizationResult,
   CollectionInfo,
   ConnectionConfig,
   ConnectionInput,
@@ -32,8 +33,9 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellRequest,
+  ShellPageRequest,
   ShellResult,
-  ShellRuntime,
+  ShellResultTotal,
   TestResult,
   UpdateState,
   UserInfo
@@ -44,12 +46,14 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsCachedAuthorization: 'connections:cachedAuthorization',
   connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
 
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
   sessionStatus: 'session:status',
+  sessionAuthorization: 'session:authorization',
   sessionStatusChanged: 'session:statusChanged',
 
   catalogDatabases: 'catalog:databases',
@@ -67,7 +71,9 @@ export const IPC = {
 
   shellExecute: 'shell:execute',
   shellAbort: 'shell:abort',
-  shellPrepare: 'shell:prepare',
+  shellPage: 'shell:page',
+  shellTotal: 'shell:total',
+  shellRelease: 'shell:release',
 
   queriesList: 'queries:list',
   queriesSave: 'queries:save',
@@ -115,6 +121,7 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    cachedAuthorization(input: ConnectionInput): Promise<AuthorizationResult | null>
     /** Single-hop SSH connectivity check (`scope`: the target host or the jump host). */
     diagnose(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
     /**
@@ -130,6 +137,7 @@ export interface Api {
     connect(connectionId: string): Promise<ConnectionStatus>
     disconnect(connectionId: string): Promise<void>
     status(connectionId: string): Promise<ConnectionStatus>
+    authorization(connectionId: string, input: ConnectionInput): Promise<AuthorizationResult>
     /** Driver topology monitoring reports unexpected disconnects and recovery here. */
     onStatusChanged(listener: (status: ConnectionStatus) => void): () => void
   }
@@ -152,9 +160,10 @@ export interface Api {
     overwriteDraft(target: SchemaTarget): Promise<SchemaModel>
   }
   shell: {
-    /** Load runtime code before the first execution. */
-    prepare(runtime: ShellRuntime): Promise<void>
     execute(request: ShellRequest): Promise<ShellResult>
+    page(request: ShellPageRequest): Promise<ShellResult>
+    total(resultId: string): Promise<ShellResultTotal>
+    release(resultId: string): Promise<void>
     /** Cancel an in-flight run by its `execId`. Resolves true if a matching
         run was found and signalled, false if it had already finished. */
     abort(execId: string): Promise<boolean>

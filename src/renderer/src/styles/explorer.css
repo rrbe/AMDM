@@ -394,6 +394,20 @@
   margin-top: 2px;
   font-size: var(--fs-xs, 11px);
 }
+.sq-sub--saved {
+  justify-content: space-between;
+  gap: 2px 8px;
+}
+.sq-sub--saved > span:first-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-saved-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .sq-sub .lib-ok {
   color: var(--ok);
 }
@@ -678,4 +692,20 @@
   color: var(--fg-3);
   font-size: var(--fs-sm);
   margin-left: auto;
+}
+
+.explorer .search-match {
+  padding: 0;
+  border-radius: 2px;
+  background: var(--search-match-background);
+  color: inherit;
+  font: inherit;
+}
+.explorer .search-match[data-approximate] {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.explorer-search-row > .conn-item {
+  position: static;
+  margin: 0;
 }

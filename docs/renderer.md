@@ -24,6 +24,12 @@ Treat [../DESIGN.md](../DESIGN.md) as the source of truth for visual rules. The 
 
 Do not repeat detailed class names or file inventories here when `DESIGN.md`, component facades, or the existing directory structure already make a convention easy to discover.
 
+## Shell editor
+
+Keep CodeMirror's JavaScript parser for syntax and local scopes. Shell semantic colors layer over it; completion uses Mongosh's official declarations from `@mongosh/shell-api/api`, augmented with live collection names and AMDM's `driverDb`. `scripts/mongosh-editor-types.mjs` resolves declarations at build time, so no Shell runtime enters the Renderer. Restart the development server after editing this generator.
+
+The TypeScript service and declaration graph load in a worker when the editor receives focus. Only small API-member metadata is loaded with the editor. Inline value hints remain local and must not appear inside comments or string literals.
+
 ## UI validation
 
 Debug and validate against the currently running Electron Renderer. Use Electron DevTools/CDP to inspect DOM, computed styles, events, focus, scrolling, and state. If attachment is unavailable, enable a remote debugging port for Electron or use its built-in DevTools; do not launch a regular Chrome instance as a substitute.

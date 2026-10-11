@@ -15,13 +15,16 @@
  * just presentation. Unknown shapes yield an empty tree and fall back to the
  * raw JSON — nothing here throws.
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { indentFor, toJsonLines } from '@renderer/lib/format'
+import { toJsonLines } from '@renderer/lib/format'
 import { parseExplain, type StageTreeNode } from '@renderer/lib/explain'
+import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 interface ExplainViewProps {
   plan: unknown
+  fontSize: number
+  folding?: JsonFoldingState
 }
 
 /** Format a number for display, or '—' when unavailable. */
@@ -29,10 +32,12 @@ function fmtNum(v: number | undefined): string {
   return v === undefined ? '—' : v.toLocaleString()
 }
 
-export function ExplainView({ plan }: ExplainViewProps): React.JSX.Element {
+export function ExplainView({ plan, fontSize, folding }: ExplainViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan), [plan])
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
+  const rawHeight = Math.min(320, rawLines.length * Math.max(22, fontSize + 8) + 24)
 
   return (
     <div className="explain-view">
@@ -62,14 +67,9 @@ export function ExplainView({ plan }: ExplainViewProps): React.JSX.Element {
       </div>
 
       <details className="explain-raw">
-        <summary>{t('explain.rawJson')}</summary>
-        <div className="explain-raw-box">
-          {rawLines.map((line, i) => (
-            <pre key={i} className="explain-raw-line">
-              {indentFor(line.depth)}
-              {line.text}
-            </pre>
-          ))}
+        <summary>{t('explain.rawJson')}<span className="explain-fold-action" ref={setFoldControls} /></summary>
+        <div className="explain-raw-box" style={{ height: rawHeight }}>
+          <FoldableJsonLines folding={folding} lines={rawLines} fontSize={fontSize} controlsContainer={foldControls} />
         </div>
       </details>
     </div>

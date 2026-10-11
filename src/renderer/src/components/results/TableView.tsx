@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
@@ -46,12 +46,14 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
  * VIRTUALIZATION APPROACH:
  *  - ROWS are virtualized with `useVirtualizer`; only visible rows (+ overscan)
  *    exist in the DOM, so a 100k-doc result renders the same handful of rows.
+ *  - Body columns are virtualized horizontally; the identity and focused column
+ *    stay mounted. Headers remain mounted for keyboard navigation and dragging.
  *  - Columns are derived ONCE (memoized on docs identity) by scanning every
  *    document for top-level field names, preserving first-seen order. We
  *    show nested values inline by default; grouped mode gives object fields
  *    a second header row and independent child columns.
  *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves.
- *  - The header is CSS-sticky; the whole table scrolls horizontally as a unit.
+ *  - The header sticks vertically; row handles and _id stay visible horizontally.
  *    Columns default to a fixed width but are resizable — drag the handle on a
  *    header cell's right edge; header and body share the per-column width.
  *
@@ -74,7 +76,7 @@ const COL_WIDTH = 200
 const MIN_COL_WIDTH = 60
 const INDEX_COL_WIDTH = 56
 const COLUMN_REORDER = {
-  itemSelector: '.tbl-column-group[data-column]',
+  itemSelector: '.tbl-column-group[data-column]:not(.tbl-pinned-id)',
   idAttribute: 'data-column',
   ignoreSelector: '.tbl-col-resizer, .tbl-group-children',
   sortingClass: 'table-columns-sorting',
@@ -112,6 +114,7 @@ export function TableView({
     title: string
     value: unknown
     documentView?: boolean
+    documentId?: unknown
     source?: JsonPreviewSource
   } | null>(null)
   // Inline edit: which cell, and whether the last commit failed validation.
@@ -121,7 +124,13 @@ export function TableView({
   // Per-column widths (serialized field path → px); unset columns use COL_WIDTH.
   const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const [tableSort, setTableSort] = useState<TableSortState | null>(null)
-  const widthOf = (col: TableColumn): number => colWidths[col.id] ?? COL_WIDTH
+  const [draggingGroup, setDraggingGroup] = useState<string | null>(null)
+  const endColumnDrag = useCallback(() => setDraggingGroup(null), [])
+  const widthOf = useCallback(
+    (col: TableColumn): number =>
+      colWidths[col.id] ?? (col.path[0] === '_id' ? Math.max(COL_WIDTH, Math.ceil(fontSize * 0.61 * 24) + 28) : COL_WIDTH),
+    [colWidths, fontSize]
+  )
 
   // Selection: a set of whole rows, plus the one "focused" cell that gets an
   // extra overlay highlight on top of its (already selected) row. A single click
@@ -159,6 +168,11 @@ export function TableView({
     return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
   }, [derivedGroups, columnOrder])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
+  const hasPinnedId = groups[0]?.key === '_id'
+  const groupStyle = (width: number, groupIndex: number): CSSProperties =>
+    hasPinnedId && groupIndex === 0
+      ? { width, left: INDEX_COL_WIDTH }
+      : columnStyle(width, groupIndex - Number(hasPinnedId))
   const headerHeight = (fontSize + 11) * (groups.some((group) => group.columns[0].path.length > 1) ? 2 : 1)
   const moveColumn = useCallback(
     (source: string, target: string) => {
@@ -172,7 +186,7 @@ export function TableView({
     },
     [groups, setColumnOrder]
   )
-  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn)
+  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn, setDraggingGroup, endColumnDrag)
   const rows = useMemo(() => {
     const column = columns.find((column) => column.id === tableSort?.column)
     const sort = tableSort && column ? { ...tableSort, column: column.path } : null
@@ -189,6 +203,40 @@ export function TableView({
     estimateSize: () => fontSize + 11,
     overscan: 12
   })
+
+  const columnLayout = useMemo(
+    () => groups.flatMap((group, groupIndex) =>
+      group.columns.map((column) => ({ column, groupIndex, width: widthOf(column) }))
+    ),
+    [groups, widthOf]
+  )
+  const draggingColumnIndexes = useMemo(
+    () => columnLayout.flatMap((entry, index) => groups[entry.groupIndex].key === draggingGroup ? [index] : []),
+    [columnLayout, groups, draggingGroup]
+  )
+  const focusedColumnIndex = columns.findIndex((column) => column.id === (editing?.col.id ?? selectedCell?.col.id))
+  const columnVirtualizer = useVirtualizer({
+    horizontal: true,
+    count: columns.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => columnLayout[index].width,
+    getItemKey: (index) => columns[index].id,
+    paddingStart: INDEX_COL_WIDTH,
+    overscan: 2 + draggingColumnIndexes.length,
+    rangeExtractor: useCallback(
+      (range) => {
+        const indexes = new Set(defaultRangeExtractor(range))
+        if (hasPinnedId) indexes.add(0)
+        if (focusedColumnIndex >= 0) indexes.add(focusedColumnIndex)
+        for (const index of draggingColumnIndexes) indexes.add(index)
+        return [...indexes].sort((a, b) => a - b)
+      },
+      [hasPinnedId, focusedColumnIndex, draggingColumnIndexes]
+    )
+  })
+  const visibleColumns = columnVirtualizer.getVirtualItems()
+
+  useEffect(() => columnVirtualizer.measure(), [columnLayout, columnVirtualizer])
 
   useEffect(() => rowVirtualizer.measure(), [fontSize, headerHeight, rowVirtualizer])
 
@@ -364,7 +412,7 @@ export function TableView({
   return (
     <div
       ref={parentRef}
-      className="table-scroller"
+      className={`table-scroller${hasPinnedId ? ' has-pinned-id' : ''}`}
       // Focusable so a grid click claims the ⌘C hotkey: claimCopyFocus moves
       // focus off the query editor AND clears a selection lingering there
       // (user-select:none rows don't collapse it natively — useCopyHotkey would
@@ -385,9 +433,9 @@ export function TableView({
           {groups.map((group, groupIndex) => (
             <div
               key={group.key}
-              className="tbl-column-group"
+              className={`tbl-column-group${group.key === '_id' ? ' tbl-pinned-id' : ''}`}
               data-column={group.key}
-              style={columnStyle(
+              style={groupStyle(
                 group.columns.reduce((sum, col) => sum + widthOf(col), 0),
                 groupIndex
               )}
@@ -427,13 +475,18 @@ export function TableView({
                   {vi.index + 1}
                 </div>
               </Tooltip>
-              {groups.flatMap((group, groupIndex) =>
-                group.columns.map((col) => (
+              {visibleColumns.map((item) => {
+                const { column: col, groupIndex } = columnLayout[item.index]
+                const style = groupStyle(item.size, groupIndex)
+                return (
                   <Cell
                     key={col.id}
                     doc={doc}
                     column={col}
-                    style={columnStyle(widthOf(col), groupIndex)}
+                    style={hasPinnedId && item.index === 0
+                      ? style
+                      : { ...style, position: 'absolute', left: item.start }
+                    }
                     selected={selectedCell?.row === sourceIndex && selectedCell?.col.id === col.id}
                     editing={editing?.row === sourceIndex && editing?.col.id === col.id}
                     editError={editError}
@@ -443,6 +496,7 @@ export function TableView({
                       setPreview({
                         title: col.path.join('.'),
                         value,
+                        documentId: docHasId(doc) ? doc._id : undefined,
                         source: docCtx
                           ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}), field: col.path }
                           : undefined
@@ -455,8 +509,8 @@ export function TableView({
                     }}
                     onContextMenu={(e) => openMenu(e, sourceIndex, col)}
                   />
-                ))
-              )}
+                )
+              })}
             </div>
           )
         })}
@@ -479,6 +533,7 @@ export function TableView({
           value={preview.value}
           fontSize={fontSize}
           documentView={preview.documentView}
+          documentId={preview.documentId}
           source={preview.source}
           onValueChange={(value) => setPreview((current) => (current ? { ...current, value } : current))}
           onClose={() => setPreview(null)}
@@ -636,7 +691,7 @@ function Cell({
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
   const { present, value } = cellValue(doc, column.path)
-  const cellCls = `tbl-td${selected ? ' selected' : ''}`
+  const cellCls = `tbl-td${column.path[0] === '_id' ? ' tbl-pinned-id' : ''}${selected ? ' selected' : ''}`
 
   if (editing) {
     return (
@@ -682,7 +737,9 @@ function Cell({
             <span key={index} className={token.cls}>{token.text}</span>
           ))
         ) : (
-          <span className={`v-${scalar!.type}`}>{scalar!.text}</span>
+          <span className={`v-${scalar!.type}`}>
+            {column.path[0] === '_id' && scalar!.type === 'objectId' ? plainScalarText(value) : scalar!.text}
+          </span>
         )}
       </div>
     </Tooltip>

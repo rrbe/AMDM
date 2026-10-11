@@ -5,7 +5,7 @@ import { highlightCode, tagHighlighter, tags as syntaxTags } from '@lezer/highli
 import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, Trash2 } from 'lucide-react'
-import type { HistoryEntry, SavedQuery, ShellRuntime } from '@shared/types'
+import type { HistoryEntry, SavedQuery } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
@@ -34,7 +34,6 @@ export interface StoredQuerySelection {
   connectionId?: string
   connectionName?: string
   database?: string
-  runtime?: ShellRuntime
 }
 
 /** One-line preview of a (possibly multi-line) code snippet. */
@@ -148,7 +147,6 @@ export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelect
       code: q.code,
       connectionId: q.connectionId,
       database: q.database,
-      runtime: q.runtime,
       folder
     })
   }
@@ -167,8 +165,7 @@ export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelect
               code: query.code,
               connectionId: query.connectionId,
               connectionName: connections.find((item) => item.id === query.connectionId)?.name ?? query.connectionId,
-              database: query.database,
-              runtime: query.runtime
+              database: query.database
             })
           }
           onDelete={(id) => void deleteQuery(id)}
@@ -206,8 +203,7 @@ export function HistoryView({ onLoad }: { onLoad: (query: StoredQuerySelection) 
               code: entry.code,
               connectionId: entry.connectionId,
               connectionName: connections.find((item) => item.id === entry.connectionId)?.name ?? entry.connectionId,
-              database: entry.database,
-              runtime: entry.runtime
+              database: entry.database
             })
           }
         />
@@ -227,7 +223,19 @@ function SavedTab({
   onDelete: (id: string) => void
   onMove: (q: SavedQuery, folder: string | undefined) => void
 }): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
+    [i18n.resolvedLanguage]
+  )
   // Collapsed folder names (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   // Right-click action menu, anchored to a specific query.
@@ -288,7 +296,10 @@ function SavedTab({
       >
         <div className="sq-name">{q.name}</div>
         <SyntaxCodePreview code={q.code} />
-        <div className="sq-sub muted">{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</div>
+        <div className="sq-sub sq-sub--saved muted">
+          <span>{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</span>
+          <span className="sq-saved-time">{dateFormatter.format(q.createdAt)}</span>
+        </div>
         <Tooltip content={t('savedQueries.menuDelete')}>
           <button
             className="ghost sq-del"

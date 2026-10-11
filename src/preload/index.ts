@@ -15,6 +15,7 @@ const api: Api = {
     save: (input) => ipcRenderer.invoke(IPC.connectionsSave, input),
     delete: (id) => ipcRenderer.invoke(IPC.connectionsDelete, id),
     test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input),
+    cachedAuthorization: (input) => ipcRenderer.invoke(IPC.connectionsCachedAuthorization, input),
     diagnose: (input, scope) => ipcRenderer.invoke(IPC.connectionsDiagnose, input, scope),
     buildUri: (input, opts) => ipcRenderer.invoke(IPC.connectionsBuildUri, input, opts)
   },
@@ -22,6 +23,7 @@ const api: Api = {
     connect: (connectionId) => ipcRenderer.invoke(IPC.sessionConnect, connectionId),
     disconnect: (connectionId) => ipcRenderer.invoke(IPC.sessionDisconnect, connectionId),
     status: (connectionId) => ipcRenderer.invoke(IPC.sessionStatus, connectionId),
+    authorization: (connectionId, input) => ipcRenderer.invoke(IPC.sessionAuthorization, connectionId, input),
     onStatusChanged: (listener) => {
       const handle = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]): void => {
         listener(status)
@@ -51,8 +53,10 @@ const api: Api = {
     overwriteDraft: (target) => ipcRenderer.invoke(IPC.schemasOverwriteDraft, target)
   },
   shell: {
-    prepare: (runtime) => ipcRenderer.invoke(IPC.shellPrepare, runtime),
     execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request),
+    page: (request) => ipcRenderer.invoke(IPC.shellPage, request),
+    total: (resultId) => ipcRenderer.invoke(IPC.shellTotal, resultId),
+    release: (resultId) => ipcRenderer.invoke(IPC.shellRelease, resultId),
     abort: (execId) => ipcRenderer.invoke(IPC.shellAbort, execId)
   },
   queries: {

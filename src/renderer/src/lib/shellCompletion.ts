@@ -23,6 +23,7 @@ import {
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import type { TsCompletionEntry } from '@renderer/lib/tsAutocomplete/protocol'
 import { methodCompletion } from '@renderer/lib/completionInfo'
+import { isShellText } from './shellSyntax'
 
 /** Cursor is completing a property after a `.` on an expression (not in a string). */
 export function isMemberCompletion(before: string): boolean {
@@ -81,6 +82,7 @@ function mapEntry(e: TsCompletionEntry, onDb: boolean): Completion {
 export async function shellCompletionSource(
   context: CompletionContext
 ): Promise<CompletionResult | null> {
+  if (isShellText(context.state, context.pos)) return null
   const token = context.matchBefore(/[\w$.]*/)
   if ((!token || token.from === token.to) && !context.explicit) return null
 

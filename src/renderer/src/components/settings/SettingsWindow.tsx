@@ -9,7 +9,6 @@ import {
   type CollectionSort,
   type KeyboardShortcutId,
   type Language,
-  type ShellRuntime,
   type TableNestedDisplay,
   type ThemeMode
 } from '@shared/types'
@@ -109,10 +108,6 @@ export function SettingsWindow(): React.JSX.Element {
       icon: Search,
       keywords: [
         t('settings.sectionQuery'),
-        t('settings.defaultShellRuntime'),
-        t('settings.defaultShellRuntimeHint'),
-        t('shell.runtimeMongosh'),
-        t('shell.runtimeAmdmDriver'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
         t('settings.tableNestedDisplay'),
@@ -161,6 +156,7 @@ export function SettingsWindow(): React.JSX.Element {
         t('settings.keyboardShortcutsEnabled'),
         t('settings.shortcutNewConnection'),
         t('settings.shortcutNewQuery'),
+        t('settings.shortcutTabSearch'),
         t('settings.shortcutTabs'),
         t('settings.shortcutResultView'),
         t('settings.shortcutOpenSettings'),
@@ -421,17 +417,6 @@ export function SettingsWindow(): React.JSX.Element {
                 />
                 <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
               </Field>
-              <Field label={t('settings.defaultShellRuntime')} hint={t('settings.defaultShellRuntimeHint')}>
-                <Select<ShellRuntime>
-                  value={settings.defaultShellRuntime}
-                  onChange={(defaultShellRuntime) => void updateSettings({ defaultShellRuntime })}
-                  options={[
-                    { label: t('shell.runtimeMongosh'), value: 'mongosh' },
-                    { label: t('shell.runtimeAmdmDriver'), value: 'legacy' }
-                  ]}
-                  aria-label={t('settings.defaultShellRuntime')}
-                />
-              </Field>
               <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
                 <Select<number>
                   value={settings.queryLimit}
@@ -561,6 +546,12 @@ export function SettingsWindow(): React.JSX.Element {
                   onEnabledChange={(enabled) => setShortcutEnabled('newQuery', enabled)}
                 />
                 <ShortcutRow
+                  label={t('settings.shortcutTabSearch')}
+                  keys={`⇧ ${primaryKey} A`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('tabSearch')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('tabSearch', enabled)}
+                />
+                <ShortcutRow
                   label={t('settings.shortcutTabs')}
                   keys={
                     isMacPlatform()
@@ -582,6 +573,8 @@ export function SettingsWindow(): React.JSX.Element {
                   enabled={!settings.disabledKeyboardShortcuts.includes('openSettings')}
                   onEnabledChange={(enabled) => setShortcutEnabled('openSettings', enabled)}
                 />
+                <ShortcutRow label={t('shell.menu.explain')} keys={`${primaryKey} ⇧ E`} />
+                <ShortcutRow label={t('shell.menu.format')} keys={`${primaryKey} ⇧ F`} />
               </div>
             </>
           )}
@@ -595,13 +588,13 @@ export function SettingsWindow(): React.JSX.Element {
 function ShortcutRow({
   label,
   keys,
-  enabled,
+  enabled = true,
   onEnabledChange
 }: {
   label: string
   keys: string
-  enabled: boolean
-  onEnabledChange: (enabled: boolean) => void
+  enabled?: boolean
+  onEnabledChange?: (enabled: boolean) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
@@ -617,14 +610,16 @@ function ShortcutRow({
         ) : (
           <span className="px-2 py-1 text-[12px] text-muted-foreground">{t('settings.shortcutUnassigned')}</span>
         )}
-        <button
-          type="button"
-          className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
-          onClick={() => onEnabledChange(!enabled)}
-          aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
-        >
-          {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
-        </button>
+        {onEnabledChange && (
+          <button
+            type="button"
+            className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+            onClick={() => onEnabledChange(!enabled)}
+            aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
+          >
+            {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
+          </button>
+        )}
       </div>
     </div>
   )

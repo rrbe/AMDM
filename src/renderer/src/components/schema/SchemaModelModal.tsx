@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { AlertTriangle, Plus, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ListTree, Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { MongoJsonSchema, SchemaFieldStat, SchemaModel, SchemaTarget, SchemaTypeStat } from '@shared/types'
 import { Button } from '@renderer/components/common/Button'
@@ -23,6 +23,7 @@ import {
   type FlatSchemaNode
 } from '@renderer/lib/schemaEdit'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { schemaPanelKey } from '@renderer/lib/schemaPanel'
 
 interface Props {
   target: SchemaTarget
@@ -258,7 +259,7 @@ function StructuredEditor({
           <Plus /> {t('schema.addField')}
         </Button>
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto scroll-p-[3px]">
         <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]
@@ -286,6 +287,8 @@ function parseDraft(text: string): MongoJsonSchema {
 
 export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element {
   const { t } = useTranslation()
+  const connected = useAppStore((state) => state.statuses[target.connectionId]?.state === 'connected')
+  const analysisBusy = useAppStore((state) => state.schemaPanels[schemaPanelKey(target)]?.analyzing ?? false)
   const loadSchemaModel = useAppStore((state) => state.loadSchemaModel)
   const analyzeSchema = useAppStore((state) => state.analyzeSchema)
   const saveSchemaDraft = useAppStore((state) => state.saveSchemaDraft)
@@ -311,6 +314,7 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
     let active = true
     const load = async (): Promise<void> => {
       let loaded = await loadSchemaModel(target)
+      if (!active) return
       if (!loaded) loaded = await analyzeSchema(target)
       if (!active) return
       if (loaded) {
@@ -395,13 +399,14 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
 
   return (
     <ResizableModal
+      sizeKey="schema-model"
       title={t('schema.title', { collection: target.collection })}
-      className="h-[min(720px,calc(100vh-48px))] w-[min(1100px,calc(100vw-48px))] max-w-none"
+      className="h-[min(720px,calc(100vh-48px))] w-[min(1100px,calc(100vw-48px))] max-w-[calc(100vw-48px)]"
       bodyClassName="flex flex-col gap-3"
       onClose={close}
       headerActions={
-        <Button size="sm" busy={analyzing} disabled={loading} onClick={() => void updateAnalysis()}>
-          <RefreshCw /> {t('schema.updateAnalysis')}
+        <Button size="sm" busy={analyzing || analysisBusy} disabled={loading || !connected} onClick={() => void updateAnalysis()}>
+          <ListTree /> {t('schema.updateAnalysis')}
         </Button>
       }
       footer={

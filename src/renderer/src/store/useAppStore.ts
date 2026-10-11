@@ -13,6 +13,7 @@ import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/types'
 import type {
   AppSettings,
+  AuthorizationResult,
   CollectionInfo,
   ConnectionConfig,
   ConnectionInput,
@@ -39,7 +40,6 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellResult,
-  ShellRuntime,
   TestResult,
   UpdateState,
   UserInfo
@@ -60,7 +60,8 @@ import {
   pickFillTarget,
   type QueryTab,
   type ResultTab,
-  type ResultView
+  type ResultView,
+  type ResultFoldView
 } from '@renderer/lib/tabs'
 import {
   dismissNotification as removeNotification,
@@ -70,8 +71,9 @@ import {
   type NotificationSource,
   type NotificationVariant
 } from '@renderer/lib/notifications'
-import { suggestShellRuntime } from '@renderer/lib/shellRuntimeSuggestion'
 import i18n from '@renderer/i18n'
+import { catalogSearchSnapshot, type CatalogSearchSnapshot } from '@renderer/lib/catalogSearch'
+import { patchSchemaPanel, releaseSchemaPanels, schemaPanelKey, type SchemaPanelState } from '@renderer/lib/schemaPanel'
 
 /** Shorthand for translating notification / error strings in the store. */
 const tr = i18n.t.bind(i18n)
@@ -113,6 +115,8 @@ interface AppState {
 
   // ---- catalog (per connection) ----
   catalogs: Record<string, CatalogState>
+  /** Namespace-only snapshots retained for offline search until reconnect/delete. */
+  catalogSearchSnapshots: Record<string, CatalogSearchSnapshot>
   /** Connection ids whose database subtree is expanded in the unified explorer. */
   expandedConnections: Set<string>
 
@@ -128,6 +132,8 @@ interface AppState {
   history: HistoryEntry[]
   /** Sampled field names for autocomplete, keyed `${connId}:${db}.${coll}`. */
   fieldCache: Record<string, string[]>
+  /** Bounded session cache shared by the Schema sidebar and model editor. */
+  schemaPanels: Record<string, SchemaPanelState>
 
   // ---- preferences ----
   settings: AppSettings
@@ -145,6 +151,8 @@ interface AppState {
   saveConnection(input: ConnectionInput): Promise<ConnectionConfig | null>
   deleteConnection(id: string): Promise<void>
   testConnection(input: ConnectionInput): Promise<TestResult>
+  readConnectionAuthorization(id: string, input: ConnectionInput): Promise<AuthorizationResult>
+  cachedConnectionAuthorization(input: ConnectionInput): Promise<AuthorizationResult | null>
   /** Build a connection string from the current form fields ("To URL"). */
   buildConnectionUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string | null>
   /** Open a native file picker (e.g. SSH private key); resolves the path or null. */
@@ -192,12 +200,10 @@ interface AppState {
 
   // ---- actions: shell (operate on the active tab) ----
   setCode(code: string): void
-  setShellRuntime(runtime: ShellRuntime): void
-  dismissShellRuntimeSuggestion(): void
-  acceptShellRuntimeSuggestion(): Promise<void>
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
+  setResultFoldedLines(view: ResultFoldView, lines: number[]): void
   setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
@@ -210,13 +216,12 @@ interface AppState {
   /** Cancel the in-flight run (the Stop button / menu item). No-op when idle. */
   stopShell(): Promise<void>
   runExplain(): Promise<void>
-  /** Re-run the active result tab's query in place (same page offset). */
+  /** Refresh the active result with a new execution, starting on page one. */
   refreshResult(): Promise<void>
-  /** Re-run the active result tab's query at a new page offset (prev/next),
-      patching that result tab in place. Only meaningful when `pageable`. */
-  loadPage(skip: number): Promise<void>
-  /** Change the page size and re-run the current query from the first page. */
-  setQueryLimit(n: number): Promise<void>
+  /** Browse the existing execution without evaluating its script again. */
+  loadPage(skip: number, pageSize?: number): Promise<void>
+  /** Change only the focused result's display page size. */
+  setResultPageSize(n: number): Promise<void>
   notify(input: NotificationInput): void
   dismissNotification(id: string): void
   clearNotifications(): void
@@ -228,7 +233,7 @@ interface AppState {
   loadHistory(): Promise<void>
   clearHistory(): Promise<void>
   /** Load a query/history snippet into its connection-bound editor (never auto-runs). */
-  applyQuery(code: string, database?: string, connectionId?: string, runtime?: ShellRuntime): void
+  applyQuery(code: string, database?: string, connectionId?: string): void
 
   // ---- actions: autocomplete (Phase 2) ----
   /** Fetch (and cache) sampled field names for a collection. */
@@ -237,6 +242,7 @@ interface AppState {
   getFields(connId: string, db: string, coll: string): string[]
 
   // ---- actions: Schema analysis / local model ----
+  updateSchemaPanel(target: SchemaTarget, patch: Pick<Partial<SchemaPanelState>, 'search' | 'expanded' | 'scrollTop'>): void
   loadSchemaModel(target: SchemaTarget): Promise<SchemaModel | null>
   analyzeSchema(target: SchemaTarget): Promise<SchemaModel | null>
   saveSchemaDraft(target: SchemaTarget, draft: MongoJsonSchema): Promise<SchemaModel | null>
@@ -393,15 +399,7 @@ function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): 
 }
 
 /** The tab present at first render (so init can point activeTabId at it). */
-const INITIAL_TAB = createTab(newTabId(), { runtime: DEFAULT_SETTINGS.defaultShellRuntime })
-
-function createDefaultTab(
-  id: string,
-  settings: AppSettings,
-  init: Partial<QueryTab> = {}
-): QueryTab {
-  return createTab(id, { runtime: settings.defaultShellRuntime, ...init })
-}
+const INITIAL_TAB = createTab(newTabId())
 
 /** Concurrent callers share one session attempt instead of opening duplicate
     clients/tunnels for the same Connection. */
@@ -465,6 +463,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeConnectionId: null,
 
   catalogs: {},
+  catalogSearchSnapshots: {},
   expandedConnections: new Set(),
 
   tabs: [INITIAL_TAB],
@@ -473,6 +472,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   savedQueries: [],
   history: [],
   fieldCache: {},
+  schemaPanels: {},
 
   settings: DEFAULT_SETTINGS,
   updateState: EMPTY_UPDATE_STATE,
@@ -528,12 +528,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.connections.delete(id)
       set((s) => {
         const { [id]: _removedCatalog, ...catalogs } = s.catalogs
+        const { [id]: _removedSnapshot, ...catalogSearchSnapshots } = s.catalogSearchSnapshots
         const { [id]: _removedStatus, ...statuses } = s.statuses
         const expandedConnections = new Set(s.expandedConnections)
         expandedConnections.delete(id)
         const tabs = s.tabs.map((tab) => (tab.connectionId === id ? { ...tab, connectionId: null } : tab))
         return {
           catalogs,
+          schemaPanels: releaseSchemaPanels(s.schemaPanels, id),
+          catalogSearchSnapshots,
           statuses,
           tabs,
           expandedConnections,
@@ -560,6 +563,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       const error = errMessage(e)
       get().notify(appNotice('error', tr('notify.testConnectionFailed'), 'connection', 'connection:test', error))
       return { ok: false, error, failureKind: 'ipc' }
+    }
+  },
+
+  async cachedConnectionAuthorization(input) {
+    try {
+      return await window.api.connections.cachedAuthorization(input)
+    } catch (error) {
+      return { authorizationError: errMessage(error) }
+    }
+  },
+
+  async readConnectionAuthorization(id, input) {
+    try {
+      return await window.api.session.authorization(id, input)
+    } catch (error) {
+      return { authorizationError: errMessage(error) }
     }
   },
 
@@ -604,6 +623,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           statuses: { ...s.statuses, [id]: { id, state: 'connecting' } },
           catalogs,
+          catalogSearchSnapshots: _removed
+            ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
+            : s.catalogSearchSnapshots,
           expandedConnections
         }
       })
@@ -615,9 +637,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           // Auto-expand the connection in the explorer so its databases appear.
           const expandedConnections = new Set(s.expandedConnections)
           if (status.state === 'connected') expandedConnections.add(id)
+          const { [id]: _snapshot, ...remainingSnapshots } = s.catalogSearchSnapshots
           return {
             statuses: { ...s.statuses, [id]: status },
             catalogs: status.state === 'connected' ? { ...s.catalogs, [id]: emptyCatalog() } : s.catalogs,
+            catalogSearchSnapshots: status.state === 'connected' ? remainingSnapshots : s.catalogSearchSnapshots,
             expandedConnections
           }
         })
@@ -695,7 +719,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       expandedConnections.delete(id)
       return {
         statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
+        schemaPanels: releaseSchemaPanels(s.schemaPanels, id),
         catalogs,
+        catalogSearchSnapshots: _removed
+          ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
+          : s.catalogSearchSnapshots,
         expandedConnections
       }
     })
@@ -715,7 +743,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   syncSessionStatus(status) {
     const previous = get().statuses[status.id]
-    set((s) => ({ statuses: { ...s.statuses, [status.id]: status } }))
+    set((s) => ({
+      statuses: { ...s.statuses, [status.id]: status },
+      ...(status.state === 'disconnected' || status.state === 'error'
+        ? { schemaPanels: releaseSchemaPanels(s.schemaPanels, status.id) }
+        : {})
+    }))
     if (previous?.state === status.state) return
     const key = `connection:${status.id}:status`
     if (status.state === 'error') {
@@ -760,7 +793,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, active.id, { connectionId: id })
         }
       }
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId: id })
+      const tab = createTab(newTabId(), { connectionId: id })
       return { activeConnectionId: id, tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
   },
@@ -887,8 +920,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => {
         const fieldCache = { ...s.fieldCache }
         delete fieldCache[`${connId}:${db}.${coll}`]
+        const schemaPanels = { ...s.schemaPanels }
+        delete schemaPanels[schemaPanelKey({ connectionId: connId, database: db, collection: coll })]
         const catalog = s.catalogs[connId]
-        if (!catalog) return { fieldCache }
+        if (!catalog) return { fieldCache, schemaPanels }
         const indexes = { ...catalog.indexes }
         delete indexes[`${db}/${coll}`]
         const expanded = new Set(catalog.expanded)
@@ -896,6 +931,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         expanded.delete(`${connId}:idx:${db}/${coll}`)
         return {
           fieldCache,
+          schemaPanels,
           catalogs: {
             ...s.catalogs,
             [connId]: {
@@ -1027,7 +1063,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const index = afterId ? s.tabs.findIndex((item) => item.id === afterId) : -1
       const connectionId = index < 0 ? s.activeConnectionId : s.tabs[index].connectionId
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId })
+      const tab = createTab(newTabId(), { connectionId })
       const tabs = [...s.tabs]
       tabs.splice(index < 0 ? tabs.length : index + 1, 0, tab)
       return { tabs, activeTabId: tab.id, activeConnectionId: connectionId }
@@ -1039,12 +1075,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const index = s.tabs.findIndex((tab) => tab.id === id)
       if (index < 0) return s
       const source = s.tabs[index]
-      const tab = createDefaultTab(newTabId(), s.settings, {
+      const tab = createTab(newTabId(), {
         connectionId: source.connectionId,
         activeDatabase: source.activeDatabase,
         code: source.code,
-        runtime: source.runtime,
-        runtimeSuggestion: source.runtimeSuggestion,
         pristine: !source.code.trim()
       })
       const tabs = [...s.tabs]
@@ -1082,7 +1116,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const remaining = s.tabs.filter((t) => !closingIds.has(t.id))
       if (remaining.length === s.tabs.length) return s
       if (remaining.length === 0) {
-        const fresh = createDefaultTab(newTabId(), s.settings, { connectionId: s.activeConnectionId })
+        const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id }
       }
       const activeIndex = s.tabs.findIndex((tab) => tab.id === s.activeTabId)
@@ -1120,44 +1154,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Only real user edits reach here (the editor skips external value syncs),
     // so typing permanently marks the tab as holding user work.
     set((s) => ({
-      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false, runtimeSuggestion: null })
+      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false })
     }))
-  },
-
-  setShellRuntime(runtime) {
-    set((s) => ({
-      tabs: patchTab(s.tabs, s.activeTabId, {
-        runtime,
-        runtimeSuggestion: null,
-        results: [],
-        activeResultId: null,
-        resultSeq: 0,
-        runFailed: false
-      })
-    }))
-    if (runtime === 'mongosh') {
-      void window.api.shell.prepare(runtime).catch((error) => {
-        get().notify(
-          appNotice(
-            'error',
-            tr('notify.prepareRuntimeFailed', { error: errMessage(error) }),
-            'query',
-            'query:prepareRuntime'
-          )
-        )
-      })
-    }
-  },
-
-  dismissShellRuntimeSuggestion() {
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { runtimeSuggestion: null }) }))
-  },
-
-  async acceptShellRuntimeSuggestion() {
-    const suggestion = getActiveTab(get()).runtimeSuggestion
-    if (!suggestion) return
-    get().setShellRuntime(suggestion.runtime)
-    await get().runShell(suggestion.code)
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
@@ -1194,6 +1192,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  setResultFoldedLines(view, lines) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      const result = activeResult(tab)
+      if (!result) return s
+      return {
+        tabs: patchTab(s.tabs, tab.id, patchResult(tab, result.id, {
+          foldedLines: { ...result.foldedLines, [view]: lines }
+        }))
+      }
+    })
+  },
+
   setTableColumnOrder(order) {
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { tableColumnOrder: order }) }))
   },
@@ -1212,7 +1223,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (focusId) return { activeTabId: focusId }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code: seed }) }
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code: seed })
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code: seed })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1229,13 +1240,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         database: db,
         code
       })
-      if (focusId) {
-        shouldRun = s.tabs.find((tab) => tab.id === focusId)?.running !== true
-        return { activeTabId: focusId }
-      }
+      if (focusId) return { activeTabId: focusId }
       shouldRun = true
       if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
-      const tab = createDefaultTab(newTabId(), s.settings, { connectionId, activeDatabase: db, code })
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })
       return { tabs: [...s.tabs, tab], activeTabId: tab.id }
     })
     if (shouldRun) void get().runShell()
@@ -1251,15 +1259,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (!code.trim()) return
-    const runtimeSuggestion = suggestShellRuntime(code, tab.runtime)
-    if (runtimeSuggestion) {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, { runtimeSuggestion: { ...runtimeSuggestion, code } })
-      }))
-      return
-    }
     const database = tab.activeDatabase || 'test'
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const { queryLimit: pageSize, queryTimeoutMS: timeoutMS } = get().settings
     const execId = newExecId()
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
@@ -1269,14 +1270,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code, runtime: tab.runtime }
+    const query = { connectionId, database, code }
     let runFailed = false
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
       // earlier results stay around for side-by-side comparison.
-      const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
+      const result = await window.api.shell.execute({ ...query, pageSize, timeoutMS, execId })
       runFailed = isRunFailure(result)
+      if (!ownsExecution(get(), tabId, execId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
       set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      updateResultTotal(tabId, result)
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
       // `use <db>` REPL command: switch only the tab that still owns this run.
@@ -1328,64 +1334,56 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  async loadPage(skip) {
+  async loadPage(skip, requestedPageSize) {
     const tab = getActiveTab(get())
     const tabId = tab.id
     const rt = activeResult(tab)
-    if (!rt?.query || skip < 0) return
-    // Paging mutates the focused result tab IN PLACE (a page flip is the same
-    // result, not a new run). Capture its id so a tab switched mid-flight (or
-    // closed — patchResult no-ops then) still lands on the right result.
+    if (!rt?.result.resultId || tab.running || skip < 0) return
     const resultId = rt.id
-    const query = rt.query
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const pageSize = requestedPageSize ?? rt.result.pageSize ?? get().settings.queryLimit
     const execId = newExecId()
+    const ownsPage = (): boolean => ownsExecution(get(), tabId, execId) &&
+      !!get().tabs.find((t) => t.id === tabId)?.results.some((r) => r.id === resultId && r.result.resultId === rt.result.resultId)
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
-        running: true,
-        stopping: false,
-        runFailed: false,
-        runningExecId: execId
+        running: true, stopping: false, runFailed: false, runningExecId: execId
       })
     }))
     let runFailed = false
     try {
-      const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
-      runFailed = isRunFailure(result)
-      set((s) =>
-        patchCurrentExecution(s, tabId, execId, (t) =>
-          patchResult(t, resultId, { result, executedAt: Date.now(), skip })
-        )
-      )
-      const notification = shellFailureNotice(result, tabId)
-      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
+      const page = await window.api.shell.page({ resultId: rt.result.resultId, skip, pageSize, execId })
+      runFailed = isRunFailure(page)
+      if (page.kind !== 'error') {
+        set((s) => patchCurrentExecution(s, tabId, execId, (t) => {
+          const current = t.results.find((r) => r.id === resultId)
+          if (!current || current.result.resultId !== rt.result.resultId) return {}
+          return patchResult(t, resultId, {
+            result: {
+              ...current.result, ...page,
+              ...(page.totalStatus === 'counting' && current.result.totalStatus !== 'counting'
+                ? { totalStatus: current.result.totalStatus, totalCount: current.result.totalCount }
+                : {})
+            }, skip: page.skip ?? skip, foldedLines: {}
+          })
+        }))
+      }
+      const notification = shellFailureNotice(page, tabId)
+      if (notification && ownsPage()) get().notify(notification)
     } catch (e) {
       runFailed = true
-      const result: ShellResult = {
-        kind: 'error',
-        error: errMessage(e),
-        errorName: 'IPCError',
-        failureKind: 'ipc'
+      if (ownsPage()) {
+        get().notify(shellFailureNotice({ kind: 'error', error: errMessage(e), errorName: 'IPCError', failureKind: 'ipc' }, tabId)!)
       }
-      set((s) => patchCurrentExecution(s, tabId, execId, (t) => patchResult(t, resultId, { result })))
-      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) =>
-        patchCurrentExecution(s, tabId, execId, () => ({
-          running: false,
-          stopping: false,
-          runFailed,
-          runningExecId: null
-        }))
-      )
+      set((s) => patchCurrentExecution(s, tabId, execId, () => ({
+        running: false, stopping: false, runFailed, runningExecId: null
+      })))
     }
   },
 
-  async setQueryLimit(n) {
-    const limit = Math.min(2000, Math.max(1, Math.floor(n) || 1))
-    await get().updateSettings({ queryLimit: limit })
-    // Re-run the focused result's query from the first page with the new size.
-    if (getActiveResult(get())?.query) await get().loadPage(0)
+  async setResultPageSize(n) {
+    const pageSize = Math.min(2000, Math.max(1, Math.floor(n) || 1))
+    await get().loadPage(0, pageSize)
   },
 
   async runExplain() {
@@ -1409,12 +1407,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningExecId: execId
       })
     }))
-    const query = { connectionId, database, code, runtime: tab.runtime }
+    const query = { connectionId, database, code }
     let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
+      if (!ownsExecution(get(), tabId, execId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
       set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      updateResultTotal(tabId, result)
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
@@ -1446,7 +1449,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rt = activeResult(tab)
     if (!rt?.query) return
     const resultId = rt.id
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const pageSize = rt.result.pageSize ?? get().settings.queryLimit
+    const timeoutMS = get().settings.queryTimeoutMS
     const execId = newExecId()
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
@@ -1458,20 +1462,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
     let runFailed = false
     try {
-      // Refresh the focused result tab in place — keep its page offset and size.
+      // Refresh is an explicit new execution. Display size stays with this result.
       const result = await window.api.shell.execute({
         ...rt.query,
-        limit,
+        pageSize,
         timeoutMS,
-        skip: rt.skip,
         execId
       })
       runFailed = isRunFailure(result)
+      if (!ownsExecution(get(), tabId, execId) || !get().tabs.find((t) => t.id === tabId)?.results.some((r) => r.id === resultId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
       set((s) =>
         patchCurrentExecution(s, tabId, execId, (t) =>
-          patchResult(t, resultId, { result, executedAt: Date.now() })
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip: 0, foldedLines: {} })
         )
       )
+      updateResultTotal(tabId, result)
       const notification = shellFailureNotice(result, tabId)
       if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
@@ -1484,7 +1492,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set((s) =>
         patchCurrentExecution(s, tabId, execId, (t) =>
-          patchResult(t, resultId, { result, executedAt: Date.now() })
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip: 0, foldedLines: {} })
         )
       )
       if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
@@ -1570,7 +1578,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyQuery(code, database, connectionId, runtime = 'legacy') {
+  applyQuery(code, database, connectionId) {
     // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
@@ -1586,7 +1594,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? active
           : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
       const activeDatabase = database || targetTab?.activeDatabase || ''
-      const match = { connectionId: targetConnectionId, database: activeDatabase, code, runtime }
+      const match = { connectionId: targetConnectionId, database: activeDatabase, code }
       const { focusId, reuseId } = pickFillTarget(s.tabs, targetTab?.id ?? s.activeTabId, match)
       if (focusId) {
         return { activeConnectionId: targetConnectionId, activeTabId: focusId }
@@ -1598,16 +1606,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, reuseId, {
             connectionId: targetConnectionId,
             code,
-            activeDatabase,
-            runtime
+            activeDatabase
           })
         }
       }
       const tab = createTab(newTabId(), {
         connectionId: targetConnectionId,
         code,
-        activeDatabase,
-        runtime
+        activeDatabase
       })
       return {
         activeConnectionId: targetConnectionId,
@@ -1636,10 +1642,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // -------------------------------------------------------------- Schema model
+  updateSchemaPanel(target, patch) {
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, patch) }))
+  },
+
   async loadSchemaModel(target) {
+    const key = schemaPanelKey(target)
+    const cached = get().schemaPanels[key]
+    if (cached?.model !== undefined) return cached.model
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: null }) }))
+    const owner = get().schemaPanels[key].owner
     try {
-      return await window.api.schemas.get(target)
+      const model = await window.api.schemas.get(target)
+      if (get().schemaPanels[key]?.owner !== owner) return null
+      // An explicit analysis may have completed while the local snapshot was loading.
+      if (get().schemaPanels[key].model !== undefined) return get().schemaPanels[key].model ?? null
+      set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      return model
     } catch (e) {
+      if (get().schemaPanels[key]?.owner !== owner) return null
+      set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: errMessage(e) }) }))
       get().notify(
         appNotice('error', tr('notify.loadSchemaFailed', { error: errMessage(e) }), 'document', 'schema:load')
       )
@@ -1647,20 +1669,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  async analyzeSchema(target) {
-    try {
-      const model = await window.api.schemas.analyze(target)
-      get().notify(appNotice('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }), 'document'))
-      return model
-    } catch (e) {
-      get().notify(appNotice('error', tr('notify.analyzeSchemaFailed', { error: errMessage(e) }), 'document'))
-      return null
-    }
+  analyzeSchema(target) {
+    const key = schemaPanelKey(target)
+    const pending = get().schemaPanels[key]?.analysisRequest
+    if (pending) return pending
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analyzing: true, error: null }) }))
+    const owner = get().schemaPanels[key].owner
+    const analysisRequest = Promise.resolve().then(async () => {
+      try {
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        const model = await window.api.schemas.analyze(target)
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+        get().notify(appNotice('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }), 'document'))
+        return model
+      } catch (e) {
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: errMessage(e) }) }))
+        get().notify(appNotice('error', tr('notify.analyzeSchemaFailed', { error: errMessage(e) }), 'document'))
+        return null
+      } finally {
+        if (get().schemaPanels[key]?.owner === owner) {
+          set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analyzing: false, analysisRequest: undefined }) }))
+        }
+      }
+    })
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analysisRequest }) }))
+    return analysisRequest
   },
 
   async saveSchemaDraft(target, draft) {
+    const key = schemaPanelKey(target)
+    const owner = get().schemaPanels[key]?.owner
     try {
       const model = await window.api.schemas.saveDraft(target, draft)
+      if (owner && get().schemaPanels[key]?.owner === owner) {
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      }
       get().notify(appNotice('success', tr('notify.schemaSaved'), 'document'))
       return model
     } catch (e) {
@@ -1670,8 +1715,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async overwriteSchemaDraft(target) {
+    const key = schemaPanelKey(target)
+    const owner = get().schemaPanels[key]?.owner
     try {
       const model = await window.api.schemas.overwriteDraft(target)
+      if (owner && get().schemaPanels[key]?.owner === owner) {
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      }
       get().notify(appNotice('success', tr('notify.schemaOverwritten'), 'document'))
       return model
     } catch (e) {
@@ -1972,14 +2022,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     subscribeToSettings()
     try {
       const settings = await window.api.settings.get()
-      set((s) => ({
-        settings,
-        tabs: s.tabs.map((tab) =>
-          tab.pristine && !tab.code && tab.results.length === 0
-            ? { ...tab, runtime: settings.defaultShellRuntime }
-            : tab
-        )
-      }))
+      set({ settings })
     } catch (e) {
       get().notify(appNotice('warn', tr('notify.loadSettingsFailed'), 'settings', 'settings:load', errMessage(e)))
     }
@@ -1999,6 +2042,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }
 }))
+
+// Result ownership follows the tab/result lifecycle, including automatic eviction.
+useAppStore.subscribe((state, previous) => {
+  if (state.tabs === previous.tabs) return
+  for (const tab of previous.tabs) {
+    const next = state.tabs.find((item) => item.id === tab.id)
+    if (next?.results === tab.results) continue
+    for (const result of tab.results) {
+      const id = result.result.resultId
+      if (id && !next?.results.some((item) => item.result.resultId === id)) {
+        void window.api.shell.release(id).catch(() => {})
+      }
+    }
+  }
+})
+
+function updateResultTotal(tabId: string, result: ShellResult): void {
+  const id = result.resultId
+  if (!id || result.totalStatus !== 'counting') return
+  void window.api.shell.total(id).then(
+    (total) => useAppStore.setState((state) => patchTabResults(state, tabId, (tab) => ({
+      results: tab.results.map((item) => item.result.resultId === id && item.result.totalStatus === 'counting'
+        ? { ...item, result: { ...item.result, ...total } }
+        : item)
+    }))),
+    () => useAppStore.setState((state) => patchTabResults(state, tabId, (tab) => ({
+      results: tab.results.map((item) => item.result.resultId === id && item.result.totalStatus === 'counting'
+        ? { ...item, result: { ...item.result, totalStatus: 'unavailable' } }
+        : item)
+    })))
+  )
+}
 
 /** Helper to flip a node's loading flag immutably. */
 function withLoading(s: AppState, connId: string, nodeId: string, on: boolean): Pick<AppState, 'catalogs'> {

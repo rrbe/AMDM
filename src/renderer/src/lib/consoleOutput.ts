@@ -6,7 +6,7 @@
  * `ObjectId("..")` / `ISODate("..")` render identically in both views.
  */
 import type { ShellOutputLine } from '@shared/types'
-import { toJsonLines, type JsonToken } from './format'
+import { toJsonLines, type JsonLine, type JsonToken } from './format'
 
 export interface ConsoleLine {
   /** Indentation depth (2-space units; always 0 for text lines). */
@@ -15,6 +15,7 @@ export interface ConsoleLine {
   text: string
   /** Syntax tokens when the line comes from a printjson payload. */
   tokens?: JsonToken[]
+  fold?: JsonLine['fold']
   /** Console channel — 'warn'/'error' tint the line. */
   level: 'log' | 'warn' | 'error'
 }
@@ -25,8 +26,15 @@ export function toConsoleLines(output: ShellOutputLine[]): ConsoleLine[] {
   for (const entry of output) {
     const level = entry.level ?? 'log'
     if (entry.kind === 'json') {
+      const offset = lines.length
       for (const jl of toJsonLines(entry.data)) {
-        lines.push({ depth: jl.depth, text: jl.text, tokens: jl.tokens, level })
+        lines.push({
+          depth: jl.depth,
+          text: jl.text,
+          tokens: jl.tokens,
+          fold: jl.fold && { ...jl.fold, end: offset + jl.fold.end },
+          level
+        })
       }
     } else {
       // A printed string may itself contain newlines — one display line each.

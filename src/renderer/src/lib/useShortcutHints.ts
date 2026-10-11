@@ -3,10 +3,9 @@ import {
   hasOpenShortcutLayer,
   isMacPlatform,
   shortcutHintModifier,
+  SHORTCUT_HINT_DELAY_MS,
   type ShortcutHintModifier
 } from './keyboardShortcuts'
-
-const SHORTCUT_HINT_DELAY_MS = 300
 
 export function useShortcutHints(enabled: boolean): ShortcutHintModifier | null {
   const [visibleModifier, setVisibleModifier] = useState<ShortcutHintModifier | null>(null)

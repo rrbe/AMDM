@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { consoleText, toConsoleLines } from '../../../src/renderer/src/lib/consoleOutput'
+import { visibleJsonLineIndexes } from '../../../src/renderer/src/lib/format'
 import type { ShellOutputLine } from '../../../src/shared/types'
 
 describe('toConsoleLines', () => {
@@ -44,6 +45,20 @@ describe('toConsoleLines', () => {
       { kind: 'text', text: 'after' }
     ])
     expect(lines.map((l) => l.text)).toEqual(['before', '42', 'after'])
+  })
+
+  it('folds each printjson payload without hiding adjacent text or payloads', () => {
+    const output: ShellOutputLine[] = [
+      { kind: 'text', text: 'before' },
+      { kind: 'json', data: { a: [1, 2] } },
+      { kind: 'text', text: 'between' },
+      { kind: 'json', data: { b: 3 } }
+    ]
+    const lines = toConsoleLines(output)
+    expect(lines[1].fold?.end).toBe(6)
+    expect(lines[8].fold?.end).toBe(10)
+    expect(visibleJsonLineIndexes(lines, new Set([1, 8]))).toEqual([0, 1, 7, 8])
+    expect(consoleText(output)).toContain('  "a": [')
   })
 })
 

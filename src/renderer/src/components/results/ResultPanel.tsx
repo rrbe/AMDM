@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Table } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
-import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
+import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
@@ -13,7 +13,6 @@ import { ContextMenu } from '@renderer/components/ContextMenu'
 import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
 import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
-import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
@@ -32,10 +31,26 @@ import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
 import { jsonCopyMenuItems } from './documentFormatMenus'
 
+const EMPTY_FOLDED_LINES: number[] = []
+
 const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
   value
 }))
+
+function ViewShortcutHint({ number }: { number: number }): React.JSX.Element {
+  return (
+    <span
+      className="result-view-shortcut absolute inset-y-0 right-0 my-auto inline-flex h-fit"
+      data-view-shortcut-number={number}
+      aria-hidden="true"
+    >
+      <span className="document-tab-shortcut bg-muted!">
+        {isMacPlatform() ? '⌘' : 'Ctrl'}{number}
+      </span>
+    </span>
+  )
+}
 
 /**
  * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
@@ -48,10 +63,12 @@ const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
 export function ResultPanel({
   expanded,
   onExpandedChange,
+  showViewShortcutHints,
   showTabShortcutHints
 }: {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
+  showViewShortcutHints: boolean
   showTabShortcutHints: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -66,7 +83,13 @@ export function ResultPanel({
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
   const viewShortcutEnabled = isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
   const setView = useAppStore((s) => s.setResultView)
+  const setResultFoldedLines = useAppStore((s) => s.setResultFoldedLines)
+  const foldingFor = (view: ResultFoldView) => ({
+    collapsedLines: active?.foldedLines?.[view] ?? EMPTY_FOLDED_LINES,
+    onChange: (lines: number[]) => setResultFoldedLines(view, lines)
+  })
   const docCtx = docActionContext(result, active?.query ?? null)
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
   const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
@@ -194,6 +217,7 @@ export function ResultPanel({
         <ErrorView
           result={result}
           compact={hasOutput}
+          actions={<span className="inline-flex" ref={setFoldControls} />}
           copied={copied}
           onCopy={copyWithFeedback}
           expanded={expanded}
@@ -201,7 +225,7 @@ export function ResultPanel({
         />
         {hasOutput && (
           <div className="result-body">
-            <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
+            <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
           </div>
         )}
       </div>
@@ -221,7 +245,7 @@ export function ResultPanel({
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
-          <ExplainView plan={result.data} />
+          <ExplainView folding={foldingFor('explain')} plan={result.data} fontSize={dataFontSize} />
         </div>
       </div>
     )
@@ -247,12 +271,13 @@ export function ResultPanel({
       {strip}
       <div className="result-bar">
         <div className="view-switch sliding-selection">
-          {(['tree', 'json', 'table'] as ResultView[]).map((v, index) => {
-            const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
+          {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
+            const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : 'Table'
+            const Icon = v === 'tree' ? Network : v === 'json' ? Braces : Table
             return (
-              <Tooltip key={v} content={`${label} (${primaryKey}${index + 1})`} disabled={!viewShortcutEnabled}>
+              <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
                 <button
-                  className={!showConsole && view === v ? 'active is-selected' : ''}
+                  className={`group/result-view flex items-center justify-center ${!showConsole && view === v ? 'active is-selected' : ''}`}
                   aria-label={label}
                   aria-pressed={!showConsole && view === v}
                   onClick={() => {
@@ -260,24 +285,25 @@ export function ResultPanel({
                     setView(v)
                   }}
                 >
-                  <ShortcutHint shortcut={viewShortcutEnabled ? `${primaryKey}${index + 1}` : undefined}>
+                  <span className="inline-flex items-center gap-1">
+                    <Icon size={12} aria-hidden="true" />
                     {label}
-                  </ShortcutHint>
+                  </span>
+                  {showViewShortcutHints && viewShortcutEnabled && <ViewShortcutHint number={i + 1} />}
                 </button>
               </Tooltip>
             )
           })}
           {hasOutput && (
-            <Tooltip content={`${t('result.view.console')} (${primaryKey}4)`} disabled={!viewShortcutEnabled}>
+            <Tooltip content={`Console (${primaryKey}4)`} disabled={!viewShortcutEnabled}>
               <button
-                className={showConsole ? 'active is-selected' : ''}
-                aria-label={t('result.view.console')}
+                className={`group/result-view flex items-center justify-center ${showConsole ? 'active is-selected' : ''}`}
+                aria-label="Console"
                 aria-pressed={showConsole}
                 onClick={() => chooseConsole(true)}
               >
-                <ShortcutHint shortcut={viewShortcutEnabled ? `${primaryKey}4` : undefined}>
-                  {t('result.view.console')}
-                </ShortcutHint>
+                Console
+                {showViewShortcutHints && viewShortcutEnabled && <ViewShortcutHint number={4} />}
               </button>
             </Tooltip>
           )}
@@ -287,6 +313,7 @@ export function ResultPanel({
         <span className="result-bar-spacer" />
         {result.kind === 'documents' && <PageSizeControl />}
         {result.kind === 'documents' && <ResultPager result={result} />}
+        <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
           className="ghost result-action"
@@ -310,7 +337,7 @@ export function ResultPanel({
 
       <div className="result-body">
         {showConsole ? (
-          <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
+          <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
         ) : (
           <>
             {view === 'tree' && (
@@ -323,7 +350,7 @@ export function ResultPanel({
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} />}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}
@@ -479,11 +506,6 @@ function ResultMeta({
   const parts = useMemo(() => {
     const out: { text: string; cls?: string }[] = []
     if (result.kind === 'documents') {
-      const n = result.count ?? docCount
-      out.push({ text: t('result.docCount', { count: n }) })
-      // For pageable results the pager shows the range + a next button, so the
-      // "truncated" badge would be redundant. Keep it for non-pageable cursors
-      // (aggregate / scripts), where raising the page size is the only way on.
       if (result.truncated && !result.pageable) {
         out.push({ text: t('result.truncated'), cls: 'truncated' })
       }
@@ -515,44 +537,44 @@ function ResultMeta({
   )
 }
 
-/**
- * Prev/next pager. Only a FindCursor is pageable (the engine injects skip);
- * aggregation/script results render no pager (the page-size control is their
- * way to see more). Next is enabled only while the page is truncated.
- */
+/** Display range and total for this execution; pages never rerun its script. */
 function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | null {
   const { t } = useTranslation()
   const skip = useAppStore((s) => getActiveResult(s)?.skip ?? 0)
-  const limit = useAppStore((s) => s.settings.queryLimit)
+  const pageSize = result.pageSize ?? 50
   const running = useAppStore((s) => getActiveTab(s).running)
   const loadPage = useAppStore((s) => s.loadPage)
 
-  if (!result.pageable) return null
-
   const count = result.count ?? 0
   const from = count === 0 ? 0 : skip + 1
-  const to = skip + count
+  const to = count === 0 ? 0 : skip + count
   return (
     <div className="result-pager">
+      <span className="result-range" aria-live="polite">
+        {from}–{to} / {t('result.totalCount', {
+          count: result.totalCount,
+          value: typeof result.totalCount === 'number'
+            ? result.totalCount.toLocaleString()
+            : t(result.totalStatus === 'counting' ? 'result.totalCounting'
+              : result.totalStatus === 'unavailable' ? 'result.totalUnavailable' : 'result.totalUnknown')
+        })}
+      </span>
       <Tooltip content={t('result.prevPage')}>
         <button
           className="ghost"
-          disabled={skip === 0 || running}
+          disabled={!result.pageable || skip === 0 || running}
           aria-label={t('result.prevPage')}
-          onClick={() => void loadPage(Math.max(0, skip - limit))}
+          onClick={() => void loadPage(Math.max(0, skip - pageSize))}
         >
           <ChevronLeft size={15} />
         </button>
       </Tooltip>
-      <span className="result-range">
-        {from}–{to}
-      </span>
       <Tooltip content={t('result.nextPage')}>
         <button
           className="ghost"
-          disabled={!result.truncated || running}
+          disabled={!result.pageable || !result.truncated || running}
           aria-label={t('result.nextPage')}
-          onClick={() => void loadPage(skip + limit)}
+          onClick={() => void loadPage(skip + pageSize)}
         >
           <ChevronRight size={15} />
         </button>
@@ -561,21 +583,21 @@ function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | n
   )
 }
 
-/** Query limit control; changing it re-runs the focused result from page one. */
+/** Display page size belongs to the focused result, independent of query limits. */
 function PageSizeControl(): React.JSX.Element {
   const { t } = useTranslation()
-  const limit = useAppStore((s) => s.settings.queryLimit)
-  const setQueryLimit = useAppStore((s) => s.setQueryLimit)
+  const pageSize = useAppStore((s) => getActiveResult(s)?.result.pageSize ?? s.settings.queryLimit)
+  const setResultPageSize = useAppStore((s) => s.setResultPageSize)
   const running = useAppStore((s) => getActiveTab(s).running)
 
   return (
     <div className="page-size">
       <span>{t('result.pageSizeLabel')}</span>
       <Select<number>
-        value={limit}
+        value={pageSize}
         options={QUERY_LIMIT_OPTIONS}
         disabled={running}
-        onChange={(n) => void setQueryLimit(n)}
+        onChange={(n) => void setResultPageSize(n)}
         className="h-6 w-[72px] px-2 text-xs"
         aria-label={t('result.pageSizeLabel')}
       />
@@ -584,6 +606,7 @@ function PageSizeControl(): React.JSX.Element {
 }
 
 function ErrorView({
+  actions,
   result,
   compact,
   copied,
@@ -593,6 +616,7 @@ function ErrorView({
 }: {
   result: ShellResult
   compact?: boolean
+  actions?: ReactNode
   copied: boolean
   onCopy: (text: string) => void
   expanded: boolean
@@ -611,6 +635,7 @@ function ErrorView({
             <div className="error-name">{name}</div>
             <div className="error-msg">{message}</div>
           </div>
+          {actions}
           <button
             className="ghost result-action shrink-0"
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}

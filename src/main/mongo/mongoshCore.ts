@@ -1,16 +1,19 @@
 import { existsSync } from 'node:fs'
 import { enableCompileCache } from 'node:module'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import vm from 'node:vm'
 import { EventEmitter } from 'node:events'
 import type { ClientSession, MongoClient } from 'mongodb'
+import { AbstractCursor, FindCursor } from 'mongodb'
 import type { CompassServiceProvider, DevtoolsConnectOptions } from '@mongosh/service-provider-node-driver'
 import type { ShellInstanceState, ShellResult as MongoshResult } from '@mongosh/shell-api'
 import type { ShellEvaluator } from '@mongosh/shell-evaluator'
 import type { ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 import { classifyOperationFailure } from './errorCore'
-import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait } from './shellCore'
+import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait, withAbort } from './shellSupport'
+import type { ShellResultSession } from './shellResults'
 
 const DEFAULT_LIMIT = 50
 const EXEC_TIMEOUT_MS = 30_000
@@ -23,27 +26,23 @@ interface MongoshRuntime {
   toShellResult(value: unknown): Promise<MongoshResult>
 }
 
-let loadedRuntime: MongoshRuntime | undefined
+let loadedRuntime: Promise<MongoshRuntime> | undefined
 const providerCleanup = new WeakMap<CompassServiceProvider, () => void>()
 
-function loadMongoshRuntime(): MongoshRuntime {
+function loadMongoshRuntime(): Promise<MongoshRuntime> {
   if (loadedRuntime) return loadedRuntime
-  const packagedPath = join(__dirname, 'mongosh-runtime.cjs')
-  const developmentPath = join(process.cwd(), 'out', 'main', 'mongosh-runtime.cjs')
+  const packagedPath = join(import.meta.dirname, 'mongosh-runtime.mjs')
+  const developmentPath = join(process.cwd(), 'out', 'main', 'mongosh-runtime.mjs')
   const runtimePath = existsSync(packagedPath) ? packagedPath : developmentPath
   // Persist V8's compiled form after the first load so later app launches do
-  // not repeatedly parse the large generated CommonJS runtime.
+  // not repeatedly parse the large generated runtime.
   enableCompileCache()
-  loadedRuntime = require(runtimePath) as MongoshRuntime
+  loadedRuntime = import(pathToFileURL(runtimePath).href) as Promise<MongoshRuntime>
   return loadedRuntime
 }
 
-export function prepareMongoshRuntime(): void {
-  loadMongoshRuntime()
-}
-
-export function createMongoshServiceProvider(client: MongoClient): CompassServiceProvider {
-  const { CompassServiceProvider } = loadMongoshRuntime()
+export async function createMongoshServiceProvider(client: MongoClient): Promise<CompassServiceProvider> {
+  const { CompassServiceProvider } = await loadMongoshRuntime()
   const event = 'topologyDescriptionChanged'
   const listenersBefore = new Set(client.listeners(event))
   const provider = new CompassServiceProvider(
@@ -84,6 +83,7 @@ export interface MongoshEvaluationOptions {
   timeoutMS?: number
   signal?: AbortSignal
   output?: OutputCollector
+  resultSession?: ShellResultSession
 }
 
 export interface MongoshEvaluation {
@@ -97,7 +97,7 @@ export async function evaluateMongosh(
   code: string,
   options: MongoshEvaluationOptions = {}
 ): Promise<MongoshEvaluation> {
-  const runtime = loadMongoshRuntime()
+  const runtime = await loadMongoshRuntime()
   // AMDM renders results itself, so mongosh's deep-inspection wrappers only
   // add per-execution proxy/closure allocation without affecting output.
   const state = new runtime.ShellInstanceState(provider, undefined, {
@@ -148,6 +148,42 @@ export async function evaluateMongosh(
         throw new Error('Explain is only supported for find()/aggregate() queries.')
       }
       value = await (value as { explain(verbosity: string): Promise<unknown> }).explain('executionStats')
+    } else if (options.resultSession && (
+      Array.isArray(value) || value instanceof AbstractCursor || type === 'Cursor' || type === 'AggregationCursor'
+    )) {
+      const native = value instanceof AbstractCursor
+        ? value
+        : (value as { _cursor?: unknown })._cursor
+      await options.resultSession.capture(value, native instanceof FindCursor ? native : undefined)
+      const page = await options.resultSession.page(0, options.limit ?? DEFAULT_LIMIT)
+      return {
+        type: 'AMDMResultPage',
+        rawValue: undefined,
+        printable: page,
+        ...(native instanceof AbstractCursor && native.namespace.collection
+          ? { source: { namespace: { db: native.namespace.db, collection: native.namespace.collection } } }
+          : {})
+      }
+    } else if (value instanceof AbstractCursor) {
+      const cursor = value
+      try {
+        if (options.skip && cursor instanceof FindCursor) cursor.skip(options.skip)
+        const documents: unknown[] = []
+        const limit = options.limit ?? DEFAULT_LIMIT
+        while (documents.length < limit && (await cursor.hasNext())) {
+          documents.push(await cursor.next())
+        }
+        return {
+          type: cursor instanceof FindCursor ? 'Cursor' : 'DriverCursor',
+          rawValue: cursor,
+          printable: { documents, cursorHasMore: await cursor.hasNext() },
+          ...(cursor.namespace.collection
+            ? { source: { namespace: { db: cursor.namespace.db, collection: cursor.namespace.collection } } }
+            : {})
+        }
+      } finally {
+        await cursor.close()
+      }
     } else if (options.skip && type === 'Cursor' && typeof (value as { skip?: unknown })?.skip === 'function') {
       const cursor = value as { skip(value: number): unknown }
       cursor.skip(options.skip)
@@ -211,6 +247,8 @@ async function adaptMongoshResult(
   const elapsedMs = Date.now() - started
   const common = { collection, elapsedMs, ...(await outputFields(output)) }
 
+  if (result.type === 'AMDMResultPage') return { ...result.printable as ShellResult, ...common }
+
   if (options.explain) {
     return {
       kind: 'explain',
@@ -272,22 +310,23 @@ export async function runMongoshOnClient(
   let provider: CompassServiceProvider | undefined
   let releaseSessions: (() => Promise<void>) | undefined
   try {
-    provider = createMongoshServiceProvider(client)
+    provider = await createMongoshServiceProvider(client)
     releaseSessions = trackExecutionSessions(provider)
     const evaluation = await evaluateMongosh(provider, options.database, code, { ...options, output })
     try {
-      return await adaptMongoshResult(evaluation, code, options, started, output)
+      return await withAbort(adaptMongoshResult(evaluation, code, options, started, output), options.signal)
     } finally {
       const rawValue = evaluation.result.rawValue as { close?: () => Promise<void> } | undefined
       if (typeof rawValue?.close === 'function') await rawValue.close().catch(() => {})
     }
   } catch (error) {
     if (options.signal?.aborted) {
+      const timedOut = classifyOperationFailure(options.signal.reason) === 'timeout'
       return {
         kind: 'error',
-        error: '执行已停止',
-        errorName: 'Aborted',
-        failureKind: 'cancelled',
+        error: timedOut ? '查询读取超时' : '执行已停止',
+        errorName: timedOut ? 'TimeoutError' : 'Aborted',
+        failureKind: timedOut ? 'timeout' : 'cancelled',
         collection: detectCollection(code),
         elapsedMs: Date.now() - started,
         ...(await outputFields(output))
@@ -303,7 +342,11 @@ export async function runMongoshOnClient(
       ...(await outputFields(output))
     }
   } finally {
-    await releaseSessions?.()
-    if (provider) releaseMongoshServiceProvider(provider)
+    const cleanup = async (): Promise<void> => {
+      await releaseSessions?.()
+      if (provider) releaseMongoshServiceProvider(provider)
+    }
+    if (options.resultSession?.retainsCursor) options.resultSession.retainCleanup(cleanup)
+    else await cleanup()
   }
 }
