@@ -46,6 +46,7 @@ export default defineConfig({
         ]
       },
       rollupOptions: {
+        output: { format: 'es' },
         // These optional Driver integrations are present only because the
         // official mongosh provider uses them. Keep the existing main bundle
         // from traversing that dependency graph; the Stage-0 runtime is built
@@ -57,10 +58,10 @@ export default defineConfig({
           'mongodb-client-encryption'
         ],
         input: {
-          index: resolve(__dirname, 'src/main/index.ts'),
+          index: resolve(import.meta.dirname, 'src/main/index.ts'),
           // Emitted as out/main/serializer.worker.js; loaded by serializerPool
-          // via new Worker(join(__dirname, 'serializer.worker.js')).
-          'serializer.worker': resolve(__dirname, 'src/main/workers/serializer.worker.ts')
+          // via a URL relative to the main bundle.
+          'serializer.worker': resolve(import.meta.dirname, 'src/main/workers/serializer.worker.ts')
         }
       }
     }
@@ -74,7 +75,8 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') }
+        output: { format: 'es' },
+        input: { index: resolve(import.meta.dirname, 'src/preload/index.ts') }
       }
     }
   },
@@ -96,7 +98,7 @@ export default defineConfig({
     worker: { plugins: () => [mongoshEditorPlugin()] },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/renderer/index.html') }
+        input: { index: resolve(import.meta.dirname, 'src/renderer/index.html') }
       }
     }
   }

@@ -1,6 +1,6 @@
 // Pack PNG files into a single .ico (PNG-in-ICO; modern Windows supports it).
 // usage: node mkico.js out.ico 16.png 32.png 48.png 64.png 128.png 256.png
-const fs = require('fs')
+import fs from 'node:fs'
 const out = process.argv[2]
 const files = process.argv.slice(3)
 const imgs = files.map((f) => {

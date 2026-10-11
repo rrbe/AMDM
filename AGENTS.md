@@ -24,6 +24,7 @@ Read the documentation relevant to the task:
 
 - [docs/architecture.md](docs/architecture.md): process boundaries, IPC, Shell, serialization, and persistence contracts.
 - [docs/development.md](docs/development.md): package management, testing, packaging, and tooling pitfalls.
+- [benchmarks/README.md](benchmarks/README.md): performance measurements, before/after comparisons, and reusable Electron test infrastructure. Read this before performance optimization.
 - [docs/renderer.md](docs/renderer.md): state management, styling migration, and Electron UI validation.
 - [DESIGN.md](DESIGN.md): design system; [TODO.md](TODO.md): current backlog.
 
@@ -37,7 +38,11 @@ pnpm dev                           # start the app with hot reload
 pnpm typecheck                     # type-check main and renderer
 pnpm test:unit                     # unit + contract tests (CI gate)
 pnpm test:integration              # integration tests with real MongoDB behavior
-pnpm test                          # run all tests
+pnpm test                          # unit + contract + integration tests
+pnpm test:packaged                 # smoke-test the native unpacked app
+pnpm test:e2e                      # real Electron UI flows (requires unpacked app)
+pnpm bench:build                   # repeated production builds and output sizes
+pnpm bench:runtime                 # packaged startup and Shell IPC timings
 pnpm build                         # production build into out/
 pnpm dist:dir --mac --arm64        # build an unpacked macOS arm64 app
 pnpm install:mac                   # build, install, and launch the local macOS app
@@ -70,5 +75,7 @@ Use pnpm exclusively. The project has no linter; the default validation gates ar
 
 - Run the relevant integration tests for changes to real MongoDB behavior, write paths, or IPC handlers.
 - Run a production build for dependency, main-build, or packaging changes. For main-process runtime dependencies, also inspect and launch the unpacked artifact for the target architecture.
+- Run `pnpm test:packaged` for main/preload/worker runtime or packaging changes. For changes to user flows covered by `test/e2e/`, run `pnpm test:e2e` and update the affected scenarios.
+- For performance optimization, reuse or extend the benchmarks and `test/helpers/packagedElectron.mjs`. Collect repeated before/after samples on the same machine with equivalent data, settings, build mode, and cache state; retain raw reports outside `dist/` when rebuilding. State the measurement boundary: Shell IPC timings do not measure result rendering or scrolling.
 - Validate UI behavior against the current Electron Renderer with Electron DevTools/CDP, including DOM, computed styles, events, focus, and scrolling. A regular Chrome page is not a substitute.
 - For changes to data views or shared per-cell components, profile view switching and scrolling in Electron with representative wide and nested results. Compare before/after timings and mounted cell/DOM counts using the same data, viewport, and build mode. Passing type checks and tests is not evidence of acceptable interaction latency; investigate measured bottlenecks before choosing an optimization.

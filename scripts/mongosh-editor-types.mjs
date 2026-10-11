@@ -10,8 +10,9 @@ export function mongoshEditorTypes() {
   if (cached) return cached
   const { api } = require('@mongosh/shell-api/api')
   const root = process.cwd()
-  const apiPath = resolve(root, 'node_modules/@mongosh/shell-api/lib/editor-api.d.ts')
-  const entry = resolve(root, 'node_modules/amdm-editor.d.ts')
+  // TypeScript passes normalized paths to CompilerHost, including on Windows.
+  const apiPath = resolve(root, 'node_modules/@mongosh/shell-api/lib/editor-api.d.ts').replaceAll('\\', '/')
+  const entry = resolve(root, 'node_modules/amdm-editor.d.ts').replaceAll('\\', '/')
   const globals = `
 import type { DatabaseWithSchema, CollectionWithSchema, ReplicaSet, Shard } from './@mongosh/shell-api/lib/editor-api';
 import type { Db } from 'mongodb';

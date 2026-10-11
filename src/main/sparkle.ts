@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
 import { app } from 'electron'
 import type { UpdateState } from '../shared/types'
 import { settingsStore } from './store/settingsStore'
@@ -14,6 +15,7 @@ interface SparkleAddon {
   setAutomaticallyChecksForUpdates(enabled: boolean): void
 }
 
+const require = createRequire(import.meta.url)
 const stateListeners = new Set<(state: UpdateState) => void>()
 let pendingVersion: string | null = null
 let currentFeedURL: string | null = null

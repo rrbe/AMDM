@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { enableCompileCache } from 'node:module'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import vm from 'node:vm'
 import { EventEmitter } from 'node:events'
 import type { ClientSession, MongoClient } from 'mongodb'
@@ -24,23 +25,23 @@ interface MongoshRuntime {
   toShellResult(value: unknown): Promise<MongoshResult>
 }
 
-let loadedRuntime: MongoshRuntime | undefined
+let loadedRuntime: Promise<MongoshRuntime> | undefined
 const providerCleanup = new WeakMap<CompassServiceProvider, () => void>()
 
-function loadMongoshRuntime(): MongoshRuntime {
+function loadMongoshRuntime(): Promise<MongoshRuntime> {
   if (loadedRuntime) return loadedRuntime
-  const packagedPath = join(__dirname, 'mongosh-runtime.cjs')
-  const developmentPath = join(process.cwd(), 'out', 'main', 'mongosh-runtime.cjs')
+  const packagedPath = join(import.meta.dirname, 'mongosh-runtime.mjs')
+  const developmentPath = join(process.cwd(), 'out', 'main', 'mongosh-runtime.mjs')
   const runtimePath = existsSync(packagedPath) ? packagedPath : developmentPath
   // Persist V8's compiled form after the first load so later app launches do
-  // not repeatedly parse the large generated CommonJS runtime.
+  // not repeatedly parse the large generated runtime.
   enableCompileCache()
-  loadedRuntime = require(runtimePath) as MongoshRuntime
+  loadedRuntime = import(pathToFileURL(runtimePath).href) as Promise<MongoshRuntime>
   return loadedRuntime
 }
 
-export function createMongoshServiceProvider(client: MongoClient): CompassServiceProvider {
-  const { CompassServiceProvider } = loadMongoshRuntime()
+export async function createMongoshServiceProvider(client: MongoClient): Promise<CompassServiceProvider> {
+  const { CompassServiceProvider } = await loadMongoshRuntime()
   const event = 'topologyDescriptionChanged'
   const listenersBefore = new Set(client.listeners(event))
   const provider = new CompassServiceProvider(
@@ -94,7 +95,7 @@ export async function evaluateMongosh(
   code: string,
   options: MongoshEvaluationOptions = {}
 ): Promise<MongoshEvaluation> {
-  const runtime = loadMongoshRuntime()
+  const runtime = await loadMongoshRuntime()
   // AMDM renders results itself, so mongosh's deep-inspection wrappers only
   // add per-execution proxy/closure allocation without affecting output.
   const state = new runtime.ShellInstanceState(provider, undefined, {
@@ -289,7 +290,7 @@ export async function runMongoshOnClient(
   let provider: CompassServiceProvider | undefined
   let releaseSessions: (() => Promise<void>) | undefined
   try {
-    provider = createMongoshServiceProvider(client)
+    provider = await createMongoshServiceProvider(client)
     releaseSessions = trackExecutionSessions(provider)
     const evaluation = await evaluateMongosh(provider, options.database, code, { ...options, output })
     try {
