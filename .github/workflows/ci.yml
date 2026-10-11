@@ -54,8 +54,8 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
-      - name: Production build
-        run: pnpm build
+      - name: Production build benchmark
+        run: pnpm bench:build --iterations 3
 
       - name: Prepare Sparkle
         if: runner.os == 'macOS'
@@ -83,10 +83,29 @@ jobs:
         if: runner.os != 'Linux'
         run: pnpm test:packaged
 
+      - name: UI E2E (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm test:e2e
+
+      - name: UI E2E (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: pnpm test:e2e
+
+      - name: Runtime benchmark (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm bench:runtime --iterations 3 --warm-queries 3
+
+      - name: Runtime benchmark (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: pnpm bench:runtime --iterations 3 --warm-queries 3
+
       - name: Runtime diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: esm-runtime-${{ runner.os }}-${{ runner.arch }}
-          path: dist/runtime-validation/
+          path: |
+            dist/runtime-validation/
+            dist/e2e-validation/
+            dist/benchmarks/
           if-no-files-found: ignore

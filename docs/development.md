@@ -12,6 +12,13 @@
 - Unit: pure logic with no MongoDB dependency.
 - Contract: BSON ↔ EJSON and other cross-layer wire formats.
 - Integration: Shell, write paths, and core operations validated against real MongoDB behavior.
+- Packaged smoke: native Electron startup, preload/IPC boundaries, transactions,
+  BSON, workers, and updater initialization (`pnpm test:packaged`).
+- UI E2E: real Electron mouse/keyboard input to connect through Explorer, enter
+  and execute queries, render results in JSON/Table, use the Run shortcut, and
+  open Settings (`pnpm test:e2e`).
+- Benchmarks: repeated production builds and packaged startup/query timings
+  (`pnpm bench:build`, `pnpm bench:runtime`), with raw samples and summaries.
 
 Test files are outside the application tsconfig includes, so `pnpm typecheck` does not replace the test suite. Run type-checking and unit/contract tests for routine changes; add the relevant integration tests when real database semantics are involved.
 
@@ -24,6 +31,23 @@ then launches that unpacked application with isolated user data and uses Electro
 CDP to verify both window bridges, concurrent first queries, transactions, BSON,
 the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
+
+The UI E2E also runs on all three platforms, with reports, Electron logs, and
+screenshots under `dist/e2e-validation/`. Build and runtime benchmarks run with
+three iterations in CI and upload their reports under `dist/benchmarks/`.
+Functional failures fail CI; benchmark timings are recorded without absolute
+performance thresholds because shared runner load varies.
+
+E2E and runtime benchmarks require an unpacked native application first. On
+macOS arm64, prepare it with `pnpm dist:dir --mac --arm64
+--config.electronDist=node_modules/electron/dist`, then run `pnpm test:e2e` or
+`pnpm bench:runtime`. These commands use isolated temporary profiles and a local
+MongoDB replica set. They do not install the test application.
+
+See [benchmarks/README.md](../benchmarks/README.md) for repeatable comparisons,
+parameters, measurement boundaries, and where to extend the scenarios. Electron
+CDP, input, native artifact discovery, and process cleanup are shared in
+`test/helpers/packagedElectron.mjs` by smoke, E2E, and runtime benchmarks.
 
 ## Local macOS installation
 
