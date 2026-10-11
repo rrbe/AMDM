@@ -187,9 +187,17 @@ try {
   assert.ok(report.workers.some(url => url.includes('serializer.worker.js')), 'Serializer worker did not start')
   const coverage = await main.call('Profiler.takePreciseCoverage')
   await main.call('Profiler.stopPreciseCoverage')
+  const mainScript = coverage.result.find(script => script.url.endsWith('/out/main/index.js'))
+  assert.ok(mainScript, 'Main process coverage missing')
+  const mainSource = await readFile(join(root, 'out/main/index.js'), 'utf8')
+  report.mainSerializerCalls = mainScript.functions
+    .filter(fn => fn.functionName === 'serialize' && mainSource
+      .slice(fn.ranges[0].startOffset, fn.ranges[0].endOffset).includes('values.map(serializeValue)'))
+    .reduce((count, fn) => count + fn.ranges[0].count, 0)
+  assert.ok(report.mainSerializerCalls > 0, 'Serializer pool was not exercised')
+  // Precise coverage omits scripts with no calls after recording starts.
   const serializerCore = coverage.result.find(script => script.url.includes('/chunks/schema-analysis-core-'))
-  assert.ok(serializerCore, 'Main serializer coverage missing')
-  report.inlineSerializationCalls = serializerCore.functions
+  report.inlineSerializationCalls = (serializerCore?.functions ?? [])
     .filter(fn => fn.functionName === 'serializeValue')
     .reduce((count, fn) => count + fn.ranges[0].count, 0)
   assert.equal(report.inlineSerializationCalls, 0, 'Serialization fell back to the main process')
