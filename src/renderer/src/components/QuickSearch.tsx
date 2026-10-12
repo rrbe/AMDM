@@ -151,7 +151,10 @@ export function QuickSearch({
     count: rows.length,
     getScrollElement: () => scroll.current,
     initialRect: { width: 660, height: 440 },
-    estimateSize: (index) => (rows[index].kind === 'hit' ? 76 : 32),
+    estimateSize: (index) => {
+      const row = rows[index]
+      return row.kind === 'hit' ? (row.hit.preview ? 76 : 64) : row.kind === 'heading' ? 36 : 32
+    },
     getItemKey: (index) => rowKey(rows[index]),
     overscan: 4
   })

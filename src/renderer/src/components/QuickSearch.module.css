@@ -69,8 +69,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 18px;
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 .list {
   height: min(440px, 55vh);
@@ -89,22 +89,23 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
+  height: 36px;
   padding: 0 18px;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 .heading > span {
+  font-size: 12px;
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .hit {
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 76px;
+  min-height: 64px;
   padding: 8px 18px;
   cursor: pointer;
 }
@@ -130,23 +131,25 @@
   text-overflow: ellipsis;
 }
 .label {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
 }
 .label > small {
   margin-left: 8px;
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
 }
 .detail {
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 20px;
   color: var(--text-secondary);
 }
 .preview {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 18px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
 }
 .more {
@@ -154,7 +157,8 @@
   height: 32px;
   padding: 6px 48px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 .footer {
@@ -164,8 +168,8 @@
   min-height: 40px;
   padding: 6px 16px;
   border-top: 1px solid var(--separator);
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 .pagination {
   display: flex;
