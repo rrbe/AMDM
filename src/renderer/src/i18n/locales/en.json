@@ -714,6 +714,7 @@
     "title": "Quick Search",
     "placeholder": "Search connections, tabs and queries…",
     "filter": "Search group",
+    "backToAll": "Back to all groups",
     "groups": {
       "all": "All",
       "connections": "Connections",

@@ -1,12 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Bookmark, Clock3, FileCode2, LoaderCircle, Search, Table2, Plug } from 'lucide-react'
+import { ArrowLeft, Bookmark, Clock3, FileCode2, LoaderCircle, Search, Table2, Plug } from 'lucide-react'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { TreeIcon } from '@renderer/components/explorer/Explorer'
 import { Dialog, DialogTitle } from '@renderer/components/ui/Dialog'
 import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { Button } from '@renderer/components/common/Button'
 import { isAppShortcutEnabled, isMacPlatform, isPrimaryShortcut } from '@renderer/lib/keyboardShortcuts'
 import {
@@ -207,7 +208,22 @@ export function QuickSearch({
           {t('quickSearch.title')}
         </DialogTitle>
         <div className={styles.searchBar}>
-          <Search size={19} aria-hidden />
+          <span className={styles.leading}>
+            {scope === 'all' ? (
+              <Search size={19} aria-hidden />
+            ) : (
+              <Tooltip content={t('quickSearch.backToAll')}>
+                <button
+                  type="button"
+                  className={styles.back}
+                  aria-label={t('quickSearch.backToAll')}
+                  onClick={() => changeScope('all')}
+                >
+                  <ArrowLeft size={19} aria-hidden />
+                </button>
+              </Tooltip>
+            )}
+          </span>
           <Input
             ref={input}
             className={styles.input}

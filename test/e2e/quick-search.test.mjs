@@ -136,6 +136,24 @@ test(
 
       await openQuickSearch(renderer)
       await searchQuickly(renderer, 'items')
+      const backButton = `document.querySelector('[data-quick-search] button[aria-label="Back to all groups"]')`
+      assert.equal(await renderer.evaluate(`!!${backButton}`), false)
+      await selectSearchGroup(renderer, 'Connections')
+      const scopedScreenshot = await renderer.call('Page.captureScreenshot')
+      await writeFile(join(diagnostics, 'group-back.png'), Buffer.from(scopedScreenshot.data, 'base64'))
+      await clickElement(renderer, backButton)
+      await waitForExpression(
+        renderer,
+        `document.querySelector('[data-quick-search] [role=listbox]')?.dataset.searchScope === 'all' && document.querySelector('[data-quick-search] [role=listbox]')?.getAttribute('aria-busy') === 'false'`
+      )
+      assert.equal(await renderer.evaluate('document.activeElement?.getAttribute("role")'), 'combobox')
+      assert.equal(await renderer.evaluate('document.querySelector("[data-quick-search] input").value'), 'items')
+      assert.equal(
+        await renderer.evaluate(`document.querySelector('[data-quick-search] button[aria-label="Search group"]').textContent.trim()`),
+        'All'
+      )
+      assert.equal(await renderer.evaluate(`!!${backButton}`), false)
+      report.steps.push('scoped search returns to all groups, preserving the search term and input focus')
       await clickElement(
         renderer,
         `[...document.querySelectorAll('[data-search-id]')].find(row => JSON.parse(row.dataset.searchId)[0] === 'connections' && row.textContent.includes('items'))`

@@ -714,6 +714,7 @@
     "title": "快捷搜索",
     "placeholder": "搜索连接、标签页和查询…",
     "filter": "搜索分组",
+    "backToAll": "返回全部分组",
     "groups": {
       "all": "全部",
       "connections": "Connections",

@@ -714,6 +714,7 @@
     "title": "快捷搜尋",
     "placeholder": "搜尋連線、分頁和查詢…",
     "filter": "搜尋分組",
+    "backToAll": "返回全部分組",
     "groups": {
       "all": "全部",
       "connections": "Connections",
