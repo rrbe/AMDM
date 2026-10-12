@@ -1,4 +1,60 @@
 {
+  "separate result pagination from query limits": {
+    "en": "Separate display pagination from query limits, reuse query results when changing pages or page size, and show result totals",
+    "zh": "将结果分页与查询条数限制分离，翻页或调整每页条数时复用查询结果，并显示结果总数"
+  },
+  "revise tab shortcuts and restore view bindings": {
+    "en": "Revise query and result tab shortcuts while preserving result view shortcuts",
+    "zh": "调整查询和结果标签页快捷键，保留结果视图切换快捷键"
+  },
+  "update query icons and explain shortcut": {
+    "en": "Unify query and schema action icons and add a shortcut for Explain",
+    "zh": "统一查询和 Schema 操作图标，新增执行计划快捷键"
+  },
+  "display connection roles and cache permissions": {
+    "en": "Display connection roles and cache permission metadata",
+    "zh": "显示连接角色并缓存权限信息"
+  },
+  "refine keyboard shortcuts and modifier hints": {
+    "en": "Improve keyboard shortcuts and show shortcut hints when holding modifier keys",
+    "zh": "完善键盘快捷键，并在按住修饰键时显示快捷键提示"
+  },
+  "refine result controls and schema modal loading": {
+    "en": "Improve result totals, page-size controls, and view selection styling, and load the Schema dialog on demand",
+    "zh": "优化结果总数、每页条数控件和视图切换样式，按需加载 Schema 弹窗"
+  },
+  "add run and save keyboard shortcut tooltips": {
+    "en": "Show keyboard shortcuts in Run and Save button tooltips",
+    "zh": "在运行和保存按钮的提示中显示快捷键"
+  },
+  "prevent clipped input focus rings and unify export filename rounding": {
+    "en": "Prevent input focus rings from being clipped and unify export filename corner styling",
+    "zh": "修复输入框焦点轮廓被裁切的问题，统一导出文件名控件的圆角样式"
+  },
+  "simplify connection form layout and clarify password storage": {
+    "en": "Simplify the connection form layout and clarify password storage options",
+    "zh": "简化连接表单布局，明确密码保存选项"
+  },
+  "preserve explorer interactions in search results": {
+    "en": "Preserve Explorer interactions in search results",
+    "zh": "在搜索结果中保留目录树的交互行为"
+  },
+  "select run button by visible label": {
+    "en": "Use the visible Run button label in UI tests",
+    "zh": "界面测试通过运行按钮的可见文字定位按钮"
+  },
+  "migrate Electron runtimes to ESM": {
+    "en": "Migrate Electron main, preload, and worker runtimes to ESM",
+    "zh": "将 Electron 主进程、预加载脚本和工作线程迁移到 ESM"
+  },
+  "clarify control focus ring and layout guidelines": {
+    "en": "Clarify control focus ring and layout guidelines",
+    "zh": "明确控件焦点轮廓和布局规范"
+  },
+  "upgrade dependencies and remediate security alerts": {
+    "en": "Upgrade dependencies and address dependency security alerts",
+    "zh": "升级依赖并处理依赖安全告警"
+  },
   "add schema inspection to the details sidebar": {
     "en": "Inspect collection schemas in the Details sidebar, with sampling, nested fields, field and type search, and access to the full Schema view",
     "zh": "详情侧栏支持查看集合 Schema，可采样分析、展开嵌套字段、搜索字段和类型，并打开完整 Schema 视图"
