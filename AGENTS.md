@@ -50,7 +50,7 @@ pnpm install:mac                   # build, install, and launch the local macOS 
 pnpm clean                         # remove generated artifacts
 ```
 
-Use pnpm exclusively. The project has no linter; the default validation gates are `pnpm typecheck` and `pnpm test:unit`.
+Use pnpm exclusively. The project has no linter. Choose type-checking and targeted tests according to the change; full test suites run in CI.
 
 ## Engineering constraints
 
@@ -74,9 +74,11 @@ Use pnpm exclusively. The project has no linter; the default validation gates ar
 
 ## Validation scope
 
+- By default, run only tests relevant to the current change. Reuse valid results when the tested code has not changed; do not repeat full local suites for every feature or commit. Documentation-only changes do not need tests.
 - Run the relevant integration tests for changes to real MongoDB behavior, write paths, or IPC handlers.
 - Run a production build for dependency, main-build, or packaging changes. For main-process runtime dependencies, also inspect and launch the unpacked artifact for the target architecture.
-- Run `pnpm test:packaged` for main/preload/worker runtime or packaging changes. For changes to user flows covered by `test/e2e/`, run `pnpm test:e2e` and update the affected scenarios.
-- For performance optimization, reuse or extend the benchmarks and `test/helpers/packagedElectron.mjs`. Collect repeated before/after samples on the same machine with equivalent data, settings, build mode, and cache state; retain raw reports outside `dist/` when rebuilding. State the measurement boundary: Shell IPC timings do not measure result rendering or scrolling.
-- Validate UI behavior against the current Electron Renderer with Electron DevTools/CDP, including DOM, computed styles, events, focus, and scrolling. A regular Chrome page is not a substitute.
-- For changes to data views or shared per-cell components, profile view switching and scrolling in Electron with representative wide and nested results. Compare before/after timings and mounted cell/DOM counts using the same data, viewport, and build mode. Passing type checks and tests is not evidence of acceptable interaction latency; investigate measured bottlenecks before choosing an optimization.
+- Run `pnpm test:packaged` for main/preload/worker runtime or packaging changes. E2E is not a default local gate: run only relevant scenarios when explicitly requested or when a change is complex enough to warrant end-to-end verification. Routine UI adjustments do not require rebuilding the app and running E2E each time.
+- Benchmarks are run periodically by the user. Do not run them automatically for every feature, UI adjustment, or commit; run them locally only when explicitly requested or when a complex performance change or regression makes measurement worthwhile.
+- When benchmarks are warranted, reuse or extend the existing benchmarks and `test/helpers/packagedElectron.mjs`. Collect repeated before/after samples on the same machine with equivalent data, settings, build mode, and cache state; retain raw reports outside `dist/` when rebuilding. State the measurement boundary: Shell IPC timings do not measure result rendering or scrolling.
+- When runtime UI verification is warranted, use the current Electron Renderer with Electron DevTools/CDP to inspect relevant DOM, computed styles, events, focus, and scrolling. A regular Chrome page is not a substitute. This does not make automated E2E a requirement for every UI change.
+- For complex changes to data views, shared per-cell components, or virtualization that warrant performance validation, profile view switching and scrolling in Electron with representative wide and nested results. Compare before/after timings and mounted cell/DOM counts using the same data, viewport, and build mode. Passing type checks and tests is not evidence of acceptable interaction latency; investigate measured bottlenecks before choosing an optimization.
