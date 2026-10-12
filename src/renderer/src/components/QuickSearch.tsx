@@ -153,7 +153,7 @@ export function QuickSearch({
     initialRect: { width: 660, height: 440 },
     estimateSize: (index) => {
       const row = rows[index]
-      return row.kind === 'hit' ? (row.hit.preview ? 76 : 64) : row.kind === 'heading' ? 36 : 32
+      return row.kind === 'hit' ? (row.hit.preview ? 50 : 40) : row.kind === 'heading' ? 32 : 28
     },
     getItemKey: (index) => rowKey(rows[index]),
     overscan: 4
@@ -332,8 +332,8 @@ export function QuickSearch({
                   style={{
                     position: 'absolute',
                     top: 0,
-                    left: 0,
-                    width: '100%',
+                    left: row.kind === 'heading' ? 0 : 8,
+                    width: row.kind === 'heading' ? '100%' : 'calc(100% - 16px)',
                     transform: `translateY(${item.start}px)`
                   }}
                   onPointerMove={
@@ -363,15 +363,17 @@ export function QuickSearch({
                         )}
                       </span>
                       <div className={styles.text}>
-                        <div className={styles.label}>
-                          <Match text={row.hit.label} query={term} />
-                          {row.hit.approximate && <small>≈</small>}
-                          {row.hit.count && row.hit.count > 1 && (
-                            <small>{t('quickSearch.executions', { count: row.hit.count })}</small>
-                          )}
-                        </div>
-                        <div className={styles.detail}>
-                          <Match text={row.hit.detail} query={term} />
+                        <div className={styles.summary}>
+                          <div className={styles.label}>
+                            <Match text={row.hit.label} query={term} />
+                            {row.hit.approximate && <small>≈</small>}
+                            {row.hit.count && row.hit.count > 1 && (
+                              <small>{t('quickSearch.executions', { count: row.hit.count })}</small>
+                            )}
+                          </div>
+                          <div className={styles.detail}>
+                            <Match text={row.hit.detail} query={term} />
+                          </div>
                         </div>
                         {row.hit.preview && (
                           <code className={styles.preview}>

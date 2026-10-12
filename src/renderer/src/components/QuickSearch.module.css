@@ -69,8 +69,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 18px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
 }
 .list {
   height: min(440px, 55vh);
@@ -89,24 +89,25 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
+  height: 32px;
   padding: 0 18px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.heading > span {
   font-size: 12px;
   font-weight: 400;
   color: var(--text-secondary);
+}
+.heading > span {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 .hit {
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 64px;
-  padding: 8px 18px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 .hit[aria-selected='true'],
@@ -122,6 +123,12 @@
   min-width: 0;
   flex: 1;
 }
+.summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
 .label,
 .detail,
 .preview {
@@ -131,34 +138,39 @@
   text-overflow: ellipsis;
 }
 .label {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 22px;
+  max-width: 65%;
+  min-width: 0;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
 }
 .label > small {
   margin-left: 8px;
-  color: var(--text-secondary);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
   font-weight: 400;
 }
 .detail {
-  font-size: 12px;
-  line-height: 20px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 18px;
   color: var(--text-secondary);
 }
 .preview {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 18px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-family: var(--font-mono);
 }
 .more {
   box-sizing: border-box;
-  height: 32px;
-  padding: 6px 48px;
+  height: 28px;
+  padding: 5px 40px;
+  border-radius: var(--radius-control);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--text-secondary);
 }
 .footer {
@@ -168,8 +180,8 @@
   min-height: 40px;
   padding: 6px 16px;
   border-top: 1px solid var(--separator);
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
 }
 .pagination {
   display: flex;
