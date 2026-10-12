@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import {
@@ -44,7 +44,6 @@ import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
-import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
 import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
 import { isAppShortcutEnabled, isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
@@ -53,6 +52,10 @@ import {
   SavedQueriesView,
   type StoredQuerySelection
 } from '@renderer/components/explorer/SavedQueriesPanel'
+
+const SchemaModelModal = lazy(async () => ({
+  default: (await import('@renderer/components/schema/SchemaModelModal')).SchemaModelModal
+}))
 
 export type ExplorerView = 'connections' | 'savedQueries' | 'history'
 
@@ -920,7 +923,11 @@ export function Explorer({
           onClose={() => setIoModal(null)}
         />
       )}
-      {schemaTarget && <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />}
+      {schemaTarget && (
+        <Suspense fallback={<div className="px-3 text-[12px] text-muted-foreground">{t('schema.loading')}</div>}>
+          <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
+        </Suspense>
+      )}
       {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
     </div>
   )

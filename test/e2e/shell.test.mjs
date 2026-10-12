@@ -103,7 +103,7 @@ test(
       )
       await waitForExpression(
         renderer,
-        'document.querySelector(".result-range")?.textContent.includes("Total 3")',
+        'document.querySelector(".result-total")?.textContent.includes("Total results: 3")',
       )
       report.steps.push('connected through Explorer and browsed a collection in a query tab')
 
@@ -133,7 +133,7 @@ test(
       )
       await waitForExpression(
         renderer,
-        'document.querySelector(".result-range")?.textContent.includes("Total 2")',
+        'document.querySelector(".result-total")?.textContent.includes("Total results: 2")',
       )
       await clickElement(renderer, 'document.querySelector(".result-bar button[aria-label=JSON]")')
       await waitForExpression(
@@ -151,7 +151,7 @@ test(
       await key('Enter', 'Enter', 13, modifier)
       await waitForExpression(
         renderer,
-        'document.querySelector(".result-range")?.textContent.includes("Total 1")',
+        'document.querySelector(".result-total")?.textContent.includes("Total results: 1")',
       )
       await waitForExpression(
         renderer,
@@ -162,35 +162,54 @@ test(
       const pagingQuery = 'db.effects.updateOne({_id:"once"},{$inc:{runs:1}},{upsert:true}); db.pages.find().sort({n:1}).limit(23)'
       await enterQuery(pagingQuery)
       await key('Enter', 'Enter', 13, modifier)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.includes("Total 23")')
+      await waitForExpression(renderer, 'document.querySelector(".result-total")?.textContent.includes("Total results: 23")')
+      const paginationLayout = await renderer.evaluate(`(() => {
+        const bar = document.querySelector('.result-pagination');
+        const total = bar.querySelector('.result-total');
+        const size = bar.querySelector('.page-size');
+        const pager = bar.querySelector('.result-pager');
+        const [previous, next] = pager.querySelectorAll('button');
+        const range = pager.querySelector('.result-range');
+        return {
+          total: total.textContent.trim(),
+          size: size.textContent.trim(),
+          sectionPositions: [total, size, pager].map(e => e.getBoundingClientRect().x),
+          navigationPositions: [previous, range, next].map(e => e.getBoundingClientRect().x)
+        };
+      })()`)
+      assert.equal(paginationLayout.total, 'Total results: 23')
+      assert.match(paginationLayout.size, /Show.*50.*rows/)
+      assert.ok(paginationLayout.sectionPositions.every((x, i, positions) => i === 0 || x > positions[i - 1]))
+      assert.ok(paginationLayout.navigationPositions.every((x, i, positions) => i === 0 || x > positions[i - 1]))
       const historyBefore = await renderer.evaluate('window.api.history.list().then(entries=>entries.length)')
       async function displaySize(size) {
         await clickElement(renderer, 'document.querySelector(".page-size [role=combobox]")')
         await clickElement(renderer, `[...document.querySelectorAll('[role=option]')].find(option=>option.textContent.trim() === ${JSON.stringify(String(size))})`)
       }
       await displaySize(5)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "1–5 / Total 23"')
+      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "1–5"')
       await clickElement(renderer, `document.querySelector('button[aria-label="Next page"]')`)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "6–10 / Total 23"')
+      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "6–10"')
       await displaySize(10)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "1–10 / Total 23"')
+      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "1–10"')
       assert.equal(await renderer.evaluate('document.querySelector(".cm-content").textContent'), pagingQuery)
       assert.doesNotMatch(await renderer.evaluate('document.querySelector(".result-meta").textContent'), /docs?/)
       assert.equal(await renderer.evaluate('window.api.history.list().then(entries=>entries.length)'), historyBefore)
       assert.equal((await mongo.db('amdm_e2e').collection('effects').findOne({_id:'once'})).runs, 1)
       await enterQuery('db.pages.find().sort({n:1}).limit(7)')
       await key('Enter', 'Enter', 13, modifier)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.includes("Total 7")')
+      await waitForExpression(renderer, 'document.querySelector(".result-total")?.textContent.includes("Total results: 7")')
       assert.equal(await renderer.evaluate('document.querySelector(".page-size [role=combobox]").textContent.trim()'), '50')
       await clickElement(renderer, 'document.querySelectorAll(".rtab")[3]')
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "1–10 / Total 23"')
+      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "1–10"')
       assert.equal(await renderer.evaluate('document.querySelector(".page-size [role=combobox]").textContent.trim()'), '10')
       report.steps.push('display size and page navigation preserve query limits, result state, history, and one-time writes')
       await enterQuery('db.pages.aggregate([{$sort:{n:1}},{$limit:53}])')
       await key('Enter', 'Enter', 13, modifier)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.includes("Total Pending")')
+      await waitForExpression(renderer, 'document.querySelector(".result-total")?.textContent.includes("Pending")')
       await clickElement(renderer, `document.querySelector('button[aria-label="Next page"]')`)
-      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "51–53 / Total 53"')
+      await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent.trim() === "51–53"')
+      await waitForExpression(renderer, 'document.querySelector(".result-total")?.textContent.trim() === "Total results: 53"')
       report.steps.push('aggregation pages confirm the exact total at cursor exhaustion')
 
       await clickElement(renderer, 'document.querySelector("button[aria-label=Settings]")')

@@ -311,8 +311,20 @@ export function ResultPanel({
         </div>
         <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
-        {result.kind === 'documents' && <PageSizeControl />}
-        {result.kind === 'documents' && <ResultPager result={result} />}
+        {result.kind === 'documents' && (
+          <div className="result-pagination">
+            <span className="result-total" aria-live="polite">
+              {typeof result.totalCount === 'number'
+                ? t('result.totalCount', { value: result.totalCount.toLocaleString() })
+                : t(result.totalStatus === 'counting' ? 'result.totalCounting'
+                    : result.totalStatus === 'unavailable' ? 'result.totalUnavailable' : 'result.totalUnknown')}
+            </span>
+            <span className="result-meta-separator" aria-hidden="true" />
+            <PageSizeControl />
+            <span className="result-meta-separator" aria-hidden="true" />
+            <ResultPager result={result} />
+          </div>
+        )}
         <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
@@ -537,7 +549,7 @@ function ResultMeta({
   )
 }
 
-/** Display range and total for this execution; pages never rerun its script. */
+/** Display range for this execution; pages never rerun its script. */
 function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | null {
   const { t } = useTranslation()
   const skip = useAppStore((s) => getActiveResult(s)?.skip ?? 0)
@@ -550,15 +562,6 @@ function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | n
   const to = count === 0 ? 0 : skip + count
   return (
     <div className="result-pager">
-      <span className="result-range" aria-live="polite">
-        {from}–{to} / {t('result.totalCount', {
-          count: result.totalCount,
-          value: typeof result.totalCount === 'number'
-            ? result.totalCount.toLocaleString()
-            : t(result.totalStatus === 'counting' ? 'result.totalCounting'
-              : result.totalStatus === 'unavailable' ? 'result.totalUnavailable' : 'result.totalUnknown')
-        })}
-      </span>
       <Tooltip content={t('result.prevPage')}>
         <button
           className="ghost"
@@ -569,6 +572,9 @@ function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | n
           <ChevronLeft size={15} />
         </button>
       </Tooltip>
+      <span className="result-range" aria-live="polite">
+        {from}–{to}
+      </span>
       <Tooltip content={t('result.nextPage')}>
         <button
           className="ghost"
@@ -598,9 +604,10 @@ function PageSizeControl(): React.JSX.Element {
         options={QUERY_LIMIT_OPTIONS}
         disabled={running}
         onChange={(n) => void setResultPageSize(n)}
-        className="h-6 w-[72px] px-2 text-xs"
+        className="h-6 w-[72px] px-2 text-center text-xs"
         aria-label={t('result.pageSizeLabel')}
       />
+      <span>{t('result.pageSizeSuffix')}</span>
     </div>
   )
 }
