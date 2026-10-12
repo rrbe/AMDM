@@ -12,6 +12,7 @@ import {
   Play,
   Plus,
   Save,
+  Search,
   Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -50,9 +51,10 @@ import {
  * Run), the lazy CodeMirror editor, and the result panel below. Each tab owns
  * its own code/result/db/run state (see the store's `tabs`).
  */
-export function ShellWorkspace({ shortcutHints, onSearch }: {
+export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
   shortcutHints: ShortcutHintModifier | null
   onSearch: () => void
+  onQuickSearch: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
@@ -135,6 +137,7 @@ export function ShellWorkspace({ shortcutHints, onSearch }: {
     <div className="work">
       <TabBar
         onSearch={onSearch}
+        onQuickSearch={onQuickSearch}
         showShortcutHints={shortcutHints === 'query-tabs'}
         contextOpen={contextOpen}
         onContextToggle={() => setContextOpen((open) => !open)}
@@ -287,11 +290,13 @@ export function ShellWorkspace({ shortcutHints, onSearch }: {
  */
 function TabBar({
   onSearch,
+  onQuickSearch,
   showShortcutHints,
   contextOpen,
   onContextToggle
 }: {
   onSearch: () => void
+  onQuickSearch: () => void
   showShortcutHints: boolean
   contextOpen: boolean
   onContextToggle: () => void
@@ -455,6 +460,17 @@ function TabBar({
           </ShortcutHint>
         </button>
       </DocumentTabStrip>
+      <Tooltip content={`${t('quickSearch.title')}${isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'quickSearch') ? ` · ${isMacPlatform() ? '⌘' : 'Ctrl+'}K` : ''}`}>
+        <button
+          type="button"
+          className="side-head-action self-center mb-1"
+          aria-label={t('quickSearch.title')}
+          aria-haspopup="dialog"
+          onClick={onQuickSearch}
+        >
+          <Search size={16} aria-hidden />
+        </button>
+      </Tooltip>
       <button
         className="side-head-action context-toggle"
         onClick={onContextToggle}

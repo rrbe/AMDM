@@ -222,7 +222,6 @@ export function Explorer({
   view,
   onViewChange,
   onQueryLoad,
-  onSearch,
   reveal,
   onCollapse,
   onSettings,
@@ -232,7 +231,6 @@ export function Explorer({
   view: ExplorerView
   onViewChange: (view: ExplorerView) => void
   onQueryLoad: (query: StoredQuerySelection) => void
-  onSearch: () => void
   reveal: CatalogDestination | null
   onCollapse: () => void
   onSettings: () => void
@@ -703,11 +701,6 @@ export function Explorer({
         <div className="app-brand">
           <span>AMDM</span>
         </div>
-        <Tooltip content={`${t('quickSearch.title')}${isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'quickSearch') ? ` · ${primaryKey}K` : ''}`}>
-          <button className="side-head-action" aria-label={t('quickSearch.title')} aria-haspopup="dialog" onClick={onSearch}>
-            <Search size={16} />
-          </button>
-        </Tooltip>
         <button className="side-head-action" aria-label={t('explorer.collapse')} onClick={onCollapse}>
           <PanelLeftClose size={16} />
         </button>

@@ -323,7 +323,6 @@ export default function App(): React.JSX.Element {
             view={view}
             onViewChange={setView}
             onQueryLoad={requestQueryLoad}
-            onSearch={() => setSearchScope('all')}
             reveal={catalogReveal}
             onCollapse={() => setExplorerOpen(false)}
             onSettings={() => void openSettings()}
@@ -344,7 +343,11 @@ export default function App(): React.JSX.Element {
             ariaLabel={t('app.resizeSidebar')}
           />
         )}
-        <ShellWorkspace shortcutHints={shortcutHints} onSearch={() => setSearchScope('queries')} />
+        <ShellWorkspace
+          shortcutHints={shortcutHints}
+          onSearch={() => setSearchScope('queries')}
+          onQuickSearch={() => setSearchScope('all')}
+        />
         {!explorerOpen && (
           <div className="sidebar-toggle-slot">
             <button
