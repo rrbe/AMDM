@@ -43,6 +43,7 @@ pnpm test:packaged                 # smoke-test the native unpacked app
 pnpm test:e2e                      # real Electron UI flows (requires unpacked app)
 pnpm bench:build                   # repeated production builds and output sizes
 pnpm bench:runtime                 # packaged startup and Shell IPC timings
+pnpm bench:search                  # packaged quick-search UI latency under pressure
 pnpm build                         # production build into out/
 pnpm dist:dir --mac --arm64        # build an unpacked macOS arm64 app
 pnpm install:mac                   # build, install, and launch the local macOS app

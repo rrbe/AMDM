@@ -18,7 +18,8 @@
   and execute queries, render results in JSON/Table, use the Run shortcut, and
   open Settings (`pnpm test:e2e`).
 - Benchmarks: repeated production builds and packaged startup/query timings
-  (`pnpm bench:build`, `pnpm bench:runtime`), with raw samples and summaries.
+  (`pnpm bench:build`, `pnpm bench:runtime`) plus native quick-search UI latency
+  (`pnpm bench:search`), with raw samples and summaries.
 
 Test files are outside the application tsconfig includes, so `pnpm typecheck` does not replace the test suite. Run type-checking and unit/contract tests for routine changes; add the relevant integration tests when real database semantics are involved.
 

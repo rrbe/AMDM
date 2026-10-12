@@ -708,5 +708,30 @@
     "errorEmpty": "文档内容为空。",
     "errorUpdateFailed": "更新失败。",
     "hint": "以全量替换方式编辑。支持 Shell 类型（ObjectId(…)、ISODate(…)），保存时将按 Extended JSON 解析文档。"
+  },
+  "quickSearch": {
+    "documents": "文档",
+    "title": "快捷搜索",
+    "placeholder": "搜索连接、标签页和查询…",
+    "filter": "搜索分组",
+    "groups": {
+      "all": "全部",
+      "connections": "Connections",
+      "queries": "Query 标签页",
+      "data": "Data 标签页",
+      "saved": "保存的查询",
+      "history": "查询历史"
+    },
+    "recent": "最近访问",
+    "loadedOnly": "搜索已加载的资源，不包含结果文档内容",
+    "searching": "搜索中…",
+    "results": "搜索结果",
+    "noRecent": "最近访问的项目会显示在这里",
+    "noResults": "没有匹配结果",
+    "viewAll": "查看全部",
+    "executions": "执行 {{count}} 次",
+    "keyboardHint": "↑ ↓ 选择 · Enter 打开 · Esc 关闭",
+    "previous": "上一页",
+    "next": "下一页"
   }
 }

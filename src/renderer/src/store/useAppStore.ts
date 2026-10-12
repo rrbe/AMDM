@@ -167,6 +167,8 @@ interface AppState {
   setActiveConnection(id: string | null): void
   /** Expand/collapse a connection's database subtree in the explorer. */
   toggleConnectionExpanded(id: string): void
+  /** Reveal already-loaded catalog ancestors without fetching or opening a query. */
+  revealCatalog(connId: string, ancestors: string[]): void
 
   // ---- actions: catalog ----
   toggleNode(connId: string, nodeId: string, kind: NodeKind, payload: NodePayload): Promise<void>
@@ -193,7 +195,7 @@ interface AppState {
 
   // ---- actions: result tabs (operate on the active query tab) ----
   /** Focus one of the active tab's result tabs. */
-  setActiveResultTab(id: string): void
+  setActiveResultTab(id: string, queryTabId?: string): void
   moveResultTab(sourceId: string, targetId: string): void
   /** Close one of the active tab's result tabs. */
   closeResultTab(id: string): void
@@ -480,6 +482,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   initializing: true,
   notifications: [],
   exportProgress: {},
+
+  revealCatalog(connId, ancestors) {
+    set((s) => {
+      if (s.statuses[connId]?.state !== 'connected') return s
+      const expandedConnections = new Set(s.expandedConnections).add(connId)
+      const catalog = s.catalogs[connId]
+      if (!catalog) return { expandedConnections }
+      const expanded = new Set(catalog.expanded)
+      for (const id of ancestors) expanded.add(id)
+      return { expandedConnections, catalogs: { ...s.catalogs, [connId]: { ...catalog, expanded } } }
+    })
+  },
 
   // --------------------------------------------------------------------- boot
   async bootstrap() {
@@ -1130,8 +1144,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // --------------------------------------------------------------- result tabs
-  setActiveResultTab(id) {
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeResultId: id }) }))
+  setActiveResultTab(id, queryTabId) {
+    set((s) => {
+      const tabId = queryTabId ?? s.activeTabId
+      const tab = s.tabs.find((item) => item.id === tabId)
+      if (!tab) return s
+      return {
+        tabs: patchTab(s.tabs, tabId, { activeResultId: id }),
+        ...(queryTabId ? { activeTabId: tabId, activeConnectionId: tab.connectionId } : {})
+      }
+    })
   },
 
   moveResultTab(sourceId, targetId) {

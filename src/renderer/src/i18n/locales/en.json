@@ -708,5 +708,30 @@
     "errorEmpty": "Document is empty.",
     "errorUpdateFailed": "Update failed.",
     "hint": "Edited as a full replacement. Shell types (ObjectId(…), ISODate(…)) are accepted; the document is parsed as Extended JSON on save."
+  },
+  "quickSearch": {
+    "documents": "Documents",
+    "title": "Quick Search",
+    "placeholder": "Search connections, tabs and queries…",
+    "filter": "Search group",
+    "groups": {
+      "all": "All",
+      "connections": "Connections",
+      "queries": "Query Tabs",
+      "data": "Data Tabs",
+      "saved": "Saved Queries",
+      "history": "Query History"
+    },
+    "recent": "Recently visited",
+    "loadedOnly": "Searches loaded resources; data documents are not searched",
+    "searching": "Searching…",
+    "results": "Search results",
+    "noRecent": "Recently visited items will appear here",
+    "noResults": "No matching results",
+    "viewAll": "View all",
+    "executions": "{{count}} executions",
+    "keyboardHint": "↑ ↓ Select · Enter Open · Esc Close",
+    "previous": "Previous",
+    "next": "Next"
   }
 }

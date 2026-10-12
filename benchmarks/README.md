@@ -24,6 +24,9 @@ pnpm bench:runtime --iterations 20 --warm-queries 10 --output /tmp/amdm-after-ru
 
 # Measure another already-built artifact; --app names the executable.
 pnpm bench:runtime --app /path/to/AMDM.app/Contents/MacOS/AMDM --output /tmp/amdm-before-runtime
+
+# Native quick-search input-to-paint latency, using synthetic pressure data.
+pnpm bench:search --iterations 25 --output /tmp/amdm-search
 ```
 
 `--iterations` and `--warm-queries` accept integers from 1 to 50. Build and runtime
@@ -73,6 +76,34 @@ memory growth, or long-running database workloads. A faster IPC result is not
 evidence of faster table interaction.
 
 ## Extending it
+
+### Quick Search
+
+`bench:search` creates an isolated profile with 1,000 saved queries and 1,000
+history entries. Main-process IPC fixtures provide 10,000 collection names and
+empty execution results; the script creates 100 Query tabs and 800 Data tabs
+through Electron UI actions. Searchable code totals about 20 million characters.
+It does not connect to a real database or measure MongoDB/Shell execution speed.
+
+Measurements start at native keyboard/input event timestamps and finish after
+the updated UI has a paint opportunity. Literal, typo, and no-match inputs are
+alternated across repeated panel openings. Reports include raw samples, median,
+p95, maximum, mounted option counts, Renderer long tasks, machine metadata, and
+the packaged app.asar checksum. Light/dark screenshots and single-group scrolling
+are retained with the report. Closing and reopening uses the same cold search
+worker lifecycle each time. The small, frequently used search UI is available
+with the workspace; matching/index code still starts on demand in its worker.
+
+This feature has explicit acceptance budgets: opening p95 ≤100ms and input to
+updated results p95 ≤150ms on this fixture. The script fails if either is exceeded;
+these are local acceptance targets, not a promise for every machine or unlimited
+code size. `--iterations` accepts 5–50; keep comparison reports outside `dist/`
+when rebuilding. The existing build/runtime suites retain their timing-only
+reporting behavior.
+
+`test/e2e/quick-search.test.mjs` separately verifies navigation against a real
+MongoDB fixture, query loading without execution, result ownership, grouped
+history, focus restoration, worker cleanup, and the inline failure path.
 
 - Change the fixture and query in `runtime.mjs` to measure another database or
   serialization path; retain bounded results and correctness assertions.

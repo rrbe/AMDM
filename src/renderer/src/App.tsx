@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PanelLeftOpen } from 'lucide-react'
-import { useAppStore } from '@renderer/store/useAppStore'
+import { getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { setLanguage } from '@renderer/i18n'
 import { Explorer, type ExplorerView } from '@renderer/components/explorer/Explorer'
 import type { StoredQuerySelection } from '@renderer/components/explorer/SavedQueriesPanel'
 import { ShellWorkspace } from '@renderer/components/shell/ShellWorkspace'
+import { QuickSearch } from '@renderer/components/QuickSearch'
 import { Toaster } from '@renderer/components/common/Toaster'
 import { TooltipLayer } from '@renderer/components/ui/Tooltip'
 import { Collapsible } from '@renderer/components/ui/Collapsible'
@@ -18,7 +19,8 @@ import {
   hasOpenShortcutLayer,
   isAppShortcutEnabled,
   isMacPlatform,
-  isPrimaryShortcut
+  isPrimaryShortcut,
+  isPrimaryShiftShortcut
 } from '@renderer/lib/keyboardShortcuts'
 import {
   applyEditorColorPalette,
@@ -27,6 +29,9 @@ import {
   resolveEditorColorScheme,
   type EditorPalettePreviewMessage
 } from '@renderer/lib/editorColorScheme'
+import type { CatalogDestination } from '@renderer/lib/quickSearch/documents'
+import { searchId, type SearchHit, type SearchScope } from '@renderer/lib/quickSearch/types'
+import { flushSearchVisits, loadSearchVisits, recordSearchVisit } from '@renderer/lib/quickSearch/visits'
 
 type QueryPrompt =
   | {
@@ -67,17 +72,60 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (explorerWasOpen.current === explorerOpen) return
     explorerWasOpen.current = explorerOpen
+    if (hasOpenShortcutLayer()) return
     const selector = explorerOpen ? '.explorer-head .side-head-action' : '.sidebar-toggle-open'
     appBodyRef.current?.querySelector<HTMLButtonElement>(selector)?.focus({ preventScroll: true })
   }, [explorerOpen])
   const [queryPrompt, setQueryPrompt] = useState<QueryPrompt | null>(null)
   const [palettePreview, setPalettePreview] = useState<EditorPalettePreviewMessage['palette']>(null)
   const [newConnectionRequested, setNewConnectionRequested] = useState(false)
+  const [searchScope, setSearchScope] = useState<SearchScope | null>(null)
+  const [catalogReveal, setCatalogReveal] = useState<CatalogDestination | null>(null)
   const queryAttempt = useRef(0)
+  const editorFocusFrame = useRef<number | undefined>(undefined)
+
+  const focusEditor = (): void => {
+    if (editorFocusFrame.current !== undefined) cancelAnimationFrame(editorFocusFrame.current)
+    editorFocusFrame.current = requestAnimationFrame(() => {
+      editorFocusFrame.current = requestAnimationFrame(() => {
+        editorFocusFrame.current = undefined
+        if (!hasOpenShortcutLayer()) {
+          document.querySelector<HTMLElement>('.cm-content[contenteditable=true]')?.focus({ preventScroll: true })
+        }
+      })
+    })
+  }
+  useEffect(() => () => {
+    if (editorFocusFrame.current !== undefined) cancelAnimationFrame(editorFocusFrame.current)
+  }, [])
 
   useEffect(() => {
     void bootstrap()
   }, [bootstrap])
+
+  useEffect(() => {
+    loadSearchVisits()
+    const unsubscribe = useAppStore.subscribe((state, previous) => {
+      if (state.initializing) return
+      const tab = getActiveTab(state)
+      const previousTab = getActiveTab(previous)
+      if (previous.initializing || state.activeTabId !== previous.activeTabId) {
+        recordSearchVisit(searchId('queries', tab.id))
+      }
+      if (
+        tab.activeResultId &&
+        (state.activeTabId !== previous.activeTabId || tab.activeResultId !== previousTab.activeResultId)
+      ) {
+        recordSearchVisit(searchId('data', tab.activeResultId))
+      }
+    })
+    window.addEventListener('beforeunload', flushSearchVisits)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('beforeunload', flushSearchVisits)
+      flushSearchVisits()
+    }
+  }, [])
 
   useEffect(
     () =>
@@ -95,8 +143,20 @@ export default function App(): React.JSX.Element {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (hasOpenShortcutLayer()) return
+      if (e.isComposing || hasOpenShortcutLayer()) return
       const isMac = isMacPlatform()
+      const quickSearch =
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'quickSearch') &&
+        isPrimaryShortcut(e, 'k', isMac)
+      const tabSearch =
+        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'tabSearch') &&
+        isPrimaryShiftShortcut(e, 'a', isMac)
+      if (quickSearch || tabSearch) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!e.repeat) setSearchScope(tabSearch ? 'queries' : 'all')
+        return
+      }
       if (
         isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'openSettings') &&
         isPrimaryShortcut(e, ',', isMac)
@@ -116,8 +176,8 @@ export default function App(): React.JSX.Element {
         setNewConnectionRequested(true)
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [disabledKeyboardShortcuts, keyboardShortcutsEnabled, openSettings])
 
   // Reflect the persisted theme onto the document root, which drives the
@@ -156,6 +216,10 @@ export default function App(): React.JSX.Element {
 
   const finishQueryLoad = (query: StoredQuerySelection, connectionId: string): void => {
     applyQuery(query.code, query.database, connectionId)
+    if (query.visitId) {
+      recordSearchVisit(query.visitId)
+      focusEditor()
+    }
     setQueryPrompt(null)
   }
 
@@ -207,6 +271,46 @@ export default function App(): React.JSX.Element {
     setQueryPrompt(null)
   }
 
+  const selectSearchResult = (hit: SearchHit, destination?: CatalogDestination): void => {
+    const state = useAppStore.getState()
+    const [, id] = JSON.parse(hit.id) as [string, string]
+    setSearchScope(null)
+    if (hit.group === 'connections' && destination) {
+      state.revealCatalog(destination.connectionId, destination.ancestors)
+      setView('connections')
+      setExplorerOpen(true)
+      setCatalogReveal({ ...destination })
+      recordSearchVisit(hit.id)
+    } else if (hit.group === 'queries') {
+      if (state.tabs.some((tab) => tab.id === id)) {
+        state.setActiveTab(id)
+        recordSearchVisit(hit.id)
+        focusEditor()
+      }
+    } else if (hit.group === 'data') {
+      const tab = state.tabs.find((tab) => tab.results.some((result) => result.id === id))
+      if (tab) {
+        state.setActiveResultTab(id, tab.id)
+        recordSearchVisit(hit.id)
+        focusEditor()
+      }
+    } else if (hit.group === 'saved' || hit.group === 'history') {
+      const query =
+        hit.group === 'saved'
+          ? state.savedQueries.find((query) => query.id === id)
+          : state.history.find((entry) => entry.id === id)
+      if (query) {
+        requestQueryLoad({
+          ...query,
+          visitId: hit.id,
+          connectionId: query.connectionId ?? undefined,
+          connectionName:
+            state.connections.find((connection) => connection.id === query.connectionId)?.name ?? query.connectionId
+        })
+      }
+    }
+  }
+
   return (
     <div
       className="app"
@@ -219,6 +323,8 @@ export default function App(): React.JSX.Element {
             view={view}
             onViewChange={setView}
             onQueryLoad={requestQueryLoad}
+            onSearch={() => setSearchScope('all')}
+            reveal={catalogReveal}
             onCollapse={() => setExplorerOpen(false)}
             onSettings={() => void openSettings()}
             newConnectionRequested={newConnectionRequested}
@@ -238,7 +344,7 @@ export default function App(): React.JSX.Element {
             ariaLabel={t('app.resizeSidebar')}
           />
         )}
-        <ShellWorkspace shortcutHints={shortcutHints} />
+        <ShellWorkspace shortcutHints={shortcutHints} onSearch={() => setSearchScope('queries')} />
         {!explorerOpen && (
           <div className="sidebar-toggle-slot">
             <button
@@ -251,6 +357,13 @@ export default function App(): React.JSX.Element {
           </div>
         )}
       </div>
+      {searchScope && (
+        <QuickSearch
+          initialScope={searchScope}
+          onClose={() => setSearchScope(null)}
+          onSelect={selectSearchResult}
+        />
+      )}
       {queryPrompt && (
         <Modal
           small

@@ -11,6 +11,7 @@ import { Button } from '@renderer/components/common/Button'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { formatTextPreview } from '@renderer/lib/resultCopy'
+import { searchId } from '@renderer/lib/quickSearch/types'
 
 /** Group saved queries by folder; folders alpha, ungrouped (`''`) last. */
 function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQuery[] }[] {
@@ -30,6 +31,7 @@ function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQue
 }
 
 export interface StoredQuerySelection {
+  visitId?: string
   code: string
   connectionId?: string
   connectionName?: string
@@ -162,6 +164,7 @@ export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelect
           queries={savedQueries}
           onLoad={(query) =>
             onLoad({
+              visitId: searchId('saved', query.id),
               code: query.code,
               connectionId: query.connectionId,
               connectionName: connections.find((item) => item.id === query.connectionId)?.name ?? query.connectionId,
@@ -200,6 +203,7 @@ export function HistoryView({ onLoad }: { onLoad: (query: StoredQuerySelection) 
           entries={sortedHistory}
           onLoad={(entry) =>
             onLoad({
+              visitId: searchId('history', entry.id),
               code: entry.code,
               connectionId: entry.connectionId,
               connectionName: connections.find((item) => item.id === entry.connectionId)?.name ?? entry.connectionId,
