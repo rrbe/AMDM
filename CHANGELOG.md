@@ -4,6 +4,31 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.3](https://github.com/rrbe/AMDM/releases/tag/v26.10.3) — 2026-10-12
+
+### Features
+
+- Separate display pagination from query limits, reuse query results when changing pages or page size, and show result totals
+- Revise query and result tab shortcuts while preserving result view shortcuts
+- Unify query and schema action icons and add a shortcut for Explain
+- Display connection roles and cache permission metadata
+- Improve keyboard shortcuts and show shortcut hints when holding modifier keys
+
+### Fixes
+
+- Improve result totals, page\-size controls, and view selection styling, and load the Schema dialog on demand
+- Show keyboard shortcuts in Run and Save button tooltips
+- Prevent input focus rings from being clipped and unify export filename corner styling
+- Simplify the connection form layout and clarify password storage options
+- Preserve Explorer interactions in search results
+
+### Other Updates
+
+- Use the visible Run button label in UI tests
+- Migrate Electron main, preload, and worker runtimes to ESM
+- Clarify control focus ring and layout guidelines
+- Upgrade dependencies and address dependency security alerts
+
 ## [v26.10.2](https://github.com/rrbe/AMDM/releases/tag/v26.10.2) — 2026-10-10
 
 ### Features
