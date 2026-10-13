@@ -382,8 +382,9 @@
     "addNestedField": "新增巢狀欄位",
     "deleteField": "刪除欄位",
     "advancedHint": "包含進階規則；可在 JSON 檢視中編輯",
-    "overwriteDraft": "用分析結果覆蓋",
-    "overwriteConfirm": "確定用最新分析結果覆蓋目前編輯稿嗎？人工修改將遺失。",
+    "resetDraft": "撤銷本次修改",
+    "restoreDefaults": "恢復預設值",
+    "restoreDefaultsConfirm": "確定恢復為最近一次分析產生的結構嗎？目前人工修改將被取代，點擊「儲存編輯稿」後生效。",
     "discardConfirm": "目前 Schema 有未儲存修改，確定關閉嗎？",
     "saveDraft": "儲存編輯稿",
     "close": "關閉"

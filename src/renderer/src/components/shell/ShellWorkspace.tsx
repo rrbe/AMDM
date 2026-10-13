@@ -314,6 +314,9 @@ function TabBar({
   const connect = useAppStore((s) => s.connect)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
+  const quickSearchShortcut = isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'quickSearch')
+    ? `${isMacPlatform() ? '⌘' : 'Ctrl+'}K`
+    : undefined
   const tabShortcutsEnabled = isAppShortcutEnabled(
     keyboardShortcutsEnabled,
     disabledKeyboardShortcuts,
@@ -460,15 +463,16 @@ function TabBar({
           </ShortcutHint>
         </button>
       </DocumentTabStrip>
-      <Tooltip content={`${t('quickSearch.title')}${isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'quickSearch') ? ` · ${isMacPlatform() ? '⌘' : 'Ctrl+'}K` : ''}`}>
+      <Tooltip content={t('quickSearch.title')}>
         <button
           type="button"
-          className="side-head-action self-center mb-1"
+          className="side-head-action side-search-toggle gap-1.5 self-center mb-1"
           aria-label={t('quickSearch.title')}
           aria-haspopup="dialog"
           onClick={onQuickSearch}
         >
           <Search size={16} aria-hidden />
+          {quickSearchShortcut && <span className="text-[11px] leading-none" aria-hidden>{quickSearchShortcut}</span>}
         </button>
       </Tooltip>
       <button

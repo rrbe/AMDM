@@ -7,10 +7,12 @@ import {
   CircleQuestionMark,
   Clock,
   Database,
+  Expand,
   FlaskConical,
   KeyRound,
   ListTree,
   Plug,
+  RefreshCw,
   Search,
   Table,
   Table2
@@ -269,7 +271,7 @@ function CollectionSchema({
           disabled={!canAnalyze || loading || panel?.analyzing || !model}
           onClick={analyze}
         >
-          <ListTree size={14} className={panel?.analyzing ? 'animate-spin motion-reduce:animate-none' : ''} />
+          <RefreshCw size={14} className={panel?.analyzing ? 'animate-spin motion-reduce:animate-none' : ''} />
         </button>
         <button
           type="button"
@@ -279,7 +281,7 @@ function CollectionSchema({
           disabled={!model || panel?.analyzing}
           onClick={() => setShowModel(true)}
         >
-          <ListTree size={14} />
+          <Expand size={14} />
         </button>
       </div>
       {model && model.analysis.fields.length > 0 && (

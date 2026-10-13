@@ -382,8 +382,9 @@
     "addNestedField": "添加嵌套字段",
     "deleteField": "删除字段",
     "advancedHint": "包含高级规则；可在 JSON 视图中编辑",
-    "overwriteDraft": "用分析结果覆盖",
-    "overwriteConfirm": "确定用最新分析结果覆盖当前编辑稿吗？人工修改将丢失。",
+    "resetDraft": "撤销本次修改",
+    "restoreDefaults": "恢复默认值",
+    "restoreDefaultsConfirm": "确定恢复为最近一次分析生成的结构吗？当前人工修改将被替换，点击“保存编辑稿”后生效。",
     "discardConfirm": "当前 Schema 有未保存修改，确定关闭吗？",
     "saveDraft": "保存编辑稿",
     "close": "关闭"

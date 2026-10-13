@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { AlertTriangle, ListTree, Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, Plus, RefreshCw, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { MongoJsonSchema, SchemaFieldStat, SchemaModel, SchemaTarget, SchemaTypeStat } from '@shared/types'
 import { Button } from '@renderer/components/common/Button'
@@ -292,7 +292,6 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
   const loadSchemaModel = useAppStore((state) => state.loadSchemaModel)
   const analyzeSchema = useAppStore((state) => state.analyzeSchema)
   const saveSchemaDraft = useAppStore((state) => state.saveSchemaDraft)
-  const overwriteSchemaDraft = useAppStore((state) => state.overwriteSchemaDraft)
   const [model, setModel] = useState<SchemaModel | null>(null)
   const [draft, setDraft] = useState<MongoJsonSchema | null>(null)
   const [jsonText, setJsonText] = useState('')
@@ -381,14 +380,17 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
     setSaving(false)
   }
 
-  const overwrite = async (): Promise<void> => {
-    if (!window.confirm(t('schema.overwriteConfirm'))) return
-    const next = await overwriteSchemaDraft(target)
-    if (!next) return
-    setModel(next)
-    setDraft(next.draft)
-    setJsonText(JSON.stringify(next.draft, null, 2))
+  const resetDraft = (): void => {
+    if (!model) return
+    setDraft(model.draft)
+    setJsonText(JSON.stringify(model.draft, null, 2))
     setDirty(false)
+    setError(null)
+  }
+
+  const restoreDefaults = (): void => {
+    if (!model || !window.confirm(t('schema.restoreDefaultsConfirm'))) return
+    applyDraft(model.analysis.generated)
     setError(null)
   }
 
@@ -405,8 +407,8 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
       bodyClassName="flex flex-col gap-3"
       onClose={close}
       headerActions={
-        <Button size="sm" busy={analyzing || analysisBusy} disabled={loading || !connected} onClick={() => void updateAnalysis()}>
-          <ListTree /> {t('schema.updateAnalysis')}
+        <Button size="sm" variant="ghost" busy={analyzing || analysisBusy} disabled={loading || !connected} onClick={() => void updateAnalysis()}>
+          <RefreshCw /> {t('schema.updateAnalysis')}
         </Button>
       }
       footer={
@@ -453,8 +455,11 @@ export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element 
                   ]}
                 />
                 <span className="flex-1" />
-                <Button size="sm" variant="ghost" onClick={() => void overwrite()}>
-                  <RotateCcw /> {t('schema.overwriteDraft')}
+                <Button size="sm" variant="ghost" disabled={!dirty || saving} onClick={resetDraft}>
+                  <Undo2 /> {t('schema.resetDraft')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={restoreDefaults}>
+                  <RotateCcw /> {t('schema.restoreDefaults')}
                 </Button>
               </div>
               {editMode === 'structured' ? (
