@@ -34,7 +34,9 @@ the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
 
 The UI E2E also runs on all three platforms, with reports, Electron logs, and
-screenshots under `dist/e2e-validation/`. Build and runtime benchmarks run with
+screenshots under `dist/e2e-validation/`. Test files run serially because native
+Electron windows share desktop focus; parallel instances can disrupt mouse,
+keyboard, and focus assertions. Build and runtime benchmarks run with
 three iterations in CI and upload their reports under `dist/benchmarks/`.
 Functional failures fail CI; benchmark timings are recorded without absolute
 performance thresholds because shared runner load varies.
