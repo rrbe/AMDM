@@ -621,7 +621,6 @@ export function Explorer({
     overscan: 8,
     enabled: view === 'connections',
     rangeExtractor: (range) => {
-      if (!searching) return defaultRangeExtractor(range)
       stickyIndex.current = 0
       for (const index of connectionIndices) {
         if (index > range.startIndex) break
@@ -815,12 +814,12 @@ export function Explorer({
                       data-index={item.index}
                       className="explorer-search-row"
                       style={{
-                        position: searching && item.index === stickyIndex.current ? 'sticky' : 'absolute',
+                        position: item.index === stickyIndex.current ? 'sticky' : 'absolute',
                         top: 0,
                         width: '100%',
-                        zIndex: searching && item.index === stickyIndex.current ? 4 : undefined,
+                        zIndex: item.index === stickyIndex.current ? 4 : undefined,
                         transform:
-                          searching && item.index === stickyIndex.current ? undefined : `translateY(${item.start}px)`
+                          item.index === stickyIndex.current ? undefined : `translateY(${item.start}px)`
                       }}
                     >
                       {renderRow(visibleRows[item.index])}

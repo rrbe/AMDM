@@ -96,6 +96,31 @@ describe('quick search', () => {
     expect((await index.search(request({ query: 'orders', scope: 'queries' })))?.hits).toEqual([])
   })
 
+  it.each([
+    ['é', 'e\u0301'],
+    ['e\u0301', 'é']
+  ])('paginates equivalent Unicode collection names in insertion order %s, %s', async (first, second) => {
+    const index = new QuickSearchIndex()
+    const names = [...Array.from({ length: SEARCH_PAGE_SIZE - 1 }, (_, n) => `a${n}`), first, second]
+    const documents = names.map((name) =>
+      doc(`c1:coll:shop/${name}`, { group: 'connections', label: name, connectionId: 'c1' })
+    )
+    await index.sync(documents, [])
+
+    const page1 = await index.search(request({ scope: 'connections' }))
+    expect(page1?.totals.connections).toBe(SEARCH_PAGE_SIZE + 1)
+    expect(page1?.hits).toHaveLength(SEARCH_PAGE_SIZE)
+    expect(page1?.more).toBe(true)
+    const page2 = await index.search(
+      request({ scope: 'connections', after: page1!.hits.at(-1)!.rank })
+    )
+    expect(page2?.hits).toHaveLength(1)
+    expect(page2?.more).toBe(false)
+    expect(new Set([...page1!.hits, ...page2!.hits].map((hit) => hit.id))).toEqual(
+      new Set(documents.map((document) => document.id))
+    )
+  })
+
   it('shows only visited items in the empty overview and resolves merged-history member visits', async () => {
     const index = new QuickSearchIndex()
     await index.sync(

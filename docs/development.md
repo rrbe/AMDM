@@ -25,6 +25,10 @@ Test files are outside the application tsconfig includes, so `pnpm typecheck` do
 
 Integration tests prefer a locally cached `mongod` binary and may need to download one when no cache exists. Worker artifacts are generally not built during tests, so worker-backed modules must support an inline path through the same core.
 
+CI runs on pushes to `master` and on pull requests. Feature branch pushes do not
+trigger a second run alongside PR checks. New runs for the same PR cancel older
+runs; `master` push runs remain independent. Version tags trigger Release only.
+
 CI runs type checking, unit/contract tests, integration tests, and a production
 build on macOS, Windows, and Linux. It caches MongoDB 8.2.1 and packages the host
 architecture using the installed Electron distribution. `pnpm test:packaged`
