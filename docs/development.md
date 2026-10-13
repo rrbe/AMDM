@@ -18,11 +18,16 @@
   and execute queries, render results in JSON/Table, use the Run shortcut, and
   open Settings (`pnpm test:e2e`).
 - Benchmarks: repeated production builds and packaged startup/query timings
-  (`pnpm bench:build`, `pnpm bench:runtime`), with raw samples and summaries.
+  (`pnpm bench:build`, `pnpm bench:runtime`) plus native quick-search UI latency
+  (`pnpm bench:search`), with raw samples and summaries.
 
 Test files are outside the application tsconfig includes, so `pnpm typecheck` does not replace the test suite. Run type-checking and unit/contract tests for routine changes; add the relevant integration tests when real database semantics are involved.
 
 Integration tests prefer a locally cached `mongod` binary and may need to download one when no cache exists. Worker artifacts are generally not built during tests, so worker-backed modules must support an inline path through the same core.
+
+CI runs on pushes to `master` and on pull requests. Feature branch pushes do not
+trigger a second run alongside PR checks. New runs for the same PR cancel older
+runs; `master` push runs remain independent. Version tags trigger Release only.
 
 CI runs type checking, unit/contract tests, integration tests, and a production
 build on macOS, Windows, and Linux. It caches MongoDB 8.2.1 and packages the host
@@ -33,7 +38,9 @@ the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
 
 The UI E2E also runs on all three platforms, with reports, Electron logs, and
-screenshots under `dist/e2e-validation/`. Build and runtime benchmarks run with
+screenshots under `dist/e2e-validation/`. Test files run serially because native
+Electron windows share desktop focus; parallel instances can disrupt mouse,
+keyboard, and focus assertions. Build and runtime benchmarks run with
 three iterations in CI and upload their reports under `dist/benchmarks/`.
 Functional failures fail CI; benchmark timings are recorded without absolute
 performance thresholds because shared runner load varies.

@@ -708,5 +708,31 @@
     "errorEmpty": "文件內容為空。",
     "errorUpdateFailed": "更新失敗。",
     "hint": "以全量替換方式編輯。支援 Shell 類型（ObjectId(…)、ISODate(…)），儲存時將按 Extended JSON 解析文件。"
+  },
+  "quickSearch": {
+    "documents": "文件",
+    "title": "快捷搜尋",
+    "placeholder": "搜尋連線、分頁和查詢…",
+    "filter": "搜尋分組",
+    "backToAll": "返回全部分組",
+    "groups": {
+      "all": "全部",
+      "connections": "Connections",
+      "queries": "Query 分頁",
+      "data": "Data 分頁",
+      "saved": "已儲存的查詢",
+      "history": "查詢歷史"
+    },
+    "recent": "最近存取",
+    "loadedOnly": "搜尋已載入的資源，不包含結果文件內容",
+    "searching": "搜尋中…",
+    "results": "搜尋結果",
+    "noRecent": "最近存取的項目會顯示在這裡",
+    "noResults": "沒有符合的結果",
+    "viewAll": "查看全部",
+    "executions": "執行 {{count}} 次",
+    "keyboardHint": "↑ ↓ 選擇 · Enter 開啟 · Esc 關閉",
+    "previous": "上一頁",
+    "next": "下一頁"
   }
 }

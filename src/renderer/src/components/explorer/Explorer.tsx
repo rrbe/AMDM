@@ -45,8 +45,11 @@ import { ContextMenu, type ContextMenuEntry } from '@renderer/components/Context
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
 import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
-import { isAppShortcutEnabled, isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { hasOpenShortcutLayer, isAppShortcutEnabled, isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import type { CatalogDestination } from '@renderer/lib/quickSearch/documents'
+import { searchId } from '@renderer/lib/quickSearch/types'
+import { recordSearchVisit } from '@renderer/lib/quickSearch/visits'
 import {
   HistoryView,
   SavedQueriesView,
@@ -60,7 +63,7 @@ const SchemaModelModal = lazy(async () => ({
 export type ExplorerView = 'connections' | 'savedQueries' | 'history'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
-function TreeIcon({ name }: { name: string }): React.JSX.Element | null {
+export function TreeIcon({ name }: { name: string }): React.JSX.Element | null {
   switch (name) {
     case 'database':
       return <Database size={15} />
@@ -219,6 +222,7 @@ export function Explorer({
   view,
   onViewChange,
   onQueryLoad,
+  reveal,
   onCollapse,
   onSettings,
   newConnectionRequested,
@@ -227,6 +231,7 @@ export function Explorer({
   view: ExplorerView
   onViewChange: (view: ExplorerView) => void
   onQueryLoad: (query: StoredQuerySelection) => void
+  reveal: CatalogDestination | null
   onCollapse: () => void
   onSettings: () => void
   newConnectionRequested: boolean
@@ -608,12 +613,13 @@ export function Explorer({
   )
   const stickyIndex = useRef(0)
   const virtualizer = useVirtualizer({
-    count: searching ? visibleRows.length : 0,
+    count: visibleRows.length,
+    initialRect: { width: 0, height: 600 },
     getScrollElement: () => bodyRef.current,
     getItemKey: (index) => visibleRows[index].id,
     estimateSize: (index) => (visibleRows[index].type === 'connection' ? 44 : 28),
     overscan: 8,
-    enabled: searching && view === 'connections',
+    enabled: view === 'connections',
     rangeExtractor: (range) => {
       stickyIndex.current = 0
       for (const index of connectionIndices) {
@@ -623,6 +629,34 @@ export function Explorer({
       return [...new Set([stickyIndex.current, ...defaultRangeExtractor(range)])].sort((a, b) => a - b)
     }
   })
+  const handledReveal = useRef<CatalogDestination | null>(null)
+  useLayoutEffect(() => {
+    if (!reveal || handledReveal.current === reveal || view !== 'connections') return
+    if (search || searchOpen) {
+      setSearch('')
+      setSearchOpen(false)
+      setSearchExpansion(new Map())
+      return
+    }
+    const index = visibleRows.findIndex((row) => row.id === reveal.rowId)
+    if (index < 0) return
+    handledReveal.current = reveal
+    setSelectedRowId(reveal.rowId)
+    virtualizer.scrollToIndex(index, { align: 'center' })
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const target = [...(bodyRef.current?.querySelectorAll<HTMLElement>('[data-explorer-row]') ?? [])].find(
+          (row) => row.dataset.explorerRow === reveal.rowId
+        )
+        if (!hasOpenShortcutLayer()) target?.focus({ preventScroll: true })
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [reveal, view, search, searchOpen, visibleRows])
+  const activateRow = (id: string): void => {
+    setSelectedRowId(id)
+    recordSearchVisit(searchId('connections', id))
+  }
   const renderRow = (row: Row): React.JSX.Element =>
     row.type === 'connection' ? (
       <ConnectionRow
@@ -630,7 +664,7 @@ export function Explorer({
         row={row}
         match={matches.get(row.id)}
         isActive={selectedRowId === row.id}
-        onActivate={() => setSelectedRowId(row.id)}
+        onActivate={() => activateRow(row.id)}
         onToggle={() => toggleRow(row)}
         onConnect={() => void connect(row.id)}
         onMove={moveConnection}
@@ -650,7 +684,7 @@ export function Explorer({
         }
         match={matches.get(row.id)}
         isActive={selectedRowId === row.id}
-        onActivate={() => setSelectedRowId(row.id)}
+        onActivate={() => activateRow(row.id)}
         onContextMenu={openCatalogMenu}
       />
     )
@@ -771,7 +805,7 @@ export function Explorer({
                 <div className="explorer-empty">{t('explorer.noSearchResults')}</div>
               )}
 
-              {searching ? (
+              {(
                 <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
                   {virtualizer.getVirtualItems().map((item) => (
                     <div
@@ -792,8 +826,6 @@ export function Explorer({
                     </div>
                   ))}
                 </div>
-              ) : (
-                visibleRows.map(renderRow)
               )}
             </div>
           </div>
@@ -970,6 +1002,8 @@ function ConnectionRow({
   return (
     <div
       className={`conn-item${isActive ? ' active' : ''}${dragging ? ' dragging' : ''}${dropEdge ? ` drop-${dropEdge}` : ''}`}
+      data-explorer-row={row.id}
+      tabIndex={-1}
       draggable
       aria-grabbed={dragging}
       onClickCapture={onActivate}
@@ -1070,8 +1104,10 @@ function CatalogRow({
   return (
     <div
       className={className}
+      data-explorer-row={row.id}
+      tabIndex={-1}
       style={{ paddingLeft: 8 + row.depth * 14 }}
-      onClickCapture={row.onClick || row.onDoubleClick ? onActivate : undefined}
+      onClickCapture={row.icon ? onActivate : undefined}
       onClick={row.onClick}
       onDoubleClick={row.onDoubleClick}
       onContextMenu={

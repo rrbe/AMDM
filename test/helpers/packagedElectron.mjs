@@ -195,18 +195,23 @@ export function waitForUi(client) {
 
 // Send input through Electron's real Renderer, retaining event/focus behavior.
 export async function clickElement(client, expression, clickCount = 1) {
-  const point = await waitForExpression(
-    client,
-    `(() => {
+  for (let count = 1; count <= clickCount; count++) {
+    const point = await waitForExpression(
+      client,
+      `(async () => {
     const element = ${expression};
     if (!element || element.disabled || element.getAttribute('aria-disabled') === 'true') return null;
-    element.scrollIntoView({block:'center', inline:'center'});
-    const r = element.getBoundingClientRect();
-    return r.width && r.height ? {x:r.x+r.width/2, y:r.y+r.height/2} : null;
+    element.scrollIntoView({block:'nearest', inline:'nearest'});
+    // Scrolling can update virtualized rows before native input arrives.
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const target = ${expression};
+    if (!target) return null;
+    const r = target.getBoundingClientRect();
+    const point = {x:r.x+r.width/2, y:r.y+r.height/2};
+    return r.width && r.height && target.contains(document.elementFromPoint(point.x, point.y)) ? point : null;
   })()`,
-  )
-  await client.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point })
-  for (let count = 1; count <= clickCount; count++) {
+    )
+    await client.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point })
     await client.call('Input.dispatchMouseEvent', {
       type: 'mousePressed',
       button: 'left',

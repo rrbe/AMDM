@@ -3,7 +3,13 @@ name: CI
 # Validate source, ESM builds, and packaged Electron runtimes on every platform.
 on:
   push:
+    branches: [master]
   pull_request:
+
+# Supersede older PR checks while keeping master push runs independent.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   check:

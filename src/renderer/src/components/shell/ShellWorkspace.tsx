@@ -12,11 +12,12 @@ import {
   Play,
   Plus,
   Save,
+  Search,
   Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
-import { matchesTabSearch, tabCollection, tabLabel, tabSearchText } from '@renderer/lib/tabs'
+import { tabCollection, tabLabel } from '@renderer/lib/tabs'
 import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { Collapsible } from '@renderer/components/ui/Collapsible'
@@ -30,7 +31,6 @@ import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
-import { SearchableSelect, type SearchableSelectHandle } from '@renderer/components/ui/SearchableSelect'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
@@ -40,7 +40,6 @@ import {
   isAppShortcutEnabled,
   isMacPlatform,
   isPrimaryShortcut,
-  isPrimaryShiftShortcut,
   queryTabDigitIndex,
   queryTabDirection,
   tabShortcutLabel,
@@ -52,7 +51,11 @@ import {
  * Run), the lazy CodeMirror editor, and the result panel below. Each tab owns
  * its own code/result/db/run state (see the store's `tabs`).
  */
-export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintModifier | null }): React.JSX.Element {
+export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
+  shortcutHints: ShortcutHintModifier | null
+  onSearch: () => void
+  onQuickSearch: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)
   const connections = useAppStore((s) => s.connections)
@@ -133,6 +136,8 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
   return (
     <div className="work">
       <TabBar
+        onSearch={onSearch}
+        onQuickSearch={onQuickSearch}
         showShortcutHints={shortcutHints === 'query-tabs'}
         contextOpen={contextOpen}
         onContextToggle={() => setContextOpen((open) => !open)}
@@ -284,10 +289,14 @@ export function ShellWorkspace({ shortcutHints }: { shortcutHints: ShortcutHintM
  * fixed status slot (spinner / failure dot), a close ✕, and a trailing "+".
  */
 function TabBar({
+  onSearch,
+  onQuickSearch,
   showShortcutHints,
   contextOpen,
   onContextToggle
 }: {
+  onSearch: () => void
+  onQuickSearch: () => void
   showShortcutHints: boolean
   contextOpen: boolean
   onContextToggle: () => void
@@ -313,7 +322,6 @@ function TabBar({
   const tabShortcut = (index: number): string | undefined =>
     tabShortcutsEnabled ? tabShortcutLabel(index, tabs.length, false, isMacPlatform()) : undefined
   const stripRef = useRef<HTMLDivElement>(null)
-  const tabSearchRef = useRef<SearchableSelectHandle>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const moveQueryTab = useAppStore((s) => s.moveQueryTab)
   useTabReorder(stripRef, tabs, setActiveTab, moveQueryTab)
@@ -325,15 +333,6 @@ function TabBar({
   // Cmd/Ctrl+W closes the query first; an already empty workspace closes the window.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (
-        isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'tabSearch') &&
-        isPrimaryShiftShortcut(e, 'a', isMacPlatform())
-      ) {
-        e.preventDefault()
-        if (e.repeat || hasOpenShortcutLayer()) return
-        tabSearchRef.current?.open()
-        return
-      }
       if (isPrimaryShortcut(e, 'w', isMacPlatform())) {
         e.preventDefault()
         if (e.repeat || hasOpenShortcutLayer()) return
@@ -362,43 +361,15 @@ function TabBar({
 
   return (
     <div className="tab-bar app-drag">
-      <SearchableSelect
-        ref={tabSearchRef}
-        value={activeTabId}
-        onChange={setActiveTab}
-        options={tabs.map((tab, index) => ({
-          value: tab.id,
-          filterText: tabSearchText(
-            tab,
-            index,
-            connections.find((connection) => connection.id === tab.connectionId)?.name
-          ),
-          label: (
-            <span className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                <span style={{ color: connectionTextColor(tab.connectionId) }}>{tabLabel(tab, index)}</span>
-              </span>
-              <small className="max-w-[118px] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
-                {[
-                  connections.find((connection) => connection.id === tab.connectionId)?.name,
-                  tab.activeDatabase
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </small>
-              {tabShortcut(index) && <span className="ctx-shortcut">{tabShortcut(index)}</span>}
-            </span>
-          )
-        }))}
-        matches={matchesTabSearch}
-        className="query-tab-picker"
-        triggerContent={<ChevronDown size={15} aria-hidden />}
-        popupClassName="w-[272px]"
-        header={`${t('shell.openTabsLabel')} · ${tabs.length}`}
-        placeholder={t('shell.tabSearchPlaceholder')}
-        emptyMessage={t('shell.noMatchingTabs')}
+      <button
+        type="button"
+        className="query-tab-picker inline-flex items-center rounded-[var(--radius-control)] border-0 outline-none focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+        onClick={onSearch}
         aria-label={t('shell.tabSearchLabel')}
-      />
+        aria-haspopup="dialog"
+      >
+        <ChevronDown size={15} aria-hidden />
+      </button>
       <DocumentTabStrip stripRef={stripRef} count={tabs.length} activeId={activeTabId} kind="query">
         {tabs.map((tab, i) => {
           const connectionStatus = tab.connectionId ? statuses[tab.connectionId] : undefined
@@ -489,6 +460,17 @@ function TabBar({
           </ShortcutHint>
         </button>
       </DocumentTabStrip>
+      <Tooltip content={`${t('quickSearch.title')}${isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'quickSearch') ? ` · ${isMacPlatform() ? '⌘' : 'Ctrl+'}K` : ''}`}>
+        <button
+          type="button"
+          className="side-head-action self-center mb-1"
+          aria-label={t('quickSearch.title')}
+          aria-haspopup="dialog"
+          onClick={onQuickSearch}
+        >
+          <Search size={16} aria-hidden />
+        </button>
+      </Tooltip>
       <button
         className="side-head-action context-toggle"
         onClick={onContextToggle}

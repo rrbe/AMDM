@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, type ComponentProps, type ReactNode } from 'react'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { ChevronDown, Check, CircleHelp } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
@@ -36,6 +36,7 @@ interface SelectProps<T> {
   triggerContent?: ReactNode
   popupHeader?: ReactNode
   popupClassName?: string
+  finalFocus?: ComponentProps<typeof BaseSelect.Popup>['finalFocus']
   'aria-label'?: string
 }
 
@@ -82,6 +83,7 @@ export function Select<T extends string | number = string>({
   triggerContent,
   popupHeader,
   popupClassName,
+  finalFocus,
   'aria-label': ariaLabel
 }: SelectProps<T>): React.JSX.Element {
   const hasDescriptions = options.some((option) => option.description != null)
@@ -123,6 +125,7 @@ export function Select<T extends string | number = string>({
           alignItemWithTrigger={false}
         >
           <BaseSelect.Popup
+            finalFocus={finalFocus}
             className={cn(
               'amdm-select-popup max-h-[var(--available-height)] min-w-[var(--anchor-width)] overflow-y-auto rounded-[var(--radius-control)] border border-[var(--separator-strong)] bg-[var(--surface-elevated)] p-1 shadow-[var(--shadow-popover)]',
               popupClassName
