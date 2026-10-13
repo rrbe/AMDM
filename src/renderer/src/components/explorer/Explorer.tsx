@@ -10,9 +10,9 @@ import {
   Database,
   Download,
   Eye,
+  FlaskConical,
   Key,
   KeyRound,
-  ListTree,
   Loader2,
   Monitor,
   Moon,
@@ -448,7 +448,7 @@ export function Explorer({
         'separator',
         {
           label: t('schema.menu'),
-          icon: <ListTree size={14} />,
+          icon: <FlaskConical size={14} />,
           disabled: coll.type === 'view',
           onClick: () =>
             setSchemaTarget({

@@ -10,7 +10,6 @@ import {
   Expand,
   FlaskConical,
   KeyRound,
-  ListTree,
   Plug,
   RefreshCw,
   Search,
@@ -399,7 +398,7 @@ function CollectionSchema({
             <span>{isView ? t('context.schema.viewUnsupported') : t('context.schema.notAnalyzed')}</span>
             {!isView && (
               <Button size="sm" busy={panel?.analyzing} disabled={!canAnalyze} onClick={analyze}>
-                <ListTree /> {t('context.schema.analyze')}
+                <FlaskConical /> {t('context.schema.analyze')}
               </Button>
             )}
           </EmptyState>
