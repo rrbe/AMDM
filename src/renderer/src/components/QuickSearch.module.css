@@ -56,9 +56,21 @@
   outline: none;
   box-shadow: 0 0 0 3px var(--focus-soft);
 }
-.input {
+.inputField {
+  position: relative;
   flex: 1;
   min-width: 0;
+}
+.placeholderIcon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.input:placeholder-shown {
+  padding-left: 36px;
 }
 .filter {
   width: 152px;

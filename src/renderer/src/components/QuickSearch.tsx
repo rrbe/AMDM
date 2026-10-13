@@ -211,10 +211,8 @@ export function QuickSearch({
           {t('quickSearch.title')}
         </DialogTitle>
         <div className={styles.searchBar}>
-          <span className={styles.leading}>
-            {scope === 'all' ? (
-              <Search size={19} aria-hidden />
-            ) : (
+          {scope !== 'all' && (
+            <span className={styles.leading}>
               <Tooltip content={t('quickSearch.backToAll')}>
                 <button
                   type="button"
@@ -225,55 +223,58 @@ export function QuickSearch({
                   <ArrowLeft size={19} aria-hidden />
                 </button>
               </Tooltip>
-            )}
-          </span>
-          <Input
-            ref={input}
-            className={styles.input}
-            value={query}
-            role="combobox"
-            aria-expanded="true"
-            aria-controls={listId}
-            aria-activedescendant={activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
-            aria-autocomplete="list"
-            aria-label={t('quickSearch.title')}
-            placeholder={t('quickSearch.placeholder')}
-            onCompositionEnd={(event) => {
-              setTerm(event.currentTarget.value)
-              setCursors([])
-              setSelected(null)
-            }}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              if (!(event.nativeEvent as InputEvent).isComposing) {
-                setTerm(event.target.value)
+            </span>
+          )}
+          <div className={styles.inputField}>
+            {!query && <Search size={16} className={styles.placeholderIcon} aria-hidden />}
+            <Input
+              ref={input}
+              className={styles.input}
+              value={query}
+              role="combobox"
+              aria-expanded="true"
+              aria-controls={listId}
+              aria-activedescendant={activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
+              aria-autocomplete="list"
+              aria-label={t('quickSearch.title')}
+              placeholder={t('quickSearch.placeholder')}
+              onCompositionEnd={(event) => {
+                setTerm(event.currentTarget.value)
                 setCursors([])
                 setSelected(null)
-              }
-            }}
-            onKeyDown={(event) => {
-              if (
-                event.nativeEvent.isComposing ||
-                event.altKey ||
-                event.ctrlKey ||
-                event.metaKey ||
-                event.shiftKey
-              )
-                return
-              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                event.preventDefault()
-                if (busy || !options.length) return
-                const current = options.findIndex((row) => rowKey(row) === activeKey)
-                const next =
-                  (current + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length
-                setSelected(rowKey(options[next]))
-              } else if (event.key === 'Enter') {
-                event.preventDefault()
-                const row = rows[activeIndex]
-                if (row) activate(row)
-              }
-            }}
-          />
+              }}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                if (!(event.nativeEvent as InputEvent).isComposing) {
+                  setTerm(event.target.value)
+                  setCursors([])
+                  setSelected(null)
+                }
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.nativeEvent.isComposing ||
+                  event.altKey ||
+                  event.ctrlKey ||
+                  event.metaKey ||
+                  event.shiftKey
+                )
+                  return
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  event.preventDefault()
+                  if (busy || !options.length) return
+                  const current = options.findIndex((row) => rowKey(row) === activeKey)
+                  const next =
+                    (current + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length
+                  setSelected(rowKey(options[next]))
+                } else if (event.key === 'Enter') {
+                  event.preventDefault()
+                  const row = rows[activeIndex]
+                  if (row) activate(row)
+                }
+              }}
+            />
+          </div>
           <Select<SearchScope>
             value={scope}
             onChange={changeScope}
