@@ -38,6 +38,7 @@ import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { createCatalogSearch, type CatalogSearchMatch, type MatchRange } from '@renderer/lib/catalogSearch'
 import { formatBytes } from '@renderer/lib/formatBytes'
+import { currentWebStorageMode } from '@renderer/lib/web/storageContext'
 import { IS_WEB } from '@renderer/lib/platform'
 import { copyText } from '@renderer/lib/resultCopy'
 import { applyConnectionOrder, reorderConnectionIds, type DropEdge } from '@renderer/lib/connectionOrder'
@@ -913,7 +914,7 @@ export function Explorer({
           </button>
         ) : (
           <span className="side-foot-version" title={__APP_VERSION__}>
-            {__APP_VERSION__}
+            {__APP_VERSION__}{IS_WEB && ` · ${t(currentWebStorageMode() === 'browser' ? 'webStorage.browserShort' : 'webStorage.serverShort')}`}
           </span>
         )}
         <Tooltip content={t('common.settings')}>

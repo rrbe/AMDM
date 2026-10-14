@@ -1,30 +1,22 @@
 import type { Api } from "@shared/ipc";
-import { randomUuid } from "@renderer/lib/randomUuid";
 import type { ConnectionStatus } from "@shared/types";
 
-interface RpcResponse<T> {
-  ok: boolean;
-  result?: T;
-  error?: string;
-}
+import {
+  webRpc as rpc,
+  webRpcWithSignal,
+  storedWebData,
+  webStorageContext,
+  currentWebStorageMode,
+  webClientId,
+} from "@renderer/lib/web/storageContext";
+import {
+  requestConnectionPassword,
+  cancelConnectionPassword,
+} from "@renderer/lib/web/passwordPrompt";
+import { webConnectionUri, webHistorySummary } from "@shared/webStorage";
+import type { SchemaAnalysis } from "@shared/types";
 
-let clientId: string | undefined;
-function webClientId(): string {
-  return (clientId ??= randomUuid());
-}
-
-async function rpc<T>(method: string, ...args: unknown[]): Promise<T> {
-  const response = await fetch("/api/rpc", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ method, args, clientId: webClientId() }),
-  });
-  const body = (await response.json()) as RpcResponse<T>;
-  if (!response.ok || !body.ok)
-    throw new Error(body.error ?? `Request failed (${response.status}).`);
-  return body.result as T;
-}
+const connecting = new Map<string, AbortController>();
 
 function unavailable(): Promise<never> {
   return Promise.reject(new Error("This feature is unavailable on AMDM Web."));
@@ -35,7 +27,11 @@ export const webApi: Api = {
     openSettings: async () => {
       if (window.location.hash === "#settings") return;
       window.history.pushState(
-        { ...window.history.state, amdmRoute: "settings" },
+        {
+          ...window.history.state,
+          amdmRoute: "settings",
+          webStorageMode: currentWebStorageMode(),
+        },
         "",
         "#settings",
       );
@@ -43,25 +39,84 @@ export const webApi: Api = {
     },
   },
   connections: {
-    list: () => rpc("connections.list"),
-    save: (input) => rpc("connections.save", input),
-    delete: (id) => rpc("connections.delete", id),
+    list: () =>
+      storedWebData("connections.list", [], (store) => store.listConnections()),
+    save: (input) =>
+      storedWebData("connections.save", [input], (store) =>
+        store.saveConnection(input),
+      ),
+    delete: async (id) => {
+      const context = await webStorageContext();
+      if (context.mode === "server") return rpc("connections.delete", id);
+      connecting.get(id)?.abort();
+      cancelConnectionPassword(id);
+      await rpc("session.disconnect", id);
+      await context.store.deleteConnection(id);
+    },
     test: (input) => rpc("connections.test", input),
     cachedAuthorization: (input) =>
       rpc("connections.cachedAuthorization", input),
     diagnose: unavailable,
-    buildUri: (input, opts) => rpc("connections.buildUri", input, opts),
+    buildUri: (input, opts) =>
+      storedWebData("connections.buildUri", [input, opts], async () =>
+        webConnectionUri(input, input.password, opts.includePassword),
+      ),
   },
   session: {
-    connect: (id) => rpc("session.connect", id),
-    disconnect: (id) => rpc("session.disconnect", id),
+    connect: async (id) => {
+      const context = await webStorageContext();
+      if (context.mode === "server") return rpc("session.connect", id);
+      const controller = new AbortController();
+      connecting.set(id, controller);
+      try {
+        const connection = await context.store.getConnection(id);
+        if (!connection) throw new Error("Connection not found.");
+        if (controller.signal.aborted) return { id, state: "disconnected" };
+        const password =
+          connection.auth.type === "scram"
+            ? await requestConnectionPassword(connection)
+            : undefined;
+        if (password === null || controller.signal.aborted)
+          return { id, state: "disconnected" };
+        return await webRpcWithSignal(
+          "session.connect",
+          [{ ...connection, password }],
+          controller.signal,
+        );
+      } catch (error) {
+        if (controller.signal.aborted) return { id, state: "disconnected" };
+        throw error;
+      } finally {
+        if (connecting.get(id) === controller) connecting.delete(id);
+      }
+    },
+    disconnect: (id) => {
+      connecting.get(id)?.abort();
+      cancelConnectionPassword(id);
+      return rpc("session.disconnect", id);
+    },
     status: (id) => rpc("session.status", id),
     authorization: (id, input) => rpc("session.authorization", id, input),
     onStatusChanged: (listener) => {
-      const events = new EventSource(`/api/events?clientId=${webClientId()}`);
-      events.onmessage = (event) =>
-        listener(JSON.parse(event.data) as ConnectionStatus);
-      const close = (): void => events.close();
+      let events: EventSource | undefined;
+      let closed = false;
+      void webStorageContext()
+        .then((context) => {
+          if (closed) return;
+          const params = new URLSearchParams({
+            clientId: webClientId(),
+            storageMode: context.mode,
+            storageOwner: context.userId,
+          });
+          events = new EventSource(`/api/events?${params}`);
+          events.onmessage = (event) =>
+            listener(JSON.parse(event.data) as ConnectionStatus);
+        })
+        .catch((error: unknown) => console.error("[Web status stream]", error));
+      const close = (): void => {
+        closed = true;
+        events?.close();
+      };
       window.addEventListener("pagehide", close);
       return () => {
         window.removeEventListener("pagehide", close);
@@ -83,26 +138,67 @@ export const webApi: Api = {
       rpc("catalog.sampleFields", id, database, collection),
   },
   schemas: {
-    get: (target) => rpc("schemas.get", target),
-    analyze: (target) => rpc("schemas.analyze", target),
-    saveDraft: (target, draft) => rpc("schemas.saveDraft", target, draft),
-    overwriteDraft: (target) => rpc("schemas.overwriteDraft", target),
+    get: (target) =>
+      storedWebData(
+        "schemas.get",
+        [target],
+        async (store) => (await store.getSchema(target)) ?? null,
+      ),
+    analyze: async (target) => {
+      const context = await webStorageContext();
+      if (context.mode === "server") return rpc("schemas.analyze", target);
+      const analysis = await rpc<SchemaAnalysis>("schemas.analyze", target);
+      return context.store.saveAnalysis(target, analysis);
+    },
+    saveDraft: (target, draft) =>
+      storedWebData("schemas.saveDraft", [target, draft], (store) =>
+        store.saveDraft(target, draft),
+      ),
+    overwriteDraft: (target) =>
+      storedWebData("schemas.overwriteDraft", [target], (store) =>
+        store.saveDraft(target),
+      ),
   },
   shell: {
-    execute: (request) => rpc("shell.execute", request),
+    execute: async (request) => {
+      const result = await rpc<Awaited<ReturnType<Api["shell"]["execute"]>>>(
+        "shell.execute",
+        request,
+      );
+      const context = await webStorageContext();
+      if (context.mode === "browser")
+        await context.store.addHistory({
+          code: request.code,
+          connectionId: request.connectionId,
+          database: request.database,
+          ok: result.kind !== "error",
+          summary: webHistorySummary(
+            result.kind,
+            result.count,
+            result.elapsedMs,
+            result.errorName,
+          ),
+        });
+      return result;
+    },
     page: (request) => rpc("shell.page", request),
     total: (id) => rpc("shell.total", id),
     release: (id) => rpc("shell.release", id),
     abort: (execId) => rpc("shell.abort", execId),
   },
   queries: {
-    list: () => rpc("queries.list"),
-    save: (input) => rpc("queries.save", input),
-    delete: (id) => rpc("queries.delete", id),
+    list: () =>
+      storedWebData("queries.list", [], (store) => store.listQueries()),
+    save: (input) =>
+      storedWebData("queries.save", [input], (store) => store.saveQuery(input)),
+    delete: (id) =>
+      storedWebData("queries.delete", [id], (store) => store.deleteQuery(id)),
   },
   history: {
-    list: () => rpc("history.list"),
-    clear: () => rpc("history.clear"),
+    list: () =>
+      storedWebData("history.list", [], (store) => store.listHistory()),
+    clear: () =>
+      storedWebData("history.clear", [], (store) => store.clearHistory()),
   },
   docs: {
     read: (request) => rpc("docs.read", request),
@@ -121,8 +217,12 @@ export const webApi: Api = {
     import: unavailable,
   },
   settings: {
-    get: () => rpc("settings.get"),
-    update: (patch) => rpc("settings.update", patch),
+    get: () =>
+      storedWebData("settings.get", [], (store) => store.getSettings()),
+    update: (patch) =>
+      storedWebData("settings.update", [patch], (store) =>
+        store.updateSettings(patch),
+      ),
   },
   updates: {
     checkForUpdates: async () => false,

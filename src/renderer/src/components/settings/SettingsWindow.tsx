@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Code2, Database, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
+import { ArrowLeft, Code2, Database, HardDrive, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -26,9 +26,10 @@ import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNe
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { cn } from '@renderer/lib/utils'
+import { WebStorageSettings } from '@renderer/components/web/WebStorageSettings'
 import { IS_WEB } from '@renderer/lib/platform'
 
-type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
+type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts' | 'storage'
 
 interface UpdateAvailableDotProps {
   version: string
@@ -68,6 +69,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl'
 
   const sections = [
+    ...(IS_WEB ? [{ id: 'storage' as const, label: t('webStorage.section'), icon: HardDrive, keywords: [t('webStorage.section'), t('webStorage.server'), t('webStorage.browser')] }] : []),
     {
       id: 'appearance',
       label: t('settings.sectionAppearance'),
@@ -256,7 +258,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
       aria-label={onClose ? t('settings.title') : undefined}
       className={cn(
         'grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground',
-        onClose && 'fixed inset-0 z-[4000]'
+        onClose && 'fixed inset-0 z-[1000]'
       )}
     >
       <nav
@@ -314,6 +316,8 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
           <h1 className="mb-7 text-[22px] font-semibold tracking-[-0.01em]">
             {displayedSection?.label ?? t('settings.searchNoResults')}
           </h1>
+
+          {displayedSectionId === 'storage' && <WebStorageSettings />}
 
           {displayedSectionId === 'appearance' && (
             <>

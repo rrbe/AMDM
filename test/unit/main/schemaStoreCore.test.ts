@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cloneMongoJsonSchema, schemaTargetKey } from '../../../src/main/store/schemaStoreCore'
+import { cloneMongoJsonSchema, schemaTargetKey } from '../../../src/shared/schemaStoreCore'
 
 describe('schemaStoreCore', () => {
   it('builds an unambiguous namespace key', () => {

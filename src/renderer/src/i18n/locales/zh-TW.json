@@ -737,5 +737,24 @@
     "keyboardHint": "↑ ↓ 選擇 · Enter 開啟 · Esc 關閉",
     "previous": "上一頁",
     "next": "下一頁"
+  },
+  "webStorage": {
+    "browserShort": "本機",
+    "serverShort": "伺服器",
+    "section": "儲存",
+    "mode": "儲存位置",
+    "modeHint": "選擇連線設定、已存查詢、歷史、設定和 Schema 的儲存位置。",
+    "server": "伺服器儲存（預設）",
+    "browser": "瀏覽器本機儲存",
+    "serverDescription": "資料按帳號儲存在伺服器。連線密碼在伺服器加密儲存，同一帳號可在不同瀏覽器中使用。",
+    "browserDescription": "資料儲存在目前瀏覽器中。連線密碼不儲存，每次連線時輸入。清除網站資料會刪除本機資料。伺服器仍負責執行查詢及記錄操作稽核。",
+    "switchHint": "兩種模式各自保留資料。切換時關閉本頁連線並重新載入工作區，已儲存資料留在原位置。",
+    "switchConfirm": "切換儲存模式並重新載入？目前連線會關閉，未儲存的查詢分頁內容會遺失。兩種模式各自保留已儲存資料。",
+    "apply": "套用並重新載入",
+    "passwordTitle": "連線密碼",
+    "passwordDescription": "請輸入「{{name}}」的密碼以連線資料庫。",
+    "browserPasswordHint": "密碼僅用於本次連線，不會儲存在瀏覽器或伺服器。",
+    "serverPasswordHint": "密碼按帳號在伺服器加密儲存。",
+    "connect": "連線"
   }
 }

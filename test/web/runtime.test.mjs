@@ -88,7 +88,7 @@ test(
             "content-type": "application/json",
             "x-forwarded-user": "runtime",
           },
-          body: JSON.stringify({ method, args, clientId }),
+          body: JSON.stringify({ method, args, clientId, storageMode: 'server' }),
         });
         const body = await response.json();
         assert.equal(body.ok, true, JSON.stringify(body));
@@ -108,7 +108,7 @@ test(
         (await call("session.connect", connection.id)).state,
         "connected",
       );
-      events = await fetch(`${origin}/api/events?clientId=${clientId}`, {
+      events = await fetch(`${origin}/api/events?clientId=${clientId}&storageMode=server`, {
         headers: { "x-forwarded-user": "runtime" },
       });
       assert.equal(events.status, 200);

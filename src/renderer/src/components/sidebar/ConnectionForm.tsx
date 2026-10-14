@@ -22,6 +22,7 @@ import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
+import { currentWebStorageMode } from '@renderer/lib/web/storageContext'
 import { IS_WEB } from '@renderer/lib/platform'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { ConnectionPermissions } from './ConnectionPermissions'
@@ -918,7 +919,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
       {tab === 'auth' && (
         <>
           <div className="mb-3 text-[11px] text-[var(--fg-3)]">
-            {tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
+            {IS_WEB ? tFn(currentWebStorageMode() === 'browser' ? 'webStorage.browserPasswordHint' : 'webStorage.serverPasswordHint') : tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
           </div>
           <div className="form-grid">
             <Field label={tFn('connection.auth.username')} error={authError}>

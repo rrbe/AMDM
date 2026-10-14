@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { MongoJsonSchema, SchemaAnalysis, SchemaModel, SchemaTarget } from '../../shared/types'
-import { modelWithAnalysis, modelWithDraft, schemaTargetKey } from './schemaStoreCore'
+import { modelWithAnalysis, modelWithDraft, schemaTargetKey } from '../../shared/schemaStoreCore'
 
 interface SchemaFile {
   version: 1

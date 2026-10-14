@@ -11,10 +11,14 @@ This document records constraints that span multiple directories and are difficu
 The typical call chain is: store action → `window.api` → preload → IPC handler → main service. When changing IPC, check the shared contract, preload, handler, caller, and relevant tests together; never update only one end of the chain.
 
 The internal Web edition uses the same Renderer API through authenticated HTTP
-RPC and an SSE connection-status stream. Its Node server injects per-user encrypted
-storage into the shared session/query cores. Result ownership includes the page
-ID; closing the status stream releases that page's results and the user's last
-page also disconnects live clients. Native dialogs and file transfers stay desktop-only.
+RPC and an SSE connection-status stream. Server mode injects per-user encrypted
+storage into the shared session/query cores. Browser mode keeps metadata in per-user
+IndexedDB and supplies credentials only to page-owned in-memory server sessions;
+each connection requires fresh password input. The two modes retain independent
+datasets, and switching reloads the page. Result ownership includes page ID and
+storage mode. Closing the status stream releases that page's results and browser
+sessions; the user's last server-mode page also disconnects server-mode clients.
+Native dialogs and file transfers stay desktop-only.
 
 ## Application updates
 

@@ -14,6 +14,8 @@ import '@fontsource/jetbrains-mono/500.css'
 import '@fontsource/jetbrains-mono/600.css'
 import { setLanguage } from '@renderer/i18n'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { WebPasswordPrompt } from '@renderer/components/web/WebPasswordPrompt'
+import { currentWebStorageMode } from '@renderer/lib/web/storageContext'
 import { webApi } from '@renderer/webApi'
 import './styles/index.css'
 
@@ -74,7 +76,7 @@ function WebRoot(): React.JSX.Element {
   }, [settingsOpen])
 
   const closeSettings = (): void => {
-    if (window.history.state?.amdmRoute === 'settings') {
+    if (window.history.state?.amdmRoute === 'settings' && window.history.state.webStorageMode === currentWebStorageMode()) {
       window.history.back()
       return
     }
@@ -87,6 +89,7 @@ function WebRoot(): React.JSX.Element {
       <div ref={appRoot} className="h-full" aria-hidden={settingsOpen || undefined}>
         <App />
       </div>
+      <WebPasswordPrompt />
       {settingsOpen && createPortal(<SettingsWindow onClose={closeSettings} />, document.body)}
     </>
   )

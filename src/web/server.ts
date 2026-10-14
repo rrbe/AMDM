@@ -47,8 +47,16 @@ import { shellResults } from "../main/mongo/shellResults";
 import {
   schemaTargetKey,
   cloneMongoJsonSchema,
-} from "../main/store/schemaStoreCore";
+} from "../shared/schemaStoreCore";
 import { WebStore } from "./webStore";
+import { BrowserSessions } from "./browserSessions";
+import { QUERY_TIMEOUTS_MS } from "../shared/types";
+import {
+  webHistorySummary,
+  type WebRpcRequest,
+  type WebStorageMode,
+} from "../shared/webStorage";
+import type { DecryptedConnection } from "../main/mongo/uri";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -69,22 +77,15 @@ export interface WebServerOptions {
   staticDir: string;
 }
 
-interface RpcBody {
-  clientId: string;
-  method: string;
-  args: unknown[];
-}
-
-function historySummary(
-  kind: string,
-  count?: number,
-  elapsedMs?: number,
-  errorName?: string,
-): string {
-  if (kind === "documents") return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`;
-  if (kind === "explain") return `explain · ${elapsedMs ?? 0}ms`;
-  if (kind === "error") return errorName ?? "error";
-  return `${kind} · ${elapsedMs ?? 0}ms`;
+interface RequestContext {
+  mode: WebStorageMode;
+  owner: string;
+  browser: BrowserSessions;
+  sessionId(id: string): string;
+  decryptedInput(input: ConnectionInput): DecryptedConnection;
+  timeoutMS(): number;
+  active(): boolean;
+  onResponseClose(listener: () => void): () => void;
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -98,7 +99,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(data);
 }
 
-function readBody(req: IncomingMessage): Promise<RpcBody> {
+function readBody(req: IncomingMessage): Promise<WebRpcRequest> {
   return new Promise((resolveBody, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -115,13 +116,19 @@ function readBody(req: IncomingMessage): Promise<RpcBody> {
       try {
         const value = JSON.parse(
           Buffer.concat(chunks).toString("utf8"),
-        ) as Partial<RpcBody>;
+        ) as Partial<WebRpcRequest>;
         if (
           !value ||
           typeof value.method !== "string" ||
           !Array.isArray(value.args) ||
           typeof value.clientId !== "string" ||
-          !/^[a-f0-9-]{36}$/i.test(value.clientId)
+          !/^[a-f0-9-]{36}$/i.test(value.clientId) ||
+          !["server", "browser"].includes(value.storageMode ?? "") ||
+          (value.storageMode === "browser" &&
+            (!QUERY_TIMEOUTS_MS.includes(
+              value.queryTimeoutMS as (typeof QUERY_TIMEOUTS_MS)[number],
+            ) ||
+              typeof value.storageOwner !== "string"))
         ) {
           throw new Error("Invalid RPC request.");
         }
@@ -129,6 +136,9 @@ function readBody(req: IncomingMessage): Promise<RpcBody> {
           method: value.method,
           args: value.args,
           clientId: value.clientId,
+          storageMode: value.storageMode!,
+          storageOwner: value.storageOwner,
+          queryTimeoutMS: value.queryTimeoutMS,
         });
       } catch (error) {
         reject(error);
@@ -192,12 +202,7 @@ function connectionInput(args: unknown[], index = 0): ConnectionInput {
   return value as unknown as ConnectionInput;
 }
 
-function shellRequest(
-  args: unknown[],
-  store: WebStore,
-  user: string,
-  owner: string,
-): ShellRequest {
+function shellRequest(args: unknown[], context: RequestContext): ShellRequest {
   const value = objectArg(args, 0);
   const connectionId = String(value.connectionId ?? "");
   const database = String(value.database ?? "");
@@ -206,18 +211,17 @@ function shellRequest(
     throw new Error("Invalid Shell request.");
   return {
     ...(value as unknown as ShellRequest),
-    connectionId: store.sessionId(user, connectionId),
+    connectionId: context.sessionId(connectionId),
     execId:
       typeof value.execId === "string" && value.execId
-        ? `${owner}:${value.execId}`
+        ? `${context.owner}:${value.execId}`
         : undefined,
   };
 }
 
 function documentRequest<T extends DocMutateRequest>(
   args: unknown[],
-  store: WebStore,
-  user: string,
+  context: RequestContext,
 ): { externalConnectionId: string; request: T } {
   const value = objectArg(args, 0);
   const connectionId = String(value.connectionId ?? "");
@@ -235,7 +239,7 @@ function documentRequest<T extends DocMutateRequest>(
     externalConnectionId: connectionId,
     request: {
       ...value,
-      connectionId: store.sessionId(user, connectionId),
+      connectionId: context.sessionId(connectionId),
     } as unknown as T,
   };
 }
@@ -256,8 +260,26 @@ async function dispatch(
   method: string,
   args: unknown[],
   reads: Map<string, ReadTask>,
-  owner: string,
+  context: RequestContext,
 ): Promise<unknown> {
+  const { owner } = context;
+  if (method === "app.context") return { userId: ownerId(user) };
+  if (
+    context.mode === "browser" &&
+    ([
+      "connections.list",
+      "connections.save",
+      "connections.delete",
+      "connections.buildUri",
+      "schemas.get",
+      "schemas.saveDraft",
+      "schemas.overwriteDraft",
+    ].includes(method) ||
+      method.startsWith("queries.") ||
+      method.startsWith("history.") ||
+      method.startsWith("settings."))
+  )
+    throw new Error("Browser metadata is stored only in IndexedDB.");
   switch (method) {
     case "connections.list":
       return store.listConnections(user);
@@ -265,7 +287,7 @@ async function dispatch(
       return store.saveConnection(user, connectionInput(args));
     case "connections.delete": {
       const id = stringArg(args, 0);
-      const sessionId = store.sessionId(user, id);
+      const sessionId = context.sessionId(id);
       for (const task of reads.values())
         if (task.connectionId === sessionId) task.controller.abort();
       await sessions.disconnect(sessionId);
@@ -274,10 +296,10 @@ async function dispatch(
     }
     case "connections.cachedAuthorization":
       return sessions.cachedAuthorization(
-        store.decryptedInput(user, connectionInput(args)),
+        context.decryptedInput(connectionInput(args)),
       );
     case "connections.test":
-      return sessions.test(store.decryptedInput(user, connectionInput(args)));
+      return sessions.test(context.decryptedInput(connectionInput(args)));
     case "connections.buildUri":
       return store.buildConnectionUri(
         user,
@@ -285,36 +307,61 @@ async function dispatch(
         objectArg(args, 1).includePassword === true,
       );
     case "session.connect": {
+      if (context.mode === "browser") {
+        if (!context.active())
+          throw new Error("The browser page is closed. Reload AMDM.");
+        const input = connectionInput(args);
+        const connection = context.browser.register(owner, input);
+        let connected = false;
+        const unsubscribe = context.onResponseClose(() => {
+          if (context.browser.getDecrypted(connection.config.id) !== connection)
+            return;
+          context.browser.forget(connection.config.id, connection);
+          void sessions.disconnect(connection.config.id);
+        });
+        try {
+          const status = await sessions.connect(connection.config.id);
+          connected = status.state === "connected";
+          return { ...status, id: input.id };
+        } finally {
+          unsubscribe();
+          if (!connected)
+            context.browser.forget(connection.config.id, connection);
+        }
+      }
       const id = stringArg(args, 0);
-      const status = await sessions.connect(store.sessionId(user, id));
+      const status = await sessions.connect(context.sessionId(id));
       return { ...status, id };
     }
     case "session.disconnect": {
-      const id = store.sessionId(user, stringArg(args, 0));
+      const id = context.sessionId(stringArg(args, 0));
       for (const task of reads.values())
         if (task.connectionId === id) task.controller.abort();
-      return sessions.disconnect(id);
+      const current = context.browser.getDecrypted(id);
+      await sessions.disconnect(id);
+      if (current) context.browser.forget(id, current);
+      return;
     }
     case "session.authorization":
       return sessions.authorization(
-        store.sessionId(user, stringArg(args, 0)),
-        store.decryptedInput(user, connectionInput(args, 1)),
+        context.sessionId(stringArg(args, 0)),
+        context.decryptedInput(connectionInput(args, 1)),
       );
     case "session.status": {
       const id = stringArg(args, 0);
-      return { ...sessions.getStatus(store.sessionId(user, id)), id };
+      return { ...sessions.getStatus(context.sessionId(id)), id };
     }
     case "catalog.databases":
-      return listDatabases(store.sessionId(user, stringArg(args, 0)), sessions);
+      return listDatabases(context.sessionId(stringArg(args, 0)), sessions);
     case "catalog.collections":
       return listCollections(
-        store.sessionId(user, stringArg(args, 0)),
+        context.sessionId(stringArg(args, 0)),
         stringArg(args, 1),
         sessions,
       );
     case "catalog.collectionCount":
       return estimateCollectionCount(
-        store.sessionId(user, stringArg(args, 0)),
+        context.sessionId(stringArg(args, 0)),
         stringArg(args, 1),
         stringArg(args, 2),
         sessions,
@@ -326,11 +373,11 @@ async function dispatch(
       let ok = false;
       try {
         await dropCollection(
-          store.sessionId(user, connectionId),
+          context.sessionId(connectionId),
           database,
           collection,
           {
-            timeoutMS: store.getSettings(user).queryTimeoutMS || 30_000,
+            timeoutMS: context.timeoutMS(),
             signal: AbortSignal.timeout(30_000),
           },
           sessions,
@@ -354,15 +401,17 @@ async function dispatch(
     case "schemas.overwriteDraft": {
       const target = objectArg(args, 0) as unknown as SchemaTarget;
       schemaTargetKey(target);
-      const connectionId = store.sessionId(user, target.connectionId);
+      const connectionId = context.sessionId(target.connectionId);
       if (method === "schemas.get") return store.getSchema(user, target);
       if (method === "schemas.analyze") {
         const analysis = await analyzeCollectionSchemaOnDb(
           sessions.getClient(connectionId).db(target.database),
           target.collection,
-          store.getSettings(user).queryTimeoutMS || 30_000,
+          context.timeoutMS(),
         );
-        return store.saveSchemaAnalysis(user, target, analysis);
+        return context.mode === "browser"
+          ? analysis
+          : store.saveSchemaAnalysis(user, target, analysis);
       }
       return store.saveSchemaDraft(
         user,
@@ -374,43 +423,44 @@ async function dispatch(
     }
     case "catalog.indexes":
       return listIndexes(
-        store.sessionId(user, stringArg(args, 0)),
+        context.sessionId(stringArg(args, 0)),
         stringArg(args, 1),
         stringArg(args, 2),
         sessions,
       );
     case "catalog.users":
       return listUsers(
-        store.sessionId(user, stringArg(args, 0)),
+        context.sessionId(stringArg(args, 0)),
         stringArg(args, 1),
         sessions,
       );
     case "catalog.sampleFields":
       return sampleFields(
-        store.sessionId(user, stringArg(args, 0)),
+        context.sessionId(stringArg(args, 0)),
         stringArg(args, 1),
         stringArg(args, 2),
         sessions,
       );
     case "shell.execute": {
       const external = objectArg(args, 0);
-      const request = shellRequest(args, store, user, owner);
+      const request = shellRequest(args, context);
       let ok = false;
       try {
         const result = await executeShell(request, owner, sessions);
         ok = result.kind !== "error";
-        store.addHistory(user, {
-          code: request.code,
-          connectionId: String(external.connectionId),
-          database: request.database,
-          ok,
-          summary: historySummary(
-            result.kind,
-            result.count,
-            result.elapsedMs,
-            result.errorName,
-          ),
-        });
+        if (context.mode === "server")
+          store.addHistory(user, {
+            code: request.code,
+            connectionId: String(external.connectionId),
+            database: request.database,
+            ok,
+            summary: webHistorySummary(
+              result.kind,
+              result.count,
+              result.elapsedMs,
+              result.errorName,
+            ),
+          });
         return result;
       } finally {
         store.audit({
@@ -441,7 +491,7 @@ async function dispatch(
       const input = objectArg(args, 0) as unknown as SavedQueryInput;
       if (typeof input.name !== "string" || typeof input.code !== "string")
         throw new Error("Invalid saved query.");
-      if (input.connectionId) store.sessionId(user, input.connectionId);
+      if (input.connectionId) context.sessionId(input.connectionId);
       return store.saveQuery(user, input);
     }
     case "queries.delete":
@@ -457,7 +507,7 @@ async function dispatch(
       return true;
     }
     case "docs.read": {
-      const { request } = documentRequest<DocReadRequest>(args, store, user);
+      const { request } = documentRequest<DocReadRequest>(args, context);
       if (typeof request.taskId !== "string" || !request.taskId)
         throw new Error("Missing document refresh task id.");
       const key = `${owner}:${request.taskId}`;
@@ -471,7 +521,7 @@ async function dispatch(
           request.id,
           {
             signal: controller.signal,
-            timeoutMS: store.getSettings(user).queryTimeoutMS || 30_000,
+            timeoutMS: context.timeoutMS(),
           },
         );
         return document === null
@@ -493,7 +543,7 @@ async function dispatch(
     }
     case "docs.update": {
       const { externalConnectionId, request } =
-        documentRequest<DocUpdateRequest>(args, store, user);
+        documentRequest<DocUpdateRequest>(args, context);
       if (typeof request.documentEjson !== "string")
         throw new Error("Invalid document update.");
       const result = await replaceDocumentOnDb(
@@ -515,7 +565,7 @@ async function dispatch(
     }
     case "docs.setField": {
       const { externalConnectionId, request } =
-        documentRequest<DocSetFieldRequest>(args, store, user);
+        documentRequest<DocSetFieldRequest>(args, context);
       if (
         typeof request.path !== "string" ||
         typeof request.valueEjson !== "string"
@@ -542,7 +592,7 @@ async function dispatch(
     }
     case "docs.delete": {
       const { externalConnectionId, request } =
-        documentRequest<DocMutateRequest>(args, store, user);
+        documentRequest<DocMutateRequest>(args, context);
       const result = await deleteDocumentOnDb(
         sessions.getClient(request.connectionId).db(request.database),
         request.collection,
@@ -626,9 +676,59 @@ export function createWebRequestHandler({
   origin,
   staticDir,
 }: WebServerOptions) {
-  const sessions = new SessionManager(store);
+  const browser = new BrowserSessions();
+  const sessions = new SessionManager({
+    getDecrypted: (id) =>
+      id.startsWith("browser:")
+        ? browser.getDecrypted(id)
+        : store.getDecrypted(id),
+  });
   const reads = new Map<string, ReadTask>();
-  const streams = new Map<ServerResponse, string>();
+  const streams = new Map<
+    ServerResponse,
+    { user: string; mode: WebStorageMode; owner: string }
+  >();
+  const requestContext = (
+    user: string,
+    clientId: string,
+    mode: WebStorageMode,
+    queryTimeoutMS: number | undefined,
+    response: ServerResponse,
+  ): RequestContext => {
+    const owner = `${ownerId(user)}:${clientId}:${mode}`;
+    return {
+      mode,
+      owner,
+      browser,
+      active: () =>
+        [...streams.values()].some((stream) => stream.owner === owner),
+      onResponseClose: (listener) => {
+        response.once("close", listener);
+        return () => {
+          response.removeListener("close", listener);
+        };
+      },
+      sessionId: (id) =>
+        mode === "browser"
+          ? browser.sessionId(owner, id)
+          : store.sessionId(user, id),
+      decryptedInput: (input) =>
+        mode === "browser"
+          ? browser.decryptedInput(owner, input)
+          : store.decryptedInput(user, input),
+      timeoutMS: () =>
+        (mode === "browser"
+          ? queryTimeoutMS
+          : store.getSettings(user).queryTimeoutMS) || 30_000,
+    };
+  };
+  const closeBrowserOwner = async (owner: string): Promise<void> => {
+    for (const id of browser.ids(owner)) {
+      const current = browser.getDecrypted(id);
+      await sessions.disconnect(id);
+      if (current) browser.forget(id, current);
+    }
+  };
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.url === "/healthz") {
       sendJson(res, 200, { ok: true });
@@ -639,24 +739,35 @@ export function createWebRequestHandler({
         if (req.headers.origin && req.headers.origin !== origin)
           throw new Error("Invalid request origin.");
         const user = userFrom(req);
-        const prefix = `${ownerId(user)}:`;
-        const clientId = new URL(req.url!, origin).searchParams.get("clientId");
+        const params = new URL(req.url!, origin).searchParams;
+        const mode = params.get("storageMode");
+        if (mode !== "server" && mode !== "browser")
+          throw new Error("Invalid storage mode.");
+        if (mode === "browser" && params.get("storageOwner") !== ownerId(user))
+          throw new Error("Authenticated user changed. Reload AMDM.");
+        const clientId = params.get("clientId");
         if (!clientId || !/^[a-f0-9-]{36}$/i.test(clientId))
           throw new Error("Invalid client id.");
-        const owner = `${ownerId(user)}:${clientId}`;
+        const context = requestContext(user, clientId, mode, undefined, res);
+        const { owner } = context;
+        const prefix =
+          mode === "browser" ? `browser:${owner}:` : `${ownerId(user)}:`;
         res.writeHead(200, {
           "content-type": "text/event-stream",
           "cache-control": "no-store",
           "x-accel-buffering": "no",
         });
         res.write(": connected\n\n");
-        streams.set(res, user);
-        for (const connection of store.listConnections(user)) {
-          const status = sessions.getStatus(
-            store.sessionId(user, connection.id),
-          );
+        streams.set(res, { user, mode, owner });
+        const sessionIds =
+          mode === "browser"
+            ? browser.ids(owner)
+            : store
+                .listConnections(user)
+                .map((connection) => context.sessionId(connection.id));
+        for (const id of sessionIds) {
           res.write(
-            `data: ${JSON.stringify({ ...status, id: connection.id })}\n\n`,
+            `data: ${JSON.stringify({ ...sessions.getStatus(id), id: id.slice(prefix.length) })}\n\n`,
           );
         }
         const unsubscribe = sessions.onStatusChanged((status) => {
@@ -679,10 +790,15 @@ export function createWebRequestHandler({
           for (const [key, task] of reads)
             if (key.startsWith(`${owner}:`)) task.controller.abort();
           void shellResults.closeOwner(owner);
-          if (![...streams.values()].includes(user)) {
-            for (const connection of store.listConnections(user)) {
-              void sessions.disconnect(store.sessionId(user, connection.id));
-            }
+          if (mode === "browser") {
+            void closeBrowserOwner(owner);
+          } else if (
+            ![...streams.values()].some(
+              (stream) => stream.user === user && stream.mode === "server",
+            )
+          ) {
+            for (const connection of store.listConnections(user))
+              void sessions.disconnect(context.sessionId(connection.id));
           }
         });
       } catch (error) {
@@ -712,6 +828,8 @@ export function createWebRequestHandler({
       }
       const user = userFrom(req);
       const body = await readBody(req);
+      if (body.storageMode === "browser" && body.storageOwner !== ownerId(user))
+        throw new Error("Authenticated user changed. Reload AMDM.");
       const result = await dispatch(
         store,
         sessions,
@@ -719,7 +837,13 @@ export function createWebRequestHandler({
         body.method,
         body.args,
         reads,
-        `${ownerId(user)}:${body.clientId}`,
+        requestContext(
+          user,
+          body.clientId,
+          body.storageMode,
+          body.queryTimeoutMS,
+          res,
+        ),
       );
       sendJson(res, 200, { ok: true, result });
     } catch (error) {
@@ -735,6 +859,7 @@ export function createWebRequestHandler({
       for (const stream of streams.keys()) stream.end();
       for (const task of reads.values()) task.controller.abort();
       await sessions.closeAll();
+      browser.clear();
     },
   };
 }
