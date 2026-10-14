@@ -103,7 +103,7 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--border-strong);
 }
 input[type='checkbox'] {
   width: auto;
@@ -127,4 +127,3 @@ label {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-

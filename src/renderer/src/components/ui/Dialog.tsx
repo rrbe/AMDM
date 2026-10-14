@@ -50,7 +50,7 @@ export function Dialog({
   popupRef,
   style,
   children
-}: DialogProps): JSX.Element {
+}: DialogProps): React.JSX.Element {
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>

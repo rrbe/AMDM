@@ -135,6 +135,7 @@ export function operatorGroups(ctx: OpContext | null): OperatorGroup[] {
 
 /** EJSON constructors / shell globals (also declared in the base d.ts). */
 export const SHELL_GLOBALS = [
+  'db', 'driverDb', 'rs', 'sh', 'config', 'EJSON',
   'ObjectId', 'ISODate', 'NumberLong', 'NumberInt', 'NumberDecimal', 'UUID', 'BinData',
   'Timestamp', 'MinKey', 'MaxKey', 'Date', 'RegExp'
 ]
@@ -180,7 +181,7 @@ export const BOOLEAN_KEYS = new Set([
 ])
 
 // --------------------------------------------------------------------------
-// REPL commands (mongosh-style; require shellCore REPL support to run)
+// Mongosh REPL commands
 // --------------------------------------------------------------------------
 
 export interface CommandDef {

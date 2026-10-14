@@ -53,6 +53,11 @@
   background: var(--interaction-selected);
   color: var(--text-primary);
 }
+.side-search-toggle {
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+}
 .explorer-nav {
   min-height: 51px;
   flex: 0 0 51px;
@@ -67,8 +72,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 8px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  font-weight: 600;
   border: 0;
   border-radius: var(--radius-row);
   background: transparent;
@@ -81,27 +87,75 @@
 .explorer-nav-item.is-active {
   background: var(--interaction-selected);
   color: var(--text-primary);
-  padding: 0 11px;
-  font-weight: 600;
 }
 .explorer-nav-item svg {
   flex: 0 0 auto;
 }
+.explorer-nav-label {
+  /* Keep labels mounted so intrinsic width can animate in either direction. */
+  interpolate-size: allow-keywords;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    width var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+.explorer-nav-label > span {
+  display: block;
+  padding-left: 7px;
+}
+.explorer-nav-item.is-active .explorer-nav-label {
+  width: auto;
+  opacity: 1;
+}
+.side-search-slot {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+}
+.side-search-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  transition: opacity var(--motion-base) var(--ease-standard);
+}
+.is-searching .side-search-heading {
+  opacity: 0;
+}
 .explorer-search {
-  height: 38px;
-  flex: 0 0 auto;
+  position: absolute;
+  inset: 0;
+  height: 28px;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 6px 8px 0;
   padding: 0 8px;
   border: 1px solid var(--separator);
   border-radius: var(--radius-control);
   background: var(--surface-control);
   color: var(--fg-3);
+  clip-path: inset(-4px -4px -4px 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    clip-path var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+.is-searching .explorer-search {
+  clip-path: inset(-4px);
+  opacity: 1;
+  pointer-events: auto;
+}
+.explorer-search > svg,
+.explorer-search button {
+  flex-shrink: 0;
 }
 .explorer-search:focus-within {
-  border-color: var(--primary);
+  border-color: var(--separator-strong);
   box-shadow: 0 0 0 3px var(--focus-soft);
 }
 .explorer-search input {
@@ -301,10 +355,37 @@
   display: block;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  color: var(--t-string);
+  color: var(--editor-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sq-code .syntax-keyword,
+.sq-code .syntax-property {
+  color: var(--editor-keyword);
+}
+.sq-code .syntax-string {
+  color: var(--editor-string);
+}
+.sq-code .syntax-number,
+.sq-code .syntax-function {
+  color: var(--editor-number);
+}
+.sq-code .syntax-variable {
+  color: var(--editor-foreground);
+}
+.sq-code .syntax-punctuation {
+  color: var(--text-secondary);
+}
+.sq-code .syntax-comment {
+  color: var(--editor-comment);
+  font-style: italic;
+}
+.sq-code .syntax-type {
+  color: var(--editor-type);
+}
+.sq-code .syntax-invalid {
+  color: var(--err);
 }
 .sq-sub {
   display: flex;
@@ -312,6 +393,20 @@
   flex-wrap: wrap;
   margin-top: 2px;
   font-size: var(--fs-xs, 11px);
+}
+.sq-sub--saved {
+  justify-content: space-between;
+  gap: 2px 8px;
+}
+.sq-sub--saved > span:first-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-saved-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .sq-sub .lib-ok {
   color: var(--ok);
@@ -597,4 +692,20 @@
   color: var(--fg-3);
   font-size: var(--fs-sm);
   margin-left: auto;
+}
+
+.explorer .search-match {
+  padding: 0;
+  border-radius: 2px;
+  background: var(--search-match-background);
+  color: inherit;
+  font: inherit;
+}
+.explorer .search-match[data-approximate] {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.explorer-search-row > .conn-item {
+  position: static;
+  margin: 0;
 }

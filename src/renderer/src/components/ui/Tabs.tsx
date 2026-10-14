@@ -28,7 +28,7 @@ export function Tabs<T extends string | number = string>({
   onChange,
   items,
   className
-}: TabsProps<T>): JSX.Element {
+}: TabsProps<T>): React.JSX.Element {
   return (
     <BaseTabs.Root value={value} onValueChange={(v) => onChange(v as T)}>
       <BaseTabs.List className={cn('flex gap-4', className)}>

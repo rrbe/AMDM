@@ -1,14 +1,18 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
+import { mongoshEditorPlugin } from './scripts/mongosh-editor-types.mjs'
 
 // Test layers:
 //   test/unit/**      pure logic, node env, no mongo — CI gate
 //   test/contract/**  cross-layer BSON↔EJSON round-trip — CI gate
-//   test/integration/** real MongoDB via mongodb-memory-server — local
+//   test/integration/** real MongoDB via mongodb-memory-server — CI gate
+// UI E2E uses node:test separately; benchmarks have dedicated pnpm commands.
 // A single mongod is shared across the run (fileParallelism: false) — no
 // parallel files spinning up competing servers. Unit/contract files don't
 // import the harness, so they never start mongod.
 export default defineConfig({
+  plugins: [mongoshEditorPlugin()],
+  define: { __WEB__: 'false' },
   resolve: {
     alias: {
       '@shared': resolve(import.meta.dirname, 'src/shared'),

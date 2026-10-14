@@ -15,7 +15,8 @@
   min-height: 41px;
   padding: 5px 12px 0;
   background: var(--surface-chrome);
-  flex: 0 0 auto;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -23,8 +24,8 @@
   display: none;
 }
 .rtab {
-  flex: 0 0 190px;
-  width: 190px;
+  flex: 0 0 var(--document-tab-width, 190px);
+  width: var(--document-tab-width, 190px);
 }
 
 .result-bar {
@@ -42,8 +43,9 @@
 .view-switch {
   display: flex;
   gap: 0;
-  padding: 0;
-  border: 1px solid var(--separator-strong);
+  padding: 1px;
+  /* Keep the outline inside the clip so the moving fill can cover it. */
+  box-shadow: inset 0 0 0 1px var(--separator-strong);
   border-radius: var(--radius-control);
   background: transparent;
   overflow: hidden;
@@ -57,17 +59,35 @@
   background: transparent;
   color: var(--text-muted);
 }
-.view-switch button:last-child {
+.view-switch button:first-of-type {
+  border-top-left-radius: calc(var(--radius-control) - 1px);
+  border-bottom-left-radius: calc(var(--radius-control) - 1px);
+}
+.view-switch button:last-of-type {
   border-right: 0;
+  border-top-right-radius: calc(var(--radius-control) - 1px);
+  border-bottom-right-radius: calc(var(--radius-control) - 1px);
 }
 .view-switch button.active {
-  background: var(--primary);
+  background: transparent;
   color: var(--primary-foreground);
 }
 .result-meta {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   align-items: center;
+}
+.result-meta-part {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+.result-meta-separator {
+  width: 1px;
+  height: 12px;
+  flex: 0 0 1px;
+  background: var(--separator);
 }
 .result-meta .truncated {
   color: var(--warn);
@@ -225,7 +245,7 @@
 }
 /* Per-doc edit/delete, revealed on row hover at the right edge. */
 /* Inline cell editor (Tree value cell + Table data cell). Fills the cell,
-   monospace, accent ring; red ring when the last commit failed validation. */
+   monospace, accent border; red border when the last commit failed validation. */
 .cell-edit-input {
   width: 100%;
   box-sizing: border-box;
@@ -238,6 +258,8 @@
   border: 1px solid var(--primary);
   border-radius: var(--radius-control);
   outline: none;
+  /* The border carries focus without clipping a global input shadow in the cell. */
+  box-shadow: none;
   /* Opt back into text selection: the grid row/table disables it, but you must
      be able to select/edit text while inline-editing a cell. */
   user-select: text;
@@ -299,16 +321,110 @@
 
 /* ------------------------------------------------------------- json result */
 .json-line {
+  --json-gutter-width: 28px;
+  isolation: isolate;
   cursor: text;
   padding-right: 12px;
   font-family: var(--font-mono);
 }
-.json-line:hover {
+.json-line:hover::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: 0 0 0 var(--json-gutter-width);
   background: var(--interaction-hover);
 }
 .json-line pre {
   margin: 0;
+  padding-left: var(--json-gutter-width);
   white-space: pre;
+}
+.json-custom-selection ::selection {
+  background: transparent;
+}
+.json-text-selected::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  left: var(--json-selection-left);
+  width: var(--json-selection-width);
+  background: var(--code-selection);
+}
+.foldable-json-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  font-family: var(--font-mono);
+}
+.foldable-json-lines .virtual-scroller {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  padding: 12px;
+}
+.json-fold-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.json-fold-action:hover:not(:disabled) {
+  background: var(--interaction-hover);
+  color: var(--text-primary);
+}
+.json-fold-toggle {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: calc(100% - 4px);
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.json-fold-toggle[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.json-fold-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--interaction-hover);
+}
+.json-fold-summary {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  margin: 0 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 3px;
+  vertical-align: baseline;
+  background: var(--interaction-hover);
+  color: var(--text-secondary);
+  font: inherit;
+  line-height: 1;
+}
+.json-fold-toggle:focus-visible,
+.json-fold-summary:focus-visible,
+.json-fold-action:focus-visible {
+  outline: 2px solid var(--separator-strong);
+  outline-offset: -2px;
 }
 .json-key {
   color: var(--t-key);
@@ -339,11 +455,50 @@
   border-bottom: 1px dashed var(--border);
   height: calc(var(--data-font-size) + 11px);
 }
+.tbl-column-group {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+}
+.tbl-column-group > .tbl-th,
+.tbl-head > .tbl-th {
+  height: 100%;
+}
+.tbl-head > .idx {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.tbl-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--data-font-size) + 11px);
+  padding: 0 10px;
+  border-right: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.tbl-group-children {
+  display: flex;
+  height: calc(100% - var(--data-font-size) - 11px);
+}
+.tbl-group-children > .tbl-th {
+  height: 100%;
+}
+.tbl-group-children .tbl-sort-trigger {
+  cursor: pointer;
+}
 .tbl-th {
   position: relative;
   flex: 0 0 auto;
   height: calc(var(--data-font-size) + 11px);
-  padding: 0 10px;
+  padding: 0;
   line-height: calc(var(--data-font-size) + 11px);
   border-right: 1px dashed var(--border);
   font-weight: 500;
@@ -351,6 +506,78 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tbl-sort-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0 18px 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.table-columns-sorting,
+.table-columns-sorting .tbl-group-title,
+.table-columns-sorting .tbl-sort-trigger {
+  cursor: grabbing;
+}
+.table-columns-sorting .tbl-th,
+.table-columns-sorting .tbl-column-group,
+.table-columns-sorting .tbl-td {
+  transition-property: transform;
+  transition-timing-function: var(--ease-standard);
+}
+.table-columns-sorting .tbl-row,
+.table-columns-sorting .tbl-column-group,
+.table-columns-sorting .tbl-th {
+  background: var(--surface-content);
+}
+.table-columns-sorting .tbl-td {
+  background: inherit;
+}
+.table-columns-sorting .tbl-column-dragging {
+  color: var(--text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-columns-sorting .tbl-th,
+  .table-columns-sorting .tbl-column-group,
+  .table-columns-sorting .tbl-td {
+    transition: none;
+  }
+}
+.tbl-sort-trigger:hover,
+.tbl-sort-trigger.active {
+  background: var(--interaction-hover);
+  color: var(--fg-1);
+}
+.tbl-sort-trigger:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.tbl-col-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-sort-trigger svg {
+  flex: 0 0 auto;
+}
+.tbl-sort-idle {
+  opacity: 0;
+}
+.tbl-sort-trigger:hover .tbl-sort-idle,
+.tbl-sort-trigger:focus-visible .tbl-sort-idle {
+  opacity: 0.65;
 }
 /* Drag the right edge of a header cell to resize that column. */
 .tbl-col-resizer {
@@ -360,12 +587,13 @@
   right: 0;
   width: 7px;
   cursor: col-resize;
-  z-index: 1;
+  z-index: 2;
 }
 .tbl-col-resizer:hover {
   background: var(--accent-soft-strong);
 }
 .tbl-th.idx {
+  padding: 0 10px;
   color: var(--fg-3);
   font-weight: 400;
 }
@@ -418,6 +646,45 @@
   background: var(--interaction-hover);
 }
 
+/* Opaque pinned cells keep scrolled data out of the identity column, including
+   the translucent hover and selection treatments used by the rest of the row. */
+.has-pinned-id .tbl-row {
+  --tbl-row-overlay: transparent;
+}
+.has-pinned-id .tbl-row:hover {
+  --tbl-row-overlay: var(--interaction-hover);
+}
+.has-pinned-id .tbl-row.selected {
+  --tbl-row-overlay: var(--accent-soft-strong);
+}
+.has-pinned-id .idx,
+.has-pinned-id .tbl-pinned-id {
+  position: sticky;
+  z-index: 3;
+  background: var(--surface-content);
+}
+.has-pinned-id .idx {
+  left: 0;
+}
+.has-pinned-id .tbl-pinned-id {
+  border-right: 1px solid var(--separator-strong);
+}
+.has-pinned-id .tbl-pinned-id .tbl-sort-trigger {
+  cursor: pointer;
+}
+.has-pinned-id .tbl-row > .idx,
+.has-pinned-id .tbl-row > .tbl-pinned-id {
+  background: linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+.has-pinned-id .tbl-row > .tbl-pinned-id.selected {
+  background: linear-gradient(var(--accent-soft-strong), var(--accent-soft-strong)),
+    linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+.has-pinned-id .tbl-row > .idx-select:hover {
+  background: linear-gradient(var(--interaction-hover), var(--interaction-hover)),
+    linear-gradient(var(--tbl-row-overlay), var(--tbl-row-overlay)), var(--surface-content);
+}
+
 /* Icon actions in the result bar. */
 .result-bar-spacer {
   flex: 1;
@@ -440,7 +707,15 @@
   color: var(--text-primary);
 }
 
-/* Result paging — prev/next + range, sits in the result bar near the right. */
+/* Result totals, display size, and range navigation. */
+.result-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .result-pager {
   display: inline-flex;
   align-items: center;
@@ -464,7 +739,7 @@
   text-align: center;
   color: var(--fg-1);
 }
-/* Query limit. */
+/* Display page size. */
 .page-size {
   display: inline-flex;
   align-items: center;
@@ -480,11 +755,6 @@
   display: flex;
   flex-direction: column;
 }
-.json-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
 .json-body.all-selected .json-line {
   background: var(--accent-soft);
 }
@@ -495,11 +765,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.console-view-wrap .virtual-scroller {
-  flex: 1;
-  min-height: 0;
-  height: auto;
 }
 .console-line pre {
   color: var(--fg-1);
@@ -550,4 +815,51 @@
   margin: 0;
   max-width: 360px;
   line-height: 1.5;
+}
+
+.view-switch.sliding-selection > .selection-indicator {
+  left: calc(anchor(left) - 1px);
+  top: 0;
+  width: calc(anchor-size(width) + 2px);
+  height: 100%;
+  background: var(--primary);
+  border-radius: 0;
+}
+.result-view-shortcut {
+  isolation: isolate;
+}
+.result-view-shortcut::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0 -4px -4px;
+  z-index: 0;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+  mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
+}
+.result-view-shortcut > .document-tab-shortcut {
+  position: relative;
+  z-index: 1;
+}
+.copy-feedback {
+  display: grid;
+  width: 14px;
+  height: 14px;
+}
+.copy-feedback > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
+.copy-feedback > svg:last-child {
+  opacity: 0;
+  transform: scale(0.8);
+}
+.copy-feedback.is-copied > svg:first-child {
+  opacity: 0;
+}
+.copy-feedback.is-copied > svg:last-child {
+  opacity: 1;
+  transform: scale(1);
 }

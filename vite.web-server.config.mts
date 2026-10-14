@@ -1,25 +1,27 @@
-import { resolve } from 'node:path'
-import { defineConfig } from 'vite'
+import { resolve } from "node:path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   resolve: {
     alias: {
-      '@shared': resolve('src/shared')
-    }
-  },
-  ssr: {
-    noExternal: ['@mongosh/async-rewriter2']
+      "@shared": resolve("src/shared"),
+    },
   },
   build: {
-    ssr: resolve('src/web/index.ts'),
-    target: 'node22',
-    outDir: resolve('out/web-server'),
+    ssr: true,
+    target: "node22",
+    outDir: resolve("out/web-server"),
     emptyOutDir: true,
     rollupOptions: {
+      input: {
+        index: resolve("src/web/index.ts"),
+        "serializer.worker": resolve("src/main/workers/serializer.worker.ts"),
+      },
       output: {
-        entryFileNames: 'index.mjs',
-        format: 'es'
-      }
-    }
-  }
-})
+        entryFileNames: (chunk) =>
+          chunk.name === "index" ? "index.mjs" : "[name].js",
+        format: "es",
+      },
+    },
+  },
+});

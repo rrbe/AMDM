@@ -1,10 +1,37 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
 import { app } from 'electron'
+import type { UpdateState } from '../shared/types'
+import { settingsStore } from './store/settingsStore'
+import { scheduledReminderVersion, sparkleFeedURL } from './updatesCore'
 
 interface SparkleAddon {
-  start(): void
+  setFeedURL(url: string): void
+  start(onScheduledUpdate: (version: string) => void): void
   checkForUpdates(): void
+  recheckForUpdates(): void
+  getAutomaticallyChecksForUpdates(): boolean
+  setAutomaticallyChecksForUpdates(enabled: boolean): void
+}
+
+const require = createRequire(import.meta.url)
+const stateListeners = new Set<(state: UpdateState) => void>()
+let pendingVersion: string | null = null
+let currentFeedURL: string | null = null
+let languageChanged = false
+
+function syncFeedLanguage(addon: SparkleAddon): void {
+  const url = sparkleFeedURL(settingsStore.get().language, app.getPreferredSystemLanguages(), process.arch)
+  if (url === currentFeedURL) return
+  if (currentFeedURL !== null) languageChanged = true
+  addon.setFeedURL(url)
+  currentFeedURL = url
+}
+
+export function updateSparkleLanguage(): void {
+  const addon = loadSparkleAddon()
+  if (addon) syncFeedLanguage(addon)
 }
 
 function loadSparkleAddon(): SparkleAddon | null {
@@ -30,10 +57,69 @@ export function startSparkle(): void {
   if (!addon) return
 
   try {
-    addon.start()
+    syncFeedLanguage(addon)
+    addon.start((version) => {
+      pendingVersion = scheduledReminderVersion(
+        version,
+        addon.getAutomaticallyChecksForUpdates(),
+        settingsStore.get().acknowledgedUpdateVersion
+      )
+      emitState()
+    })
   } catch (error) {
     console.error('[sparkle] failed to start updater', error)
   }
+}
+
+export function getSparkleState(): UpdateState {
+  const addon = loadSparkleAddon()
+  if (!addon) {
+    return {
+      available: false,
+      automaticallyChecksForUpdates: false,
+      phase: 'idle',
+      availableVersion: null,
+      downloadProgress: null
+    }
+  }
+  return {
+    available: true,
+    automaticallyChecksForUpdates: addon.getAutomaticallyChecksForUpdates(),
+    phase: pendingVersion ? 'available' : 'idle',
+    availableVersion: pendingVersion,
+    downloadProgress: null
+  }
+}
+
+function emitState(): void {
+  const state = getSparkleState()
+  for (const listener of stateListeners) listener(state)
+}
+
+export function onSparkleStateChanged(listener: (state: UpdateState) => void): () => void {
+  stateListeners.add(listener)
+  return () => stateListeners.delete(listener)
+}
+
+export function setSparkleAutomaticChecks(enabled: boolean): UpdateState {
+  const addon = loadSparkleAddon()
+  if (!addon) return getSparkleState()
+  addon.setAutomaticallyChecksForUpdates(enabled)
+  if (!enabled) pendingVersion = null
+  emitState()
+  return getSparkleState()
+}
+
+export function showAvailableSparkleUpdate(): boolean {
+  const addon = loadSparkleAddon()
+  if (!addon) return false
+  if (pendingVersion) settingsStore.update({ acknowledgedUpdateVersion: pendingVersion })
+  pendingVersion = null
+  emitState()
+  syncFeedLanguage(addon)
+  addon.recheckForUpdates()
+  languageChanged = false
+  return true
 }
 
 /** Trigger Sparkle's native update UI from a renderer action. */
@@ -42,7 +128,10 @@ export function checkSparkleForUpdates(): boolean {
   if (!addon) return false
 
   try {
-    addon.checkForUpdates()
+    syncFeedLanguage(addon)
+    if (languageChanged) addon.recheckForUpdates()
+    else addon.checkForUpdates()
+    languageChanged = false
     return true
   } catch (error) {
     console.error('[sparkle] failed to check for updates', error)

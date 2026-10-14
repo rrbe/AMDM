@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { Db } from 'mongodb'
 import {
+  dropCollectionOnDb,
   estimateCollectionCountOnDb,
   listCollectionsOnDb,
   listIndexesOnDb,
@@ -48,6 +49,35 @@ describe('listCollectionsOnDb', () => {
   it('uses MongoDB metadata for an estimated document count', async () => {
     await db.collection('users').insertMany([{ n: 1 }, { n: 2 }, { n: 3 }])
     expect(await estimateCollectionCountOnDb(db, 'users')).toBe(3)
+  })
+})
+
+describe('dropCollectionOnDb', () => {
+  it('drops only the named collection and its indexes in the specified database', async () => {
+    const name = 'orders.with.dots'
+    const otherDb = harness.client.db('catalogDropOther')
+    await db.collection(name).insertOne({ order: 1 })
+    await db.collection(name).createIndex({ order: 1 })
+    await db.collection('keep').insertOne({ keep: true })
+    await otherDb.collection(name).insertOne({ keep: true })
+
+    await dropCollectionOnDb(db, name, { timeoutMS: 5_000, signal: new AbortController().signal })
+
+    expect(await db.listCollections({ name }).toArray()).toEqual([])
+    expect(await db.collection('keep').countDocuments()).toBe(1)
+    expect(await otherDb.collection(name).countDocuments()).toBe(1)
+  })
+
+  it('honors cancellation before deleting data', async () => {
+    await db.collection('keep').insertOne({ keep: true })
+    const controller = new AbortController()
+    const reason = new Error('owner closed')
+    controller.abort(reason)
+
+    await expect(
+      dropCollectionOnDb(db, 'keep', { timeoutMS: 5_000, signal: controller.signal })
+    ).rejects.toBe(reason)
+    expect(await db.collection('keep').countDocuments()).toBe(1)
   })
 })
 

@@ -71,31 +71,75 @@ describe('queryStore — history', () => {
 describe('settingsStore', () => {
   it('returns defaults when nothing is stored', () => {
     expect(settingsStore.get()).toMatchObject({
+      defaultExportDirectory: electron.app.getPath('downloads'),
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
       dataFontSize: 13,
+      tableNestedDisplay: 'inline',
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],
       sidebarWidth: 270,
-      editorHeight: 142
+      contextPanelWidth: 300,
+      contextPanelOpen: false,
+      editorHeight: 142,
+      acknowledgedUpdateVersion: null,
+      automaticUpdateChecks: true
     })
   })
   it('merges + persists an update', () => {
-    const next = settingsStore.update({ queryLimit: 100 })
+    const next = settingsStore.update({ queryLimit: 100, contextPanelWidth: 420 })
     expect(next.queryLimit).toBe(100)
+    settingsStore.init()
+    expect(settingsStore.get().contextPanelWidth).toBe(420)
     expect(settingsStore.get().theme).toBe('system') // untouched
   })
+
+  it('persists the selected default export directory', () => {
+    const directory = join(electron.app.getPath('userData'), 'exports')
+    settingsStore.update({ defaultExportDirectory: directory })
+    settingsStore.init()
+    expect(settingsStore.get().defaultExportDirectory).toBe(directory)
+  })
+
+  it('defaults existing installations to inline previews and persists grouped headers', () => {
+    electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
+    settingsStore.init()
+    expect(settingsStore.get().tableNestedDisplay).toBe('inline')
+    settingsStore.update({ tableNestedDisplay: 'grouped' })
+    settingsStore.init()
+    expect(settingsStore.get().tableNestedDisplay).toBe('grouped')
+    settingsStore.update({ tableNestedDisplay: 'auto' })
+    settingsStore.init()
+    expect(settingsStore.get().tableNestedDisplay).toBe('auto')
+    expect(settingsStore.get().theme).toBe('dark')
+  })
+
+  it('persists the acknowledged update version', () => {
+    settingsStore.update({ acknowledgedUpdateVersion: '26.8.11' })
+    settingsStore.init()
+    expect(settingsStore.get().acknowledgedUpdateVersion).toBe('26.8.11')
+  })
+
+  it('persists the automatic update-check preference', () => {
+    settingsStore.update({ automaticUpdateChecks: false })
+    settingsStore.init()
+    expect(settingsStore.get().automaticUpdateChecks).toBe(false)
+  })
+
   it('merges stored settings over defaults on load (forward-compatible upgrade)', () => {
     electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
     settingsStore.init()
     expect(settingsStore.get()).toMatchObject({
       theme: 'dark',
+      defaultExportDirectory: electron.app.getPath('downloads'),
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
-      sidebarWidth: 270
+      sidebarWidth: 270,
+      contextPanelWidth: 300,
+      contextPanelOpen: false
     })
   })
 
@@ -103,6 +147,15 @@ describe('settingsStore', () => {
     settingsStore.update({ connectionOrder: ['b', 'a'] })
     settingsStore.init()
     expect(settingsStore.get().connectionOrder).toEqual(['b', 'a'])
+  })
+
+  it('remembers both expanded and collapsed Details sidebar states', () => {
+    settingsStore.update({ contextPanelOpen: true })
+    settingsStore.init()
+    expect(settingsStore.get().contextPanelOpen).toBe(true)
+    settingsStore.update({ contextPanelOpen: false })
+    settingsStore.init()
+    expect(settingsStore.get().contextPanelOpen).toBe(false)
   })
 
   it('persists named editor color schemes', () => {

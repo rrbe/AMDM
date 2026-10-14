@@ -18,7 +18,7 @@ const METHOD_SNIPPETS: Record<string, string> = {
   project: 'project({ ${field}: ${1} })',
   projection: 'projection({ ${field}: ${1} })',
   countDocuments: 'countDocuments({ ${} })',
-  distinct: 'distinct(${field})',
+  distinct: 'distinct("${field}")',
   insertOne: 'insertOne({ ${} })',
   insertMany: 'insertMany([ ${} ])',
   updateOne: 'updateOne({ ${filter} }, { $set: { ${} } })',
@@ -27,8 +27,8 @@ const METHOD_SNIPPETS: Record<string, string> = {
   deleteOne: 'deleteOne({ ${} })',
   deleteMany: 'deleteMany({ ${} })',
   createIndex: 'createIndex({ ${field}: ${1} })',
-  getSiblingDB: 'getSiblingDB(${db})',
-  getCollection: 'getCollection(${name})',
+  getSiblingDB: 'getSiblingDB("${db}")',
+  getCollection: 'getCollection("${name}")',
   runCommand: 'runCommand({ ${} })'
 }
 
@@ -42,6 +42,12 @@ const ZERO_ARG_METHODS = new Set([
   'next',
   'explain',
   'getName',
+  'getMongo',
+  'startSession',
+  'startTransaction',
+  'commitTransaction',
+  'abortTransaction',
+  'endSession',
   'getCollectionNames',
   'getCollectionInfos',
   'drop',
@@ -88,11 +94,11 @@ const METHOD_DOCS: Record<string, CompletionDoc> = {
   project: {
     signature: 'project(specification)',
     summary: 'Shapes fields returned by the cursor.',
-    example: 'db.products.find({}).project({ name: 1, price: 1 })'
+    example: 'driverDb.collection("products").find({}).project({ name: 1, price: 1 })'
   },
   projection: {
     signature: 'projection(specification)',
-    summary: 'Mongosh-compatible alias for cursor projection.',
+    summary: 'Shapes fields returned by the cursor.',
     example: 'db.products.find({}).projection({ name: 1, price: 1 })'
   },
   countDocuments: {

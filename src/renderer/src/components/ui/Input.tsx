@@ -1,18 +1,18 @@
-import { type ComponentPropsWithoutRef } from 'react'
+import { type ComponentPropsWithRef } from 'react'
 import { Input as BaseInput } from '@base-ui/react/input'
 import { cn } from '@renderer/lib/utils'
 
 /**
  * Thin wrapper over Base UI Input — a native `<input>` that auto-wires id / aria
  * / validation state when rendered inside a `ui/Field`. shadcn-style Tailwind
- * skin: neutral control surface and graphite focus ring.
+ * skin: neutral control surface and a soft outer focus ring.
  *
  * Accepts the usual native props (`value`, `onChange`, `placeholder`, …); Base UI
  * additionally exposes `onValueChange(value)` if you prefer the value directly.
  */
-type InputProps = ComponentPropsWithoutRef<typeof BaseInput>
+type InputProps = ComponentPropsWithRef<typeof BaseInput>
 
-export function Input({ className, ...props }: InputProps): JSX.Element {
+export function Input({ className, ...props }: InputProps): React.JSX.Element {
   return (
     <BaseInput
       {...props}

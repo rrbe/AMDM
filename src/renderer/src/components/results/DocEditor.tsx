@@ -34,7 +34,7 @@ function toEditableText(doc: unknown): string {
     .join('\n')
 }
 
-export function DocEditor({ connectionId, database, collection, doc, id, onClose }: DocEditorProps): JSX.Element {
+export function DocEditor({ connectionId, database, collection, doc, id, onClose }: DocEditorProps): React.JSX.Element {
   const { t } = useTranslation()
   const updateDocument = useAppStore((s) => s.updateDocument)
 
@@ -70,6 +70,7 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
 
   return (
     <ResizableModal
+      sizeKey="document-editor"
       title={t('docEditor.title', { collection })}
       className="h-[560px] min-h-[420px]"
       bodyClassName="flex flex-col gap-2"

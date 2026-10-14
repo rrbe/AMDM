@@ -24,12 +24,26 @@ export function writeChunk(
       resolve()
       return
     }
-    const onError = (e: Error): void => reject(e)
-    stream.once('error', onError)
-    stream.once('drain', () => {
+    const cleanup = (): void => {
       stream.removeListener('error', onError)
+      stream.removeListener('close', onClose)
+      stream.removeListener('drain', onDrain)
+    }
+    const onError = (e: Error): void => {
+      cleanup()
+      reject(e)
+    }
+    const onClose = (): void => {
+      cleanup()
+      reject(new Error('Write stream closed before draining.'))
+    }
+    const onDrain = (): void => {
+      cleanup()
       resolve()
-    })
+    }
+    stream.once('error', onError)
+    stream.once('close', onClose)
+    stream.once('drain', onDrain)
   })
 }
 

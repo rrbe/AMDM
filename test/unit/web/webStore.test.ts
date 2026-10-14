@@ -87,4 +87,17 @@ describe('WebStore', () => {
       ok: true
     })
   })
+  it('duplicates an owned connection with its encrypted password and current UI preferences', () => {
+    const root = mkdtempSync(join(tmpdir(), 'amdm-web-copy-'))
+    const store = new WebStore(root, Buffer.alloc(32, 6))
+    const original = store.saveConnection('alice', input())
+    const copied = store.saveConnection('alice', { ...original, id: '', name: 'Copy', copyFromId: original.id })
+    expect(copied.id).not.toBe(original.id)
+    expect(copied.hasPassword).toBe(true)
+    expect(store.getDecrypted(store.sessionId('alice', copied.id))?.password).toBe('secret')
+    expect(() => store.saveConnection('bob', { ...original, id: '', copyFromId: original.id })).toThrow('Connection not found')
+    const updated = store.updateSettings('alice', { contextPanelWidth: 420, contextPanelOpen: false, tableNestedDisplay: 'grouped', disabledKeyboardShortcuts: ['quickSearch'] })
+    expect(new WebStore(root, Buffer.alloc(32, 6)).getSettings('alice')).toEqual(updated)
+  })
+
 })

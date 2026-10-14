@@ -3,16 +3,17 @@
  *
  * Holds: connections, the active connection, per-connection status,
  * the lazily-loaded catalog tree state, the active database, the shell editor
- * code, per-tab result strips, the chosen result view, and loading/error flags.
+ * code, per-tab result strips and views, and loading/error flags.
  *
  * All backend access happens here via `window.api`; components dispatch actions
- * and read state. Every async action catches rejections and surfaces them as
- * `lastError` (or per-connection status) rather than letting the UI crash.
+ * and read state. Every async action catches rejections and surfaces relevant
+ * failures through the bounded notification queue or contextual result state.
  */
 import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/types'
 import type {
   AppSettings,
+  AuthorizationResult,
   CollectionInfo,
   ConnectionConfig,
   ConnectionInput,
@@ -21,11 +22,15 @@ import type {
   DataOpResult,
   DiagnoseScope,
   DiagnoseStage,
+  DocReadRequest,
+  DocReadResult,
   DocMutateRequest,
   DocMutateResult,
   DocSetFieldRequest,
   DocUpdateRequest,
-  ExportRequest,
+  ExportDirectorySelection,
+  ExportFileRequest,
+  ExportProgress,
   HistoryEntry,
   ImportRequest,
   IndexInfo,
@@ -36,6 +41,7 @@ import type {
   SchemaTarget,
   ShellResult,
   TestResult,
+  UpdateState,
   UserInfo
 } from '@shared/types'
 import {
@@ -44,34 +50,36 @@ import {
   closeResult,
   createTab,
   dbCollRef,
+  indexDetailsQuery,
   isRunFailure,
+  moveTab,
+  MAX_RESULT_TABS,
   patchResult,
   patchTab,
   pickActiveAfterClose,
   pickFillTarget,
   type QueryTab,
-  type ResultTab
+  type ResultTab,
+  type ResultView,
+  type ResultFoldView
 } from '@renderer/lib/tabs'
+import {
+  dismissNotification as removeNotification,
+  enqueueNotification,
+  type AppNotification,
+  type NotificationInput,
+  type NotificationSource,
+  type NotificationVariant
+} from '@renderer/lib/notifications'
 import { randomUuid } from '@renderer/lib/randomUuid'
 import i18n from '@renderer/i18n'
+import { catalogSearchSnapshot, type CatalogSearchSnapshot } from '@renderer/lib/catalogSearch'
+import { patchSchemaPanel, releaseSchemaPanels, schemaPanelKey, type SchemaPanelState } from '@renderer/lib/schemaPanel'
 
 /** Shorthand for translating notification / error strings in the store. */
 const tr = i18n.t.bind(i18n)
 
-export type { QueryTab, ResultTab }
-
-export type ResultView = 'tree' | 'json' | 'table'
-
-export type NoticeKind = 'success' | 'info' | 'warn'
-
-/** A transient, non-error notification shown as a toast. Errors keep using
-    `lastError` (their own channel); this carries success / info / warning. */
-export interface Notice {
-  kind: NoticeKind
-  message: string
-  /** Bumped per emit so React remounts the toast and restarts auto-dismiss. */
-  key: number
-}
+export type { QueryTab, ResultTab, ResultView }
 
 /** Loaded children for a catalog node, keyed by a synthetic node id. */
 export interface CatalogState {
@@ -108,6 +116,8 @@ interface AppState {
 
   // ---- catalog (per connection) ----
   catalogs: Record<string, CatalogState>
+  /** Namespace-only snapshots retained for offline search until reconnect/delete. */
+  catalogSearchSnapshots: Record<string, CatalogSearchSnapshot>
   /** Connection ids whose database subtree is expanded in the unified explorer. */
   expandedConnections: Set<string>
 
@@ -117,22 +127,22 @@ interface AppState {
   tabs: QueryTab[]
   /** Id of the focused tab (always references an existing tab; ≥1 tab exists). */
   activeTabId: string
-  /** Result view (Tree/JSON/Table) — a global UI preference, not per-tab. */
-  resultView: ResultView
 
   // ---- saved queries + history + autocomplete (Phase 2) ----
   savedQueries: SavedQuery[]
   history: HistoryEntry[]
   /** Sampled field names for autocomplete, keyed `${connId}:${db}.${coll}`. */
   fieldCache: Record<string, string[]>
+  /** Bounded session cache shared by the Schema sidebar and model editor. */
+  schemaPanels: Record<string, SchemaPanelState>
 
   // ---- preferences ----
   settings: AppSettings
+  updateState: UpdateState
 
   // ---- ui ----
   initializing: boolean
-  lastError: string | null
-  notice: Notice | null
+  notifications: AppNotification[]
 
   // ---- actions: bootstrap ----
   bootstrap(): Promise<void>
@@ -142,6 +152,8 @@ interface AppState {
   saveConnection(input: ConnectionInput): Promise<ConnectionConfig | null>
   deleteConnection(id: string): Promise<void>
   testConnection(input: ConnectionInput): Promise<TestResult>
+  readConnectionAuthorization(id: string, input: ConnectionInput): Promise<AuthorizationResult>
+  cachedConnectionAuthorization(input: ConnectionInput): Promise<AuthorizationResult | null>
   /** Build a connection string from the current form fields ("To URL"). */
   buildConnectionUri(input: ConnectionInput, opts: { includePassword: boolean }): Promise<string | null>
   /** Open a native file picker (e.g. SSH private key); resolves the path or null. */
@@ -152,28 +164,40 @@ interface AppState {
   // ---- actions: session ----
   connect(id: string): Promise<void>
   disconnect(id: string): Promise<void>
+  syncSessionStatus(status: ConnectionStatus): void
   setActiveConnection(id: string | null): void
   /** Expand/collapse a connection's database subtree in the explorer. */
   toggleConnectionExpanded(id: string): void
+  /** Reveal already-loaded catalog ancestors without fetching or opening a query. */
+  revealCatalog(connId: string, ancestors: string[]): void
 
   // ---- actions: catalog ----
   toggleNode(connId: string, nodeId: string, kind: NodeKind, payload: NodePayload): Promise<void>
   loadDatabases(connId: string): Promise<void>
   loadCollections(connId: string, db: string): Promise<void>
+  /** Refresh one collection's estimated document count and indexes together. */
+  refreshCollection(connId: string, db: string, coll: string): Promise<void>
+  dropCollection(connId: string, db: string, coll: string): Promise<void>
   loadIndexes(connId: string, db: string, coll: string): Promise<void>
   loadUsers(connId: string, db: string): Promise<void>
 
   // ---- actions: tabs ----
   /** Open a new empty query tab and focus it. */
-  newTab(): void
+  newTab(afterId?: string): void
+  /** Copy a tab's query and connection into a new tab beside it. */
+  duplicateTab(id: string): void
   /** Focus an existing tab. */
   setActiveTab(id: string): void
+  moveQueryTab(sourceId: string, targetId: string): void
   /** Close a tab (aborts its run if any); always leaves ≥1 tab open. */
   closeTab(id: string): void
+  /** Close several tabs in one update, aborting any running queries. */
+  closeTabs(ids: string[]): void
 
   // ---- actions: result tabs (operate on the active query tab) ----
   /** Focus one of the active tab's result tabs. */
-  setActiveResultTab(id: string): void
+  setActiveResultTab(id: string, queryTabId?: string): void
+  moveResultTab(sourceId: string, targetId: string): void
   /** Close one of the active tab's result tabs. */
   closeResultTab(id: string): void
 
@@ -182,26 +206,28 @@ interface AppState {
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
+  setResultFoldedLines(view: ResultFoldView, lines: number[]): void
+  setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
   browseCollection(db: string, coll: string): void
+  /** Open and run a query for one index's complete server-side definition. */
+  inspectIndex(db: string, coll: string, indexName: string): void
   /** Run the editor's script, or `codeOverride` when given (e.g. the current
       statement / selection from the right-click menu). */
   runShell(codeOverride?: string): Promise<void>
   /** Cancel the in-flight run (the Stop button / menu item). No-op when idle. */
   stopShell(): Promise<void>
   runExplain(): Promise<void>
-  /** Re-run the active result tab's query in place (same page offset). */
+  /** Refresh the active result with a new execution, starting on page one. */
   refreshResult(): Promise<void>
-  /** Re-run the active result tab's query at a new page offset (prev/next),
-      patching that result tab in place. Only meaningful when `pageable`. */
-  loadPage(skip: number): Promise<void>
-  /** Change the page size and re-run the current query from the first page. */
-  setQueryLimit(n: number): Promise<void>
-  clearError(): void
-  /** Show a transient success/info/warning toast (errors use `lastError`). */
-  notify(kind: NoticeKind, message: string): void
-  dismissNotice(): void
+  /** Browse the existing execution without evaluating its script again. */
+  loadPage(skip: number, pageSize?: number): Promise<void>
+  /** Change only the focused result's display page size. */
+  setResultPageSize(n: number): Promise<void>
+  notify(input: NotificationInput): void
+  dismissNotification(id: string): void
+  clearNotifications(): void
 
   // ---- actions: saved queries + history (Phase 2) ----
   loadQueries(): Promise<void>
@@ -219,22 +245,36 @@ interface AppState {
   getFields(connId: string, db: string, coll: string): string[]
 
   // ---- actions: Schema analysis / local model ----
+  updateSchemaPanel(target: SchemaTarget, patch: Pick<Partial<SchemaPanelState>, 'search' | 'expanded' | 'scrollTop'>): void
   loadSchemaModel(target: SchemaTarget): Promise<SchemaModel | null>
   analyzeSchema(target: SchemaTarget): Promise<SchemaModel | null>
   saveSchemaDraft(target: SchemaTarget, draft: MongoJsonSchema): Promise<SchemaModel | null>
   overwriteSchemaDraft(target: SchemaTarget): Promise<SchemaModel | null>
 
-  // ---- actions: document edit/delete (Phase 2) ----
+  // ---- actions: document read/edit/delete (Phase 2) ----
+  readDocument(req: DocReadRequest): Promise<DocReadResult>
+  cancelDocumentRead(taskId: string): Promise<boolean>
   updateDocument(req: DocUpdateRequest): Promise<DocMutateResult>
   setDocumentField(req: DocSetFieldRequest): Promise<DocMutateResult>
   deleteDocument(req: DocMutateRequest): Promise<DocMutateResult>
 
   // ---- actions: import/export (Phase 3) ----
-  exportCollection(req: ExportRequest): Promise<DataOpResult>
+  exportProgress: Record<string, ExportProgress | undefined>
+  chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+  exportCollection(req: ExportFileRequest): Promise<DataOpResult>
+  cancelExport(taskId: string): Promise<boolean>
+  openExportedFile(taskId: string): Promise<string | null>
+  revealExportedFile(taskId: string): Promise<string | null>
+  clearExportProgress(taskId: string): void
   importCollection(req: ImportRequest): Promise<DataOpResult>
 
   // ---- actions: preferences ----
   checkForUpdates(): Promise<boolean>
+  loadUpdateState(): Promise<void>
+  setAutomaticUpdateChecks(enabled: boolean): Promise<void>
+  showAvailableUpdate(): Promise<boolean>
+  cancelUpdateDownload(): Promise<boolean>
+  openSettings(): Promise<void>
   loadSettings(): Promise<void>
   updateSettings(patch: Partial<AppSettings>): Promise<void>
 }
@@ -253,6 +293,29 @@ function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message
   if (typeof e === 'string') return e
   return 'Unknown error'
+}
+
+function appNotice(
+  variant: NotificationVariant,
+  title: string,
+  source: NotificationSource,
+  dedupeKey?: string,
+  detail?: string
+): NotificationInput {
+  return { variant, title, source, dedupeKey, detail }
+}
+
+function shellFailureNotice(result: ShellResult, tabId: string): NotificationInput | null {
+  if (result.kind !== 'error' || result.errorName === 'Aborted' || result.failureKind === 'cancelled') {
+    return null
+  }
+  return appNotice(
+    'error',
+    result.failureKind === 'timeout' ? tr('notify.queryTimeout') : tr('notify.queryFailed'),
+    'query',
+    `query:${tabId}:${result.failureKind ?? result.errorName ?? 'unknown'}`,
+    result.error ?? tr('notify.unknown')
+  )
 }
 
 /** Opaque per-run id so a run can be cancelled via `shell.abort` (Stop). */
@@ -293,6 +356,51 @@ function patchTabResults(
   return { tabs: patchTab(s.tabs, tabId, make(tab)) }
 }
 
+/** Apply an async result only while this exact execution still owns the tab. */
+function patchCurrentExecution(
+  s: { tabs: QueryTab[] },
+  tabId: string,
+  execId: string,
+  make: (tab: QueryTab) => Partial<QueryTab>
+): { tabs: QueryTab[] } | Record<string, never> {
+  const tab = s.tabs.find((item) => item.id === tabId)
+  if (!tab || tab.runningExecId !== execId) return {}
+  return { tabs: patchTab(s.tabs, tabId, make(tab)) }
+}
+
+/** Append and explain actual result eviction in the same execution-owned state update. */
+function appendExecutionResult(
+  s: AppState,
+  tabId: string,
+  execId: string,
+  result: ShellResult,
+  query: ResultTab['query']
+): Partial<AppState> {
+  const tab = s.tabs.find((item) => item.id === tabId)
+  if (!tab || tab.runningExecId !== execId) return {}
+  const patch = appendResult(tab, newResultId(), result, query)
+  const evicted = patch.results!.length < tab.results.length + 1
+  return {
+    tabs: patchTab(s.tabs, tabId, patch),
+    notifications: evicted
+      ? enqueueNotification(
+          s.notifications,
+          appNotice(
+            'info',
+            tr('notify.resultRetentionLimit', { count: MAX_RESULT_TABS }),
+            'query',
+            `query:${tabId}:resultRetention`
+          ),
+          { id: randomUuid(), now: Date.now() }
+        )
+      : s.notifications
+  }
+}
+
+function ownsExecution(s: { tabs: QueryTab[] }, tabId: string, execId: string): boolean {
+  return s.tabs.some((tab) => tab.id === tabId && tab.runningExecId === execId)
+}
+
 /** The tab present at first render (so init can point activeTabId at it). */
 const INITIAL_TAB = createTab(newTabId())
 
@@ -305,11 +413,12 @@ const connectionAttempts = new Map<string, { promise: Promise<void>; token: obje
 // renderer windows; the main process remains the persistence authority.
 let settingsChannel: BroadcastChannel | null | undefined
 let settingsSubscribed = false
+let updatesSubscribed = false
+let exportProgressSubscribed = false
 
 function getSettingsChannel(): BroadcastChannel | null {
   if (settingsChannel !== undefined) return settingsChannel
-  settingsChannel =
-    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('amdm-settings')
+  settingsChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('amdm-settings')
   return settingsChannel
 }
 
@@ -325,36 +434,78 @@ function subscribeToSettings(): void {
   })
 }
 
+function subscribeToUpdates(): void {
+  if (updatesSubscribed) return
+  updatesSubscribed = true
+  window.api.updates.onStateChanged((updateState) => {
+    useAppStore.setState({ updateState })
+  })
+}
+
+function subscribeToExportProgress(): void {
+  if (exportProgressSubscribed) return
+  exportProgressSubscribed = true
+  window.api.io.onExportProgress((progress) => {
+    useAppStore.setState((state) => ({
+      exportProgress: { ...state.exportProgress, [progress.taskId]: progress }
+    }))
+  })
+}
+
+const EMPTY_UPDATE_STATE: UpdateState = {
+  available: false,
+  automaticallyChecksForUpdates: false,
+  phase: 'idle',
+  availableVersion: null,
+  downloadProgress: null
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
   activeConnectionId: null,
 
   catalogs: {},
+  catalogSearchSnapshots: {},
   expandedConnections: new Set(),
 
   tabs: [INITIAL_TAB],
   activeTabId: INITIAL_TAB.id,
-  resultView: 'tree',
 
   savedQueries: [],
   history: [],
   fieldCache: {},
+  schemaPanels: {},
 
   settings: DEFAULT_SETTINGS,
+  updateState: EMPTY_UPDATE_STATE,
 
   initializing: true,
-  lastError: null,
-  notice: null,
+  notifications: [],
+  exportProgress: {},
+
+  revealCatalog(connId, ancestors) {
+    set((s) => {
+      if (s.statuses[connId]?.state !== 'connected') return s
+      const expandedConnections = new Set(s.expandedConnections).add(connId)
+      const catalog = s.catalogs[connId]
+      if (!catalog) return { expandedConnections }
+      const expanded = new Set(catalog.expanded)
+      for (const id of ancestors) expanded.add(id)
+      return { expandedConnections, catalogs: { ...s.catalogs, [connId]: { ...catalog, expanded } } }
+    })
+  },
 
   // --------------------------------------------------------------------- boot
   async bootstrap() {
+    subscribeToExportProgress()
     set({ initializing: true })
     await Promise.all([
       get().loadConnections(),
       get().loadQueries(),
       get().loadHistory(),
-      get().loadSettings()
+      get().loadSettings(),
+      get().loadUpdateState()
     ])
     set({ initializing: false })
   },
@@ -364,7 +515,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const connections = await window.api.connections.list()
       set({ connections })
     } catch (e) {
-      set({ lastError: tr('notify.loadConnectionsFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadConnectionsFailed', { error: errMessage(e) }),
+          'connection',
+          'connections:load'
+        )
+      )
     }
   },
 
@@ -375,7 +533,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().loadConnections()
       return saved
     } catch (e) {
-      set({ lastError: tr('notify.saveConnectionFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.saveConnectionFailed', { error: errMessage(e) }), 'connection'))
       return null
     }
   },
@@ -385,14 +543,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.connections.delete(id)
       set((s) => {
         const { [id]: _removedCatalog, ...catalogs } = s.catalogs
+        const { [id]: _removedSnapshot, ...catalogSearchSnapshots } = s.catalogSearchSnapshots
         const { [id]: _removedStatus, ...statuses } = s.statuses
         const expandedConnections = new Set(s.expandedConnections)
         expandedConnections.delete(id)
-        const tabs = s.tabs.map((tab) =>
-          tab.connectionId === id ? { ...tab, connectionId: null } : tab
-        )
+        const tabs = s.tabs.map((tab) => (tab.connectionId === id ? { ...tab, connectionId: null } : tab))
         return {
           catalogs,
+          schemaPanels: releaseSchemaPanels(s.schemaPanels, id),
+          catalogSearchSnapshots,
           statuses,
           tabs,
           expandedConnections,
@@ -401,7 +560,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       await get().loadConnections()
     } catch (e) {
-      set({ lastError: tr('notify.deleteConnectionFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.deleteConnectionFailed', { error: errMessage(e) }),
+          'connection',
+          `connection:${id}:delete`
+        )
+      )
     }
   },
 
@@ -409,7 +575,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.connections.test(input)
     } catch (e) {
-      return { ok: false, error: errMessage(e) }
+      const error = errMessage(e)
+      get().notify(appNotice('error', tr('notify.testConnectionFailed'), 'connection', 'connection:test', error))
+      return { ok: false, error, failureKind: 'ipc' }
+    }
+  },
+
+  async cachedConnectionAuthorization(input) {
+    try {
+      return await window.api.connections.cachedAuthorization(input)
+    } catch (error) {
+      return { authorizationError: errMessage(error) }
+    }
+  },
+
+  async readConnectionAuthorization(id, input) {
+    try {
+      return await window.api.session.authorization(id, input)
+    } catch (error) {
+      return { authorizationError: errMessage(error) }
     }
   },
 
@@ -417,7 +601,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.connections.buildUri(input, opts)
     } catch (e) {
-      set({ lastError: tr('notify.buildUriFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.buildUriFailed', { error: errMessage(e) }), 'connection'))
       return null
     }
   },
@@ -425,7 +609,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   async pickFile(opts) {
     try {
       return await window.api.dialog.openFile(opts)
-    } catch {
+    } catch (e) {
+      get().notify(appNotice('error', tr('notify.pickFileFailed', { error: errMessage(e) }), 'io', 'dialog:openFile'))
       return null
     }
   },
@@ -434,7 +619,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       return await window.api.connections.diagnose(input, scope)
     } catch (e) {
-      set({ lastError: tr('notify.diagnoseFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.diagnoseFailed', { error: errMessage(e) }), 'connection'))
       return []
     }
   },
@@ -453,67 +638,83 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           statuses: { ...s.statuses, [id]: { id, state: 'connecting' } },
           catalogs,
-          expandedConnections,
-          lastError: null
+          catalogSearchSnapshots: _removed
+            ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
+            : s.catalogSearchSnapshots,
+          expandedConnections
         }
       })
       try {
         const status = await window.api.session.connect(id)
         // A disconnect or newer retry may have won while this call was pending.
-        if (
-          connectionAttempts.get(id)?.token !== token ||
-          get().statuses[id]?.state !== 'connecting'
-        )
-          return
+        if (connectionAttempts.get(id)?.token !== token || get().statuses[id]?.state !== 'connecting') return
         set((s) => {
           // Auto-expand the connection in the explorer so its databases appear.
           const expandedConnections = new Set(s.expandedConnections)
           if (status.state === 'connected') expandedConnections.add(id)
+          const { [id]: _snapshot, ...remainingSnapshots } = s.catalogSearchSnapshots
           return {
             statuses: { ...s.statuses, [id]: status },
-            catalogs:
-              status.state === 'connected'
-                ? { ...s.catalogs, [id]: emptyCatalog() }
-                : s.catalogs,
-            expandedConnections,
-            lastError:
-              status.state === 'error'
-                ? tr('notify.connectFailed', { error: status.error ?? tr('notify.unknown') })
-                : s.lastError
+            catalogs: status.state === 'connected' ? { ...s.catalogs, [id]: emptyCatalog() } : s.catalogs,
+            catalogSearchSnapshots: status.state === 'connected' ? remainingSnapshots : s.catalogSearchSnapshots,
+            expandedConnections
           }
         })
+        const statusKey = `connection:${id}:status`
+        if (status.state === 'error') {
+          get().notify(
+            appNotice(
+              'error',
+              status.failureKind === 'timeout' ? tr('notify.connectTimeout') : tr('notify.connectFailedTitle'),
+              'connection',
+              statusKey,
+              status.error ?? tr('notify.unknown')
+            )
+          )
+        } else if (
+          status.state === 'connected' &&
+          get().notifications.some(
+            (notification) => notification.dedupeKey === statusKey && notification.variant === 'error'
+          )
+        ) {
+          const connection = get().connections.find((item) => item.id === id)
+          get().notify(
+            appNotice(
+              'success',
+              tr('notify.connectionRestoredNamed', { name: connection?.name ?? id }),
+              'connection',
+              statusKey
+            )
+          )
+        }
         if (status.state === 'connected') {
-          get().setActiveConnection(id)
-          // Default the active tab's database to the connection's preferred db,
-          // unless that tab already has one chosen (don't clobber an explicit pick).
+          // Connecting is an explorer action: it must not create or focus a query tab.
+          // If this is a reconnect for the active tab, preserve the default-db warmup.
           const conn = get().connections.find((c) => c.id === id)
           const db = conn?.defaultDatabase
-          if (db && get().activeConnectionId === id) {
+          if (db && getActiveTab(get()).connectionId === id) {
             set((s) =>
-              getActiveTab(s).activeDatabase
-                ? {}
-                : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
+              getActiveTab(s).activeDatabase ? {} : { tabs: patchTab(s.tabs, s.activeTabId, { activeDatabase: db }) }
             )
           }
           await get().loadDatabases(id)
           // Prefetch the active db's collection names so `db.` completion works
           // without expanding the tree (only that db; skip if already cached).
-          const activeDb = getActiveTab(get()).activeDatabase
+          const activeTab = getActiveTab(get())
+          const activeDb = activeTab.connectionId === id ? activeTab.activeDatabase : ''
           if (activeDb && get().catalogs[id]?.collections[activeDb] === undefined) {
             void get().loadCollections(id, activeDb)
           }
         }
       } catch (e) {
-        if (
-          connectionAttempts.get(id)?.token !== token ||
-          get().statuses[id]?.state !== 'connecting'
-        )
-          return
+        if (connectionAttempts.get(id)?.token !== token || get().statuses[id]?.state !== 'connecting') return
         const error = errMessage(e)
         set((s) => ({
-          statuses: { ...s.statuses, [id]: { id, state: 'error', error } },
-          lastError: tr('notify.connectFailed', { error })
+          statuses: { ...s.statuses, [id]: { id, state: 'error', error, failureKind: 'ipc' } }
         }))
+        get().notify(
+          appNotice('error', tr('notify.connectFailedTitle'), 'connection', `connection:${id}:status`, error)
+        )
       }
     })()
 
@@ -533,14 +734,61 @@ export const useAppStore = create<AppState>((set, get) => ({
       expandedConnections.delete(id)
       return {
         statuses: { ...s.statuses, [id]: { id, state: 'disconnected' } },
+        schemaPanels: releaseSchemaPanels(s.schemaPanels, id),
         catalogs,
+        catalogSearchSnapshots: _removed
+          ? { ...s.catalogSearchSnapshots, [id]: catalogSearchSnapshot(_removed) }
+          : s.catalogSearchSnapshots,
         expandedConnections
       }
     })
     try {
       await window.api.session.disconnect(id)
     } catch (e) {
-      set({ lastError: tr('notify.disconnectFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.disconnectFailed', { error: errMessage(e) }),
+          'connection',
+          `connection:${id}:disconnect`
+        )
+      )
+    }
+  },
+
+  syncSessionStatus(status) {
+    const previous = get().statuses[status.id]
+    set((s) => ({
+      statuses: { ...s.statuses, [status.id]: status },
+      ...(status.state === 'disconnected' || status.state === 'error'
+        ? { schemaPanels: releaseSchemaPanels(s.schemaPanels, status.id) }
+        : {})
+    }))
+    if (previous?.state === status.state) return
+    const key = `connection:${status.id}:status`
+    if (status.state === 'error') {
+      const connection = get().connections.find((item) => item.id === status.id)
+      get().notify(
+        appNotice(
+          'error',
+          status.failureKind === 'timeout'
+            ? tr('notify.connectionRuntimeTimeout', { name: connection?.name ?? status.id })
+            : tr('notify.connectionLost', { name: connection?.name ?? status.id }),
+          'connection',
+          key,
+          status.error ?? tr('notify.unknown')
+        )
+      )
+    } else if (previous?.state === 'error' && status.state === 'connected') {
+      const connection = get().connections.find((item) => item.id === status.id)
+      get().notify(
+        appNotice(
+          'success',
+          tr('notify.connectionRestoredNamed', { name: connection?.name ?? status.id }),
+          'connection',
+          key
+        )
+      )
     }
   },
 
@@ -605,7 +853,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else if (kind === 'collection' && payload.db && payload.coll) {
       const db = payload.db
       const coll = payload.coll
-      const key = `${db}/${coll}`
       const collection = get().catalogs[connId]?.collections[db]?.find((item) => item.name === coll)
       if (
         collection &&
@@ -613,37 +860,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         collection.estimatedCount === undefined &&
         !get().catalogs[connId]?.loading.has(nodeId)
       ) {
-        set((s) => withLoading(s, connId, nodeId, true))
-        void Promise.all([
-          window.api.catalog.collectionCount(connId, db, coll),
-          window.api.catalog.indexes(connId, db, coll)
-        ])
-          .then(([estimatedCount, indexes]) =>
-            set((s) => {
-              const c = s.catalogs[connId]
-              const collections = c?.collections[db]
-              if (!c || !collections?.includes(collection)) return {}
-              return {
-                catalogs: {
-                  ...s.catalogs,
-                  [connId]: {
-                    ...c,
-                    collections: {
-                      ...c.collections,
-                      [db]: collections.map((item) =>
-                        item.name === coll ? { ...item, estimatedCount } : item
-                      )
-                    },
-                    indexes: { ...c.indexes, [key]: indexes }
-                  }
-                }
-              }
-            })
-          )
-          .catch(() => {})
-          .finally(() =>
-            set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : {}))
-          )
+        void get().refreshCollection(connId, db, coll)
       }
     } else if (kind === 'indexes' && payload.db && payload.coll) {
       const key = `${payload.db}/${payload.coll}`
@@ -668,7 +885,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { catalogs: { ...s.catalogs, [connId]: { ...c, databases } } }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadDatabasesFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadDatabasesFailed', { error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:databases`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -689,9 +913,109 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadCollectionsFailed', { db, error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadCollectionsFailed', { db, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:collections`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
+    }
+  },
+
+  async dropCollection(connId, db, coll) {
+    const nodeId = `${connId}:coll:${db}/${coll}`
+    if (get().catalogs[connId]?.loading.has(nodeId)) return
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      await window.api.catalog.dropCollection(connId, db, coll)
+      set((s) => {
+        const fieldCache = { ...s.fieldCache }
+        delete fieldCache[`${connId}:${db}.${coll}`]
+        const schemaPanels = { ...s.schemaPanels }
+        delete schemaPanels[schemaPanelKey({ connectionId: connId, database: db, collection: coll })]
+        const catalog = s.catalogs[connId]
+        if (!catalog) return { fieldCache, schemaPanels }
+        const indexes = { ...catalog.indexes }
+        delete indexes[`${db}/${coll}`]
+        const expanded = new Set(catalog.expanded)
+        expanded.delete(nodeId)
+        expanded.delete(`${connId}:idx:${db}/${coll}`)
+        return {
+          fieldCache,
+          schemaPanels,
+          catalogs: {
+            ...s.catalogs,
+            [connId]: {
+              ...catalog,
+              collections: {
+                ...catalog.collections,
+                [db]: catalog.collections[db]?.filter((collection) => collection.name !== coll)
+              },
+              indexes,
+              expanded
+            }
+          }
+        }
+      })
+    } catch (e) {
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.dropCollectionFailed', { target: `${db}.${coll}`, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:${coll}:drop`
+        )
+      )
+    } finally {
+      set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : s))
+    }
+  },
+
+  async refreshCollection(connId, db, coll) {
+    const nodeId = `${connId}:coll:${db}/${coll}`
+    const catalog = get().catalogs[connId]
+    const collection = catalog?.collections[db]?.find((item) => item.name === coll)
+    if (!collection || collection.type === 'view' || catalog.loading.has(nodeId)) return
+
+    set((s) => withLoading(s, connId, nodeId, true))
+    try {
+      const [estimatedCount, indexes] = await Promise.all([
+        window.api.catalog.collectionCount(connId, db, coll),
+        window.api.catalog.indexes(connId, db, coll)
+      ])
+      set((s) => {
+        const c = s.catalogs[connId]
+        const collections = c?.collections[db]
+        if (!c || !collections?.includes(collection)) return {}
+        return {
+          catalogs: {
+            ...s.catalogs,
+            [connId]: {
+              ...c,
+              collections: {
+                ...c.collections,
+                [db]: collections.map((item) => (item.name === coll ? { ...item, estimatedCount } : item))
+              },
+              indexes: { ...c.indexes, [`${db}/${coll}`]: indexes }
+            }
+          }
+        }
+      })
+    } catch (e) {
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.refreshFailed', { error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:${coll}:refresh`
+        )
+      )
+    } finally {
+      set((s) => (s.catalogs[connId] ? withLoading(s, connId, nodeId, false) : {}))
     }
   },
 
@@ -711,7 +1035,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadIndexesFailed', { key, error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadIndexesFailed', { key, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${key}:indexes`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
@@ -729,16 +1060,46 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
-      set({ lastError: tr('notify.loadUsersFailed', { db, error: errMessage(e) }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.loadUsersFailed', { db, error: errMessage(e) }),
+          'catalog',
+          `catalog:${connId}:${db}:users`
+        )
+      )
     } finally {
       set((s) => withLoading(s, connId, nodeId, false))
     }
   },
 
   // ---------------------------------------------------------------------- tabs
-  newTab() {
-    const tab = createTab(newTabId(), { connectionId: get().activeConnectionId })
-    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+  newTab(afterId) {
+    set((s) => {
+      const index = afterId ? s.tabs.findIndex((item) => item.id === afterId) : -1
+      const connectionId = index < 0 ? s.activeConnectionId : s.tabs[index].connectionId
+      const tab = createTab(newTabId(), { connectionId })
+      const tabs = [...s.tabs]
+      tabs.splice(index < 0 ? tabs.length : index + 1, 0, tab)
+      return { tabs, activeTabId: tab.id, activeConnectionId: connectionId }
+    })
+  },
+
+  duplicateTab(id) {
+    set((s) => {
+      const index = s.tabs.findIndex((tab) => tab.id === id)
+      if (index < 0) return s
+      const source = s.tabs[index]
+      const tab = createTab(newTabId(), {
+        connectionId: source.connectionId,
+        activeDatabase: source.activeDatabase,
+        code: source.code,
+        pristine: !source.code.trim()
+      })
+      const tabs = [...s.tabs]
+      tabs.splice(index + 1, 0, tab)
+      return { tabs, activeTabId: tab.id, activeConnectionId: tab.connectionId }
+    })
   },
 
   setActiveTab(id) {
@@ -748,26 +1109,60 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
-  closeTab(id) {
-    const closing = get().tabs.find((t) => t.id === id)
-    // Free a server-side run the closed tab may have had in flight.
-    if (closing?.runningExecId) void window.api.shell.abort(closing.runningExecId).catch(() => {})
+  moveQueryTab(sourceId, targetId) {
     set((s) => {
-      const remaining = s.tabs.filter((t) => t.id !== id)
+      const tabs = moveTab(s.tabs, sourceId, targetId)
+      return tabs === s.tabs ? s : { tabs }
+    })
+  },
+
+  closeTab(id) {
+    get().closeTabs([id])
+  },
+
+  closeTabs(ids) {
+    const closingIds = new Set(ids)
+    for (const tab of get().tabs) {
+      if (closingIds.has(tab.id) && tab.runningExecId) {
+        void window.api.shell.abort(tab.runningExecId).catch(() => {})
+      }
+    }
+    set((s) => {
+      const remaining = s.tabs.filter((t) => !closingIds.has(t.id))
+      if (remaining.length === s.tabs.length) return s
       if (remaining.length === 0) {
         const fresh = createTab(newTabId(), { connectionId: s.activeConnectionId })
         return { tabs: [fresh], activeTabId: fresh.id }
       }
-      const nextActive = pickActiveAfterClose(s.tabs, s.activeTabId, id) ?? remaining[0].id
-      const activeConnectionId =
-        remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
+      const activeIndex = s.tabs.findIndex((tab) => tab.id === s.activeTabId)
+      const leftNeighbor = s.tabs.slice(0, activeIndex).reverse().find((tab) => !closingIds.has(tab.id))
+      const nextActive = remaining.some((tab) => tab.id === s.activeTabId)
+        ? s.activeTabId
+        : (leftNeighbor?.id ?? remaining[0].id)
+      const activeConnectionId = remaining.find((tab) => tab.id === nextActive)?.connectionId ?? null
       return { tabs: remaining, activeTabId: nextActive, activeConnectionId }
     })
   },
 
   // --------------------------------------------------------------- result tabs
-  setActiveResultTab(id) {
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { activeResultId: id }) }))
+  setActiveResultTab(id, queryTabId) {
+    set((s) => {
+      const tabId = queryTabId ?? s.activeTabId
+      const tab = s.tabs.find((item) => item.id === tabId)
+      if (!tab) return s
+      return {
+        tabs: patchTab(s.tabs, tabId, { activeResultId: id }),
+        ...(queryTabId ? { activeTabId: tabId, activeConnectionId: tab.connectionId } : {})
+      }
+    })
+  },
+
+  moveResultTab(sourceId, targetId) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      const results = moveTab(tab.results, sourceId, targetId)
+      return results === tab.results ? s : { tabs: patchTab(s.tabs, tab.id, { results }) }
+    })
   },
 
   closeResultTab(id) {
@@ -781,11 +1176,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCode(code) {
     // Only real user edits reach here (the editor skips external value syncs),
     // so typing permanently marks the tab as holding user work.
-    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false }) }))
+    set((s) => ({
+      tabs: patchTab(s.tabs, s.activeTabId, { code, pristine: false })
+    }))
   },
 
   // Pretty-print the editor's JS with Prettier (lazy-loaded). A syntax error
-  // surfaces as `lastError` like any other failure rather than throwing into UI.
+  // surfaces through the notification queue rather than throwing into UI.
   async formatCode() {
     const tab = getActiveTab(get())
     const code = tab.code
@@ -795,7 +1192,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const formatted = await formatJs(code)
       if (formatted !== code) set((s) => ({ tabs: patchTab(s.tabs, tab.id, { code: formatted }) }))
     } catch (e) {
-      set({ lastError: tr('notify.formatFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.formatFailed', { error: errMessage(e) }), 'query', `query:${tab.id}:format`)
+      )
     }
   },
 
@@ -809,7 +1208,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setResultView(view) {
-    set({ resultView: view })
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.activeResultId) return s
+      return { tabs: patchTab(s.tabs, tab.id, patchResult(tab, tab.activeResultId, { resultView: view })) }
+    })
+  },
+
+  setResultFoldedLines(view, lines) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      const result = activeResult(tab)
+      if (!result) return s
+      return {
+        tabs: patchTab(s.tabs, tab.id, patchResult(tab, result.id, {
+          foldedLines: { ...result.foldedLines, [view]: lines }
+        }))
+      }
+    })
+  },
+
+  setTableColumnOrder(order) {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { tableColumnOrder: order }) }))
   },
 
   browseCollection(db, coll) {
@@ -832,18 +1252,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (shouldRun) void get().runShell()
   },
 
+  inspectIndex(db, coll, indexName) {
+    const code = indexDetailsQuery(coll, indexName)
+    let shouldRun = false
+    set((s) => {
+      const connectionId = getActiveTab(s).connectionId
+      if (!connectionId) return {}
+      const { focusId, reuseId } = pickFillTarget(s.tabs, s.activeTabId, {
+        connectionId,
+        database: db,
+        code
+      })
+      if (focusId) return { activeTabId: focusId }
+      shouldRun = true
+      if (reuseId) return { tabs: patchTab(s.tabs, reuseId, { activeDatabase: db, code }) }
+      const tab = createTab(newTabId(), { connectionId, activeDatabase: db, code })
+      return { tabs: [...s.tabs, tab], activeTabId: tab.id }
+    })
+    if (shouldRun) void get().runShell()
+  },
+
   async runShell(codeOverride) {
     const tab = getActiveTab(get())
     const connectionId = tab.connectionId
     const tabId = tab.id
     const code = codeOverride ?? tab.code
     if (!connectionId) {
-      set({ lastError: tr('notify.noActiveConnection') })
+      get().notify(appNotice('warn', tr('notify.noActiveConnection'), 'query', 'query:noConnection'))
       return
     }
     if (!code.trim()) return
     const database = tab.activeDatabase || 'test'
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const { queryLimit: pageSize, queryTimeoutMS: timeoutMS } = get().settings
     const execId = newExecId()
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
@@ -851,36 +1291,50 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     const query = { connectionId, database, code }
     let runFailed = false
     try {
       // A fresh run always starts at page 0 and lands in a NEW result tab, so
       // earlier results stay around for side-by-side comparison.
-      const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip: 0, execId })
+      const result = await window.api.shell.execute({ ...query, pageSize, timeoutMS, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
-      // `use <db>` REPL command: switch the tab's active database (also warms
-      // its collection names for completion via setActiveDatabase).
-      if (result.useDatabase) get().setActiveDatabase(result.useDatabase)
+      if (!ownsExecution(get(), tabId, execId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      updateResultTotal(tabId, result)
+      const notification = shellFailureNotice(result, tabId)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
+      // `use <db>` REPL command: switch only the tab that still owns this run.
+      const nextDatabase = result.useDatabase
+      if (nextDatabase && ownsExecution(get(), tabId, execId)) {
+        set((s) => patchCurrentExecution(s, tabId, execId, () => ({ activeDatabase: nextDatabase })))
+        if (get().catalogs[connectionId]?.collections[nextDatabase] === undefined) {
+          void get().loadCollections(connectionId, nextDatabase)
+        }
+      }
     } catch (e) {
       runFailed = true
-      set((s) =>
-        patchTabResults(s, tabId, (t) =>
-          appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
-        )
-      )
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
     void get().loadHistory()
   },
@@ -894,66 +1348,65 @@ export const useAppStore = create<AppState>((set, get) => ({
     // races past it (the run already finished).
     try {
       await window.api.shell.abort(execId)
-    } catch {
+    } catch (e) {
       set((s) => {
         const current = s.tabs.find((t) => t.id === tab.id)
-        return current?.runningExecId === execId
-          ? { tabs: patchTab(s.tabs, tab.id, { stopping: false }) }
-          : {}
+        return current?.runningExecId === execId ? { tabs: patchTab(s.tabs, tab.id, { stopping: false }) } : {}
       })
+      get().notify(appNotice('error', tr('notify.stopQueryFailed'), 'query', `query:${tab.id}:stop`, errMessage(e)))
     }
   },
 
-  async loadPage(skip) {
+  async loadPage(skip, requestedPageSize) {
     const tab = getActiveTab(get())
     const tabId = tab.id
     const rt = activeResult(tab)
-    if (!rt?.query || skip < 0) return
-    // Paging mutates the focused result tab IN PLACE (a page flip is the same
-    // result, not a new run). Capture its id so a tab switched mid-flight (or
-    // closed — patchResult no-ops then) still lands on the right result.
+    if (!rt?.result.resultId || tab.running || skip < 0) return
     const resultId = rt.id
-    const query = rt.query
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const pageSize = requestedPageSize ?? rt.result.pageSize ?? get().settings.queryLimit
     const execId = newExecId()
+    const ownsPage = (): boolean => ownsExecution(get(), tabId, execId) &&
+      !!get().tabs.find((t) => t.id === tabId)?.results.some((r) => r.id === resultId && r.result.resultId === rt.result.resultId)
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
-        running: true,
-        stopping: false,
-        runFailed: false,
-        runningExecId: execId
-      }),
-      lastError: null
+        running: true, stopping: false, runFailed: false, runningExecId: execId
+      })
     }))
     let runFailed = false
     try {
-      const result = await window.api.shell.execute({ ...query, limit, timeoutMS, skip, execId })
-      runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result, skip })))
+      const page = await window.api.shell.page({ resultId: rt.result.resultId, skip, pageSize, execId })
+      runFailed = isRunFailure(page)
+      if (page.kind !== 'error') {
+        set((s) => patchCurrentExecution(s, tabId, execId, (t) => {
+          const current = t.results.find((r) => r.id === resultId)
+          if (!current || current.result.resultId !== rt.result.resultId) return {}
+          return patchResult(t, resultId, {
+            result: {
+              ...current.result, ...page,
+              ...(page.totalStatus === 'counting' && current.result.totalStatus !== 'counting'
+                ? { totalStatus: current.result.totalStatus, totalCount: current.result.totalCount }
+                : {})
+            }, skip: page.skip ?? skip, foldedLines: {}
+          })
+        }))
+      }
+      const notification = shellFailureNotice(page, tabId)
+      if (notification && ownsPage()) get().notify(notification)
     } catch (e) {
       runFailed = true
-      set((s) =>
-        patchTabResults(s, tabId, (t) =>
-          patchResult(t, resultId, { result: { kind: 'error', error: errMessage(e), errorName: 'IPCError' } })
-        )
-      )
+      if (ownsPage()) {
+        get().notify(shellFailureNotice({ kind: 'error', error: errMessage(e), errorName: 'IPCError', failureKind: 'ipc' }, tabId)!)
+      }
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
-          running: false,
-          stopping: false,
-          runFailed,
-          runningExecId: null
-        })
-      }))
+      set((s) => patchCurrentExecution(s, tabId, execId, () => ({
+        running: false, stopping: false, runFailed, runningExecId: null
+      })))
     }
   },
 
-  async setQueryLimit(n) {
-    const limit = Math.min(2000, Math.max(1, Math.floor(n) || 1))
-    await get().updateSettings({ queryLimit: limit })
-    // Re-run the focused result's query from the first page with the new size.
-    if (getActiveResult(get())?.query) await get().loadPage(0)
+  async setResultPageSize(n) {
+    const pageSize = Math.min(2000, Math.max(1, Math.floor(n) || 1))
+    await get().loadPage(0, pageSize)
   },
 
   async runExplain() {
@@ -962,7 +1415,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabId = tab.id
     const code = tab.code
     if (!connectionId) {
-      set({ lastError: tr('notify.noActiveConnection') })
+      get().notify(appNotice('warn', tr('notify.noActiveConnection'), 'query', 'query:noConnection'))
       return
     }
     if (!code.trim()) return
@@ -975,31 +1428,40 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     const query = { connectionId, database, code }
     let runFailed = false
     try {
       const result = await window.api.shell.execute({ ...query, timeoutMS, explain: true, execId })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => appendResult(t, newResultId(), result, query)))
+      if (!ownsExecution(get(), tabId, execId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      updateResultTotal(tabId, result)
+      const notification = shellFailureNotice(result, tabId)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
-      set((s) =>
-        patchTabResults(s, tabId, (t) =>
-          appendResult(t, newResultId(), { kind: 'error', error: errMessage(e), errorName: 'IPCError' }, query)
-        )
-      )
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) => appendExecutionResult(s, tabId, execId, result, query))
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
     void get().loadHistory()
   },
@@ -1010,7 +1472,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rt = activeResult(tab)
     if (!rt?.query) return
     const resultId = rt.id
-    const { queryLimit: limit, queryTimeoutMS: timeoutMS } = get().settings
+    const pageSize = rt.result.pageSize ?? get().settings.queryLimit
+    const timeoutMS = get().settings.queryTimeoutMS
     const execId = newExecId()
     set((s) => ({
       tabs: patchTab(s.tabs, tabId, {
@@ -1018,46 +1481,71 @@ export const useAppStore = create<AppState>((set, get) => ({
         stopping: false,
         runFailed: false,
         runningExecId: execId
-      }),
-      lastError: null
+      })
     }))
     let runFailed = false
     try {
-      // Refresh the focused result tab in place — keep its page offset and size.
+      // Refresh is an explicit new execution. Display size stays with this result.
       const result = await window.api.shell.execute({
         ...rt.query,
-        limit,
+        pageSize,
         timeoutMS,
-        skip: rt.skip,
         execId
       })
       runFailed = isRunFailure(result)
-      set((s) => patchTabResults(s, tabId, (t) => patchResult(t, resultId, { result })))
+      if (!ownsExecution(get(), tabId, execId) || !get().tabs.find((t) => t.id === tabId)?.results.some((r) => r.id === resultId)) {
+        if (result.resultId) void window.api.shell.release(result.resultId)
+        return
+      }
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip: 0, foldedLines: {} })
+        )
+      )
+      updateResultTotal(tabId, result)
+      const notification = shellFailureNotice(result, tabId)
+      if (notification && ownsExecution(get(), tabId, execId)) get().notify(notification)
     } catch (e) {
       runFailed = true
-      set({ lastError: tr('notify.refreshFailed', { error: errMessage(e) }) })
+      const result: ShellResult = {
+        kind: 'error',
+        error: errMessage(e),
+        errorName: 'IPCError',
+        failureKind: 'ipc'
+      }
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, (t) =>
+          patchResult(t, resultId, { result, executedAt: Date.now(), skip: 0, foldedLines: {} })
+        )
+      )
+      if (ownsExecution(get(), tabId, execId)) get().notify(shellFailureNotice(result, tabId)!)
     } finally {
-      set((s) => ({
-        tabs: patchTab(s.tabs, tabId, {
+      set((s) =>
+        patchCurrentExecution(s, tabId, execId, () => ({
           running: false,
           stopping: false,
           runFailed,
           runningExecId: null
-        })
-      }))
+        }))
+      )
     }
   },
 
-  clearError() {
-    set({ lastError: null })
+  notify(input) {
+    set((state) => ({
+      notifications: enqueueNotification(state.notifications, input, {
+        id: randomUuid(),
+        now: Date.now()
+      })
+    }))
   },
 
-  notify(kind, message) {
-    set({ notice: { kind, message, key: Date.now() } })
+  dismissNotification(id) {
+    set((state) => ({ notifications: removeNotification(state.notifications, id) }))
   },
 
-  dismissNotice() {
-    set({ notice: null })
+  clearNotifications() {
+    set({ notifications: [] })
   },
 
   // ----------------------------------------------------- saved queries + history
@@ -1065,7 +1553,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ savedQueries: await window.api.queries.list() })
     } catch (e) {
-      set({ lastError: tr('notify.loadSavedQueriesFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.loadSavedQueriesFailed', { error: errMessage(e) }), 'system', 'queries:load')
+      )
     }
   },
 
@@ -1073,10 +1563,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const saved = await window.api.queries.save(input)
       await get().loadQueries()
-      get().notify('success', tr('notify.saveQuerySuccess', { name: saved.name }))
+      get().notify(appNotice('success', tr('notify.saveQuerySuccess', { name: saved.name }), 'query'))
       return saved
     } catch (e) {
-      set({ lastError: tr('notify.saveQueryFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.saveQueryFailed', { error: errMessage(e) }), 'query'))
       return null
     }
   },
@@ -1086,7 +1576,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.queries.delete(id)
       await get().loadQueries()
     } catch (e) {
-      set({ lastError: tr('notify.deleteQueryFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.deleteQueryFailed', { error: errMessage(e) }), 'query', `query:${id}:delete`)
+      )
     }
   },
 
@@ -1094,7 +1586,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ history: await window.api.history.list() })
     } catch (e) {
-      set({ lastError: tr('notify.loadHistoryFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.loadHistoryFailed', { error: errMessage(e) }), 'system', 'history:load')
+      )
     }
   },
 
@@ -1103,7 +1597,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await window.api.history.clear()
       set({ history: [] })
     } catch (e) {
-      set({ lastError: tr('notify.clearHistoryFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.clearHistoryFailed', { error: errMessage(e) }), 'system'))
     }
   },
 
@@ -1111,9 +1605,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Never auto-run. Loads land like browse seeds: refill
     // the active tab while it's pristine, else open a tab of their own —
     // loading a query must not clobber code the user wrote.
+    const targetConnectionId = connectionId ?? get().activeConnectionId
+    if (!targetConnectionId) {
+      get().notify(appNotice('warn', tr('notify.noActiveConnection'), 'query', 'query:noConnection'))
+      return
+    }
     set((s) => {
-      const targetConnectionId = connectionId ?? s.activeConnectionId
-      if (!targetConnectionId) return { lastError: tr('notify.noActiveConnection') }
       const active = getActiveTab(s)
       const targetTab =
         active.connectionId === targetConnectionId
@@ -1121,11 +1618,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           : s.tabs.find((tab) => tab.connectionId === targetConnectionId)
       const activeDatabase = database || targetTab?.activeDatabase || ''
       const match = { connectionId: targetConnectionId, database: activeDatabase, code }
-      const { focusId, reuseId } = pickFillTarget(
-        s.tabs,
-        targetTab?.id ?? s.activeTabId,
-        match
-      )
+      const { focusId, reuseId } = pickFillTarget(s.tabs, targetTab?.id ?? s.activeTabId, match)
       if (focusId) {
         return { activeConnectionId: targetConnectionId, activeTabId: focusId }
       }
@@ -1172,58 +1665,136 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // -------------------------------------------------------------- Schema model
+  updateSchemaPanel(target, patch) {
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, patch) }))
+  },
+
   async loadSchemaModel(target) {
+    const key = schemaPanelKey(target)
+    const cached = get().schemaPanels[key]
+    if (cached?.model !== undefined) return cached.model
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: null }) }))
+    const owner = get().schemaPanels[key].owner
     try {
-      return await window.api.schemas.get(target)
+      const model = await window.api.schemas.get(target)
+      if (get().schemaPanels[key]?.owner !== owner) return null
+      // An explicit analysis may have completed while the local snapshot was loading.
+      if (get().schemaPanels[key].model !== undefined) return get().schemaPanels[key].model ?? null
+      set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      return model
     } catch (e) {
-      set({ lastError: tr('notify.loadSchemaFailed', { error: errMessage(e) }) })
+      if (get().schemaPanels[key]?.owner !== owner) return null
+      set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: errMessage(e) }) }))
+      get().notify(
+        appNotice('error', tr('notify.loadSchemaFailed', { error: errMessage(e) }), 'document', 'schema:load')
+      )
       return null
     }
   },
 
-  async analyzeSchema(target) {
-    try {
-      const model = await window.api.schemas.analyze(target)
-      get().notify('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }))
-      return model
-    } catch (e) {
-      set({ lastError: tr('notify.analyzeSchemaFailed', { error: errMessage(e) }) })
-      return null
-    }
+  analyzeSchema(target) {
+    const key = schemaPanelKey(target)
+    const pending = get().schemaPanels[key]?.analysisRequest
+    if (pending) return pending
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analyzing: true, error: null }) }))
+    const owner = get().schemaPanels[key].owner
+    const analysisRequest = Promise.resolve().then(async () => {
+      try {
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        const model = await window.api.schemas.analyze(target)
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+        get().notify(appNotice('success', tr('notify.schemaAnalyzed', { count: model.analysis.sampleSize }), 'document'))
+        return model
+      } catch (e) {
+        if (get().schemaPanels[key]?.owner !== owner) return null
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { error: errMessage(e) }) }))
+        get().notify(appNotice('error', tr('notify.analyzeSchemaFailed', { error: errMessage(e) }), 'document'))
+        return null
+      } finally {
+        if (get().schemaPanels[key]?.owner === owner) {
+          set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analyzing: false, analysisRequest: undefined }) }))
+        }
+      }
+    })
+    set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { analysisRequest }) }))
+    return analysisRequest
   },
 
   async saveSchemaDraft(target, draft) {
+    const key = schemaPanelKey(target)
+    const owner = get().schemaPanels[key]?.owner
     try {
       const model = await window.api.schemas.saveDraft(target, draft)
-      get().notify('success', tr('notify.schemaSaved'))
+      if (owner && get().schemaPanels[key]?.owner === owner) {
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      }
+      get().notify(appNotice('success', tr('notify.schemaSaved'), 'document'))
       return model
     } catch (e) {
-      set({ lastError: tr('notify.saveSchemaFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.saveSchemaFailed', { error: errMessage(e) }), 'document'))
       return null
     }
   },
 
   async overwriteSchemaDraft(target) {
+    const key = schemaPanelKey(target)
+    const owner = get().schemaPanels[key]?.owner
     try {
       const model = await window.api.schemas.overwriteDraft(target)
-      get().notify('success', tr('notify.schemaOverwritten'))
+      if (owner && get().schemaPanels[key]?.owner === owner) {
+        set((s) => ({ schemaPanels: patchSchemaPanel(s.schemaPanels, target, { model }) }))
+      }
+      get().notify(appNotice('success', tr('notify.schemaOverwritten'), 'document'))
       return model
     } catch (e) {
-      set({ lastError: tr('notify.overwriteSchemaFailed', { error: errMessage(e) }) })
+      get().notify(appNotice('error', tr('notify.overwriteSchemaFailed', { error: errMessage(e) }), 'document'))
       return null
     }
   },
 
-  // ----------------------------------------------------------- document mutations
+  // --------------------------------------------------------- document operations
+  async readDocument(req) {
+    try {
+      return await window.api.docs.read(req)
+    } catch (e) {
+      return { ok: false, found: false, error: errMessage(e) }
+    }
+  },
+
+  async cancelDocumentRead(taskId) {
+    try {
+      return await window.api.docs.cancelRead(taskId)
+    } catch {
+      return false
+    }
+  },
+
   async updateDocument(req) {
     try {
       const res = await window.api.docs.update(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }) })
+      else {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }),
+            'document',
+            `document:${req.connectionId}:${req.database}:${req.collection}:update`
+          )
+        )
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.updateFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.updateFailed', { error }),
+          'document',
+          `document:${req.connectionId}:${req.database}:${req.collection}:update`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1232,11 +1803,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.setField(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }) })
+      else {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.updateFailed', { error: res.error ?? tr('notify.unknown') }),
+            'document',
+            `document:${req.connectionId}:${req.database}:${req.collection}:field:${req.path}`
+          )
+        )
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.updateFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.updateFailed', { error }),
+          'document',
+          `document:${req.connectionId}:${req.database}:${req.collection}:field:${req.path}`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1245,36 +1832,137 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await window.api.docs.delete(req)
       if (res.ok) await get().refreshResult()
-      else set({ lastError: tr('notify.deleteFailed', { error: res.error ?? tr('notify.unknown') }) })
+      else {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.deleteFailed', { error: res.error ?? tr('notify.unknown') }),
+            'document',
+            `document:${req.connectionId}:${req.database}:${req.collection}:delete`
+          )
+        )
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.deleteFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.deleteFailed', { error }),
+          'document',
+          `document:${req.connectionId}:${req.database}:${req.collection}:delete`
+        )
+      )
       return { ok: false, error }
     }
   },
 
   // ------------------------------------------------------------- import/export
+  async chooseExportDirectory() {
+    try {
+      return await window.api.io.chooseExportDirectory()
+    } catch (e) {
+      get().notify(
+        appNotice(
+          'error',
+          tr('io.chooseExportDirectoryFailed', { error: errMessage(e) }),
+          'io',
+          'export:chooseDirectory'
+        )
+      )
+      return null
+    }
+  },
+
   async exportCollection(req) {
     try {
       const res = await window.api.io.export(req)
-      if (!res.ok && !res.cancelled) set({ lastError: tr('notify.exportFailed', { error: res.error ?? tr('notify.unknown') }) })
+      if (!res.ok && !res.cancelled) {
+        get().notify(
+          appNotice(
+            'error',
+            tr('notify.exportFailed', { error: res.error ?? tr('notify.unknown') }),
+            'io',
+            `export:${req.taskId}`
+          )
+        )
+      } else if (res.warning) {
+        get().notify(appNotice('warn', tr('notify.exportWarning'), 'io', `export:${req.taskId}:warning`, res.warning))
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.exportFailed', { error }) })
+      get().notify(appNotice('error', tr('notify.exportFailed', { error }), 'io', `export:${req.taskId}`))
       return { ok: false, error }
     }
+  },
+
+  async cancelExport(taskId) {
+    try {
+      return await window.api.io.cancelExport(taskId)
+    } catch (e) {
+      get().notify(appNotice('error', tr('notify.cancelExportFailed'), 'io', `export:${taskId}:cancel`, errMessage(e)))
+      return false
+    }
+  },
+
+  async openExportedFile(taskId) {
+    try {
+      const error = await window.api.io.openExportedFile(taskId)
+      if (error) {
+        get().notify(appNotice('error', tr('io.openExportedFileFailed', { error }), 'io', `export:${taskId}:open`))
+      }
+      return error
+    } catch (e) {
+      const error = errMessage(e)
+      get().notify(appNotice('error', tr('io.openExportedFileFailed', { error }), 'io', `export:${taskId}:open`))
+      return error
+    }
+  },
+
+  async revealExportedFile(taskId) {
+    try {
+      const error = await window.api.io.revealExportedFile(taskId)
+      if (error) {
+        get().notify(appNotice('error', tr('io.revealExportedFileFailed', { error }), 'io', `export:${taskId}:reveal`))
+      }
+      return error
+    } catch (e) {
+      const error = errMessage(e)
+      get().notify(appNotice('error', tr('io.revealExportedFileFailed', { error }), 'io', `export:${taskId}:reveal`))
+      return error
+    }
+  },
+
+  clearExportProgress(taskId) {
+    set((state) => {
+      const { [taskId]: _removed, ...exportProgress } = state.exportProgress
+      return { exportProgress }
+    })
   },
 
   async importCollection(req) {
     try {
       const res = await window.api.io.import(req)
-      if (!res.ok && !res.cancelled) set({ lastError: tr('notify.importFailed', { error: res.error ?? tr('notify.unknown') }) })
+      const key = `import:${req.connectionId}:${req.database}:${req.collection}`
+      if (!res.ok && !res.cancelled) {
+        get().notify(
+          appNotice('error', tr('notify.importFailed', { error: res.error ?? tr('notify.unknown') }), 'io', key)
+        )
+      } else if (res.warning) {
+        get().notify(appNotice('warn', tr('notify.importWarning'), 'io', `${key}:warning`, res.warning))
+      }
       return res
     } catch (e) {
       const error = errMessage(e)
-      set({ lastError: tr('notify.importFailed', { error }) })
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.importFailed', { error }),
+          'io',
+          `import:${req.connectionId}:${req.database}:${req.collection}`
+        )
+      )
       return { ok: false, error }
     }
   },
@@ -1283,20 +1971,83 @@ export const useAppStore = create<AppState>((set, get) => ({
   async checkForUpdates() {
     try {
       const started = await window.api.updates.checkForUpdates()
-      if (!started) set({ lastError: tr('notify.updateCheckUnavailable') })
+      if (!started) {
+        get().notify(appNotice('warn', tr('notify.updateCheckUnavailable'), 'settings', 'updates:unavailable'))
+      }
       return started
     } catch (e) {
-      set({ lastError: tr('notify.updateCheckFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.updateCheckFailed', { error: errMessage(e) }), 'settings', 'updates:check')
+      )
       return false
+    }
+  },
+
+  async loadUpdateState() {
+    subscribeToUpdates()
+    try {
+      set({ updateState: await window.api.updates.getState() })
+    } catch {
+      set({ updateState: EMPTY_UPDATE_STATE })
+    }
+  },
+
+  async setAutomaticUpdateChecks(enabled) {
+    try {
+      set({ updateState: await window.api.updates.setAutomaticChecks(enabled) })
+    } catch (e) {
+      get().notify(
+        appNotice('error', tr('notify.updateCheckFailed', { error: errMessage(e) }), 'settings', 'updates:automatic')
+      )
+    }
+  },
+
+  async showAvailableUpdate() {
+    try {
+      const started = await window.api.updates.showAvailableUpdate()
+      if (!started) {
+        get().notify(appNotice('warn', tr('notify.updateCheckUnavailable'), 'settings', 'updates:unavailable'))
+      }
+      return started
+    } catch (e) {
+      get().notify(
+        appNotice('error', tr('notify.updateDownloadFailed', { error: errMessage(e) }), 'settings', 'updates:show')
+      )
+      return false
+    }
+  },
+
+  async cancelUpdateDownload() {
+    try {
+      return await window.api.updates.cancelDownload()
+    } catch (e) {
+      get().notify(
+        appNotice(
+          'error',
+          tr('notify.cancelUpdateFailed', { error: errMessage(e) }),
+          'settings',
+          'updates:cancel'
+        )
+      )
+      return false
+    }
+  },
+
+  async openSettings() {
+    try {
+      await window.api.app.openSettings()
+    } catch (e) {
+      get().notify(appNotice('error', tr('notify.openSettingsFailed'), 'system', 'settings:open', errMessage(e)))
     }
   },
 
   async loadSettings() {
     subscribeToSettings()
     try {
-      set({ settings: await window.api.settings.get() })
-    } catch {
-      /* keep defaults */
+      const settings = await window.api.settings.get()
+      set({ settings })
+    } catch (e) {
+      get().notify(appNotice('warn', tr('notify.loadSettingsFailed'), 'settings', 'settings:load', errMessage(e)))
     }
   },
 
@@ -1308,18 +2059,47 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ settings: saved })
       getSettingsChannel()?.postMessage(saved)
     } catch (e) {
-      set({ lastError: tr('notify.saveSettingsFailed', { error: errMessage(e) }) })
+      get().notify(
+        appNotice('error', tr('notify.saveSettingsFailed', { error: errMessage(e) }), 'settings', 'settings:save')
+      )
     }
   }
 }))
 
+// Result ownership follows the tab/result lifecycle, including automatic eviction.
+useAppStore.subscribe((state, previous) => {
+  if (state.tabs === previous.tabs) return
+  for (const tab of previous.tabs) {
+    const next = state.tabs.find((item) => item.id === tab.id)
+    if (next?.results === tab.results) continue
+    for (const result of tab.results) {
+      const id = result.result.resultId
+      if (id && !next?.results.some((item) => item.result.resultId === id)) {
+        void window.api.shell.release(id).catch(() => {})
+      }
+    }
+  }
+})
+
+function updateResultTotal(tabId: string, result: ShellResult): void {
+  const id = result.resultId
+  if (!id || result.totalStatus !== 'counting') return
+  void window.api.shell.total(id).then(
+    (total) => useAppStore.setState((state) => patchTabResults(state, tabId, (tab) => ({
+      results: tab.results.map((item) => item.result.resultId === id && item.result.totalStatus === 'counting'
+        ? { ...item, result: { ...item.result, ...total } }
+        : item)
+    }))),
+    () => useAppStore.setState((state) => patchTabResults(state, tabId, (tab) => ({
+      results: tab.results.map((item) => item.result.resultId === id && item.result.totalStatus === 'counting'
+        ? { ...item, result: { ...item.result, totalStatus: 'unavailable' } }
+        : item)
+    })))
+  )
+}
+
 /** Helper to flip a node's loading flag immutably. */
-function withLoading(
-  s: AppState,
-  connId: string,
-  nodeId: string,
-  on: boolean
-): Pick<AppState, 'catalogs'> {
+function withLoading(s: AppState, connId: string, nodeId: string, on: boolean): Pick<AppState, 'catalogs'> {
   const c = s.catalogs[connId] ?? emptyCatalog()
   const loading = new Set(c.loading)
   if (on) loading.add(nodeId)

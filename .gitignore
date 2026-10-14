@@ -10,3 +10,6 @@ build/sparkle/
 
 # Test coverage reports
 coverage/
+
+# Repository-local worktrees
+.worktrees/

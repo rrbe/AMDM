@@ -47,7 +47,7 @@ if (!container) {
   throw new Error('Root element #root not found')
 }
 
-function WebRoot(): JSX.Element {
+function WebRoot(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(window.location.hash === '#settings')
   const appRoot = useRef<HTMLDivElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)

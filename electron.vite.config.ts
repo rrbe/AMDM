@@ -4,26 +4,34 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { version } from './package.json'
+import { mongoshEditorPlugin } from './scripts/mongosh-editor-types.mjs'
 
-const buildId = `${version} - ${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
+const mongoshRuntimePlugin = {
+  name: 'build-mongosh-runtime',
+  closeBundle(): void {
+    execFileSync(process.execPath, [resolve('scripts/build-mongosh-runtime.mjs')], { stdio: 'inherit' })
+  }
+}
 
 export default defineConfig({
   main: {
+    // electron-vite clears out/main before both production and dev builds.
+    // Build the isolated mongosh artifact only after the main bundle has been
+    // written so Electron never starts with the companion file missing.
+    plugins: [mongoshRuntimePlugin],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')
       }
     },
     build: {
-      // exceljs, @mongosh/async-rewriter2, the Schema analyzer, the MongoDB driver and its
+      // exceljs, the Schema analyzer, the MongoDB driver and its
       // connection-string parser are bundled (not externalized) on purpose:
       // electron-builder 26's pnpm
       // dependency collector reconstructs
       // the nested tree from the lockfile and drops some leaf transitive deps —
-      // util-deprecate under exceljs's readable-stream, and ms /
-      // @babel/helper-globals / @jridgewell/* under async-rewriter2's
-      // @babel/core — so externalizing either crashed the packaged app at
-      // launch with "Cannot find module …". Letting rollup inline them + all
+      // util-deprecate under exceljs's readable-stream, for example. Externalizing
+      // those dependencies caused "Cannot find module …" at launch. Inlining
       // their transitive deps makes the asar self-contained and sidesteps that
       // collector entirely. All are pure JS (no native bindings), so bundling
       // is safe. (electron-vite 5 externalizes all deps by default — the
@@ -31,7 +39,6 @@ export default defineConfig({
       externalizeDeps: {
         exclude: [
           'exceljs',
-          '@mongosh/async-rewriter2',
           '@mongodb-js/mongodb-schema',
           'reservoir',
           'mongodb',
@@ -39,11 +46,22 @@ export default defineConfig({
         ]
       },
       rollupOptions: {
+        output: { format: 'es' },
+        // These optional Driver integrations are present only because the
+        // official mongosh provider uses them. Keep the existing main bundle
+        // from traversing that dependency graph; the Stage-0 runtime is built
+        // separately by scripts/build-mongosh-runtime.mjs.
+        external: [
+          '@aws-sdk/credential-providers',
+          'gcp-metadata',
+          'kerberos',
+          'mongodb-client-encryption'
+        ],
         input: {
-          index: resolve(__dirname, 'src/main/index.ts'),
+          index: resolve(import.meta.dirname, 'src/main/index.ts'),
           // Emitted as out/main/serializer.worker.js; loaded by serializerPool
-          // via new Worker(join(__dirname, 'serializer.worker.js')).
-          'serializer.worker': resolve(__dirname, 'src/main/workers/serializer.worker.ts')
+          // via a URL relative to the main bundle.
+          'serializer.worker': resolve(import.meta.dirname, 'src/main/workers/serializer.worker.ts')
         }
       }
     }
@@ -57,14 +75,15 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') }
+        output: { format: 'es' },
+        input: { index: resolve(import.meta.dirname, 'src/preload/index.ts') }
       }
     }
   },
   renderer: {
     root: 'src/renderer',
     define: {
-      __BUILD_ID__: JSON.stringify(buildId),
+      __APP_VERSION__: JSON.stringify(version),
       __WEB__: 'false'
     },
     resolve: {
@@ -76,10 +95,11 @@ export default defineConfig({
         '@': resolve('src/renderer/src')
       }
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), mongoshEditorPlugin()],
+    worker: { plugins: () => [mongoshEditorPlugin()] },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/renderer/index.html') }
+        input: { index: resolve(import.meta.dirname, 'src/renderer/index.html') }
       }
     }
   }

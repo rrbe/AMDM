@@ -1,5 +1,5 @@
 /**
- * Catalog read core (driver-only core + thin session
+ * Catalog core (driver-only core + thin session
  * wrapper). These take a `Db` directly — no `sessionManager` — so they can be
  * integration-tested against a real MongoDB. `catalog.ts` wraps them with
  * session resolution, the disconnect-race guard, and field-sample caching.
@@ -26,6 +26,14 @@ export async function listCollectionsOnDb(db: Db): Promise<CollectionInfo[]> {
 
 export function estimateCollectionCountOnDb(db: Db, collection: string): Promise<number> {
   return db.collection(collection).estimatedDocumentCount()
+}
+
+export async function dropCollectionOnDb(
+  db: Db,
+  collection: string,
+  options: { timeoutMS: number; signal: AbortSignal }
+): Promise<void> {
+  await db.command({ drop: collection }, options)
 }
 
 export async function listIndexesOnDb(db: Db, collection: string): Promise<IndexInfo[]> {

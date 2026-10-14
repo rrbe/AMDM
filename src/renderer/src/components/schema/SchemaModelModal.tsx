@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { AlertTriangle, Plus, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, Plus, RefreshCw, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { MongoJsonSchema, SchemaFieldStat, SchemaModel, SchemaTarget, SchemaTypeStat } from '@shared/types'
 import { Button } from '@renderer/components/common/Button'
@@ -23,6 +23,7 @@ import {
   type FlatSchemaNode
 } from '@renderer/lib/schemaEdit'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { schemaPanelKey } from '@renderer/lib/schemaPanel'
 
 interface Props {
   target: SchemaTarget
@@ -64,7 +65,7 @@ function flattenStats(fields: SchemaFieldStat[], parent = '', depth = 0): FlatSt
   return rows
 }
 
-function AnalysisView({ model }: { model: SchemaModel }): JSX.Element {
+function AnalysisView({ model }: { model: SchemaModel }): React.JSX.Element {
   const { t } = useTranslation()
   const rows = useMemo(() => flattenStats(model.analysis.fields), [model.analysis.fields])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -129,7 +130,7 @@ function SchemaRow({
   row: FlatSchemaNode
   onChange: (change: (schema: MongoJsonSchema) => MongoJsonSchema) => void
   onError: (message: string | null) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const types = bsonTypesOf(row.schema)
   const canAddChild = types.includes('object') || types.includes('array')
@@ -205,7 +206,8 @@ function SchemaRow({
       <div className="flex justify-end gap-0.5">
         {canAddChild && (
           <button
-            className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-[var(--interaction-hover)] hover:text-foreground"
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded border-0 bg-transparent p-0 text-muted-foreground outline-none hover:bg-[var(--interaction-hover)] hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
             title={t('schema.addNestedField')}
             aria-label={t('schema.addNestedField')}
             onClick={() => safeChange((schema) => addChildProperty(schema, row.path))}
@@ -214,7 +216,8 @@ function SchemaRow({
           </button>
         )}
         <button
-          className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          type="button"
+          className="inline-flex size-7 items-center justify-center rounded border-0 bg-transparent p-0 text-muted-foreground outline-none hover:bg-destructive/10 hover:text-destructive focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           title={t('schema.deleteField')}
           aria-label={t('schema.deleteField')}
           onClick={() => safeChange((schema) => deleteSchemaNode(schema, row.parentPath, row))}
@@ -234,7 +237,7 @@ function StructuredEditor({
   schema: MongoJsonSchema
   onChange: (schema: MongoJsonSchema) => void
   onError: (message: string | null) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const rows = useMemo(() => flattenSchema(schema), [schema])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -256,7 +259,7 @@ function StructuredEditor({
           <Plus /> {t('schema.addField')}
         </Button>
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto scroll-p-[3px]">
         <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]
@@ -282,12 +285,13 @@ function parseDraft(text: string): MongoJsonSchema {
   return parsed
 }
 
-export function SchemaModelModal({ target, onClose }: Props): JSX.Element {
+export function SchemaModelModal({ target, onClose }: Props): React.JSX.Element {
   const { t } = useTranslation()
+  const connected = useAppStore((state) => state.statuses[target.connectionId]?.state === 'connected')
+  const analysisBusy = useAppStore((state) => state.schemaPanels[schemaPanelKey(target)]?.analyzing ?? false)
   const loadSchemaModel = useAppStore((state) => state.loadSchemaModel)
   const analyzeSchema = useAppStore((state) => state.analyzeSchema)
   const saveSchemaDraft = useAppStore((state) => state.saveSchemaDraft)
-  const overwriteSchemaDraft = useAppStore((state) => state.overwriteSchemaDraft)
   const [model, setModel] = useState<SchemaModel | null>(null)
   const [draft, setDraft] = useState<MongoJsonSchema | null>(null)
   const [jsonText, setJsonText] = useState('')
@@ -309,6 +313,7 @@ export function SchemaModelModal({ target, onClose }: Props): JSX.Element {
     let active = true
     const load = async (): Promise<void> => {
       let loaded = await loadSchemaModel(target)
+      if (!active) return
       if (!loaded) loaded = await analyzeSchema(target)
       if (!active) return
       if (loaded) {
@@ -375,14 +380,17 @@ export function SchemaModelModal({ target, onClose }: Props): JSX.Element {
     setSaving(false)
   }
 
-  const overwrite = async (): Promise<void> => {
-    if (!window.confirm(t('schema.overwriteConfirm'))) return
-    const next = await overwriteSchemaDraft(target)
-    if (!next) return
-    setModel(next)
-    setDraft(next.draft)
-    setJsonText(JSON.stringify(next.draft, null, 2))
+  const resetDraft = (): void => {
+    if (!model) return
+    setDraft(model.draft)
+    setJsonText(JSON.stringify(model.draft, null, 2))
     setDirty(false)
+    setError(null)
+  }
+
+  const restoreDefaults = (): void => {
+    if (!model || !window.confirm(t('schema.restoreDefaultsConfirm'))) return
+    applyDraft(model.analysis.generated)
     setError(null)
   }
 
@@ -393,12 +401,13 @@ export function SchemaModelModal({ target, onClose }: Props): JSX.Element {
 
   return (
     <ResizableModal
+      sizeKey="schema-model"
       title={t('schema.title', { collection: target.collection })}
-      className="h-[min(720px,calc(100vh-48px))] w-[min(1100px,calc(100vw-48px))] max-w-none"
+      className="h-[min(720px,calc(100vh-48px))] w-[min(1100px,calc(100vw-48px))] max-w-[calc(100vw-48px)]"
       bodyClassName="flex flex-col gap-3"
       onClose={close}
       headerActions={
-        <Button size="sm" busy={analyzing} disabled={loading} onClick={() => void updateAnalysis()}>
+        <Button size="sm" variant="ghost" busy={analyzing || analysisBusy} disabled={loading || !connected} onClick={() => void updateAnalysis()}>
           <RefreshCw /> {t('schema.updateAnalysis')}
         </Button>
       }
@@ -446,8 +455,11 @@ export function SchemaModelModal({ target, onClose }: Props): JSX.Element {
                   ]}
                 />
                 <span className="flex-1" />
-                <Button size="sm" variant="ghost" onClick={() => void overwrite()}>
-                  <RotateCcw /> {t('schema.overwriteDraft')}
+                <Button size="sm" variant="ghost" disabled={!dirty || saving} onClick={resetDraft}>
+                  <Undo2 /> {t('schema.resetDraft')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={restoreDefaults}>
+                  <RotateCcw /> {t('schema.restoreDefaults')}
                 </Button>
               </div>
               {editMode === 'structured' ? (

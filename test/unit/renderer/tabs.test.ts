@@ -10,7 +10,9 @@ import {
   closeResult,
   createTab,
   dbCollRef,
+  indexDetailsQuery,
   isRunFailure,
+  matchesTabSearch,
   patchResult,
   patchTab,
   pickActiveAfterClose,
@@ -18,6 +20,7 @@ import {
   resultTabLabel,
   tabCollection,
   tabLabel,
+  tabSearchText,
   type ResultTab
 } from '../../../src/renderer/src/lib/tabs'
 import type { ShellResult } from '../../../src/shared/types'
@@ -29,6 +32,20 @@ describe('dbCollRef', () => {
     for (const name of ['admin', 'collection', 'aggregate', 'getCollection', 'stats']) {
       expect(dbCollRef(name)).toBe(`db.getCollection("${name}")`)
     }
+  })
+})
+
+describe('indexDetailsQuery', () => {
+  it('queries one complete index definition by name', () => {
+    expect(indexDetailsQuery('orders', 'status_1_createdAt_-1')).toBe(
+      'db.orders.getIndexes().filter((index) => index.name === "status_1_createdAt_-1")'
+    )
+  })
+
+  it('quotes unsafe collection and index names', () => {
+    expect(indexDetailsQuery('order.items', 'sku_"quoted"\n')).toBe(
+      'db.getCollection("order.items").getIndexes().filter((index) => index.name === "sku_\\"quoted\\"\\n")'
+    )
   })
 })
 
@@ -65,6 +82,7 @@ describe('isRunFailure', () => {
     expect(isRunFailure(docsResult())).toBe(false)
     expect(isRunFailure({ kind: 'error', errorName: 'MongoServerError' })).toBe(true)
     expect(isRunFailure({ kind: 'error', errorName: 'Aborted' })).toBe(false)
+    expect(isRunFailure({ kind: 'error', errorName: 'AbortError', failureKind: 'cancelled' })).toBe(false)
   })
 })
 
@@ -189,6 +207,22 @@ describe('tabLabel', () => {
   })
 })
 
+describe('query tab search', () => {
+  it('matches the label, connection, and database case-insensitively', () => {
+    const tab = createTab('a', {
+      code: 'db.orders.find({})',
+      activeDatabase: 'Sales'
+    })
+    const filterText = tabSearchText(tab, 0, 'Production')
+
+    expect(matchesTabSearch(filterText, 'orders')).toBe(true)
+    expect(matchesTabSearch(filterText, 'production')).toBe(true)
+    expect(matchesTabSearch(filterText, ' SALES ')).toBe(true)
+    expect(matchesTabSearch(filterText, '')).toBe(true)
+    expect(matchesTabSearch(filterText, 'customers')).toBe(false)
+  })
+})
+
 describe('tabCollection', () => {
   it('returns the collection without inventing a fallback label', () => {
     expect(tabCollection(createTab('a', { code: 'db.orders.find({})' }))).toBe('orders')
@@ -214,10 +248,12 @@ function tabWithResults(n: number): ReturnType<typeof createTab> {
 
 describe('appendResult', () => {
   it('appends a focused result tab with a monotonic seq and skip 0', () => {
+    const before = Date.now()
     const tab = tabWithResults(2)
     expect(tab.results.map((r) => r.id)).toEqual(['r1', 'r2'])
     expect(tab.results.map((r) => r.seq)).toEqual([1, 2])
     expect(tab.results[1].skip).toBe(0)
+    expect(tab.results[1].executedAt).toBeGreaterThanOrEqual(before)
     expect(tab.activeResultId).toBe('r2')
     expect(tab.resultSeq).toBe(2)
   })
@@ -228,9 +264,30 @@ describe('appendResult', () => {
     expect(tab.results.map((r) => r.seq)).toEqual([2, 3])
     expect(tab.activeResultId).toBe('r3')
   })
+  it('evicts by run sequence after sorting, retaining the surviving display order', () => {
+    const tab = tabWithResults(3)
+    const [first, second, third] = tab.results
+    const next = appendResult({ ...tab, results: [third, first, second] }, 'r4', docsResult(), QUERY, 3)
+    expect(next.results?.map((result) => result.id)).toEqual(['r3', 'r2', 'r4'])
+    expect(next.results?.[0]).toBe(third)
+    expect(next.results?.[1]).toBe(second)
+    expect(next.activeResultId).toBe('r4')
+    expect(next.resultSeq).toBe(4)
+  })
 })
 
 describe('patchResult', () => {
+  it('retains folding through view changes and clears it when the result changes', () => {
+    const tab = tabWithResults(2)
+    tab.results[0].foldedLines = { json: [1, 5], console: [0] }
+    const switched = patchResult(tab, 'r1', { resultView: 'table' }).results!
+    expect(switched[0].foldedLines).toEqual({ json: [1, 5], console: [0] })
+    expect(switched[1]).toBe(tab.results[1])
+    const refreshed = patchResult({ ...tab, results: switched }, 'r1', { result: docsResult() }).results!
+    expect(refreshed[0].foldedLines).toBeUndefined()
+    expect(refreshed[1]).toBe(tab.results[1])
+  })
+
   it('patches only the target result and keeps others by reference', () => {
     const tab = tabWithResults(2)
     const [a] = tab.results
@@ -276,7 +333,14 @@ describe('activeResult', () => {
 })
 
 describe('resultTabLabel', () => {
-  const rt = (result: ShellResult, seq = 1): ResultTab => ({ id: 'r', seq, result, query: null, skip: 0 })
+  const rt = (result: ShellResult, seq = 1): ResultTab => ({
+    id: 'r',
+    seq,
+    result,
+    executedAt: 0,
+    query: null,
+    skip: 0
+  })
 
   it('uses the target collection plus the run sequence', () => {
     expect(resultTabLabel(rt(docsResult('orders'), 3))).toBe('orders 3')

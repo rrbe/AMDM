@@ -109,11 +109,12 @@ export interface ConnectionConfig {
  * the main process will encrypt. Leave a secret field `undefined` on update to
  * keep the previously stored value; pass empty string to clear it.
  */
-export interface ConnectionInput
-  extends Omit<
-    ConnectionConfig,
-    'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
-  > {
+export interface ConnectionInput extends Omit<
+  ConnectionConfig,
+  'hasPassword' | 'hasSshPassword' | 'hasSshPassphrase' | 'hasJumpSshPassphrase' | 'createdAt' | 'updatedAt'
+> {
+  /** Create a new connection, inheriting unchanged secrets from this saved connection. */
+  copyFromId?: string
   password?: string
   sshPassword?: string
   sshPassphrase?: string
@@ -150,20 +151,40 @@ export interface DiagnoseStage {
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+/** Stable failure categories carried across IPC; UI copy must not parse driver messages. */
+export type FailureKind =
+  'timeout' | 'network' | 'dns' | 'auth' | 'hostkey' | 'cancelled' | 'execution' | 'ipc' | 'unknown'
+
 export interface ConnectionStatus {
   id: string
   state: ConnectionState
   /** Populated when state === 'error'. */
   error?: string
+  failureKind?: FailureKind
   /** Topology hint, e.g. "ReplicaSetWithPrimary" / "Single". */
   topology?: string
   /** Server version string, when known. */
   serverVersion?: string
 }
 
-export interface TestResult {
+export interface ConnectionAuthorization {
+  users: { user: string; db: string }[]
+  roles: { role: string; db: string }[]
+  privileges: {
+    resource: { db?: string; collection?: string; cluster?: boolean; anyResource?: boolean }
+    actions: string[]
+  }[]
+}
+
+export interface AuthorizationResult {
+  authorization?: ConnectionAuthorization
+  authorizationError?: string
+}
+
+export interface TestResult extends AuthorizationResult {
   ok: boolean
   error?: string
+  failureKind?: FailureKind
   topology?: string
   serverVersion?: string
 }
@@ -257,11 +278,8 @@ export interface ShellRequest {
   connectionId: string
   database: string
   code: string
-  /** Default page size applied to bare cursors so results remain bounded. */
-  limit?: number
-  /** Page offset injected into a `find()` cursor for prev/next paging. Only
-      honored when the script's result is a FindCursor (see `pageable`). */
-  skip?: number
+  /** Documents displayed per page; never overrides the query's limit/skip. */
+  pageSize?: number
   /** Run the query under explain('executionStats') instead of fetching docs. */
   explain?: boolean
   /** Default server-side limit for read operations. Explicit query options win. */
@@ -272,6 +290,18 @@ export interface ShellRequest {
 }
 
 export type ShellResultKind = 'documents' | 'value' | 'ack' | 'explain' | 'error'
+
+export interface ShellResultTotal {
+  totalCount?: number
+  totalStatus: 'known' | 'counting' | 'unknown' | 'unavailable'
+}
+
+export interface ShellPageRequest {
+  resultId: string
+  skip: number
+  pageSize: number
+  execId: string
+}
 
 /**
  * One captured shell-output line (print / printjson / console.*). Text lines
@@ -300,12 +330,17 @@ export interface ShellResult {
   data?: unknown
   /** Number of docs in `data` when kind === 'documents'. */
   count?: number
-  /** True if a default limit was auto-applied to a cursor (more may exist). */
+  /** Main-owned execution result; pages are read from its cursor/cache. */
+  resultId?: string
+  pageSize?: number
+  /** Full query result cardinality, including the query's own skip/limit. */
+  totalCount?: number
+  totalStatus?: ShellResultTotal['totalStatus']
+  /** True when additional result documents can be displayed on later pages. */
   truncated?: boolean
-  /** True when the result is a FindCursor, so prev/next paging (skip) is
-      supported. Aggregation cursors and arrays are not pageable. */
+  /** True when this execution has cached pages or a retained cursor. */
   pageable?: boolean
-  /** Page offset that produced this result (echoes the request's skip). */
+  /** Display offset within this execution, separate from the query's skip. */
   skip?: number
   /** Target collection parsed from the code (enables doc edit/delete). */
   collection?: string
@@ -314,6 +349,7 @@ export interface ShellResult {
   /** Populated when kind === 'error'. */
   error?: string
   errorName?: string
+  failureKind?: FailureKind
   /** Set by the `use <db>` REPL command — tells the renderer to switch the
       active database for the tab (mongosh-style). */
   useDatabase?: string
@@ -387,6 +423,19 @@ export interface DocSetFieldRequest extends DocMutateRequest {
   valueEjson: string
 }
 
+export interface DocReadRequest extends DocMutateRequest {
+  /** Opaque owner-scoped id used to cancel this one refresh operation. */
+  taskId: string
+}
+
+export interface DocReadResult {
+  ok: boolean
+  found: boolean
+  /** EJSON-canonical document when found. */
+  document?: unknown
+  error?: string
+}
+
 export interface DocMutateResult {
   ok: boolean
   error?: string
@@ -399,28 +448,82 @@ export interface DocMutateResult {
 // Import / export (Phase 3)
 // ---------------------------------------------------------------------------
 
-export type DataFormat = 'json' | 'csv' | 'xlsx' | 'bson'
+export type TabularExportFormat = 'csv' | 'tsv' | 'xlsx'
+export type JsonExportFormat = 'json' | 'jsonl'
+export type JsonEncoding = 'plain' | 'relaxed' | 'canonical'
+export type ResultExportFormat = JsonExportFormat | TabularExportFormat | 'bson'
+export type ExportFormat = ResultExportFormat
+export type TabularDelimiter = ',' | ';' | ' ' | '\t' | '/' | '-' | '.'
 
-export interface ExportRequest {
+/** Owner-scoped directory capability returned by the native directory picker. */
+export interface ExportDirectorySelection {
+  selectionId: string
+  path: string
+}
+
+export interface ExportDestination {
+  directorySelectionId: string
+  /** Base file name entered in the export form; the format controls the extension. */
+  fileName: string
+}
+
+interface ExportOptions {
+  /** Opaque id used for progress events and cancellation. */
+  taskId: string
+  format: ExportFormat
+  /** Tabular formats: include the derived field-name row. */
+  includeHeader?: boolean
+  /** CSV/TSV: prepend a UTF-8 BOM for spreadsheet compatibility. */
+  utf8Bom?: boolean
+  /** CSV/TSV line separator. */
+  lineEnding?: 'lf' | 'crlf'
+  /** CSV/TSV field separator. */
+  delimiter?: TabularDelimiter
+  /** XLSX worksheet name; sanitized again in main before writing. */
+  worksheetName?: string
+  /** JSON/JSONL: how canonical EJSON values are represented in the output. */
+  jsonEncoding?: JsonEncoding
+  /** Keep exported columns consistent with the Table view. */
+  fieldSort?: CollectionSort
+}
+
+export interface CollectionExportRequest extends ExportOptions {
+  source: 'collection'
   connectionId: string
   database: string
   collection: string
-  format: DataFormat
   /** Optional EJSON filter string for native formats (default {} = all). */
   query?: string
   /** Optional cap on documents exported. */
   limit?: number
-  /** json: true = single array, false = newline-delimited (NDJSON). */
-  jsonArray?: boolean
   /** bson: gzip the output (writes a `.bson.gz`). */
   gzip?: boolean
 }
+
+export interface ResultExportRequest extends ExportOptions {
+  source: 'result'
+  format: ResultExportFormat
+  /** EJSON-canonical, structured-cloneable documents already loaded by Renderer. */
+  documents: unknown[]
+}
+
+export type ExportRequest = CollectionExportRequest | ResultExportRequest
+export type ExportFileRequest = ExportRequest & { destination: ExportDestination }
 
 export interface ImportRequest {
   connectionId: string
   database: string
   collection: string
-  format: DataFormat
+}
+
+export type ExportProgressPhase = 'scanning' | 'writing' | 'finalizing'
+
+export interface ExportProgress {
+  taskId: string
+  phase: ExportProgressPhase
+  processed: number
+  /** Present for an in-memory result source; collection totals are not queried implicitly. */
+  total?: number
 }
 
 export interface DataOpResult {
@@ -474,9 +577,15 @@ export const PINE_COLOR_SCHEME_ID = 'pine'
  */
 export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
+export type KeyboardShortcutId =
+  'newConnection' | 'newQuery' | 'tabSearch' | 'quickSearch' | 'contextualTabs' | 'resultView' | 'openSettings'
+export type TableNestedDisplay = 'inline' | 'grouped' | 'auto'
+
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
   connectionOrder: string[]
+  /** Absolute directory opened first by the native export-directory picker. */
+  defaultExportDirectory: string
   /** 'natural' = server order; 'alpha' = A→Z by name. */
   collectionSort: CollectionSort
   /** 'system' = follow OS (default); 'light' = Stone; 'dark' = Stone Night. */
@@ -485,10 +594,13 @@ export interface AppSettings {
   language: Language
   /** Explorer sidebar width in px (drag-resizable; clamped at the UI). */
   sidebarWidth: number
+  /** Details sidebar width in px (drag-resizable; clamped at the UI). */
+  contextPanelWidth: number
+  /** Remember whether the Details sidebar is expanded. */
+  contextPanelOpen: boolean
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
   editorHeight: number
-  /** Page size for query results — how many docs a cursor fetches per page
-      (bounded; never the whole collection). */
+  /** Initial display page size for new results; does not change query limits. */
   queryLimit: number
   /** Default MongoDB maxTimeMS for read operations; 0 disables the limit. */
   queryTimeoutMS: number
@@ -498,6 +610,8 @@ export interface AppSettings {
   editorFontSize: number
   /** Data result views font size in px (Tree / JSON / Table / Console). */
   dataFontSize: number
+  /** Nested objects in Table: inline preview or one-level grouped columns. */
+  tableNestedDisplay: TableNestedDisplay
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
@@ -509,6 +623,37 @@ export interface AppSettings {
   /** Remembered "To URL" choice: inline the real password (vs `<password>`
       placeholder). Defaults off; persisted so the user's last pick sticks. */
   exportIncludeRealPassword: boolean
+  /** Latest scheduled update reminder the user opened; later versions still notify. */
+  acknowledgedUpdateVersion: string | null
+  /** Automatic update checks on Windows/Linux; macOS persists this in Sparkle. */
+  automaticUpdateChecks: boolean
+  /** App-wide navigation/new-item shortcuts; editor-local key bindings are separate. */
+  keyboardShortcutsEnabled: boolean
+  /** Individually cleared app shortcut ids. */
+  disabledKeyboardShortcuts: KeyboardShortcutId[]
+}
+
+export type UpdatePhase = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded'
+
+export interface UpdateDownloadProgress {
+  percent: number
+  transferred: number
+  total: number
+  bytesPerSecond: number
+}
+
+/** Runtime state of the platform updater. */
+export interface UpdateState {
+  /** False outside a packaged build supported by the platform updater. */
+  available: boolean
+  /** Persisted scheduled-check preference. */
+  automaticallyChecksForUpdates: boolean
+  /** Current updater lifecycle. */
+  phase: UpdatePhase
+  /** Version shown by the reminder, or null when no update is pending. */
+  availableVersion: string | null
+  /** Present only while a Windows/Linux package is downloading. */
+  downloadProgress: UpdateDownloadProgress | null
 }
 
 export const QUERY_LIMITS = [5, 10, 20, 50, 100, 200, 500, 1000, 2000] as const
@@ -517,19 +662,27 @@ export const HISTORY_LIMITS = [50, 100, 200, 500, 1000] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
   connectionOrder: [],
+  defaultExportDirectory: '',
   collectionSort: 'alpha',
   theme: 'system',
   language: 'system',
   sidebarWidth: 270,
+  contextPanelWidth: 300,
+  contextPanelOpen: false,
   editorHeight: 142,
   queryLimit: 50,
   queryTimeoutMS: 30_000,
   historyLimit: 200,
   editorFontSize: 13,
   dataFontSize: 13,
+  tableNestedDisplay: 'inline',
   editorWordWrap: false,
   editorTabSize: 2,
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,
   editorColorSchemes: [],
-  exportIncludeRealPassword: false
+  exportIncludeRealPassword: false,
+  acknowledgedUpdateVersion: null,
+  automaticUpdateChecks: true,
+  keyboardShortcutsEnabled: true,
+  disabledKeyboardShortcuts: []
 }

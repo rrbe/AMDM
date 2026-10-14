@@ -16,17 +16,29 @@ function webBackend(): Plugin {
       const keyPath = resolve(dataDir, "master-key");
       mkdirSync(dataDir, { recursive: true, mode: 0o700 });
       if (!existsSync(keyPath))
-        writeFileSync(keyPath, randomBytes(32).toString("base64"), { mode: 0o600 });
+        writeFileSync(keyPath, randomBytes(32).toString("base64"), {
+          mode: 0o600,
+        });
 
       const app = createWebRequestHandler({
-        store: new WebStore(dataDir, Buffer.from(readFileSync(keyPath, "utf8").trim(), "base64")),
+        store: new WebStore(
+          dataDir,
+          Buffer.from(readFileSync(keyPath, "utf8").trim(), "base64"),
+        ),
         origin: DEV_ORIGIN,
         staticDir: resolve("out/web"),
       });
       viteServer.middlewares.use((req, res, next) => {
-        if (req.url !== "/healthz" && req.url !== "/api/rpc") return next();
-        if (req.url === "/api/rpc") {
-          if (req.headers.origin === `http://${req.headers.host}`) req.headers.origin = DEV_ORIGIN;
+        const pathname = req.url?.split("?")[0];
+        if (
+          pathname !== "/healthz" &&
+          pathname !== "/api/rpc" &&
+          pathname !== "/api/events"
+        )
+          return next();
+        if (pathname === "/api/rpc" || pathname === "/api/events") {
+          if (req.headers.origin === `http://${req.headers.host}`)
+            req.headers.origin = DEV_ORIGIN;
           req.headers["x-forwarded-user"] = "local-dev";
         }
         void app.handle(req, res);
@@ -43,7 +55,6 @@ export default defineConfig(
       host: "0.0.0.0",
       port: 5173,
       strictPort: true,
-      allowedHosts: ["shawns-mbp.tailnet.fairydog.net"],
     },
   }),
 );

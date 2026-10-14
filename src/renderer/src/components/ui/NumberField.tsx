@@ -31,7 +31,7 @@ export function NumberField({
   name,
   className,
   'aria-label': ariaLabel
-}: NumberFieldProps): JSX.Element {
+}: NumberFieldProps): React.JSX.Element {
   return (
     <BaseNumberField.Root
       value={value}

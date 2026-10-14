@@ -1,31 +1,30 @@
-import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { version } from './package.json' with { type: 'json' }
-
-const buildId = `${version} Web - ${execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { encoding: 'utf8' }).trim()}`
+import { resolve } from "node:path";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import pkg from "./package.json" with { type: "json" };
+import { mongoshEditorPlugin } from "./scripts/mongosh-editor-types.mjs";
 
 export default defineConfig({
-  root: 'src/renderer',
+  root: "src/renderer",
   define: {
-    __BUILD_ID__: JSON.stringify(buildId),
-    __WEB__: 'true'
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __WEB__: "true",
   },
   resolve: {
     alias: {
-      '@renderer': resolve('src/renderer/src'),
-      '@shared': resolve('src/shared'),
-      '@': resolve('src/renderer/src')
-    }
+      "@renderer": resolve("src/renderer/src"),
+      "@shared": resolve("src/shared"),
+      "@": resolve("src/renderer/src"),
+    },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), mongoshEditorPlugin()],
+  worker: { plugins: () => [mongoshEditorPlugin()] },
   build: {
-    outDir: resolve('out/web'),
+    outDir: resolve("out/web"),
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve('src/renderer/index.html')
-    }
-  }
-})
+      input: resolve("src/renderer/index.html"),
+    },
+  },
+});

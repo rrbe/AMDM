@@ -1,25 +1,56 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Table } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type ShellResult } from '@shared/types'
+import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
-import { resultTabLabel, type ResultTab } from '@renderer/lib/tabs'
+import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
+import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { docActionContext } from '@renderer/lib/docActions'
-import { copyText, toCsv, toPlainJson, toShellText, toStrictEjson, toTsv } from '@renderer/lib/resultCopy'
+import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
+import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
+import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
+import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
+import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { ExportModal } from '@renderer/components/io/ExportModal'
+import {
+  hasOpenShortcutLayer,
+  isAppShortcutEnabled,
+  isMacPlatform,
+  primaryDigitIndex,
+  tabShortcutLabel
+} from '@renderer/lib/keyboardShortcuts'
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
+import { jsonCopyMenuItems } from './documentFormatMenus'
+
+const EMPTY_FOLDED_LINES: number[] = []
 
 const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
   value
 }))
+
+function ViewShortcutHint({ number }: { number: number }): React.JSX.Element {
+  return (
+    <span
+      className="result-view-shortcut absolute inset-y-0 right-0 my-auto inline-flex h-fit"
+      data-view-shortcut-number={number}
+      aria-hidden="true"
+    >
+      <span className="document-tab-shortcut bg-muted!">
+        {isMacPlatform() ? '⌘' : 'Ctrl'}{number}
+      </span>
+    </span>
+  )
+}
 
 /**
  * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
@@ -31,25 +62,54 @@ const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
  */
 export function ResultPanel({
   expanded,
-  onExpandedChange
+  onExpandedChange,
+  showViewShortcutHints,
+  showTabShortcutHints
 }: {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
-}): JSX.Element {
+  showViewShortcutHints: boolean
+  showTabShortcutHints: boolean
+}): React.JSX.Element {
   const { t } = useTranslation()
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
-  const view = useAppStore((s) => s.resultView)
+  const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
+  const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
+  const viewShortcutEnabled = isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
   const setView = useAppStore((s) => s.setResultView)
+  const setResultFoldedLines = useAppStore((s) => s.setResultFoldedLines)
+  const foldingFor = (view: ResultFoldView) => ({
+    collapsedLines: active?.foldedLines?.[view] ?? EMPTY_FOLDED_LINES,
+    onChange: (lines: number[]) => setResultFoldedLines(view, lines)
+  })
   const docCtx = docActionContext(result, active?.query ?? null)
+  const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
+  const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
+  const [tableDocumentOrder, setTableDocumentOrder] = useState<number[] | null>(null)
+  const updateTableDocumentOrder = useCallback((next: number[]) => {
+    setTableDocumentOrder((current) =>
+      current?.length === next.length && current.every((sourceIndex, index) => sourceIndex === next[index])
+        ? current
+        : next
+    )
+  }, [])
+  const [exportModal, setExportModal] = useState<{
+    format: ResultExportFormat
+    jsonEncoding?: JsonEncoding
+    fixedDocuments?: unknown[]
+  } | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const copiedTimer = useRef<number | null>(null)
   const copyAttempt = useRef(0)
+  const copyButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(
     () => () => {
@@ -92,38 +152,50 @@ export function ResultPanel({
     })
   }
 
-  // Cmd/Ctrl+1/2/3 switch Tree/JSON/Table (and ⌘4 Console when present) — only
-  // while the switcher is showing (a documents/value result, not error/explain).
+  // Cmd+1–4 (Ctrl elsewhere) selects Tree, JSON, Table, or available Console.
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
-    if (!switchable) return
-    const keyMap: Record<string, ResultView> = { '1': 'tree', '2': 'json', '3': 'table' }
+    if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
+    const views: ResultView[] = ['tree', 'json', 'table']
     const onKey = (e: KeyboardEvent): void => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
-      if (e.key === '4') {
+      if (hasOpenShortcutLayer()) return
+      const index = primaryDigitIndex(e, isMacPlatform())
+      if (index === 3) {
         if (!hasOutput) return
         e.preventDefault()
+        e.stopPropagation()
         chooseConsole(true)
         return
       }
-      const target = keyMap[e.key]
+      const target = index == null ? undefined : views[index]
       if (!target) return
       e.preventDefault()
+      e.stopPropagation()
       chooseConsole(false)
       setView(target)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [switchable, hasOutput, active?.id, setView])
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [switchable, hasOutput, active?.id, results, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   useEffect(() => {
     if (!result && expanded) onExpandedChange(false)
   }, [result, expanded, onExpandedChange])
 
+  useEffect(() => {
+    setSelectedDocIndexes(new Set())
+  }, [active?.id, result?.data])
+
+  useEffect(() => {
+    if (view !== 'table') setTableDocumentOrder(null)
+  }, [view])
+
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
   const strip =
-    results.length > 1 ? <ResultTabStrip results={results} activeId={active?.id ?? null} /> : null
+    results.length > 1 ? (
+      <ResultTabStrip results={results} activeId={active?.id ?? null} showShortcutHints={showTabShortcutHints} />
+    ) : null
 
   if (!result) {
     return (
@@ -145,6 +217,7 @@ export function ResultPanel({
         <ErrorView
           result={result}
           compact={hasOutput}
+          actions={<span className="inline-flex" ref={setFoldControls} />}
           copied={copied}
           onCopy={copyWithFeedback}
           expanded={expanded}
@@ -152,7 +225,7 @@ export function ResultPanel({
         />
         {hasOutput && (
           <div className="result-body">
-            <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
+            <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
           </div>
         )}
       </div>
@@ -167,12 +240,12 @@ export function ResultPanel({
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
-          <ResultMeta result={result} docCount={0} />
+          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <span className="result-bar-spacer" />
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
-          <ExplainView plan={result.data} />
+          <ExplainView folding={foldingFor('explain')} plan={result.data} fontSize={dataFontSize} />
         </div>
       </div>
     )
@@ -181,43 +254,80 @@ export function ResultPanel({
   // Normalize to a documents array for the three views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = normalizeDocs(result)
+  const documentOrder = view === 'table' && tableDocumentOrder ? tableDocumentOrder : docs.map((_, index) => index)
+  const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
+    .filter((index) => index >= 0 && index < docs.length)
+    .map((index) => docs[index])
+  const openSelectionExport = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding): void => {
+    setExportModal({ format, jsonEncoding, fixedDocuments: documents })
+  }
+  const closeExport = (): void => {
+    setExportModal(null)
+    window.requestAnimationFrame(() => copyButtonRef.current?.focus())
+  }
 
   return (
     <div className="result-panel">
       {strip}
       <div className="result-bar">
-        <div className="view-switch">
+        <div className="view-switch sliding-selection">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? t('result.view.tree') : v === 'json' ? 'JSON' : t('result.view.table')
+            const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : 'Table'
+            const Icon = v === 'tree' ? Network : v === 'json' ? Braces : Table
             return (
-              <button
-                key={v}
-                className={!showConsole && view === v ? 'active' : ''}
-                onClick={() => {
-                  chooseConsole(false)
-                  setView(v)
-                }}
-              >
-                {label}
-                <span className="text-[0.8em] leading-none font-normal text-muted-foreground">(⌘{i + 1})</span>
-              </button>
+              <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
+                <button
+                  className={`group/result-view flex items-center justify-center ${!showConsole && view === v ? 'active is-selected' : ''}`}
+                  aria-label={label}
+                  aria-pressed={!showConsole && view === v}
+                  onClick={() => {
+                    chooseConsole(false)
+                    setView(v)
+                  }}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <Icon size={12} aria-hidden="true" />
+                    {label}
+                  </span>
+                  {showViewShortcutHints && viewShortcutEnabled && <ViewShortcutHint number={i + 1} />}
+                </button>
+              </Tooltip>
             )
           })}
           {hasOutput && (
-            <button
-              className={showConsole ? 'active' : ''}
-              data-tip={`Console (⌘4)`}
-              onClick={() => chooseConsole(true)}
-            >
-              {t('result.view.console')}
-            </button>
+            <Tooltip content={`Console (${primaryKey}4)`} disabled={!viewShortcutEnabled}>
+              <button
+                className={`group/result-view flex items-center justify-center ${showConsole ? 'active is-selected' : ''}`}
+                aria-label="Console"
+                aria-pressed={showConsole}
+                onClick={() => chooseConsole(true)}
+              >
+                Console
+                {showViewShortcutHints && viewShortcutEnabled && <ViewShortcutHint number={4} />}
+              </button>
+            </Tooltip>
           )}
+          <span className="selection-indicator" aria-hidden="true" />
         </div>
-        <ResultMeta result={result} docCount={docs.length} />
+        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
-        {result.kind === 'documents' && <PageSizeControl />}
-        {result.kind === 'documents' && <ResultPager result={result} />}
+        {result.kind === 'documents' && (
+          <div className="result-pagination">
+            <span className="result-total" aria-live="polite">
+              {typeof result.totalCount === 'number'
+                ? t('result.totalCount', { value: result.totalCount.toLocaleString() })
+                : t(result.totalStatus === 'counting' ? 'result.totalCounting'
+                    : result.totalStatus === 'unavailable' ? 'result.totalUnavailable' : 'result.totalUnknown')}
+            </span>
+            <span className="result-meta-separator" aria-hidden="true" />
+            <PageSizeControl />
+            <span className="result-meta-separator" aria-hidden="true" />
+            <ResultPager result={result} />
+          </div>
+        )}
+        <span className="inline-flex" ref={setFoldControls} />
         <button
+          ref={copyButtonRef}
           className="ghost result-action"
           aria-label={copied ? t('notify.copied') : t('result.copyAllTip')}
           onClick={(e) => {
@@ -229,19 +339,42 @@ export function ResultPanel({
             setCopyMenu({ x: r.left, y: r.bottom + 4 })
           }}
         >
-          {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+          <span className={copied ? 'copy-feedback is-copied' : 'copy-feedback'} aria-hidden="true">
+            <Copy size={14} />
+            <Check size={14} className="text-[var(--ok)]" />
+          </span>
         </button>
         <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
       </div>
 
       <div className="result-body">
         {showConsole ? (
-          <ConsoleView output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} />
+          <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
         ) : (
           <>
-            {view === 'tree' && <TreeView docs={docs} fontSize={dataFontSize} docCtx={docCtx} />}
-            {view === 'json' && <JsonView value={docs} fontSize={dataFontSize} />}
-            {view === 'table' && <TableView docs={docs} fontSize={dataFontSize} docCtx={docCtx} />}
+            {view === 'tree' && (
+              <TreeView
+                docs={docs}
+                fontSize={dataFontSize}
+                selectedDocIndexes={selectedDocIndexes}
+                onSelectedDocIndexesChange={setSelectedDocIndexes}
+                onExport={openSelectionExport}
+                docCtx={docCtx}
+              />
+            )}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'table' && (
+              <TableView
+                key={active?.id}
+                docs={docs}
+                fontSize={dataFontSize}
+                selectedDocIndexes={selectedDocIndexes}
+                onSelectedDocIndexesChange={setSelectedDocIndexes}
+                onDocumentOrderChange={updateTableDocumentOrder}
+                onExport={openSelectionExport}
+                docCtx={docCtx}
+              />
+            )}
           </>
         )}
       </div>
@@ -252,12 +385,28 @@ export function ResultPanel({
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            { label: t('result.copy.pureJson'), onClick: () => copyWithFeedback(toPlainJson(docs)) },
+            ...jsonCopyMenuItems(docs, copyWithFeedback),
             { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
-            { label: t('result.copy.extendedJson'), onClick: () => copyWithFeedback(toStrictEjson(docs)) },
             { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
             { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
+        />
+      )}
+      {exportModal && (
+        <ExportModal
+          source={{
+            kind: 'result',
+            documents: exportModal.fixedDocuments ?? docs,
+            selectedDocuments: exportModal.fixedDocuments ?? selectedDocuments,
+            fixedSelection: exportModal.fixedDocuments != null,
+            connectionId: docCtx?.connectionId ?? active?.query?.connectionId,
+            database: docCtx?.database ?? active?.query?.database,
+            collection: docCtx?.collection,
+            suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
+          }}
+          initialFormat={exportModal.format}
+          initialJsonEncoding={exportModal.jsonEncoding}
+          onClose={closeExport}
         />
       )}
     </div>
@@ -270,7 +419,7 @@ function ResultExpandButton({
 }: {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const label = t(expanded ? 'result.restoreEditor' : 'result.expandResults')
   return (
@@ -292,46 +441,59 @@ function ResultExpandButton({
  */
 function ResultTabStrip({
   results,
-  activeId
+  activeId,
+  showShortcutHints
 }: {
   results: ResultTab[]
   activeId: string | null
-}): JSX.Element {
-  const { t } = useTranslation()
+  showShortcutHints: boolean
+}): React.JSX.Element {
+  const { t, i18n } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
+  const tabShortcutsEnabled = useAppStore((s) =>
+    isAppShortcutEnabled(s.settings.keyboardShortcutsEnabled, s.settings.disabledKeyboardShortcuts, 'contextualTabs')
+  )
   const stripRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!activeId) return
-    stripRef.current
-      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`)
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [activeId])
+  const moveResultTab = useAppStore((s) => s.moveResultTab)
+  useTabReorder(stripRef, results, setActiveResultTab, moveResultTab)
 
   return (
-    <div ref={stripRef} className="result-tabs">
-      {results.map((r) => (
-        <DocumentTab
-          key={r.id}
-          active={r.id === activeId}
-          className="rtab"
-          dataTabId={r.id}
-          label={resultTabLabel(r)}
-          tooltip={r.query ? firstLine(r.query.code) : undefined}
-          closeLabel={t('result.closeTab')}
-          onSelect={() => setActiveResultTab(r.id)}
-          onClose={() => closeResultTab(r.id)}
-        />
-      ))}
-    </div>
+    <DocumentTabStrip stripRef={stripRef} count={results.length} activeId={activeId} kind="result">
+      {results.map((r, index) => {
+        const query = r.query
+        return (
+          <DocumentTab
+            key={r.id}
+            active={r.id === activeId}
+            className="rtab"
+            dataTabId={r.id}
+            label={
+              <>
+                <span className="result-tab-full-label">{resultTabLabel(r)}</span>
+                <span className="result-tab-compact-label">{r.seq}</span>
+              </>
+            }
+            tooltip={query ? () => <span data-result-tab-query="">{query.code}</span> : resultTabLabel(r)}
+            tooltipFooter={() => (
+              <div className="flex flex-col gap-1">
+                <span data-result-tab-time="">
+                  {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
+                </span>
+                <span>{t('context.resultDataSize')} · <ResultDataSize results={[r]} /></span>
+              </div>
+            )}
+            tooltipVariant="code"
+            closeLabel={t('result.closeTab')}
+            onSelect={() => setActiveResultTab(r.id)}
+            onClose={() => closeResultTab(r.id)}
+            shortcut={tabShortcutsEnabled ? tabShortcutLabel(index, results.length, true, isMacPlatform()) : undefined}
+            showShortcutHint={showShortcutHints}
+          />
+        )
+      })}
+    </DocumentTabStrip>
   )
-}
-
-/** Tooltip-sized preview of the query that produced a result tab. */
-function firstLine(code: string): string {
-  const line = code.split('\n', 1)[0].trim()
-  return line.length > 80 ? `${line.slice(0, 80)}…` : line
 }
 
 /** Turn any non-error ShellResult into an array of values for the views. */
@@ -343,16 +505,19 @@ function normalizeDocs(result: ShellResult): unknown[] {
   return result.data === undefined ? [] : [result.data]
 }
 
-function ResultMeta({ result, docCount }: { result: ShellResult; docCount: number }): JSX.Element {
-  const { t } = useTranslation()
+function ResultMeta({
+  result,
+  docCount,
+  executedAt
+}: {
+  result: ShellResult
+  docCount: number
+  executedAt: number
+}): React.JSX.Element {
+  const { t, i18n } = useTranslation()
   const parts = useMemo(() => {
     const out: { text: string; cls?: string }[] = []
     if (result.kind === 'documents') {
-      const n = result.count ?? docCount
-      out.push({ text: t('result.docCount', { count: n }) })
-      // For pageable results the pager shows the range + a next button, so the
-      // "truncated" badge would be redundant. Keep it for non-pageable cursors
-      // (aggregate / scripts), where raising the page size is the only way on.
       if (result.truncated && !result.pageable) {
         out.push({ text: t('result.truncated'), cls: 'truncated' })
       }
@@ -367,87 +532,88 @@ function ResultMeta({ result, docCount }: { result: ShellResult; docCount: numbe
     if (typeof result.elapsedMs === 'number') {
       out.push({ text: t('result.elapsed', { ms: result.elapsedMs }) })
     }
+    const queryTime = formatQueryTime(executedAt, i18n.resolvedLanguage)
+    if (queryTime) out.push({ text: queryTime })
     return out
-  }, [result, docCount, t])
+  }, [result, docCount, executedAt, i18n.resolvedLanguage, t])
 
   return (
     <div className="result-meta">
       {parts.map((p, i) => (
-        <span key={i} className={p.cls}>
-          {p.text}
+        <span key={i} className="result-meta-part">
+          {i > 0 && <span className="result-meta-separator" aria-hidden="true" />}
+          <span className={p.cls}>{p.text}</span>
         </span>
       ))}
     </div>
   )
 }
 
-/**
- * Prev/next pager. Only a FindCursor is pageable (the engine injects skip);
- * aggregation/script results render no pager (the page-size control is their
- * way to see more). Next is enabled only while the page is truncated.
- */
-function ResultPager({ result }: { result: ShellResult }): JSX.Element | null {
+/** Display range for this execution; pages never rerun its script. */
+function ResultPager({ result }: { result: ShellResult }): React.JSX.Element | null {
   const { t } = useTranslation()
   const skip = useAppStore((s) => getActiveResult(s)?.skip ?? 0)
-  const limit = useAppStore((s) => s.settings.queryLimit)
+  const pageSize = result.pageSize ?? 50
   const running = useAppStore((s) => getActiveTab(s).running)
   const loadPage = useAppStore((s) => s.loadPage)
 
-  if (!result.pageable) return null
-
   const count = result.count ?? 0
   const from = count === 0 ? 0 : skip + 1
-  const to = skip + count
+  const to = count === 0 ? 0 : skip + count
   return (
     <div className="result-pager">
-      <button
-        className="ghost"
-        disabled={skip === 0 || running}
-        data-tip={t('result.prevPage')}
-        aria-label={t('result.prevPage')}
-        onClick={() => void loadPage(Math.max(0, skip - limit))}
-      >
-        <ChevronLeft size={15} />
-      </button>
-      <span className="result-range">
+      <Tooltip content={t('result.prevPage')}>
+        <button
+          className="ghost"
+          disabled={!result.pageable || skip === 0 || running}
+          aria-label={t('result.prevPage')}
+          onClick={() => void loadPage(Math.max(0, skip - pageSize))}
+        >
+          <ChevronLeft size={15} />
+        </button>
+      </Tooltip>
+      <span className="result-range" aria-live="polite">
         {from}–{to}
       </span>
-      <button
-        className="ghost"
-        disabled={!result.truncated || running}
-        data-tip={t('result.nextPage')}
-        aria-label={t('result.nextPage')}
-        onClick={() => void loadPage(skip + limit)}
-      >
-        <ChevronRight size={15} />
-      </button>
+      <Tooltip content={t('result.nextPage')}>
+        <button
+          className="ghost"
+          disabled={!result.pageable || !result.truncated || running}
+          aria-label={t('result.nextPage')}
+          onClick={() => void loadPage(skip + pageSize)}
+        >
+          <ChevronRight size={15} />
+        </button>
+      </Tooltip>
     </div>
   )
 }
 
-/** Query limit control; changing it re-runs the focused result from page one. */
-function PageSizeControl(): JSX.Element {
+/** Display page size belongs to the focused result, independent of query limits. */
+function PageSizeControl(): React.JSX.Element {
   const { t } = useTranslation()
-  const limit = useAppStore((s) => s.settings.queryLimit)
-  const setQueryLimit = useAppStore((s) => s.setQueryLimit)
+  const pageSize = useAppStore((s) => getActiveResult(s)?.result.pageSize ?? s.settings.queryLimit)
+  const setResultPageSize = useAppStore((s) => s.setResultPageSize)
   const running = useAppStore((s) => getActiveTab(s).running)
 
   return (
     <div className="page-size">
       <span>{t('result.pageSizeLabel')}</span>
       <Select<number>
-        value={limit}
+        value={pageSize}
         options={QUERY_LIMIT_OPTIONS}
         disabled={running}
-        onChange={(n) => void setQueryLimit(n)}
-        className="h-6 w-[72px] px-2 text-xs"
+        onChange={(n) => void setResultPageSize(n)}
+        className="h-6 w-[72px] px-2 text-center text-xs"
         aria-label={t('result.pageSizeLabel')}
       />
+      <span>{t('result.pageSizeSuffix')}</span>
     </div>
   )
 }
 
 function ErrorView({
+  actions,
   result,
   compact,
   copied,
@@ -457,11 +623,12 @@ function ErrorView({
 }: {
   result: ShellResult
   compact?: boolean
+  actions?: ReactNode
   copied: boolean
   onCopy: (text: string) => void
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const name = result.errorName ?? t('result.errorName')
   const message = result.error ?? t('result.errorUnknown')
@@ -475,12 +642,16 @@ function ErrorView({
             <div className="error-name">{name}</div>
             <div className="error-msg">{message}</div>
           </div>
+          {actions}
           <button
             className="ghost result-action shrink-0"
             aria-label={copied ? t('notify.copied') : t('result.copyErrorTip')}
             onClick={() => onCopy(`${name}: ${message}`)}
           >
-            {copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+            <span className={copied ? 'copy-feedback is-copied' : 'copy-feedback'} aria-hidden="true">
+              <Copy size={14} />
+              <Check size={14} className="text-[var(--ok)]" />
+            </span>
           </button>
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>

@@ -15,13 +15,22 @@ const api: Api = {
     save: (input) => ipcRenderer.invoke(IPC.connectionsSave, input),
     delete: (id) => ipcRenderer.invoke(IPC.connectionsDelete, id),
     test: (input) => ipcRenderer.invoke(IPC.connectionsTest, input),
+    cachedAuthorization: (input) => ipcRenderer.invoke(IPC.connectionsCachedAuthorization, input),
     diagnose: (input, scope) => ipcRenderer.invoke(IPC.connectionsDiagnose, input, scope),
     buildUri: (input, opts) => ipcRenderer.invoke(IPC.connectionsBuildUri, input, opts)
   },
   session: {
     connect: (connectionId) => ipcRenderer.invoke(IPC.sessionConnect, connectionId),
     disconnect: (connectionId) => ipcRenderer.invoke(IPC.sessionDisconnect, connectionId),
-    status: (connectionId) => ipcRenderer.invoke(IPC.sessionStatus, connectionId)
+    status: (connectionId) => ipcRenderer.invoke(IPC.sessionStatus, connectionId),
+    authorization: (connectionId, input) => ipcRenderer.invoke(IPC.sessionAuthorization, connectionId, input),
+    onStatusChanged: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]): void => {
+        listener(status)
+      }
+      ipcRenderer.on(IPC.sessionStatusChanged, handle)
+      return () => ipcRenderer.removeListener(IPC.sessionStatusChanged, handle)
+    }
   },
   catalog: {
     databases: (connectionId) => ipcRenderer.invoke(IPC.catalogDatabases, connectionId),
@@ -29,6 +38,8 @@ const api: Api = {
       ipcRenderer.invoke(IPC.catalogCollections, connectionId, database),
     collectionCount: (connectionId, database, collection) =>
       ipcRenderer.invoke(IPC.catalogCollectionCount, connectionId, database, collection),
+    dropCollection: (connectionId, database, collection) =>
+      ipcRenderer.invoke(IPC.catalogDropCollection, connectionId, database, collection),
     indexes: (connectionId, database, collection) =>
       ipcRenderer.invoke(IPC.catalogIndexes, connectionId, database, collection),
     users: (connectionId, database) => ipcRenderer.invoke(IPC.catalogUsers, connectionId, database),
@@ -43,6 +54,9 @@ const api: Api = {
   },
   shell: {
     execute: (request) => ipcRenderer.invoke(IPC.shellExecute, request),
+    page: (request) => ipcRenderer.invoke(IPC.shellPage, request),
+    total: (resultId) => ipcRenderer.invoke(IPC.shellTotal, resultId),
+    release: (resultId) => ipcRenderer.invoke(IPC.shellRelease, resultId),
     abort: (execId) => ipcRenderer.invoke(IPC.shellAbort, execId)
   },
   queries: {
@@ -55,12 +69,25 @@ const api: Api = {
     clear: () => ipcRenderer.invoke(IPC.historyClear)
   },
   docs: {
+    read: (request) => ipcRenderer.invoke(IPC.docRead, request),
+    cancelRead: (taskId) => ipcRenderer.invoke(IPC.docReadCancel, taskId),
     update: (request) => ipcRenderer.invoke(IPC.docUpdate, request),
     setField: (request) => ipcRenderer.invoke(IPC.docSetField, request),
     delete: (request) => ipcRenderer.invoke(IPC.docDelete, request)
   },
   io: {
+    chooseExportDirectory: () => ipcRenderer.invoke(IPC.ioChooseExportDirectory),
     export: (request) => ipcRenderer.invoke(IPC.ioExport, request),
+    cancelExport: (taskId) => ipcRenderer.invoke(IPC.ioExportCancel, taskId),
+    onExportProgress: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof listener>[0]): void => {
+        listener(progress)
+      }
+      ipcRenderer.on(IPC.ioExportProgress, handle)
+      return () => ipcRenderer.removeListener(IPC.ioExportProgress, handle)
+    },
+    openExportedFile: (taskId) => ipcRenderer.invoke(IPC.ioOpenExportedFile, taskId),
+    revealExportedFile: (taskId) => ipcRenderer.invoke(IPC.ioRevealExportedFile, taskId),
     import: (request) => ipcRenderer.invoke(IPC.ioImport, request)
   },
   settings: {
@@ -68,7 +95,18 @@ const api: Api = {
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch)
   },
   updates: {
-    checkForUpdates: () => ipcRenderer.invoke(IPC.updatesCheck)
+    checkForUpdates: () => ipcRenderer.invoke(IPC.updatesCheck),
+    getState: () => ipcRenderer.invoke(IPC.updatesGetState),
+    setAutomaticChecks: (enabled) => ipcRenderer.invoke(IPC.updatesSetAutomaticChecks, enabled),
+    showAvailableUpdate: () => ipcRenderer.invoke(IPC.updatesShowAvailable),
+    cancelDownload: () => ipcRenderer.invoke(IPC.updatesCancelDownload),
+    onStateChanged: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]): void => {
+        listener(state)
+      }
+      ipcRenderer.on(IPC.updatesStateChanged, handle)
+      return () => ipcRenderer.removeListener(IPC.updatesStateChanged, handle)
+    }
   },
   dialog: {
     openFile: (opts) => ipcRenderer.invoke(IPC.dialogOpenFile, opts)

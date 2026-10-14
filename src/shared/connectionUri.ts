@@ -9,7 +9,6 @@
  *
  */
 
-// @ts-expect-error v3 ships declarations but omits them from its exports map.
 import ConnectionString from 'mongodb-connection-string-url'
 
 export interface ParsedUri {

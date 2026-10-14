@@ -1,6 +1,6 @@
 /* =========================================================================
    Base UI wrappers (components/ui/*) — only the primitives NOT yet migrated to
-   Tailwind keep CSS here (Menu/ContextMenu, Tooltip). The Dialog
+   Tailwind keep CSS here (Menu/ContextMenu). The Dialog
    keeps its portal positioning + z-index here; the migrated primitives
    (Select/Checkbox/Tabs/Input/Field/Button/Modal box) are now styled with
    Tailwind utilities + cva in their components — their old `.ui-*` rules were

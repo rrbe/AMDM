@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ClipboardPaste, Link, MessageSquareText, Plus, Trash2 } from 'lucide-react'
 import type {
+  AuthorizationResult,
   ConnectionConfig,
   ConnectionInput,
   DiagnoseStage,
@@ -18,8 +19,12 @@ import { Field } from '@renderer/components/ui/Field'
 import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
 import { IS_WEB } from '@renderer/lib/platform'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { ConnectionPermissions } from './ConnectionPermissions'
 import {
   buildConnectionOptions,
   connectionMembersAreValid,
@@ -51,11 +56,12 @@ function optionRows(options: ConnectionOption[]): OptionRow[] {
 
 interface ConnectionFormProps {
   editing?: ConnectionConfig
+  copyFromId?: string
   onClose: () => void
 }
 
 /** Per-step ✓/✗ list for one hop's connectivity check (shared by SSH + jump). */
-function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): JSX.Element {
+function DiagnoseResult({ stages }: { stages: DiagnoseStage[] }): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <div className="mt-1 flex flex-col gap-1">
@@ -91,7 +97,7 @@ function DiagnoseControl({
   busy: boolean
   stages: DiagnoseStage[] | null
   onRun: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -109,18 +115,19 @@ function DiagnoseControl({
             <span className="font-bold" style={{ color: allOk ? 'var(--ok)' : 'var(--err)' }}>
               {allOk ? '✓' : '✗'}
             </span>
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
-              data-tip={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
-              className={cn(
-                'inline-flex cursor-pointer items-center border-0 bg-transparent p-0',
-                open ? 'text-foreground' : 'text-[var(--fg-3)]'
-              )}
-            >
-              <MessageSquareText size={16} />
-            </button>
+            <Tooltip content={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}>
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-label={t(open ? 'connection.ssh.diagHide' : 'connection.ssh.diagShow')}
+                className={cn(
+                  'inline-flex cursor-pointer items-center border-0 bg-transparent p-0',
+                  open ? 'text-foreground' : 'text-[var(--fg-3)]'
+                )}
+              >
+                <MessageSquareText size={16} />
+              </button>
+            </Tooltip>
           </>
         )}
       </div>
@@ -140,10 +147,18 @@ function DiagnoseControl({
  * exports the current fields OUT as a connection string. They never share a
  * live field, so neither drives the other.
  */
-export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.Element {
+export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormProps): React.JSX.Element {
   const { t: tFn } = useTranslation()
+  const passwordStoragePlatform = isMacPlatform()
+    ? 'mac'
+    : navigator.platform.toLowerCase().startsWith('win')
+      ? 'windows'
+      : 'linux'
   const saveConnection = useAppStore((s) => s.saveConnection)
   const testConnection = useAppStore((s) => s.testConnection)
+  const readConnectionAuthorization = useAppStore((s) => s.readConnectionAuthorization)
+  const cachedConnectionAuthorization = useAppStore((s) => s.cachedConnectionAuthorization)
+  const connected = useAppStore((s) => !!editing && s.statuses[editing.id]?.state === 'connected')
   const buildConnectionUri = useAppStore((s) => s.buildConnectionUri)
   const pickFile = useAppStore((s) => s.pickFile)
   const diagnoseConnection = useAppStore((s) => s.diagnoseConnection)
@@ -155,6 +170,8 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [test, setTest] = useState<TestResult | null>(null)
+  const [authorization, setAuthorization] = useState<AuthorizationResult | null>(null)
+  const [readingAuthorization, setReadingAuthorization] = useState(false)
 
   // ---- URL popups (From URL / To URL) ----
   const [urlPanel, setUrlPanel] = useState<'from' | 'to' | null>(null)
@@ -344,12 +361,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   }
 
   const copyToUri = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(toUriText)
-      setToCopied(true)
-    } catch {
-      /* clipboard may be unavailable */
-    }
+    if (await copyText(toUriText)) setToCopied(true)
   }
 
   // Esc / backdrop closes the open popup first, then the form itself.
@@ -362,6 +374,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     () => (): ConnectionInput => {
       const input: ConnectionInput = {
         id: editing?.id ?? genId(),
+        copyFromId,
         name: name.trim() || 'Untitled',
         color: color || undefined,
         useSrv,
@@ -408,13 +421,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
       // Secrets: only include if the user typed (else keep stored value).
       if (authType === 'none') input.password = ''
       else if (passwordTouched) input.password = password
-      if (!IS_WEB && sshPasswordTouched) input.sshPassword = sshPassword
-      if (!IS_WEB && sshPassphraseTouched) input.sshPassphrase = sshPassphrase
-      if (!IS_WEB && jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
+      if (sshPasswordTouched) input.sshPassword = sshPassword
+      if (sshPassphraseTouched) input.sshPassphrase = sshPassphrase
+      if (jumpSshPassphraseTouched) input.jumpSshPassphrase = jumpSshPassphrase
       return input
     },
     [
       editing,
+      copyFromId,
       name,
       color,
       useSrv,
@@ -452,6 +466,47 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
     ]
   )
 
+  // Presentation-only edits do not change which account the permission result describes.
+  const { id: _id, name: _name, color: _color, ...connectionFields } = buildInput()
+  const inputKey = JSON.stringify(connectionFields)
+  const initialInputKey = useRef(inputKey)
+  const currentInputKey = useRef(inputKey)
+  currentInputKey.current = inputKey
+  const requestVersion = useRef(0)
+
+  useEffect(() => {
+    requestVersion.current += 1
+    setTest(null)
+    setAuthorization(null)
+    return () => {
+      requestVersion.current += 1
+    }
+  }, [inputKey])
+
+  useEffect(() => {
+    if (tab !== 'auth' || authorization || testing) {
+      return
+    }
+    let active = true
+    const version = requestVersion.current
+    setReadingAuthorization(true)
+    void (async () => {
+      let result = await cachedConnectionAuthorization(buildInput())
+      if (!active || version !== requestVersion.current || inputKey !== currentInputKey.current) return
+      if (!result && editing && connected && inputKey === initialInputKey.current) {
+        result = await readConnectionAuthorization(editing.id, buildInput())
+      }
+      if (active && version === requestVersion.current && inputKey === currentInputKey.current) {
+        setAuthorization(result)
+        setReadingAuthorization(false)
+      }
+    })()
+    return () => {
+      active = false
+      setReadingAuthorization(false)
+    }
+  }, [tab, editing, connected, inputKey, authorization, testing, readConnectionAuthorization, cachedConnectionAuthorization])
+
   const submit = async (): Promise<void> => {
     setSaving(true)
     const saved = await saveConnection(buildInput())
@@ -462,8 +517,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
   const runTest = async (): Promise<void> => {
     setTesting(true)
     setTest(null)
+    setAuthorization(null)
+    const version = ++requestVersion.current
+    const key = inputKey
     const r = await testConnection(buildInput())
-    setTest(r)
+    if (version === requestVersion.current && key === currentInputKey.current) {
+      setTest(r)
+      if (r.ok) setAuthorization(r)
+    }
     setTesting(false)
   }
 
@@ -485,7 +546,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
   return (
     <Modal
-      title={editing ? tFn('connection.title.edit') : tFn('connection.title.new')}
+      title={tFn(copyFromId ? 'connection.menu.duplicate' : editing ? 'connection.title.edit' : 'connection.title.new')}
       description={tFn('connection.description')}
       onClose={handleModalClose}
       size="lg"
@@ -598,21 +659,22 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   {tFn('connection.general.color')}
                 </label>
                 <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    className={cn(
-                      'relative size-5 shrink-0 rounded-full border-2 border-[var(--separator)] bg-[var(--surface-control)] p-0 transition-colors hover:border-[var(--separator-strong)]',
-                      color === '' && 'border-[var(--primary)]'
-                    )}
-                    data-tip={tFn('connection.general.noColor')}
-                    aria-label={tFn('connection.general.noColor')}
-                    onClick={() => setColor('')}
-                  >
-                    <span
-                      className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
-                      aria-hidden
-                    />
-                  </button>
+                  <Tooltip content={tFn('connection.general.noColor')}>
+                    <button
+                      type="button"
+                      className={cn(
+                        'relative size-5 shrink-0 rounded-full border-2 border-[var(--separator)] bg-[var(--surface-control)] p-0 transition-colors hover:border-[var(--separator-strong)]',
+                        color === '' && 'border-[var(--primary)]'
+                      )}
+                      aria-label={tFn('connection.general.noColor')}
+                      onClick={() => setColor('')}
+                    >
+                      <span
+                        className="absolute inset-x-1 top-1/2 h-0.5 -translate-y-1/2 -rotate-45 bg-[var(--err)]"
+                        aria-hidden
+                      />
+                    </button>
+                  </Tooltip>
                   {PRESET_COLORS.map((c) => (
                     <button
                       type="button"
@@ -632,7 +694,22 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           </section>
 
           <section className="connection-form-section">
-            <h2>{tFn('connection.section.server')}</h2>
+            <div className="mb-3.5 flex items-center justify-between gap-3">
+              <h2 className="m-0 text-[13px] font-[620] text-[var(--text-primary)]">
+                {tFn('connection.section.server')}
+              </h2>
+              {!useSrv && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
+                >
+                  <Plus size={14} />
+                  {tFn('connection.general.addMember')}
+                </Button>
+              )}
+            </div>
             <div className="form-row">
               <Checkbox checked={useSrv} onCheckedChange={setUseSrv} label={tFn('connection.general.useSrv')} />
             </div>
@@ -643,26 +720,15 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               </Field>
             ) : (
               <div>
-                <div className="mb-1.5 flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-medium text-muted-foreground">{tFn('connection.general.hosts')}</div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setMembers((current) => [...current, { id: genId(), host: '', port: '27017' }])}
-                  >
-                    <Plus size={14} />
-                    {tFn('connection.general.addMember')}
-                  </Button>
-                </div>
-
                 <div className="overflow-visible">
-                  <div className="max-h-[151px] overflow-y-auto">
-                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
-                      <span>{tFn('connection.general.memberHost')}</span>
-                      <span>{tFn('connection.general.memberPort')}</span>
-                      <span />
-                    </div>
+                  <div className="-m-[3px] max-h-[157px] overflow-y-auto scroll-pb-[3px] scroll-pt-7 p-[3px]">
+                    {members.length > 0 && (
+                      <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_112px_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                        <span>{tFn('connection.general.memberHost')}</span>
+                        <span>{tFn('connection.general.memberPort')}</span>
+                        <span />
+                      </div>
+                    )}
                     {members.length === 0 ? (
                       <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noMembers')}</div>
                     ) : (
@@ -699,15 +765,16 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                             />
                           </div>
                           <div className="flex items-center justify-center">
-                            <button
-                              type="button"
-                              className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                              aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
-                              data-tip={tFn('connection.general.removeMember')}
-                              onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <Tooltip content={tFn('connection.general.removeMember')}>
+                              <button
+                                type="button"
+                                className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                aria-label={`${tFn('connection.general.removeMember')} ${index + 1}`}
+                                onClick={() => setMembers((current) => current.filter((row) => row.id !== member.id))}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </Tooltip>
                           </div>
                         </div>
                       ))
@@ -758,9 +825,6 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                   placeholder={tFn('connection.optional')}
                 />
               </Field>
-              <Field label={tFn('connection.auth.authSource')}>
-                <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
-              </Field>
             </div>
 
             {sshEnabled && replicaSet.trim() && (
@@ -769,12 +833,11 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           </section>
 
           <section className="connection-form-section">
-            <h2>{tFn('connection.section.options')}</h2>
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-medium text-muted-foreground">
+                <h2 className="m-0 text-[13px] font-[620] text-[var(--text-primary)]">
                   {tFn('connection.general.customOptions')}
-                </div>
+                </h2>
                 <Button
                   type="button"
                   variant="ghost"
@@ -786,12 +849,14 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                 </Button>
               </div>
               <div className="overflow-visible">
-                <div className="max-h-[151px] overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
-                    <span>{tFn('connection.general.optionKey')}</span>
-                    <span>{tFn('connection.general.optionValue')}</span>
-                    <span />
-                  </div>
+                <div className="-m-[3px] max-h-[157px] overflow-y-auto scroll-pb-[3px] scroll-pt-7 p-[3px]">
+                  {customOptions.length > 0 && (
+                    <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-2 bg-[var(--surface-elevated)] pb-1.5 text-[11px] font-medium text-muted-foreground">
+                      <span>{tFn('connection.general.optionKey')}</span>
+                      <span>{tFn('connection.general.optionValue')}</span>
+                      <span />
+                    </div>
+                  )}
                   {customOptions.length === 0 ? (
                     <div className="py-3 text-[12px] text-[var(--fg-3)]">{tFn('connection.general.noOptions')}</div>
                   ) : (
@@ -827,15 +892,18 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
                           />
                         </div>
                         <div className="flex items-center justify-center">
-                          <button
-                            type="button"
-                            className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
-                            data-tip={tFn('connection.general.removeOption')}
-                            onClick={() => setCustomOptions((current) => current.filter((row) => row.id !== option.id))}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <Tooltip content={tFn('connection.general.removeOption')}>
+                            <button
+                              type="button"
+                              className="inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={`${tFn('connection.general.removeOption')} ${index + 1}`}
+                              onClick={() =>
+                                setCustomOptions((current) => current.filter((row) => row.id !== option.id))
+                              }
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </Tooltip>
                         </div>
                       </div>
                     ))
@@ -849,7 +917,9 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
 
       {tab === 'auth' && (
         <>
-          <div className="mb-3 text-[11px] text-[var(--fg-3)]">{tFn('connection.auth.emptyMeansNone')}</div>
+          <div className="mb-3 text-[11px] text-[var(--fg-3)]">
+            {tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
+          </div>
           <div className="form-grid">
             <Field label={tFn('connection.auth.username')} error={authError}>
               <Input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -866,17 +936,23 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
               />
             </Field>
           </div>
-          <Field className="w-[calc(50%-8px)]" label={tFn('connection.auth.mechanism')}>
-            <Select<ScramMechanism>
-              value={mechanism}
-              onChange={setMechanism}
-              options={[
-                { label: 'DEFAULT', value: 'DEFAULT' },
-                { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
-                { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
-              ]}
-            />
-          </Field>
+          <div className="form-grid">
+            <Field label={tFn('connection.auth.authSource')}>
+              <Input value={authSource} onChange={(e) => setAuthSource(e.target.value)} placeholder="admin" />
+            </Field>
+            <Field label={tFn('connection.auth.mechanism')}>
+              <Select<ScramMechanism>
+                value={mechanism}
+                onChange={setMechanism}
+                options={[
+                  { label: 'DEFAULT', value: 'DEFAULT' },
+                  { label: 'SCRAM-SHA-256', value: 'SCRAM-SHA-256' },
+                  { label: 'SCRAM-SHA-1', value: 'SCRAM-SHA-1' }
+                ]}
+              />
+            </Field>
+          </div>
+          <ConnectionPermissions key={inputKey} result={authorization} busy={testing || readingAuthorization} />
         </>
       )}
 
@@ -1080,7 +1156,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
           </div>
         </div>
         <textarea
-          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--primary)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--separator-strong)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           autoFocus
           rows={3}
           spellCheck={false}
@@ -1128,7 +1204,7 @@ export function ConnectionForm({ editing, onClose }: ConnectionFormProps): JSX.E
         {/* Editable: regenerated on open / password-toggle, but the user can tweak
             it before copying. Copy uses whatever is in the box. */}
         <textarea
-          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--primary)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          className="w-full resize-y rounded-[var(--radius-control)] border border-[var(--separator)] bg-[var(--surface-control)] px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground outline-none [word-break:break-all] hover:border-[var(--separator-strong)] focus-visible:border-[var(--separator-strong)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
           rows={3}
           spellCheck={false}
           autoComplete="off"

@@ -17,7 +17,6 @@
  * safely copies the small, bounded payload instead.
  */
 import { Worker } from 'node:worker_threads'
-import { join } from 'node:path'
 import { serialize as bsonSerialize } from 'bson'
 import type { SchemaAnalysis } from '../../shared/types'
 import { serializeValue, extractFieldPaths } from './serialize-core'
@@ -27,7 +26,7 @@ type Op = 'serialize' | 'fields' | 'schema'
 
 interface Pending {
   resolve: (value: unknown) => void
-  reject: (reason: Error) => void
+  reject: (reason: unknown) => void
 }
 
 interface WorkerResponse {
@@ -48,7 +47,7 @@ class SerializerPool {
     if (this.broken) return null
     if (this.worker) return this.worker
     try {
-      const worker = new Worker(join(__dirname, 'serializer.worker.js'))
+      const worker = new Worker(new URL('./serializer.worker.js', import.meta.url))
       worker.on('message', (msg: WorkerResponse) => this.onMessage(msg))
       worker.on('error', (err) => this.onFatal(err))
       worker.on('exit', (code) => {
@@ -71,7 +70,7 @@ class SerializerPool {
   }
 
   /** Worker died: reject everything in flight and degrade to inline forever. */
-  private onFatal(err: Error): void {
+  private onFatal(err: unknown): void {
     this.broken = true
     this.worker = null
     for (const p of this.pending.values()) p.reject(err)

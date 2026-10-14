@@ -52,7 +52,7 @@ export function Field({
   disabled,
   className,
   style
-}: FieldProps): JSX.Element {
+}: FieldProps): React.JSX.Element {
   return (
     <BaseField.Root
       className={cn('mb-3 flex flex-col gap-1.5', className)}

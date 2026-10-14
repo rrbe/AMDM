@@ -7,7 +7,10 @@
  */
 import type { ShellResult } from '@shared/types'
 
-/** The query that produced a result (refresh / paging / doc-edit target). */
+export type ResultView = 'tree' | 'json' | 'table'
+export type ResultFoldView = 'json' | 'console' | 'explain'
+
+/** The query that produced a result (refresh / doc-edit target). */
 export interface ResultQuery {
   connectionId: string
   database: string
@@ -17,11 +20,16 @@ export interface ResultQuery {
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
 export interface ResultTab {
   id: string
+  /** Selected Tree/JSON/Table view for this result tab. */
+  resultView?: ResultView
+  foldedLines?: Partial<Record<ResultFoldView, number[]>>
   /** 1-based run sequence within its query tab (drives the "结果 N" label).
       Monotonic — eviction of old results never renumbers survivors. */
   seq: number
   result: ShellResult
-  /** Query that produced `result`; refresh/paging/doc edits re-run this. */
+  /** Local wall-clock time when this result was received. */
+  executedAt: number
+  /** Query that produced `result`; explicit refresh/doc edits re-run this. */
   query: ResultQuery | null
   /** Page offset of the current result page (0 = first page). */
   skip: number
@@ -33,12 +41,39 @@ export const MAX_RESULT_TABS = 8
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 const DB_MEMBERS = new Set([
-  'getCollection', 'getSiblingDB', 'getCollectionNames', 'getCollectionInfos', 'getName', 'version',
-  'runCommand', 'adminCommand', 'aggregate', 'admin', 'collection', 'collections', 'command',
-  'createCollection', 'createIndex', 'dropCollection', 'dropDatabase', 'indexInformation',
-  'listCollections', 'profilingLevel', 'removeUser', 'renameCollection', 'setProfilingLevel',
-  'stats', 'watch', 'namespace', 'databaseName', 'options', 'readConcern', 'writeConcern',
-  'readPreference', 's', 'client'
+  'getCollection',
+  'getSiblingDB',
+  'getCollectionNames',
+  'getCollectionInfos',
+  'getName',
+  'version',
+  'runCommand',
+  'adminCommand',
+  'aggregate',
+  'admin',
+  'collection',
+  'collections',
+  'command',
+  'createCollection',
+  'createIndex',
+  'dropCollection',
+  'dropDatabase',
+  'indexInformation',
+  'listCollections',
+  'profilingLevel',
+  'removeUser',
+  'renameCollection',
+  'setProfilingLevel',
+  'stats',
+  'watch',
+  'namespace',
+  'databaseName',
+  'options',
+  'readConcern',
+  'writeConcern',
+  'readPreference',
+  's',
+  'client'
 ])
 
 /** Shell-safe collection reference for generated browse queries. */
@@ -46,6 +81,12 @@ export function dbCollRef(collection: string): string {
   return IDENTIFIER.test(collection) && !DB_MEMBERS.has(collection)
     ? `db.${collection}`
     : `db.getCollection(${JSON.stringify(collection)})`
+}
+
+/** Shell query for the complete server-side definition of one named index. */
+export function indexDetailsQuery(collection: string, indexName: string): string {
+  const name = JSON.stringify(indexName)
+  return `${dbCollRef(collection)}.getIndexes().filter((index) => index.name === ${name})`
 }
 
 export interface QueryTab {
@@ -61,10 +102,12 @@ export interface QueryTab {
       editor's onChange (user keystrokes only — external value syncs don't
       fire it), never set back. */
   pristine: boolean
-  /** Result strip: one entry per run, newest last, capped at MAX_RESULT_TABS. */
+  /** Result strip in display order, capped at MAX_RESULT_TABS. New runs append. */
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
   activeResultId: string | null
+  /** Last manually arranged Table columns, retained for this query tab's lifetime. */
+  tableColumnOrder: string[]
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
@@ -86,6 +129,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     pristine: true,
     results: [],
     activeResultId: null,
+    tableColumnOrder: [],
     resultSeq: 0,
     running: false,
     stopping: false,
@@ -97,7 +141,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
 
 /** Whether a completed run should leave the query tab's red failure dot on. */
 export function isRunFailure(result: ShellResult): boolean {
-  return result.kind === 'error' && result.errorName !== 'Aborted'
+  return result.kind === 'error' && result.errorName !== 'Aborted' && result.failureKind !== 'cancelled'
 }
 
 /**
@@ -169,6 +213,16 @@ export function activeResult(tab: QueryTab): ResultTab | null {
   return tab.results.find((r) => r.id === tab.activeResultId) ?? null
 }
 
+/** Move a tab to another tab's index without replacing its editor or result state. */
+export function moveTab<T extends { id: string }>(tabs: T[], sourceId: string, targetId: string): T[] {
+  const from = tabs.findIndex((tab) => tab.id === sourceId)
+  const to = tabs.findIndex((tab) => tab.id === targetId)
+  if (from < 0 || to < 0 || from === to) return tabs
+  const next = [...tabs]
+  next.splice(to, 0, ...next.splice(from, 1))
+  return next
+}
+
 /** Append a new run's result as a fresh, focused result tab (evicting the
     oldest beyond `max`). */
 export function appendResult(
@@ -179,9 +233,13 @@ export function appendResult(
   max = MAX_RESULT_TABS
 ): Partial<QueryTab> {
   const seq = tab.resultSeq + 1
-  const results = [...tab.results, { id, seq, result, query, skip: 0 }]
+  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0, resultView: 'tree' as const }]
+  // Display order can change; eviction still follows the run sequence.
+  const evicted = new Set(
+    [...results].sort((a, b) => a.seq - b.seq).slice(0, Math.max(0, results.length - max))
+  )
   return {
-    results: results.length > max ? results.slice(results.length - max) : results,
+    results: evicted.size ? results.filter((entry) => !evicted.has(entry)) : results,
     activeResultId: id,
     resultSeq: seq
   }
@@ -189,21 +247,19 @@ export function appendResult(
 
 /** Immutably patch one result tab by id (no-op shape when the id is absent —
     e.g. the tab was closed while its page load was in flight). */
-export function patchResult(
-  tab: QueryTab,
-  resultId: string,
-  patch: Partial<ResultTab>
-): Partial<QueryTab> {
-  return { results: tab.results.map((r) => (r.id === resultId ? { ...r, ...patch } : r)) }
+export function patchResult(tab: QueryTab, resultId: string, patch: Partial<ResultTab>): Partial<QueryTab> {
+  return {
+    results: tab.results.map((r) => r.id === resultId
+      ? { ...r, ...patch, foldedLines: patch.result && patch.result !== r.result ? undefined : patch.foldedLines ?? r.foldedLines }
+      : r)
+  }
 }
 
 /** Close one result tab, moving focus to a neighbor when it was active. */
 export function closeResult(tab: QueryTab, resultId: string): Partial<QueryTab> {
   const results = tab.results.filter((r) => r.id !== resultId)
   if (results.length === tab.results.length) return {}
-  const next = tab.activeResultId
-    ? pickActiveAfterClose(tab.results, tab.activeResultId, resultId)
-    : undefined
+  const next = tab.activeResultId ? pickActiveAfterClose(tab.results, tab.activeResultId, resultId) : undefined
   return { results, activeResultId: next ?? null }
 }
 
@@ -232,4 +288,14 @@ export function tabCollection(tab: QueryTab): string | null {
 /** Short display label for a tab: the targeted collection, else "查询 N". */
 export function tabLabel(tab: QueryTab, index: number): string {
   return tabCollection(tab) ?? `查询 ${index + 1}`
+}
+
+/** Searchable text shown by the query-tab picker. */
+export function tabSearchText(tab: QueryTab, index: number, connectionName?: string): string {
+  return [tabLabel(tab, index), connectionName, tab.activeDatabase].filter(Boolean).join('\n')
+}
+
+export function matchesTabSearch(filterText: string, query: string): boolean {
+  const normalized = query.trim().toLocaleLowerCase()
+  return !normalized || filterText.toLocaleLowerCase().includes(normalized)
 }

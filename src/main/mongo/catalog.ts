@@ -1,7 +1,14 @@
 import type { MongoClient } from 'mongodb'
+import { readAuthorization } from './authorization'
 import type { CollectionInfo, DatabaseInfo, IndexInfo, UserInfo } from '../../shared/types'
 import type { SessionManager } from './sessionManager'
-import { estimateCollectionCountOnDb, listCollectionsOnDb, listIndexesOnDb, sampleFieldsOnDb } from './catalogCore'
+import {
+  dropCollectionOnDb,
+  estimateCollectionCountOnDb,
+  listCollectionsOnDb,
+  listIndexesOnDb,
+  sampleFieldsOnDb
+} from './catalogCore'
 
 /**
  * True when an error is the benign result of a concurrent disconnect: a lazy
@@ -69,31 +76,17 @@ export async function listDatabases(connectionId: string, sessions: SessionManag
  * `showPrivileges: true` flattens every granted role into concrete privileges,
  * so a `readWrite@somedb` grant surfaces `somedb` even when it has no data.
  * Cluster-wide privileges (`resource.db === ''`) are skipped — they target "any
- * database", not a specific one. Never throws: a probe failure (e.g. a user
- * without permission to read its own status) just yields no extra databases.
+ * database", not a specific one. Never throws: a probe failure (e.g. an
+ * unsupported command on a compatible server) just yields no extra databases.
  */
 async function authorizedDatabaseNames(client: MongoClient): Promise<string[]> {
-  try {
-    const status = (await client.db('admin').command({
-      connectionStatus: 1,
-      showPrivileges: true
-    })) as ConnectionStatus
-    const privileges = status.authInfo?.authenticatedUserPrivileges ?? []
-    const names = new Set<string>()
-    for (const p of privileges) {
-      const db = p.resource?.db
-      if (typeof db === 'string' && db !== '') names.add(db)
-    }
-    return [...names]
-  } catch {
-    return []
+  const { authorization } = await readAuthorization(client)
+  const names = new Set<string>()
+  for (const p of authorization?.privileges ?? []) {
+    const db = p.resource.db
+    if (typeof db === 'string' && db !== '') names.add(db)
   }
-}
-
-interface ConnectionStatus {
-  authInfo?: {
-    authenticatedUserPrivileges?: { resource?: { db?: string } }[]
-  }
+  return [...names]
 }
 
 export async function listCollections(
@@ -101,7 +94,10 @@ export async function listCollections(
   database: string,
   sessions: SessionManager
 ): Promise<CollectionInfo[]> {
-  return guardClosed(() => listCollectionsOnDb(sessions.getClient(connectionId).db(database)), [])
+  return guardClosed(
+    () => listCollectionsOnDb(sessions.getClient(connectionId).db(database)),
+    []
+  )
 }
 
 export async function estimateCollectionCount(
@@ -110,7 +106,10 @@ export async function estimateCollectionCount(
   collection: string,
   sessions: SessionManager
 ): Promise<number> {
-  return guardClosed(() => estimateCollectionCountOnDb(sessions.getClient(connectionId).db(database), collection), 0)
+  return guardClosed(
+    () => estimateCollectionCountOnDb(sessions.getClient(connectionId).db(database), collection),
+    0
+  )
 }
 
 export async function listIndexes(
@@ -119,13 +118,28 @@ export async function listIndexes(
   collection: string,
   sessions: SessionManager
 ): Promise<IndexInfo[]> {
-  return guardClosed(() => listIndexesOnDb(sessions.getClient(connectionId).db(database), collection), [])
+  return guardClosed(
+    () => listIndexesOnDb(sessions.getClient(connectionId).db(database), collection),
+    []
+  )
 }
 
 // --- field sampling for autocomplete (bounded + cached) ---
 
 const SAMPLE_LIMIT = 50
 const fieldCache = new Map<string, string[]>()
+
+/** Destructive catalog operations must surface disconnects and server failures. */
+export async function dropCollection(
+  connectionId: string,
+  database: string,
+  collection: string,
+  options: { timeoutMS: number; signal: AbortSignal },
+  sessions: SessionManager
+): Promise<void> {
+  await dropCollectionOnDb(sessions.getClient(connectionId).db(database), collection, options)
+  fieldCache.delete(`${connectionId}:${database}.${collection}`)
+}
 
 /**
  * Sample a bounded number of documents and return their (dot-pathed) field
@@ -146,6 +160,7 @@ export async function sampleFields(
   return guardClosed(async () => {
     const db = sessions.getClient(connectionId).db(database)
     const fields = await sampleFieldsOnDb(db, collection, SAMPLE_LIMIT)
+    if (fieldCache.size >= 500) fieldCache.delete(fieldCache.keys().next().value!)
     fieldCache.set(cacheKey, fields)
     return fields
   }, [])
@@ -158,20 +173,18 @@ export async function listUsers(connectionId: string, database: string, sessions
     const client = sessions.getClient(connectionId)
     try {
       const res = (await client.db(database).command({ usersInfo: 1 })) as {
-        users?: Array<{
-          user: string
-          db: string
-          roles: Array<{ role: string; db: string }>
-        }>
+        users?: Array<{ user: string; db: string; roles: Array<{ role: string; db: string }> }>
       }
-      return (res.users ?? []).map((u) => ({
-        user: u.user,
-        db: u.db,
-        roles: u.roles ?? []
-      }))
+      return (res.users ?? []).map((u) => ({ user: u.user, db: u.db, roles: u.roles ?? [] }))
     } catch (err) {
       if (isClientClosed(err)) throw err // let guardClosed handle the race
       return []
     }
   }, [])
+}
+
+export function clearFieldCache(connectionId: string): void {
+  for (const key of fieldCache.keys()) {
+    if (key.startsWith(`${connectionId}:`)) fieldCache.delete(key)
+  }
 }

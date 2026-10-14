@@ -24,6 +24,8 @@ export interface JsonLine {
   text: string
   /** Same content split into colored segments, for the syntax-highlighted view. */
   tokens: JsonToken[]
+  /** Non-empty container: the matching closing line and its punctuation. */
+  fold?: { end: number; closeText: string }
 }
 
 const INDENT = '  '
@@ -54,6 +56,58 @@ function scalarText(value: unknown): string {
       // ObjectId("..")/ISODate("..")/NumberLong("..") etc. render verbatim.
       return text
   }
+}
+
+const INLINE_PREVIEW_ITEMS = 5
+const INLINE_PREVIEW_TEXT_LENGTH = 80
+
+function inlineText(text: string): string {
+  return text.length > INLINE_PREVIEW_TEXT_LENGTH ? `${text.slice(0, INLINE_PREVIEW_TEXT_LENGTH)}…` : text
+}
+
+function inlineValue(value: unknown): JsonToken {
+  if (Array.isArray(value)) return { text: value.length ? `[ ${value.length} ]` : '[]', cls: 'v-array' }
+  if (typeof value === 'object' && value !== null && !isExtended(value)) {
+    return { text: Object.keys(value).length ? '{ … }' : '{}', cls: 'v-object' }
+  }
+  const { type } = formatScalar(value)
+  const text = typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(scalarText(value))
+  return { text, cls: `v-${type}` }
+}
+
+/** One level of an object/array, with bounded entries and text for Table cells. */
+export function toInlineJsonTokens(value: unknown): JsonToken[] {
+  const isArray = Array.isArray(value)
+  if (!isArray && (typeof value !== 'object' || value === null || isExtended(value))) {
+    return [inlineValue(value)]
+  }
+
+  const tokens: JsonToken[] = [punct(isArray ? '[' : '{')]
+  let count = 0
+  const addValue = (item: unknown, key?: string): void => {
+    tokens.push(punct(count++ ? ', ' : ' '))
+    if (key !== undefined) {
+      const text = inlineText(key)
+      tokens.push({ text: /^[A-Za-z_$][\w$]*$/.test(text) ? text : quoteKey(text), cls: 'json-key' }, punct(': '))
+    }
+    tokens.push(inlineValue(item))
+  }
+
+  if (isArray) {
+    for (let index = 0; index < Math.min(value.length, INLINE_PREVIEW_ITEMS); index++) addValue(value[index])
+    if (value.length > INLINE_PREVIEW_ITEMS) tokens.push(punct(', …'))
+  } else {
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue
+      if (count === INLINE_PREVIEW_ITEMS) {
+        tokens.push(punct(', …'))
+        break
+      }
+      addValue((value as Record<string, unknown>)[key], key)
+    }
+  }
+  tokens.push(punct(`${count ? ' ' : ''}${isArray ? ']' : '}'}`))
+  return tokens
 }
 
 /**
@@ -104,6 +158,7 @@ function pushLines(
     return
   }
 
+  const start = out.length
   out.push({ depth, text: `${keyPrefix}${open}`, tokens: [...keyToks, punct(open)] })
   entries.forEach(([k, v], i) => {
     const last = i === entries.length - 1
@@ -111,6 +166,7 @@ function pushLines(
     pushLines(v, depth + 1, childKey, !last, out)
   })
   out.push({ depth, text: `${close}${comma}`, tokens: [punct(close), ...commaToks] })
+  out[start].fold = { end: out.length - 1, closeText: `${close}${comma}` }
 }
 
 /** Flatten any EJSON value into virtualizable lines. */
@@ -118,6 +174,17 @@ export function toJsonLines(value: unknown): JsonLine[] {
   const out: JsonLine[] = []
   pushLines(value, 0, null, false, out)
   return out
+}
+
+/** Project the full line array onto visible rows without visiting hidden subtrees. */
+export function visibleJsonLineIndexes(lines: readonly { fold?: JsonLine['fold'] }[], collapsed: ReadonlySet<number>): number[] {
+  const visible: number[] = []
+  for (let index = 0; index < lines.length; index++) {
+    visible.push(index)
+    const fold = lines[index].fold
+    if (fold && collapsed.has(index)) index = fold.end
+  }
+  return visible
 }
 
 /** Indentation string for a given depth (exported for the view to apply). */

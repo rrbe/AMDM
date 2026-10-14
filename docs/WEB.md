@@ -4,7 +4,9 @@ AMDM Web 是供可信团队在内网使用的单实例版本。它复用桌面�
 
 ## 首版能力
 
-保留连接管理、目录浏览、Shell、结果视图、Explain、保存查询、历史、设置和单文档改删。SSH、Schema 建模、导入导出、更新检查及原生文件对话框仅在桌面端提供。
+复用当前桌面端界面：连接复制和权限展示、目录搜索、统一快速搜索、可拖动查询/数据标签、mongosh 和 Driver 查询、分页结果、嵌套表格与 JSON 折叠、Explain、保存查询、历史、Schema 分析和草稿、可调宽详情侧栏、单文档刷新/改删及集合删除。设置包括主题、语言、颜色方案和快捷键。
+
+SSH、文件导入导出、更新检查及原生文件对话框仍在桌面端提供。Web 不显示对应入口。TLS 文件路径指向服务端文件，须由可信运维人员配置。
 
 ## 构建和运行
 
@@ -26,6 +28,8 @@ export AMDM_WEB_MASTER_KEY="$(openssl rand -base64 32)"
 export AMDM_WEB_DATA_DIR='/var/lib/amdm-web'
 pnpm start:web
 ```
+
+构建产物为 `out/web/` 和 `out/web-server/`，后者包含独立 mongosh runtime 和序列化 worker。运行环境使用 Node 24.11 或更新版本，并安装生产依赖。
 
 服务默认只监听 `127.0.0.1:4173`。可用 `AMDM_WEB_HOST`、`AMDM_WEB_PORT` 和 `AMDM_WEB_STATIC_DIR` 覆盖，但不要把服务直接暴露到网络。
 
@@ -50,12 +54,12 @@ location / {
 }
 ```
 
-`/healthz` 不包含用户数据，可供本机健康检查使用。所有 RPC 都要求可信 Origin、JSON Content-Type 和 `X-Forwarded-User`。
+`/healthz` 不包含用户数据，可供本机健康检查使用。所有 RPC 都要求可信 Origin、JSON Content-Type 和 `X-Forwarded-User`。`/api/events` 使用 SSE 推送连接状态；反向代理须关闭该路径的响应缓冲，并允许持续连接。
 
 ## 安全边界
 
-- 每个连接和运行中的 Session 都绑定 SSO 用户；其他用户即使知道 ID 也不能访问或取消。
+- 每个连接和运行中的 Session 都绑定 SSO 用户；分页结果和取消任务还绑定浏览器页面 ID。其他用户或页面即使知道结果 ID 也不能访问或取消。页面状态流关闭会释放它持有的游标、缓存和文档刷新任务；同一用户最后一个页面关闭时断开数据库连接。
 - MongoDB 密码使用 AES-256-GCM 加密，用户状态文件原子写入且权限为 `0600`。
-- 文档改删和 Shell 执行写入 `audit.ndjson`，不记录密码、查询代码、完整文档或返回结果。
-- 当前 Shell 使用 Node `vm`，它不是不可信代码沙箱。只有完全可信的团队成员才能获得 AMDM Web 访问权；否则必须关闭 Shell 或增加 OS/容器级隔离。
+- 集合删除、文档改删和 Shell 执行写入 `audit.ndjson`，不记录密码、查询代码、完整文档或返回结果。
+- 当前 Shell 使用官方 mongosh evaluator 和 Node `vm`，它不是不可信代码沙箱。只有完全可信的团队成员才能获得 AMDM Web 访问权；否则必须关闭 Shell 或增加 OS/容器级隔离。
 - 状态存储是单实例 JSON 持久卷，不支持多个 Node 实例同时写入。

@@ -1,4 +1,4 @@
-import type { JsonValue, MongoJsonSchema, SchemaTarget } from '../../shared/types'
+import type { JsonValue, MongoJsonSchema, SchemaTarget, SchemaAnalysis, SchemaModel } from '../../shared/types'
 
 export function schemaTargetKey(target: SchemaTarget): string {
   if (!target?.connectionId || !target.database || !target.collection) {
@@ -30,4 +30,18 @@ export function cloneMongoJsonSchema(value: unknown): MongoJsonSchema {
     throw new Error('Schema must be a JSON object.')
   }
   return cloneJsonValue(value, 'Schema') as MongoJsonSchema
+}
+
+export function modelWithAnalysis(target: SchemaTarget, analysis: SchemaAnalysis, previous?: SchemaModel): SchemaModel {
+  return {
+    target,
+    analysis,
+    draft: previous?.draft ?? cloneMongoJsonSchema(analysis.generated),
+    draftUpdatedAt: previous?.draftUpdatedAt ?? analysis.analyzedAt
+  }
+}
+
+export function modelWithDraft(previous: SchemaModel | undefined, draft?: MongoJsonSchema): SchemaModel {
+  if (!previous) throw new Error('Analyze the collection before editing a Schema.')
+  return { ...previous, draft: cloneMongoJsonSchema(draft ?? previous.analysis.generated), draftUpdatedAt: Date.now() }
 }

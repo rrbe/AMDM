@@ -2,6 +2,7 @@
  * SSH tunnel option assembly — auth-method decision + host-key TOFU + diagnosis plan.
  */
 import { describe, it, expect } from 'vitest'
+import { normalize } from 'node:path'
 import {
   buildTunnelOptions,
   classifyConnError,
@@ -40,7 +41,7 @@ describe('expandHome', () => {
     expect(expandHome('~', '/home/u')).toBe('/home/u')
   })
   it('expands a leading ~/ to home/...', () => {
-    expect(expandHome('~/.ssh/id_ed25519', '/home/u')).toBe('/home/u/.ssh/id_ed25519')
+    expect(expandHome('~/.ssh/id_ed25519', '/home/u')).toBe(normalize('/home/u/.ssh/id_ed25519'))
   })
   it('leaves absolute and ~user paths untouched', () => {
     expect(expandHome('/keys/id', '/home/u')).toBe('/keys/id')
@@ -160,11 +161,15 @@ describe('classifyConnError', () => {
   it('maps timeouts and DNS failures', () => {
     expect(classifyConnError({ code: 'ETIMEDOUT' }).kind).toBe('timeout')
     expect(classifyConnError({ level: 'client-timeout' }).kind).toBe('timeout')
+    expect(classifyConnError(new Error('Server selection timed out after 30000 ms'))).toMatchObject({
+      kind: 'timeout'
+    })
     expect(classifyConnError({ code: 'ENOTFOUND' }).kind).toBe('dns')
   })
   it('classifies ssh2 auth failures by level or message', () => {
     expect(classifyConnError({ level: 'client-authentication' }).kind).toBe('auth')
     expect(classifyConnError(new Error('All configured authentication methods failed')).kind).toBe('auth')
+    expect(classifyConnError(new Error('SSH authentication was rejected')).kind).toBe('auth')
   })
   it('recognizes host-key errors and falls back to other', () => {
     expect(classifyConnError(new Error('Host key verification failed for x')).kind).toBe('hostkey')
@@ -212,28 +217,18 @@ describe('evaluateHostKey (TOFU)', () => {
 
 describe('buildTunnelOptions — guards & defaults', () => {
   it('throws for SRV/Atlas (single forwarded socket only)', () => {
-    expect(() =>
-      buildTunnelOptions(dec(cfg({ authMethod: 'password' }, { useSrv: true })), stubKey)
-    ).toThrow(/SRV/i)
+    expect(() => buildTunnelOptions(dec(cfg({ authMethod: 'password' }, { useSrv: true })), stubKey)).toThrow(/SRV/i)
   })
 
   it('defaults ssh port to 22 and dest port to 27017', () => {
-    const o = buildTunnelOptions(
-      dec(cfg({ authMethod: 'password', port: undefined }, { port: undefined })),
-      stubKey
-    )
+    const o = buildTunnelOptions(dec(cfg({ authMethod: 'password', port: undefined }, { port: undefined })), stubKey)
     expect(o.target.port).toBe(22)
     expect(o.destPort).toBe(27017)
   })
 
   it('forwards the first inline replica-set seed through the single tunnel', () => {
     const o = buildTunnelOptions(
-      dec(
-        cfg(
-          { authMethod: 'password' },
-          { host: 'db1.internal:5001,db2.internal:5002', port: undefined }
-        )
-      ),
+      dec(cfg({ authMethod: 'password' }, { host: 'db1.internal:5001,db2.internal:5002', port: undefined })),
       stubKey
     )
     expect(o).toMatchObject({ destHost: 'db1.internal', destPort: 5001 })

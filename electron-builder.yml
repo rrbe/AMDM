@@ -17,6 +17,7 @@ npmRebuild: false
 afterPack: scripts/after-pack.mjs
 
 mac:
+  minimumSystemVersion: "13.0"
   category: public.app-category.developer-tools
   icon: build/icon.icns
   identity: "-"
@@ -27,8 +28,12 @@ mac:
     SUFeedURL: https://github.com/rrbe/AMDM/releases/latest/download/appcast-arm64.xml
     SUPublicEDKey: yF0fhsSuotJutGHezmoAFb3+M7nA6gcOln5aEWycXp8=
     SUEnableAutomaticChecks: true
-    SUAutomaticallyUpdate: true
-    SUScheduledCheckInterval: 86400
+    # Scheduled results are surfaced by the app's gentle reminder instead of
+    # interrupting work with Sparkle's native window. Manual checks still show it.
+    SUAutomaticallyUpdate: false
+    # Check often enough for AMDM's release cadence while leaving scheduling,
+    # wake handling, and request coalescing to Sparkle.
+    SUScheduledCheckInterval: 21600
   extraResources:
     - from: build/sparkle/native/sparkle.node
       to: native/sparkle.node
@@ -49,18 +54,28 @@ dmg:
 
 win:
   icon: build/icon.ico
+  publish:
+    - provider: github
+      owner: rrbe
+      repo: AMDM
   target:
     - target: nsis
       arch: [x64]
 
 nsis:
+  artifactName: ${productName}.Setup.${version}.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  differentialPackage: true
 
 linux:
   icon: build/icon.png
   category: Development
   maintainer: shawn
+  publish:
+    - provider: github
+      owner: rrbe
+      repo: AMDM
   target:
     - AppImage

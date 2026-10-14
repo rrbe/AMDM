@@ -1,9 +1,18 @@
 import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
-import { Decoration, type DecorationSet, type EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view'
+import {
+  Decoration,
+  type DecorationSet,
+  type EditorView,
+  ViewPlugin,
+  type ViewUpdate
+} from '@codemirror/view'
 import { SHELL_GLOBALS } from '@renderer/lib/completionRegistry'
+import { DATABASE_RESERVED } from './tsAutocomplete/mongoBaseDts'
+import { isShellGlobal, isShellText } from './shellSyntax'
 
-export type ShellSemanticKind = 'db' | 'collection' | 'method' | 'operator' | 'constructor' | 'field'
+export type ShellSemanticKind =
+  'db' | 'collection' | 'method' | 'operator' | 'constructor' | 'field' | 'command'
 
 export interface ShellSemanticToken {
   from: number
@@ -14,6 +23,20 @@ export interface ShellSemanticToken {
 type SyntaxNode = ReturnType<typeof syntaxTree>['topNode']
 
 const CONSTRUCTORS = new Set(SHELL_GLOBALS)
+const SHELL_OBJECTS = new Set(['db', 'driverDb', 'rs', 'sh', 'config', 'EJSON'])
+
+function shellRoot(node: SyntaxNode, state: EditorState): boolean {
+  let root = node
+  while (root.name === 'MemberExpression' || root.name === 'CallExpression') {
+    if (!root.firstChild) return false
+    root = root.firstChild
+  }
+  return (
+    root.name === 'VariableName' &&
+    SHELL_OBJECTS.has(textOf(state, root)) &&
+    isShellGlobal(state, root.from, root.to)
+  )
+}
 
 function sameNode(a: SyntaxNode | null, b: SyntaxNode): boolean {
   return !!a && a.from === b.from && a.to === b.to && a.name === b.name
@@ -38,29 +61,41 @@ function isDbCollection(node: SyntaxNode, state: EditorState): boolean {
   const member = node.parent
   if (member?.name !== 'MemberExpression') return false
   const owner = member.firstChild
-  return owner?.name === 'VariableName' && textOf(state, owner) === 'db'
+  return (
+    owner?.name === 'VariableName' &&
+    textOf(state, owner) === 'db' &&
+    !DATABASE_RESERVED.has(unquote(textOf(state, node))) &&
+    isShellGlobal(state, owner.from, owner.to)
+  )
 }
 
 function classify(node: SyntaxNode, state: EditorState): ShellSemanticKind | null {
   const text = textOf(state, node)
 
   if (node.name === 'VariableName') {
-    if (text === 'db') return 'db'
-    if (CONSTRUCTORS.has(text)) return 'constructor'
+    if (SHELL_OBJECTS.has(text) && isShellGlobal(state, node.from, node.to)) return 'db'
+    if (CONSTRUCTORS.has(text) && isShellGlobal(state, node.from, node.to)) return 'constructor'
     return null
   }
 
   if (node.name === 'PropertyName') {
-    if (isCalledProperty(node)) return 'method'
+    if (isCalledProperty(node) && shellRoot(node.parent!, state)) return 'method'
     if (isDbCollection(node, state)) return 'collection'
     return null
   }
 
-  if (node.name === 'PropertyDefinition') return text.startsWith('$') ? 'operator' : 'field'
+  let inQuery = false
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.name === 'CallExpression' && shellRoot(parent, state)) {
+      inQuery = true
+      break
+    }
+  }
+  if (node.name === 'PropertyDefinition' && inQuery) return text.startsWith('$') ? 'operator' : 'field'
 
   if (node.name === 'String') {
     if (isDbCollection(node, state)) return 'collection'
-    if (node.parent?.name === 'Property' && sameNode(node.parent.firstChild, node)) {
+    if (inQuery && node.parent?.name === 'Property' && sameNode(node.parent.firstChild, node)) {
       return unquote(text).startsWith('$') ? 'operator' : 'field'
     }
   }
@@ -73,8 +108,40 @@ function classify(node: SyntaxNode, state: EditorState): ShellSemanticKind | nul
  * Keeping this pure makes the MongoDB-specific layer independently testable;
  * the view plugin below only turns the returned ranges into decorations.
  */
-export function shellSemanticTokens(state: EditorState, from = 0, to = state.doc.length): ShellSemanticToken[] {
+export function shellSemanticTokens(
+  state: EditorState,
+  from = 0,
+  to = state.doc.length
+): ShellSemanticToken[] {
   const tokens: ShellSemanticToken[] = []
+  // REPL commands are only recognized at the top level, on their own line.
+  for (let pos = state.doc.lineAt(from).from; pos <= to;) {
+    const line = state.doc.lineAt(pos)
+    const match = /^(\s*)(use|show)\s+([^;]+?)\s*;?\s*$/.exec(line.text)
+    if (match) {
+      const start = line.from + match[1].length
+      let nested = false
+      for (let node = syntaxTree(state).resolveInner(start + 1); node; node = node.parent!) {
+        if (/Block|Function|ObjectExpression/.test(node.name)) nested = true
+      }
+      const argument = match[3]
+      if (
+        !nested &&
+        !isShellText(state, start + 1) &&
+        (match[2] === 'use'
+          ? /^[\w.$-]+$/.test(argument)
+          : /^(dbs|databases|collections|tables|users|roles|profile|logs|log\s+\S+)$/.test(argument))
+      ) {
+        tokens.push({
+          from: start,
+          to: start + match[2].length,
+          kind: 'command'
+        })
+      }
+    }
+    if (line.to >= state.doc.length) break
+    pos = line.to + 1
+  }
   syntaxTree(state).iterate({
     from,
     to,
@@ -92,7 +159,8 @@ const marks: Record<ShellSemanticKind, Decoration> = {
   method: Decoration.mark({ class: 'cm-shell-method' }),
   operator: Decoration.mark({ class: 'cm-shell-operator' }),
   constructor: Decoration.mark({ class: 'cm-shell-constructor' }),
-  field: Decoration.mark({ class: 'cm-shell-field' })
+  field: Decoration.mark({ class: 'cm-shell-field' }),
+  command: Decoration.mark({ class: 'cm-shell-command' })
 }
 
 function decorationsFor(view: EditorView): DecorationSet {
@@ -105,7 +173,9 @@ function decorationsFor(view: EditorView): DecorationSet {
 export function shouldRefreshShellSemanticHighlight(
   update: Pick<ViewUpdate, 'docChanged' | 'viewportChanged' | 'startState' | 'state'>
 ): boolean {
-  return update.docChanged || update.viewportChanged || syntaxTree(update.startState) !== syntaxTree(update.state)
+  return (
+    update.docChanged || update.viewportChanged || syntaxTree(update.startState) !== syntaxTree(update.state)
+  )
 }
 
 /** MongoDB-aware syntax colors layered over the JavaScript highlighter. */

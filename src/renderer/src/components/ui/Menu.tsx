@@ -1,6 +1,8 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
 import { ContextMenu as BaseContextMenu } from '@base-ui/react/context-menu'
 import { Menu as BaseMenu } from '@base-ui/react/menu'
+import { CircleHelp } from 'lucide-react'
+import { Tooltip } from './Tooltip'
 
 /**
  * Thin wrapper over Base UI Menu — a cursor-anchored, data-driven menu. Backs the
@@ -15,6 +17,8 @@ import { Menu as BaseMenu } from '@base-ui/react/menu'
 interface MenuItemBase {
   label: string
   icon?: ReactNode
+  /** Optional explanation opened from a help icon at the end of the item. */
+  description?: ReactNode
   /** Greyed-out + unclickable. */
   disabled?: boolean
 }
@@ -34,6 +38,7 @@ export type MenuItemDef = MenuActionDef | MenuSubmenuDef
 
 /** A divider between groups of items. */
 export type MenuEntry = MenuItemDef | 'separator'
+export type MenuFinalFocus = ComponentProps<typeof BaseMenu.Popup>['finalFocus']
 
 interface MenuProps {
   open: boolean
@@ -41,9 +46,40 @@ interface MenuProps {
   x: number
   y: number
   items: MenuEntry[]
+  finalFocus?: MenuFinalFocus
 }
 
-function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
+function MenuHelp({ label, description }: { label: string; description: ReactNode }): React.JSX.Element {
+  const triggerRef = useRef<HTMLSpanElement>(null)
+
+  return (
+    <Tooltip
+      content={description}
+      variant="text"
+      delay={100}
+      anchor={() => triggerRef.current?.closest('.ctx-menu') ?? null}
+      align="end"
+    >
+      <span
+        ref={triggerRef}
+        className="ctx-menu-help inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center text-[var(--fg-3)] outline-none hover:text-inherit focus-visible:rounded-sm focus-visible:text-inherit focus-visible:shadow-[0_0_0_2px_var(--focus-soft)]"
+        role="button"
+        tabIndex={0}
+        aria-label={typeof description === 'string' ? `${label}: ${description}` : label}
+        onPointerDown={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <CircleHelp size={13} />
+      </span>
+    </Tooltip>
+  )
+}
+
+function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: MenuFinalFocus }): React.JSX.Element {
   return (
     <>
       {items.map((item, index) => {
@@ -53,13 +89,26 @@ function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
         if ('children' in item) {
           return (
             <BaseMenu.SubmenuRoot key={index}>
-              <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
-                {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
-                <span className="ctx-label">{item.label}</span>
-                <span className="ctx-submenu-arrow" aria-hidden="true">
-                  ›
-                </span>
-              </BaseMenu.SubmenuTrigger>
+              {item.description != null ? (
+                <div className="ctx-submenu-with-help">
+                  <BaseMenu.SubmenuTrigger className="ctx-item ctx-item-with-help" disabled={item.disabled} openOnHover>
+                    {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
+                    <span className="ctx-label">{item.label}</span>
+                    <MenuHelp label={item.label} description={item.description} />
+                    <span className="ctx-submenu-arrow" aria-hidden="true">
+                      ›
+                    </span>
+                  </BaseMenu.SubmenuTrigger>
+                </div>
+              ) : (
+                <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
+                  {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
+                  <span className="ctx-label">{item.label}</span>
+                  <span className="ctx-submenu-arrow" aria-hidden="true">
+                    ›
+                  </span>
+                </BaseMenu.SubmenuTrigger>
+              )}
               <BaseMenu.Portal>
                 <BaseMenu.Positioner
                   className="ui-menu-positioner"
@@ -68,8 +117,8 @@ function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
                   sideOffset={5}
                   alignOffset={-4}
                 >
-                  <BaseMenu.Popup className="ctx-menu ui-menu-popup">
-                    <MenuEntries items={item.children} />
+                  <BaseMenu.Popup className="ctx-menu ui-menu-popup" finalFocus={finalFocus}>
+                    <MenuEntries items={item.children} finalFocus={finalFocus} />
                   </BaseMenu.Popup>
                 </BaseMenu.Positioner>
               </BaseMenu.Portal>
@@ -85,6 +134,7 @@ function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
           >
             {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
             <span className="ctx-label">{item.label}</span>
+            {item.description != null && <MenuHelp label={item.label} description={item.description} />}
             {item.shortcut != null && <span className="ctx-shortcut">{item.shortcut}</span>}
           </BaseMenu.Item>
         )
@@ -93,7 +143,7 @@ function MenuEntries({ items }: { items: MenuEntry[] }): JSX.Element {
   )
 }
 
-export function Menu({ open, onClose, x, y, items }: MenuProps): JSX.Element {
+export function Menu({ open, onClose, x, y, items, finalFocus }: MenuProps): React.JSX.Element {
   // Virtual anchor: a zero-size rect at the cursor. Memoised so Base UI's
   // positioner isn't re-anchored on every render.
   const anchor = useMemo(
@@ -116,8 +166,8 @@ export function Menu({ open, onClose, x, y, items }: MenuProps): JSX.Element {
           align="start"
           sideOffset={2}
         >
-          <BaseMenu.Popup className="ctx-menu ui-menu-popup">
-            <MenuEntries items={items} />
+          <BaseMenu.Popup className="ctx-menu ui-menu-popup" finalFocus={finalFocus}>
+            <MenuEntries items={items} finalFocus={finalFocus} />
           </BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>

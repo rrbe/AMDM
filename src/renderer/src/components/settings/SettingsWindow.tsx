@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Code2, Database, Palette, RefreshCw, Search } from 'lucide-react'
+import { ArrowLeft, Code2, Database, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -7,36 +7,65 @@ import {
   QUERY_LIMITS,
   QUERY_TIMEOUTS_MS,
   type CollectionSort,
+  type KeyboardShortcutId,
   type Language,
+  type TableNestedDisplay,
   type ThemeMode
 } from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
 import { matchesSettingsSearch } from '@renderer/lib/settingsSearch'
-import { IS_WEB } from '@renderer/lib/platform'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { Toaster } from '@renderer/components/common/Toaster'
 import { Field } from '@renderer/components/ui/Field'
+import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
+import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNestedDisplayPreview'
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { cn } from '@renderer/lib/utils'
+import { IS_WEB } from '@renderer/lib/platform'
 
-type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'query' | 'editor'
+type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
 
-interface SettingsWindowProps {
-  onClose?: () => void
+interface UpdateAvailableDotProps {
+  version: string
+  className?: string
 }
 
-export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
+export function UpdateAvailableDot({ version, className }: UpdateAvailableDotProps): React.JSX.Element {
+  const { t } = useTranslation()
+  const label = t('updates.newVersion', { version })
+
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      title={label}
+      className={cn('inline-block size-2 shrink-0 rounded-full bg-destructive', className)}
+    />
+  )
+}
+
+export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
+  const updateState = useAppStore((s) => s.updateState)
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
+  const loadUpdateState = useAppStore((s) => s.loadUpdateState)
+  const setAutomaticUpdateChecks = useAppStore((s) => s.setAutomaticUpdateChecks)
+  const showAvailableUpdate = useAppStore((s) => s.showAvailableUpdate)
+  const cancelUpdateDownload = useAppStore((s) => s.cancelUpdateDownload)
   const loadSettings = useAppStore((s) => s.loadSettings)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const chooseExportDirectory = useAppStore((s) => s.chooseExportDirectory)
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance')
   const [searchQuery, setSearchQuery] = useState('')
   const [checking, setChecking] = useState(false)
+  const [choosingExportDirectory, setChoosingExportDirectory] = useState(false)
+  const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl'
 
   const sections = [
     {
@@ -57,7 +86,11 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
       id: 'updates',
       label: t('settings.sectionUpdates'),
       icon: RefreshCw,
-      keywords: [t('settings.sectionUpdates'), t('settings.checkForUpdates'), t('settings.checkForUpdatesHint')]
+      keywords: [
+        t('settings.sectionUpdates'),
+        t('settings.automaticUpdateChecks'),
+        t('settings.checkForUpdates')
+      ]
     },
     {
       id: 'catalog',
@@ -78,10 +111,25 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
         t('settings.sectionQuery'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
+        t('settings.tableNestedDisplay'),
+        t('settings.tableNestedInline'),
+        t('settings.tableNestedGrouped'),
+        t('settings.tableNestedAuto'),
         t('settings.queryTimeout'),
         t('settings.queryTimeoutHint'),
         t('settings.historyLimit'),
         t('settings.historyLimitHint')
+      ]
+    },
+    {
+      id: 'export',
+      label: t('settings.sectionExport'),
+      icon: FolderOutput,
+      keywords: [
+        t('settings.sectionExport'),
+        t('settings.defaultExportDirectory'),
+        t('settings.defaultExportDirectoryHint'),
+        t('settings.chooseExportDirectory')
       ]
     },
     {
@@ -99,17 +147,36 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
         t('settings.editorColors.scheme'),
         t('settings.editorColors.keyword')
       ]
+    },
+    {
+      id: 'shortcuts',
+      label: t('settings.sectionShortcuts'),
+      icon: Keyboard,
+      keywords: [
+        t('settings.sectionShortcuts'),
+        t('settings.keyboardShortcutsEnabled'),
+        t('settings.shortcutNewConnection'),
+        t('settings.shortcutNewQuery'),
+        t('settings.shortcutTabSearch'),
+        t('quickSearch.title'),
+        t('settings.shortcutTabs'),
+        t('settings.shortcutResultView'),
+        t('settings.shortcutOpenSettings'),
+        t('settings.shortcutClear'),
+        t('settings.shortcutRestore')
+      ]
     }
   ] as const
   const visibleSections = sections.filter(
-    (section) => (!IS_WEB || section.id !== 'updates') && matchesSettingsSearch(section.keywords, searchQuery)
+    (section) => (!IS_WEB || !['updates', 'export'].includes(section.id)) && matchesSettingsSearch(section.keywords, searchQuery)
   )
   const displayedSection = visibleSections.find((section) => section.id === activeSection) ?? visibleSections[0]
   const displayedSectionId = displayedSection?.id
 
   useEffect(() => {
     void loadSettings()
-  }, [loadSettings])
+    void loadUpdateState()
+  }, [loadSettings, loadUpdateState])
 
   useEffect(() => {
     setLanguage(settings.language)
@@ -137,14 +204,18 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
 
   useEffect(() => {
     if (!onClose) return
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
+    const close = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !event.defaultPrevented) onClose()
     }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
   }, [onClose])
 
   const runUpdateCheck = async (): Promise<void> => {
+    if (updateState.phase === 'available' || updateState.phase === 'downloaded') {
+      await showAvailableUpdate()
+      return
+    }
     setChecking(true)
     try {
       await checkForUpdates()
@@ -153,11 +224,40 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
     }
   }
 
+  const updateActionLabel =
+    updateState.phase === 'downloaded'
+      ? t('updates.restartToUpdate')
+      : updateState.phase === 'available' && updateState.availableVersion
+        ? t('updates.updateTo', { version: updateState.availableVersion })
+        : t('settings.checkForUpdates')
+
+  const setShortcutEnabled = (id: KeyboardShortcutId, enabled: boolean): void => {
+    const disabledKeyboardShortcuts = enabled
+      ? settings.disabledKeyboardShortcuts.filter((shortcut) => shortcut !== id)
+      : [...new Set([...settings.disabledKeyboardShortcuts, id])]
+    void updateSettings({ disabledKeyboardShortcuts })
+  }
+
+  const selectDefaultExportDirectory = async (): Promise<void> => {
+    if (choosingExportDirectory) return
+    setChoosingExportDirectory(true)
+    try {
+      const selection = await chooseExportDirectory()
+      if (selection) await updateSettings({ defaultExportDirectory: selection.path })
+    } finally {
+      setChoosingExportDirectory(false)
+    }
+  }
+
   return (
     <div
-      className={`grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground ${
-        onClose ? 'fixed inset-0 z-[4000]' : ''
-      }`}
+      role={onClose ? 'dialog' : undefined}
+      aria-modal={onClose ? true : undefined}
+      aria-label={onClose ? t('settings.title') : undefined}
+      className={cn(
+        'grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground',
+        onClose && 'fixed inset-0 z-[4000]'
+      )}
     >
       <nav
         className="app-drag flex flex-col gap-1 border-r border-border bg-secondary px-3 pb-4 pt-[52px]"
@@ -184,22 +284,28 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
           />
         </label>
 
-        {visibleSections.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={`flex items-center gap-2.5 rounded-md border-0 px-3 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] ${
-              displayedSectionId === id
-                ? 'bg-[var(--bg-sel)] text-foreground'
-                : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-            aria-current={displayedSectionId === id ? 'page' : undefined}
-            onClick={() => setActiveSection(id)}
-          >
-            <Icon size={16} aria-hidden />
-            <span>{label}</span>
-          </button>
-        ))}
+        <div className="settings-sections sliding-selection flex flex-col gap-1">
+          {visibleSections.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={`flex items-center gap-2.5 rounded-md border-0 px-3 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] ${
+                displayedSectionId === id
+                  ? 'is-selected text-foreground'
+                  : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+              aria-current={displayedSectionId === id ? 'page' : undefined}
+              onClick={() => setActiveSection(id)}
+            >
+              <Icon size={16} aria-hidden />
+              <span>{label}</span>
+              {id === 'updates' && updateState.availableVersion ? (
+                <UpdateAvailableDot version={updateState.availableVersion} className="ml-auto" />
+              ) : null}
+            </button>
+          ))}
+          <span className="selection-indicator" aria-hidden="true" />
+        </div>
       </nav>
 
       <main className="relative overflow-y-auto bg-card px-8 pb-8 pt-[52px]">
@@ -238,12 +344,58 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
             </>
           )}
 
-          {!IS_WEB && displayedSectionId === 'updates' && (
-            <Field label={t('settings.checkForUpdates')} hint={t('settings.checkForUpdatesHint')}>
-              <Button type="button" busy={checking} onClick={() => void runUpdateCheck()}>
-                {checking ? t('settings.checkingForUpdates') : t('settings.checkForUpdates')}
-              </Button>
-            </Field>
+          {displayedSectionId === 'updates' && (
+            <>
+              <div className="mb-3">
+                <Checkbox
+                  checked={updateState.automaticallyChecksForUpdates}
+                  disabled={!updateState.available}
+                  onCheckedChange={(enabled) => void setAutomaticUpdateChecks(enabled)}
+                  label={t('settings.automaticUpdateChecks')}
+                />
+              </div>
+              <Field label={t('settings.checkForUpdates')}>
+                <div className="flex flex-col items-start gap-2">
+                  <div className="relative flex items-center gap-2">
+                    <Button
+                      type="button"
+                      busy={checking || updateState.phase === 'checking'}
+                      disabled={!updateState.available || updateState.phase === 'downloading'}
+                      onClick={() => void runUpdateCheck()}
+                    >
+                      {checking || updateState.phase === 'checking'
+                        ? t('settings.checkingForUpdates')
+                        : updateActionLabel}
+                    </Button>
+                    {updateState.phase === 'downloading' ? (
+                      <Button type="button" variant="danger" onClick={() => void cancelUpdateDownload()}>
+                        {t('updates.cancelDownload')}
+                      </Button>
+                    ) : null}
+                    {updateState.availableVersion && updateState.phase === 'available' ? (
+                      <UpdateAvailableDot
+                        version={updateState.availableVersion}
+                        className="pointer-events-none absolute -right-1 -top-1"
+                      />
+                    ) : null}
+                  </div>
+                  {updateState.phase === 'downloading' && updateState.downloadProgress ? (
+                    <div className="flex w-64 flex-col gap-1" role="status">
+                      <progress
+                        className="h-1.5 w-full accent-[var(--primary)]"
+                        max={100}
+                        value={updateState.downloadProgress.percent}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {t('updates.downloading', {
+                          percent: Math.round(updateState.downloadProgress.percent)
+                        })}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </Field>
+            </>
           )}
 
           {displayedSectionId === 'catalog' && (
@@ -259,8 +411,42 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
             </Field>
           )}
 
+          {displayedSectionId === 'export' && (
+            <Field label={t('settings.defaultExportDirectory')} hint={t('settings.defaultExportDirectoryHint')}>
+              <div className="flex min-w-0 items-center gap-2">
+                <Input
+                  className="min-w-0 flex-1 font-mono text-xs"
+                  value={settings.defaultExportDirectory}
+                  title={settings.defaultExportDirectory}
+                  readOnly
+                />
+                <Button
+                  type="button"
+                  className="h-[38px] shrink-0"
+                  busy={choosingExportDirectory}
+                  onClick={() => void selectDefaultExportDirectory()}
+                >
+                  {t('settings.chooseExportDirectory')}
+                </Button>
+              </div>
+            </Field>
+          )}
+
           {displayedSectionId === 'query' && (
             <>
+              <Field label={t('settings.tableNestedDisplay')}>
+                <Select<TableNestedDisplay>
+                  value={settings.tableNestedDisplay}
+                  onChange={(tableNestedDisplay) => void updateSettings({ tableNestedDisplay })}
+                  options={[
+                    { label: t('settings.tableNestedInline'), value: 'inline' },
+                    { label: t('settings.tableNestedGrouped'), value: 'grouped' },
+                    { label: t('settings.tableNestedAuto'), value: 'auto' }
+                  ]}
+                  aria-label={t('settings.tableNestedDisplay')}
+                />
+                <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
+              </Field>
               <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
                 <Select<number>
                   value={settings.queryLimit}
@@ -360,9 +546,117 @@ export function SettingsWindow({ onClose }: SettingsWindowProps): JSX.Element {
               <EditorColorSchemeSettings />
             </>
           )}
+
+          {displayedSectionId === 'shortcuts' && (
+            <>
+              <div className="mb-6 rounded-lg border border-border bg-secondary/45 p-4">
+                <Checkbox
+                  checked={settings.keyboardShortcutsEnabled}
+                  onCheckedChange={(keyboardShortcutsEnabled) =>
+                    void updateSettings({ keyboardShortcutsEnabled })
+                  }
+                  label={t('settings.keyboardShortcutsEnabled')}
+                />
+                <p className="mb-0 ml-[23px] mt-2 text-[12px] leading-5 text-muted-foreground">
+                  {t('settings.keyboardShortcutsHint')}
+                </p>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border">
+                <ShortcutRow
+                  label={t('settings.shortcutNewConnection')}
+                  keys={`${primaryKey} N`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('newConnection')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('newConnection', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutNewQuery')}
+                  keys={`${primaryKey} T`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('newQuery')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('newQuery', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutTabSearch')}
+                  keys={`⇧ ${primaryKey} A`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('tabSearch')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('tabSearch', enabled)}
+                />
+                <ShortcutRow
+                  label={t('quickSearch.title')}
+                  keys={`${primaryKey} K`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('quickSearch')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('quickSearch', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutTabs')}
+                  keys={
+                    isMacPlatform()
+                      ? `${t('settings.shortcutQueryTabs')}: ⌘⌥ 1–8 / 9 · ⌃ Tab / ⌃⇧ Tab\n${t('settings.shortcutDataTabs')}: ⌘⌃ 1–8 / 9 · ⌘⌃ Tab / ⌘⌃⇧ Tab`
+                      : 'Ctrl+Alt+1–8 / 9 · Ctrl+Tab / Ctrl+Shift+Tab'
+                  }
+                  enabled={!settings.disabledKeyboardShortcuts.includes('contextualTabs')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('contextualTabs', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutResultView')}
+                  keys={`${primaryKey} 1–4`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('resultView')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('resultView', enabled)}
+                />
+                <ShortcutRow
+                  label={t('settings.shortcutOpenSettings')}
+                  keys={`${primaryKey} ,`}
+                  enabled={!settings.disabledKeyboardShortcuts.includes('openSettings')}
+                  onEnabledChange={(enabled) => setShortcutEnabled('openSettings', enabled)}
+                />
+                <ShortcutRow label={t('shell.menu.explain')} keys={`${primaryKey} ⇧ E`} />
+                <ShortcutRow label={t('shell.menu.format')} keys={`${primaryKey} ⇧ F`} />
+              </div>
+            </>
+          )}
         </div>
       </main>
       <Toaster />
+    </div>
+  )
+}
+
+function ShortcutRow({
+  label,
+  keys,
+  enabled = true,
+  onEnabledChange
+}: {
+  label: string
+  keys: string
+  enabled?: boolean
+  onEnabledChange?: (enabled: boolean) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-border px-4 py-2.5 last:border-b-0">
+      <span className={enabled ? 'text-[13px] text-foreground/90' : 'text-[13px] text-muted-foreground'}>
+        {label}
+      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {enabled ? (
+          <kbd className="whitespace-pre-line rounded-md border border-[var(--separator-strong)] bg-[var(--surface-control)] px-2 py-1 font-mono text-[12px] text-muted-foreground shadow-[0_1px_0_var(--separator-strong)]">
+            {keys}
+          </kbd>
+        ) : (
+          <span className="px-2 py-1 text-[12px] text-muted-foreground">{t('settings.shortcutUnassigned')}</span>
+        )}
+        {onEnabledChange && (
+          <button
+            type="button"
+            className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+            onClick={() => onEnabledChange(!enabled)}
+            aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
+          >
+            {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

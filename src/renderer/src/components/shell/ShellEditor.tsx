@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useRef, useState } from 'react'
+import { Suspense, forwardRef, lazy, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
 import {
@@ -12,7 +12,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { Prec, EditorState, EditorSelection } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
-import { syntaxTree, indentUnit, getIndentUnit } from '@codemirror/language'
+import { indentUnit, getIndentUnit } from '@codemirror/language'
 import { shellCompletionSource } from '@renderer/lib/shellCompletion'
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
@@ -21,7 +21,10 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
 import { selectionCode } from '@renderer/lib/shellSelection'
+import { queryRunGutter, updateQueryRunBusy } from '@renderer/lib/queryRunGutter'
+import { shellStatementAt } from '@renderer/lib/shellStatement'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
+import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 
 /**
  * CodeMirror is heavy, so we lazy-load it — it stays out of
@@ -52,9 +55,9 @@ const FONT_MIN = 10
 const FONT_MAX = 24
 const FONT_DEFAULT = 13
 
-// Editor-preference mutators (font size / word wrap / tab width). Kept at module
-// scope and reading fresh store state via getState() so the CodeMirror keymap can
-// call them without capturing stale closures; each persists to AppSettings.
+// Editor font-size mutators. Kept at module scope and reading fresh store state
+// via getState() so the CodeMirror keymap can call them without capturing stale
+// closures; each persists to AppSettings.
 function adjustFontSize(delta: number): void {
   const store = useAppStore.getState()
   const next = Math.min(FONT_MAX, Math.max(FONT_MIN, store.settings.editorFontSize + delta))
@@ -62,14 +65,6 @@ function adjustFontSize(delta: number): void {
 }
 function resetFontSize(): void {
   void useAppStore.getState().updateSettings({ editorFontSize: FONT_DEFAULT })
-}
-function toggleWordWrap(): void {
-  const store = useAppStore.getState()
-  void store.updateSettings({ editorWordWrap: !store.settings.editorWordWrap })
-}
-function cycleTabSize(): void {
-  const store = useAppStore.getState()
-  void store.updateSettings({ editorTabSize: store.settings.editorTabSize === 2 ? 4 : 2 })
 }
 
 /**
@@ -103,69 +98,88 @@ function enterKeepIndent(view: EditorView): boolean {
 interface ShellEditorProps {
   value: string
   onChange: (value: string) => void
-  onSelectionChange: (code: string | undefined) => void
   onRun: (code?: string) => void
   /** Run just the current statement / selection (right-click menu, F6). */
   onRunStatement: (code: string) => void
   onSave: () => void
   onExplain: () => void
-  /** Pretty-print the editor (Shift+Alt+F) — independent of `busy`. */
+  /** Pretty-print the editor (Cmd/Ctrl+Shift+F) — independent of `busy`. */
   onFormat: () => void
   /** Cancel the in-flight run (the "停止执行" menu item / toolbar Stop). */
   onStop: () => void
   /** True while a query is running — enables Stop, disables the run actions. */
   running: boolean
-  /** When true (a query is running, or the editor is empty) run/save/explain
-      keys are swallowed without acting — mirroring the disabled toolbar buttons. */
+  /** When true, run/explain keys are swallowed without acting. */
   busy: boolean
+  /** Save is local and remains available while disconnected. */
+  saveBusy: boolean
 }
 
-export function ShellEditor({
-  value,
-  onChange,
-  onSelectionChange,
-  onRun,
-  onRunStatement,
-  onSave,
-  onExplain,
-  onFormat,
-  onStop,
-  running,
-  busy
-}: ShellEditorProps): JSX.Element {
-  const { t } = useTranslation()
+export interface ShellEditorHandle {
+  /** Read the live CodeMirror selection when an external toolbar action runs. */
+  getSelectedCode(): string | undefined
+}
+
+export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(function ShellEditor(
+  { value, onChange, onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy, saveBusy },
+  ref
+): React.JSX.Element {
+  const { t, i18n } = useTranslation()
   // Follow the app's Pine light/dark preference so the editor reads as part of
   // the same surface (custom Pine themes, not CodeMirror's generic defaults).
   const isDark = useIsDark()
 
-  // Editor preferences (persisted to AppSettings; see the right-click menu and
-  // ⌘+/⌘−/⌘0). These feed the extensions memo below, so a change reconfigures
+  // Editor preferences persisted to AppSettings. Font size also supports ⌘+,
+  // ⌘−, and ⌘0. These feed the extensions memo below, so a change reconfigures
   // CodeMirror — infrequent enough that the rebuild cost is irrelevant.
   const fontSize = useAppStore((s) => s.settings.editorFontSize)
   const wordWrap = useAppStore((s) => s.settings.editorWordWrap)
   const tabSize = useAppStore((s) => s.settings.editorTabSize)
 
   // The live EditorView, captured on mount. The right-click menu needs it to
-  // drive native commands (undo/redo/select-all, toggle-comment, search) and to
+  // drive native commands (undo/redo/select-all, search) and to
   // read the selection / locate the current statement for "Run Current Statement".
   const viewRef = useRef<EditorView | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const selectionHandler = useRef(onSelectionChange)
-  selectionHandler.current = onSelectionChange
+
+  useImperativeHandle(ref, () => ({ getSelectedCode: () => selectionCode(viewRef.current?.state) }), [])
 
   // Hold the latest callbacks in a ref so the keymap extension can stay a stable
   // reference — recreating `extensions` would reconfigure CodeMirror on every
   // keystroke. The bindings read fresh props through this ref.
-  const handlers = useRef({ onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy })
-  handlers.current = { onRun, onRunStatement, onSave, onExplain, onFormat, onStop, running, busy }
+  const handlers = useRef({
+    onRun,
+    onRunStatement,
+    onSave,
+    onExplain,
+    onFormat,
+    onStop,
+    running,
+    busy,
+    saveBusy
+  })
+  handlers.current = {
+    onRun,
+    onRunStatement,
+    onSave,
+    onExplain,
+    onFormat,
+    onStop,
+    running,
+    busy,
+    saveBusy
+  }
+
+  const runStatementLabel = t('shell.menu.runStatement')
 
   const extensions = useMemo(
     () => [
       javascript({ typescript: false }),
       shellSemanticHighlight,
-      EditorView.updateListener.of((update) => {
-        if (update.selectionSet || update.docChanged) {
-          selectionHandler.current(selectionCode(update.state))
+      queryRunGutter({
+        label: runStatementLabel,
+        onRun: (code) => {
+          if (!handlers.current.busy) handlers.current.onRunStatement(code)
         }
       }),
       autocompletion({ override: [shellCompletionSource] }),
@@ -183,6 +197,19 @@ export function ShellEditor({
       }),
       // Provides the Find/Replace panel that ⌘F and the menu's openSearchPanel open.
       search({ top: true }),
+      EditorState.phrases.of({
+        Find: t('shell.search.find'),
+        Replace: t('shell.search.replace'),
+        next: t('shell.search.next'),
+        previous: t('shell.search.previous'),
+        all: t('shell.search.all'),
+        'match case': t('shell.search.matchCase'),
+        regexp: t('shell.search.regexp'),
+        'by word': t('shell.search.wholeWord'),
+        replace: t('shell.search.replaceAction'),
+        'replace all': t('shell.search.replaceAll'),
+        close: t('shell.search.close')
+      }),
       // Editor preferences applied as extensions: font size cascades from the
       // editor root; tab width drives both the visual tab + the spaces Tab inserts.
       EditorView.theme({ '&': { fontSize: `${fontSize}px` } }),
@@ -207,11 +234,10 @@ export function ShellEditor({
           { key: 'F6', run: () => runStatementIfReady() },
           // Cmd/Ctrl+S saves; preventDefault stops the browser "save page" dialog.
           { key: 'Mod-s', preventDefault: true, run: () => saveIfReady() },
-          // Cmd/Ctrl+E runs explain().
-          { key: 'Mod-e', run: () => explainIfReady() },
-          // Shift+Alt+F formats the script (VS Code's convention). preventDefault
-          // stops macOS Option+F from inserting a stray "ƒ" glyph.
-          { key: 'Shift-Alt-f', preventDefault: true, run: () => formatNow() },
+          // Cmd/Ctrl+Shift+E runs explain().
+          { key: 'Mod-Shift-e', preventDefault: true, run: () => explainIfReady() },
+          // Cmd/Ctrl+Shift+F formats the script.
+          { key: 'Mod-Shift-f', preventDefault: true, run: () => formatNow() },
           // Cmd/Ctrl+/ toggles line comments (also bound in defaultKeymap; pinned
           // here so it works regardless of basicSetup defaults).
           { key: 'Mod-/', run: (view) => toggleComment(view) },
@@ -232,8 +258,13 @@ export function ShellEditor({
     ],
     // Rebuild only when an editor preference changes (not per keystroke — the
     // run/save/explain callbacks are read through `handlers` ref).
-    [fontSize, wordWrap, tabSize]
+    [fontSize, wordWrap, tabSize, runStatementLabel, i18n.resolvedLanguage, t]
   )
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (view) updateQueryRunBusy(view, busy)
+  }, [busy])
 
   return (
     <div
@@ -254,7 +285,7 @@ export function ShellEditor({
           onChange={onChange}
           onCreateEditor={(view) => {
             viewRef.current = view
-            selectionHandler.current(selectionCode(view.state))
+            updateQueryRunBusy(view, handlers.current.busy)
             // Pre-spawn the TS-service worker so the heavy `typescript` chunk
             // loads off the critical path and the service is warm by first use.
             tsAutocomplete.warm()
@@ -286,7 +317,7 @@ export function ShellEditor({
     return true
   }
   function saveIfReady(): boolean {
-    if (!handlers.current.busy) handlers.current.onSave()
+    if (!handlers.current.saveBusy) handlers.current.onSave()
     return true
   }
   function explainIfReady(): boolean {
@@ -316,7 +347,7 @@ export function ShellEditor({
   }
 
   function buildMenu(): ContextMenuEntry[] {
-    const { busy: isBusy, running: isRunning } = handlers.current
+    const { busy: isBusy, saveBusy: isSaveBusy, running: isRunning } = handlers.current
     const hasSel = viewRef.current ? !viewRef.current.state.selection.main.empty : false
     return [
       {
@@ -331,23 +362,20 @@ export function ShellEditor({
         disabled: isBusy,
         onClick: () => runStatementIfReady()
       },
-      { label: t('shell.menu.explain'), shortcut: '⌘E', disabled: isBusy, onClick: () => explainIfReady() },
+      {
+        label: t('shell.menu.explain'),
+        shortcut: isMacPlatform() ? '⌘⇧E' : 'Ctrl+Shift+E',
+        disabled: isBusy,
+        onClick: () => explainIfReady()
+      },
       // Enabled only mid-run; cancels the in-flight find/aggregate server-side.
       { label: t('shell.menu.stop'), disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',
-      { label: t('shell.menu.format'), shortcut: '⌥⇧F', onClick: () => formatNow() },
-      { label: t('shell.menu.toggleComment'), shortcut: '⌘/', onClick: () => withView((v) => toggleComment(v)) },
-      'separator',
-      // Editor preferences (persisted): the `：值` labels show current state,
-      // since the menu closes on click (no live checkmark column).
-      { label: t('shell.menu.wordWrap', { state: wordWrap ? t('shell.on') : t('shell.off') }), onClick: () => toggleWordWrap() },
-      { label: t('shell.menu.tabSize', { size: tabSize }), onClick: () => cycleTabSize() },
-      { label: t('shell.menu.increaseFontSize'), shortcut: '⌘+', onClick: () => bumpFont(1) },
-      { label: t('shell.menu.decreaseFontSize'), shortcut: '⌘−', onClick: () => bumpFont(-1) },
+      { label: t('shell.menu.format'), shortcut: '⌘⇧F', onClick: () => formatNow() },
       'separator',
       { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       'separator',
-      { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isBusy, onClick: () => saveIfReady() },
+      { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isSaveBusy, onClick: () => saveIfReady() },
       'separator',
       { label: t('shell.menu.undo'), shortcut: '⌘Z', onClick: () => withView((v) => undo(v)) },
       { label: t('shell.menu.redo'), shortcut: '⇧⌘Z', onClick: () => withView((v) => redo(v)) },
@@ -358,29 +386,16 @@ export function ShellEditor({
       { label: t('shell.menu.selectAll'), shortcut: '⌘A', onClick: () => withView((v) => selectAll(v)) }
     ]
   }
-}
+})
 
 /**
  * The text to run for "Run Current Statement": the selection if there is one,
- * otherwise the top-level statement under the cursor — located via the JS syntax
- * tree (the direct child of the Script root containing, or just before, the
- * cursor). Falls back to the whole doc if the tree yields nothing.
+ * otherwise the valid top-level statement under the cursor. Whitespace and
+ * syntax-error recovery ranges intentionally yield no runnable statement.
  */
 function statementCode(view: EditorView): string {
   const { state } = view
   const sel = state.selection.main
   if (!sel.empty) return state.sliceDoc(sel.from, sel.to).trim()
-  const pos = sel.head
-  const root = syntaxTree(state).topNode
-  let chosen: typeof root | null = null
-  let lastBefore: typeof root | null = null
-  for (let child = root.firstChild; child; child = child.nextSibling) {
-    if (pos >= child.from && pos <= child.to) {
-      chosen = child
-      break
-    }
-    if (child.to <= pos) lastBefore = child
-  }
-  const node = chosen ?? lastBefore ?? root.firstChild
-  return (node ? state.sliceDoc(node.from, node.to) : state.doc.toString()).trim()
+  return shellStatementAt(state)?.code ?? ''
 }

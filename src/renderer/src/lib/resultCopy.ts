@@ -15,86 +15,21 @@
  */
 import { isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
-import { cellValue, deriveColumns } from './tableShape'
-import type { CollectionSort } from '@shared/types'
+import { cellValue, deriveColumns, type TableColumnPath } from './tableShape'
+import type { CollectionSort, JsonEncoding } from '@shared/types'
+import { encodeCanonicalJson, toPlainJsonValue, unwrapEjsonWrapper } from '@shared/jsonSerialization'
 import { useAppStore } from '@renderer/store/useAppStore'
 import i18n from '@renderer/i18n'
 
 type Dict = Record<string, unknown>
 
-function isObject(v: unknown): v is Dict {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
-
-/** Render a `$date` payload (string | { $numberLong } | number) as ISO. */
-function dateToIso(payload: unknown): string {
-  if (typeof payload === 'string') return payload
-  if (isObject(payload) && '$numberLong' in payload) {
-    const ms = Number(payload['$numberLong'])
-    if (!Number.isNaN(ms)) return new Date(ms).toISOString()
-  }
-  if (typeof payload === 'number') return new Date(payload).toISOString()
-  return String(payload)
-}
-
-/** Collapse an EJSON extended-type wrapper to a plain JSON value. */
-function unwrapExtended(o: Dict): unknown {
-  if ('$oid' in o) return String(o['$oid'])
-  if ('$date' in o) return dateToIso(o['$date'])
-  if ('$numberInt' in o) return Number(o['$numberInt'])
-  if ('$numberLong' in o) {
-    const s = String(o['$numberLong'])
-    const n = Number(s)
-    // Keep precision: only emit a JS number when it round-trips losslessly.
-    return Number.isSafeInteger(n) ? n : s
-  }
-  if ('$numberDouble' in o) {
-    const n = Number(o['$numberDouble'])
-    // Infinity / NaN can't be JSON numbers — keep the canonical token string.
-    return Number.isFinite(n) ? n : String(o['$numberDouble'])
-  }
-  if ('$numberDecimal' in o) return String(o['$numberDecimal']) // precision
-  if ('$binary' in o) {
-    const bin = o['$binary']
-    return isObject(bin) ? String(bin['base64'] ?? '') : String(bin) // legacy: string
-  }
-  if ('$regularExpression' in o) {
-    const re = o['$regularExpression']
-    if (isObject(re)) return `/${String(re['pattern'] ?? '')}/${String(re['options'] ?? '')}`
-    return '/regex/'
-  }
-  if ('$timestamp' in o) {
-    const ts = o['$timestamp']
-    if (isObject(ts)) return { t: Number(ts['t'] ?? 0), i: Number(ts['i'] ?? 0) }
-    return String(ts)
-  }
-  if ('$minKey' in o) return 'MinKey'
-  if ('$maxKey' in o) return 'MaxKey'
-  if ('$undefined' in o) return null
-  if ('$symbol' in o) return String(o['$symbol'])
-  if ('$code' in o) {
-    return '$scope' in o
-      ? { code: String(o['$code']), scope: toPlainValue(o['$scope']) }
-      : String(o['$code'])
-  }
-  if ('$ref' in o && '$id' in o) {
-    const out: Dict = { $ref: String(o['$ref']), $id: toPlainValue(o['$id']) }
-    if (o['$db'] !== undefined) out['$db'] = String(o['$db'])
-    return out
-  }
-  return o // unreachable for known wrappers; pass through defensively
+function isObject(value: unknown): value is Dict {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Recursively collapse an EJSON-canonical value to plain JSON-friendly data. */
 export function toPlainValue(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(toPlainValue)
-  if (isObject(v)) {
-    if (isExtended(v)) return unwrapExtended(v)
-    const out: Dict = {}
-    for (const [k, val] of Object.entries(v)) out[k] = toPlainValue(val)
-    return out
-  }
-  return v
+  return toPlainJsonValue(v)
 }
 
 /** Default copy format — extended types collapsed to ordinary JSON. */
@@ -114,6 +49,20 @@ export function toStrictEjson(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
 
+/** JSON Array using the selected plain/relaxed/canonical representation. */
+export function toEncodedJsonArray(documents: unknown[], encoding: JsonEncoding): string {
+  return JSON.stringify(
+    documents.map((document) => encodeCanonicalJson(document, encoding)),
+    null,
+    2
+  )
+}
+
+/** JSON Lines / NDJSON using the selected representation, one compact document per line. */
+export function toEncodedJsonLines(documents: unknown[], encoding: JsonEncoding): string {
+  return documents.map((document) => JSON.stringify(encodeCanonicalJson(document, encoding))).join('\n')
+}
+
 /**
  * Plain-text for a single value (a tree value cell / a table cell). Scalars
  * render bare (a string copies without quotes; an ObjectId copies its hex);
@@ -127,15 +76,164 @@ export function plainScalarText(value: unknown): string {
   return JSON.stringify(p, null, 2)
 }
 
+/** Plain-text payload for the focused Table cell; no focus defers to native copy. */
+export function tableCellCopyText(
+  docs: unknown[],
+  selectedCell: { row: number; col: TableColumnPath } | null
+): string | null {
+  if (!selectedCell) return null
+  const { present, value } = cellValue(docs[selectedCell.row], selectedCell.col)
+  return present ? plainScalarText(value) : ''
+}
+
 /** Plain-JSON field fragment for a context-menu "Copy Key-Value" action. */
 export function toPlainKeyValue(key: string, value: unknown): string {
   return `${JSON.stringify(key)}: ${JSON.stringify(toPlainValue(value), null, 2) ?? 'null'}`
 }
 
-/** Formatted, bounded JSON for previews such as table-cell tooltips. */
-export function compactJsonPreview(value: unknown, maxLength = 240): string {
-  const text = JSON.stringify(toPlainValue(value), null, 2) ?? String(value)
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text
+export interface BoundedPreview {
+  text: string
+  truncated: boolean
+}
+
+interface PreviewLimits {
+  maxChars?: number
+  maxDepth?: number
+  maxLines?: number
+  maxStringChars?: number
+}
+
+const DEFAULT_PREVIEW_LIMITS = {
+  maxChars: 1200,
+  maxDepth: 4,
+  maxLines: 16,
+  maxStringChars: 160
+} as const
+
+function truncateCodePoints(text: string, maxChars: number): { text: string; truncated: boolean } {
+  const chars = Array.from(text)
+  if (chars.length <= maxChars) return { text, truncated: false }
+  return { text: `${chars.slice(0, Math.max(0, maxChars - 1)).join('')}…`, truncated: true }
+}
+
+function uniqueEllipsisKey(target: Dict): string {
+  let key = '…'
+  while (Object.prototype.hasOwnProperty.call(target, key)) key += '…'
+  return key
+}
+
+function buildPreviewValue(
+  value: unknown,
+  depth: number,
+  budget: { nodes: number; truncated: boolean },
+  maxDepth: number,
+  maxStringChars: number
+): unknown {
+  if (budget.nodes <= 0) {
+    budget.truncated = true
+    return '…'
+  }
+  budget.nodes -= 1
+
+  if (typeof value === 'string') {
+    const truncated = truncateCodePoints(value, maxStringChars)
+    if (truncated.truncated) budget.truncated = true
+    return truncated.text
+  }
+  if (typeof value === 'bigint') return String(value)
+  if (value == null || typeof value === 'number' || typeof value === 'boolean') return value
+  if (value === undefined) return null
+
+  if (Array.isArray(value)) {
+    if (depth >= maxDepth) {
+      budget.truncated = true
+      return ['…']
+    }
+    const out: unknown[] = []
+    for (const item of value) {
+      if (budget.nodes <= 0) break
+      out.push(buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars))
+    }
+    if (out.length < value.length) {
+      budget.truncated = true
+      out.push('…')
+    }
+    return out
+  }
+
+  if (isObject(value)) {
+    if (isExtended(value)) {
+      const unwrapped = unwrapEjsonWrapper(value, (nested) =>
+        buildPreviewValue(nested, depth + 1, budget, maxDepth, maxStringChars)
+      )
+      return buildPreviewValue(unwrapped, depth, budget, maxDepth, maxStringChars)
+    }
+    if (depth >= maxDepth) {
+      budget.truncated = true
+      return { '…': '…' }
+    }
+    const entries = Object.entries(value)
+    const out: Dict = {}
+    for (const [rawKey, item] of entries) {
+      if (budget.nodes <= 0) break
+      const key = truncateCodePoints(rawKey, maxStringChars)
+      if (key.truncated) budget.truncated = true
+      let displayKey = key.text
+      while (Object.prototype.hasOwnProperty.call(out, displayKey)) displayKey += '…'
+      out[displayKey] = buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars)
+    }
+    if (Object.keys(out).length < entries.length) {
+      budget.truncated = true
+      out[uniqueEllipsisKey(out)] = '…'
+    }
+    return out
+  }
+
+  const scalar = truncateCodePoints(String(value), maxStringChars)
+  if (scalar.truncated) budget.truncated = true
+  return scalar.text
+}
+
+/** Pretty JSON preview that never traverses or renders an unbounded value. */
+export function formatJsonPreview(value: unknown, limits: PreviewLimits = {}): BoundedPreview {
+  const { maxChars, maxDepth, maxLines, maxStringChars } = { ...DEFAULT_PREVIEW_LIMITS, ...limits }
+
+  for (let nodeLimit = 48; nodeLimit >= 1; nodeLimit -= 1) {
+    const budget = { nodes: nodeLimit, truncated: false }
+    const previewValue = buildPreviewValue(value, 0, budget, maxDepth, maxStringChars)
+    const json = JSON.stringify(previewValue, null, 2) ?? String(previewValue)
+    const text = budget.truncated ? `${json}\n…` : json
+    if (text.length <= maxChars && text.split('\n').length <= maxLines) {
+      return { text, truncated: budget.truncated }
+    }
+  }
+
+  return { text: '…', truncated: true }
+}
+
+/** Preserve code/text layout while bounding tooltip work and viewport usage. */
+export function formatTextPreview(
+  value: string,
+  { maxChars = DEFAULT_PREVIEW_LIMITS.maxChars, maxLines = DEFAULT_PREVIEW_LIMITS.maxLines }: PreviewLimits = {}
+): BoundedPreview {
+  const normalized = value.replace(/\r\n?/g, '\n')
+  const truncated = normalized.split('\n').length > maxLines || Array.from(normalized).length > maxChars
+  if (!truncated) return { text: normalized, truncated: false }
+
+  const contentLineLimit = Math.max(0, maxLines - 1)
+  const contentCharLimit = Math.max(0, maxChars - 2)
+  const lines: string[] = []
+  let usedChars = 0
+  for (const line of normalized.split('\n').slice(0, contentLineLimit)) {
+    const separatorChars = lines.length > 0 ? 1 : 0
+    const remaining = contentCharLimit - usedChars - separatorChars
+    if (remaining <= 0) break
+    const clipped = truncateCodePoints(line, remaining)
+    lines.push(clipped.text)
+    usedChars += separatorChars + Array.from(clipped.text).length
+    if (clipped.truncated) break
+  }
+  return { text: [...lines, '…'].join('\n'), truncated: true }
 }
 
 // ----------------------------------------------------------------- CSV / TSV
@@ -163,9 +261,7 @@ function cellText(doc: unknown, column: string): string {
 function toDelimited(docs: unknown[], delimiter: string, sort: CollectionSort): string {
   const cols = deriveColumns(docs, sort)
   const header = cols.map((c) => escapeField(c, delimiter)).join(delimiter)
-  const rows = docs.map((doc) =>
-    cols.map((c) => escapeField(cellText(doc, c), delimiter)).join(delimiter)
-  )
+  const rows = docs.map((doc) => cols.map((c) => escapeField(cellText(doc, c), delimiter)).join(delimiter))
   return [header, ...rows].join('\n')
 }
 
@@ -181,15 +277,20 @@ export function toTsv(docs: unknown[], sort: CollectionSort = 'alpha'): string {
 
 /**
  * Write `text` to the clipboard. Resolves `true` on success, `false` on failure
- * (e.g. clipboard permission denied) — which also surfaces via `lastError`
- * rather than throwing. Callers that don't care about the outcome can ignore it.
+ * (e.g. clipboard permission denied) — which also surfaces through the global
+ * notification queue rather than throwing.
  */
 export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    useAppStore.setState({ lastError: i18n.t('notify.clipboardUnavailable') })
+    useAppStore.getState().notify({
+      variant: 'error',
+      title: i18n.t('notify.clipboardUnavailable'),
+      source: 'system',
+      dedupeKey: 'clipboard:write'
+    })
     return false
   }
 }

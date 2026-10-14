@@ -14,7 +14,7 @@ interface SaveQueryModalProps {
   onClose: () => void
 }
 
-export function SaveQueryModal({ onClose }: SaveQueryModalProps): JSX.Element {
+export function SaveQueryModal({ onClose }: SaveQueryModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const code = useAppStore((s) => getActiveTab(s).code)
   const activeConnectionId = useAppStore((s) => s.activeConnectionId)

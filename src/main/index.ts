@@ -10,7 +10,7 @@ import { resolveWindowBounds } from './store/windowStateCore'
 import { sessionManager } from './mongo/desktopSession'
 import { serializerPool } from './workers/serializerPool'
 import { registerIpc } from './ipc/registerIpc'
-import { startSparkle } from './sparkle'
+import { startUpdates } from './updater'
 import { bringWindowToFront } from './windowOpenCore'
 
 // Default geometry, also the floor on size. Saved bounds are reconciled against
@@ -36,7 +36,7 @@ function openSettingsWindow(owner: BrowserWindow): void {
     backgroundColor: '#edece8',
     icon: appIcon,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(import.meta.dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -81,7 +81,7 @@ function createWindow(): void {
     // Window/taskbar icon for Windows + Linux (macOS uses the .app bundle icon).
     icon: appIcon,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(import.meta.dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -94,6 +94,15 @@ function createWindow(): void {
   else if (saved.isMaximized) win.maximize()
 
   win.on('ready-to-show', () => win.show())
+
+  // Let the query workspace handle Cmd/Ctrl+W before Electron closes the window.
+  win.webContents.on('before-input-event', (_event, input) => {
+    const primaryModifier =
+      process.platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta
+    win.webContents.setIgnoreMenuShortcuts(
+      primaryModifier && !input.alt && !input.shift && input.key.toLowerCase() === 'w'
+    )
+  })
 
   // Remember the window geometry across launches. getNormalBounds() returns the
   // restored (un-maximized, un-fullscreen) rect, so re-maximizing / re-entering
@@ -126,8 +135,8 @@ function createWindow(): void {
   // Dev diagnostics: surface renderer console + crashes in the terminal.
   // (Open DevTools yourself with Cmd/Ctrl+Alt+I when you need them.)
   if (process.env['ELECTRON_RENDERER_URL']) {
-    win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
-      console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`)
+    win.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+      console.log(`[renderer:${level}] ${message} (${sourceId}:${lineNumber})`)
     })
     win.webContents.on('render-process-gone', (_e, details) => {
       console.error('[renderer gone]', details)
@@ -150,7 +159,7 @@ function createWindow(): void {
   if (devUrl) {
     win.loadURL(devUrl)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
   }
 }
 
@@ -168,7 +177,7 @@ app.whenReady().then(() => {
   windowStateStore.init()
   registerIpc(openSettingsWindow)
   createWindow()
-  startSparkle()
+  startUpdates()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -45,7 +45,7 @@ describe('AMDM Web RPC', () => {
           origin,
           ...(user ? { 'x-forwarded-user': user } : {})
         },
-        body: JSON.stringify({ method, args })
+        body: JSON.stringify({ method, args, clientId: '00000000-0000-4000-8000-000000000001' })
       })
 
     const connection: ConnectionInput = {

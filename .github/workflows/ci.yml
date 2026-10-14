@@ -1,16 +1,31 @@
 name: CI
 
-# Quality gate: typecheck + fast unit/contract tests on every push and PR.
-# Integration tests are NOT run here — mongodb-memory-server would download a
-# mongod binary over the network (slow, flaky on CI). They run locally against
-# the cached binary in ~/.cache/mongodb-binaries.
+# Validate source, ESM builds, and packaged Electron runtimes on every platform.
 on:
   push:
+    branches: [master]
   pull_request:
+
+# Supersede older PR checks while keeping master push runs independent.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    name: Check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      MONGOMS_VERSION: 8.2.1
+      MONGOMS_DOWNLOAD_DIR: .cache/mongodb-binaries
     steps:
       - uses: actions/checkout@v6
 
@@ -22,8 +37,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
+
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.MONGOMS_DOWNLOAD_DIR }}
+          key: mongodb-${{ runner.os }}-${{ runner.arch }}-8.2.1
 
       # mongodb-memory-server's postinstall is intentionally not allowed
       # (onlyBuiltDependencies); it would otherwise try to download mongod.
@@ -35,3 +56,68 @@ jobs:
 
       - name: Unit + contract tests
         run: pnpm test:unit
+
+      - name: Integration tests
+        run: pnpm test:integration
+
+      - name: Production build benchmark
+        run: pnpm bench:build --iterations 3
+
+      - name: Web production build
+        run: pnpm build:web
+
+      - name: Web runtime
+        run: pnpm test:web
+
+      - name: Prepare Sparkle
+        if: runner.os == 'macOS'
+        run: pnpm prepare:sparkle
+
+      - name: Package native architecture
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          node --input-type=module <<'JS'
+          import { spawnSync } from 'node:child_process';
+          import { createRequire } from 'node:module';
+          const cli = createRequire(import.meta.url).resolve('electron-builder/out/cli/cli.js');
+          const result = spawnSync(process.execPath, [cli, '--dir', '--' + process.arch,
+            '--config.electronDist=node_modules/electron/dist'], { stdio: 'inherit' });
+          if (result.error) throw result.error;
+          process.exit(result.status ?? 1);
+          JS
+
+      - name: Packaged ESM runtime (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm test:packaged
+
+      - name: Packaged ESM runtime (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: pnpm test:packaged
+
+      - name: UI E2E (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm test:e2e
+
+      - name: UI E2E (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: pnpm test:e2e
+
+      - name: Runtime benchmark (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm bench:runtime --iterations 3 --warm-queries 3
+
+      - name: Runtime benchmark (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: pnpm bench:runtime --iterations 3 --warm-queries 3
+
+      - name: Runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: esm-runtime-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            dist/runtime-validation/
+            dist/e2e-validation/
+            dist/benchmarks/
+          if-no-files-found: ignore

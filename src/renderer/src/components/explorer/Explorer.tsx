@@ -1,14 +1,16 @@
-import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import {
   Bookmark,
-  ChartNoAxesColumnIncreasing,
   ChevronRight,
   Clock,
   Clock3,
+  Copy,
   Database,
   Download,
   Eye,
+  FlaskConical,
   Key,
   KeyRound,
   Loader2,
@@ -22,7 +24,7 @@ import {
   Search,
   Settings,
   Sun,
-  Table2,
+  Table,
   Trash2,
   Unplug,
   Upload,
@@ -30,42 +32,39 @@ import {
   Users as UsersIcon,
   X
 } from 'lucide-react'
-import type {
-  CollectionSort,
-  ConnectionConfig,
-  ConnectionState,
-  SchemaTarget
-} from '@shared/types'
-import {
-  useAppStore,
-  type CatalogState,
-  type NodeKind,
-  type NodePayload
-} from '@renderer/store/useAppStore'
+import type { CollectionSort, ConnectionConfig, ConnectionState, SchemaTarget } from '@shared/types'
+import { useAppStore, type CatalogState, type NodeKind, type NodePayload } from '@renderer/store/useAppStore'
 import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
+import { createCatalogSearch, type CatalogSearchMatch, type MatchRange } from '@renderer/lib/catalogSearch'
 import { formatBytes } from '@renderer/lib/formatBytes'
 import { IS_WEB } from '@renderer/lib/platform'
-import {
-  applyConnectionOrder,
-  reorderConnectionIds,
-  type DropEdge
-} from '@renderer/lib/connectionOrder'
+import { copyText } from '@renderer/lib/resultCopy'
+import { applyConnectionOrder, reorderConnectionIds, type DropEdge } from '@renderer/lib/connectionOrder'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import { ImportModal } from '@renderer/components/io/ImportModal'
-import { SchemaModelModal } from '@renderer/components/schema/SchemaModelModal'
+import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
+import { hasOpenShortcutLayer, isAppShortcutEnabled, isMacPlatform } from '@renderer/lib/keyboardShortcuts'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import type { CatalogDestination } from '@renderer/lib/quickSearch/documents'
+import { searchId } from '@renderer/lib/quickSearch/types'
+import { recordSearchVisit } from '@renderer/lib/quickSearch/visits'
 import {
   HistoryView,
   SavedQueriesView,
   type StoredQuerySelection
 } from '@renderer/components/explorer/SavedQueriesPanel'
 
+const SchemaModelModal = lazy(async () => ({
+  default: (await import('@renderer/components/schema/SchemaModelModal')).SchemaModelModal
+}))
+
 export type ExplorerView = 'connections' | 'savedQueries' | 'history'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
-function TreeIcon({ name }: { name: string }): JSX.Element | null {
+export function TreeIcon({ name }: { name: string }): React.JSX.Element | null {
   switch (name) {
     case 'database':
       return <Database size={15} />
@@ -74,7 +73,7 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
     case 'user':
       return <UserIcon size={14} />
     case 'collection':
-      return <Table2 size={15} />
+      return <Table size={15} />
     case 'view':
       return <Eye size={15} />
     case 'timeseries':
@@ -98,8 +97,8 @@ function TreeIcon({ name }: { name: string }): JSX.Element | null {
  * connected connection expands to reveal its database subtree, lazily loaded
  * via catalog.* and cached per-connection in the store.
  *
- * Clicking a collection runs one bounded newest-first query on first open;
- * clicking it again focuses the existing Shell tab without re-running it.
+ * Double-clicking a collection runs one bounded newest-first query on first open;
+ * double-clicking it again focuses the existing Shell tab without re-running it.
  */
 
 interface TreeRow {
@@ -110,7 +109,7 @@ interface TreeRow {
   depth: number
   label: string
   icon: string
-  kind: NodeKind | 'leaf'
+  kind: NodeKind | 'index' | 'leaf'
   expandable: boolean
   expanded: boolean
   loading: boolean
@@ -123,7 +122,15 @@ interface TreeRow {
   approximateCount?: boolean
   /** Present on collection rows: enables the Export/Import hover actions. */
   collection?: { db: string; name: string; type: 'collection' | 'view' | 'timeseries' }
+  /** Optional tooltip override; unlike ordinary catalog labels, it is always shown. */
+  tooltip?: string
+  cached?: boolean
+  /** Present on index rows: enables index-specific actions. */
+  indexName?: string
+  /** Present on the Indexes folder: scopes refresh to its owning collection. */
+  indexCollection?: { db: string; name: string }
   onClick?: () => void
+  onDoubleClick?: () => void
   onToggle?: () => void
 }
 
@@ -140,17 +147,68 @@ interface ConnRow {
 
 type Row = ConnRow | TreeRow
 
+function connectionSubtitle(conn: ConnectionConfig): string {
+  return conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
+}
+
+function searchEntries(rows: Row[]): { id: string; text: string; detail?: string }[] {
+  return rows.map((row) =>
+    row.type === 'connection'
+      ? { id: row.id, text: row.conn.name, detail: connectionSubtitle(row.conn) }
+      : { id: row.id, text: row.label }
+  )
+}
+
+export function filterExplorerRows(
+  rows: Row[],
+  search: string,
+  matches = createCatalogSearch(searchEntries(rows))(search),
+  expansion: ReadonlyMap<string, boolean> = new Map()
+): Row[] {
+  if (!search.trim()) return rows
+
+  const visibleIds = new Set<string>()
+  const ancestorIds = new Set<string>()
+  const ancestors: Row[] = []
+  for (const row of rows) {
+    const depth = row.type === 'connection' ? 0 : row.depth
+    ancestors.length = depth
+    ancestors.push(row)
+    if (matches.has(row.id)) {
+      for (const ancestor of ancestors) visibleIds.add(ancestor.id)
+      for (const ancestor of ancestors.slice(0, -1)) ancestorIds.add(ancestor.id)
+    }
+  }
+  // Matching ancestors reveal the path; a matching node's expanded subtree
+  // remains usable even when its children do not contain the search text.
+  const result: Row[] = []
+  const branch: { expanded: boolean; subtree: boolean }[] = []
+  for (const row of rows) {
+    const depth = row.type === 'connection' ? 0 : row.depth
+    branch.length = depth
+    const parent = branch[depth - 1]
+    const visible = (!parent || parent.expanded) && (visibleIds.has(row.id) || parent?.subtree)
+    const subtree = matches.has(row.id) || (parent?.subtree ?? false)
+    const expanded = expansion.get(row.id) ?? (row.expanded || ancestorIds.has(row.id))
+    branch.push({
+      expanded: !!visible && expanded,
+      subtree: !!visible && subtree
+    })
+    if (visible) result.push({ ...row, expanded })
+  }
+  return result
+}
+
+export function canDisconnectConnection(state: ConnectionState): boolean {
+  return state !== 'disconnected'
+}
+
 /** The store actions the catalog rows wire their click handlers to. */
 interface RowActions {
-  toggleNode: (
-    connId: string,
-    nodeId: string,
-    kind: NodeKind,
-    payload: NodePayload
-  ) => Promise<void>
+  toggleNode: (connId: string, nodeId: string, kind: NodeKind, payload: NodePayload) => Promise<void>
   setActiveConnection: (id: string | null) => void
-  setActiveDatabase: (db: string) => void
   browseCollection: (db: string, coll: string) => void
+  inspectIndex: (db: string, coll: string, indexName: string) => void
 }
 
 /** Which import/export modal (if any) is open, and for which collection. */
@@ -165,42 +223,82 @@ export function Explorer({
   view,
   onViewChange,
   onQueryLoad,
+  reveal,
   onCollapse,
-  onSettings
+  onSettings,
+  newConnectionRequested,
+  onNewConnectionRequestHandled
 }: {
   view: ExplorerView
   onViewChange: (view: ExplorerView) => void
   onQueryLoad: (query: StoredQuerySelection) => void
+  reveal: CatalogDestination | null
   onCollapse: () => void
   onSettings: () => void
-}): JSX.Element {
+  newConnectionRequested: boolean
+  onNewConnectionRequestHandled: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
   const catalogs = useAppStore((s) => s.catalogs)
+  const catalogSearchSnapshots = useAppStore((s) => s.catalogSearchSnapshots)
   const expandedConnections = useAppStore((s) => s.expandedConnections)
   const connectionOrder = useAppStore((s) => s.settings.connectionOrder)
   const collectionSort = useAppStore((s) => s.settings.collectionSort)
   const theme = useAppStore((s) => s.settings.theme)
+  const updateState = useAppStore((s) => s.updateState)
+  const availableVersion = updateState.availableVersion
+  const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
+  const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
+  const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
 
   const connect = useAppStore((s) => s.connect)
   const disconnect = useAppStore((s) => s.disconnect)
   const setActiveConnection = useAppStore((s) => s.setActiveConnection)
   const toggleConnectionExpanded = useAppStore((s) => s.toggleConnectionExpanded)
-  const setActiveDatabase = useAppStore((s) => s.setActiveDatabase)
   const deleteConnection = useAppStore((s) => s.deleteConnection)
   const toggleNode = useAppStore((s) => s.toggleNode)
   const loadDatabases = useAppStore((s) => s.loadDatabases)
   const loadCollections = useAppStore((s) => s.loadCollections)
+  const loadIndexes = useAppStore((s) => s.loadIndexes)
+  const refreshCollection = useAppStore((s) => s.refreshCollection)
+  const dropCollection = useAppStore((s) => s.dropCollection)
   const browseCollection = useAppStore((s) => s.browseCollection)
+  const inspectIndex = useAppStore((s) => s.inspectIndex)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const showAvailableUpdate = useAppStore((s) => s.showAvailableUpdate)
 
   const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchToggleRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (view === 'connections' && searchOpen) searchInputRef.current?.focus({ preventScroll: true })
+  }, [view, searchOpen])
   const [search, setSearch] = useState('')
+  const [searchExpansion, setSearchExpansion] = useState<Map<string, boolean>>(() => new Map())
+  const searching = search.trim().length > 0
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const originalScroll = useRef(0)
+  const changeSearch = (value: string): void => {
+    if (!searching && value.trim()) originalScroll.current = bodyRef.current?.scrollTop ?? 0
+    setSearch(value)
+    setSearchExpansion(new Map())
+  }
+  useLayoutEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = searching ? 0 : originalScroll.current
+  }, [searching, search])
+  const closeSearch = (): void => {
+    setSearch('')
+    setSearchExpansion(new Map())
+    setSearchOpen(false)
+    searchToggleRef.current?.focus({ preventScroll: true })
+  }
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const [connForm, setConnForm] = useState<{
     open: boolean
     editing?: ConnectionConfig
+    copyFromId?: string
   }>({
     open: false
   })
@@ -211,6 +309,14 @@ export function Explorer({
     y: number
     items: ContextMenuEntry[]
   } | null>(null)
+
+  useEffect(() => {
+    if (!newConnectionRequested) return
+    setCtxMenu(null)
+    setConnForm({ open: true })
+    onNewConnectionRequestHandled()
+  }, [newConnectionRequested, onNewConnectionRequestHandled])
+
   const orderedConnections = useMemo(
     () => applyConnectionOrder(connections, connectionOrder),
     [connections, connectionOrder]
@@ -219,40 +325,57 @@ export function Explorer({
   // Right-click a connection → manage it or refresh only its database list.
   const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
     e.preventDefault()
-    const disconnectable = row.state === 'connected' || row.state === 'connecting'
+    const disconnectable = canDisconnectConnection(row.state)
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
       items: [
         disconnectable
           ? {
-              label: 'Disconnect',
+              label: t('connection.menu.disconnect'),
               icon: <Unplug size={14} />,
               onClick: () => void disconnect(row.id)
             }
           : {
-              label: 'Connect',
+              label: t('connection.menu.connect'),
               icon: <Plug size={14} />,
               onClick: () => void connect(row.id)
             },
         {
-          label: 'Refresh',
+          label: t('common.refresh'),
           icon: <RefreshCw size={14} />,
           disabled: row.state !== 'connected',
           onClick: () => void loadDatabases(row.id)
         },
         'separator',
         {
-          label: 'Edit',
+          label: t('connection.menu.edit'),
           icon: <Pencil size={14} />,
           onClick: () => setConnForm({ open: true, editing: row.conn })
         },
         {
-          label: 'Delete',
+          label: t('connection.menu.duplicate'),
+          icon: <Copy size={14} />,
+          onClick: () => {
+            const baseName = t('connection.copyName', { name: row.conn.name })
+            const names = new Set(connections.map((c) => c.name))
+            let name = baseName
+            for (let suffix = 2; names.has(name); suffix++) name = `${baseName} ${suffix}`
+            setConnForm({
+              open: true,
+              editing: { ...row.conn, id: '', name },
+              copyFromId: row.id
+            })
+          }
+        },
+        {
+          label: t('connection.menu.delete'),
           icon: <Trash2 size={14} />,
           danger: true,
           onClick: () => {
-            if (confirm(`Delete connection "${row.conn.name}"?`)) void deleteConnection(row.id)
+            if (confirm(t('connection.menu.deleteConfirm', { name: row.conn.name }))) {
+              void deleteConnection(row.id)
+            }
           }
         }
       ]
@@ -263,13 +386,46 @@ export function Explorer({
   // remain scoped to that collection.
   const openCatalogMenu = (e: MouseEvent, row: TreeRow): void => {
     e.preventDefault()
+    const indexName = row.indexName
+    if (row.kind === 'index' && indexName !== undefined) {
+      setCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            label: t('explorer.copyIndexName'),
+            icon: <Copy size={14} />,
+            onClick: () => void copyText(indexName)
+          }
+        ]
+      })
+      return
+    }
+
+    const indexCollection = row.indexCollection
+    if (row.kind === 'indexes' && indexCollection) {
+      setCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          {
+            label: t('common.refresh'),
+            icon: <RefreshCw size={14} />,
+            disabled: row.loading,
+            onClick: () => void loadIndexes(row.connId, indexCollection.db, indexCollection.name)
+          }
+        ]
+      })
+      return
+    }
+
     if (row.kind === 'database') {
       setCtxMenu({
         x: e.clientX,
         y: e.clientY,
         items: [
           {
-            label: 'Refresh',
+            label: t('common.refresh'),
             icon: <RefreshCw size={14} />,
             onClick: () => void loadCollections(row.connId, row.label)
           }
@@ -280,14 +436,20 @@ export function Explorer({
 
     const coll = row.collection
     if (!coll) return
-    if (IS_WEB) return
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
       items: [
         {
+          label: t('common.refresh'),
+          icon: <RefreshCw size={14} />,
+          disabled: coll.type === 'view' || row.loading,
+          onClick: () => void refreshCollection(row.connId, coll.db, coll.name)
+        },
+        'separator',
+        {
           label: t('schema.menu'),
-          icon: <ChartNoAxesColumnIncreasing size={14} />,
+          icon: <FlaskConical size={14} />,
           disabled: coll.type === 'view',
           onClick: () =>
             setSchemaTarget({
@@ -296,6 +458,7 @@ export function Explorer({
               collection: coll.name
             })
         },
+        ...(!IS_WEB ? [
         'separator',
         {
           label: t('io.exportCollection'),
@@ -318,27 +481,60 @@ export function Explorer({
               db: coll.db,
               collection: coll.name
             })
+        },
+        ] as ContextMenuEntry[] : []),
+        'separator',
+        {
+          label: t('explorer.dropCollection'),
+          icon: <Trash2 size={14} />,
+          danger: true,
+          disabled: row.loading,
+          onClick: () => {
+            const connection = connections.find((item) => item.id === row.connId)
+            if (
+              window.confirm(
+                t('explorer.dropCollectionConfirm', {
+                  connection: connection?.name ?? row.connId,
+                  database: coll.db,
+                  collection: coll.name
+                })
+              )
+            ) {
+              void dropCollection(row.connId, coll.db, coll.name)
+            }
+          }
         }
       ]
     })
   }
 
-  // Build the flat visible-row list. Connections sit at depth 0; each connected
-  // + expanded connection contributes its database subtree starting at depth 1.
+  // Connections sit at depth 0. Search includes loaded descendants even when
+  // collapsed or offline; normal browsing keeps the user's expansion state.
   // zustand action refs are stable, so listing them as deps is free.
   const rows = useMemo<Row[]>(() => {
     const actions: RowActions = {
       toggleNode,
       setActiveConnection,
-      setActiveDatabase,
-      browseCollection
+      browseCollection,
+      inspectIndex
     }
     const out: Row[] = []
     for (const conn of orderedConnections) {
       const state = statuses[conn.id]?.state ?? 'disconnected'
       const connected = state === 'connected'
       const expanded = connected && expandedConnections.has(conn.id)
-      const catalog = catalogs[conn.id]
+      const snapshot = searching ? catalogSearchSnapshots[conn.id] : undefined
+      const catalog =
+        catalogs[conn.id] ??
+        (snapshot
+          ? {
+              ...snapshot,
+              indexes: {},
+              users: {},
+              expanded: new Set<string>(),
+              loading: new Set<string>()
+            }
+          : undefined)
       const dbsLoading = catalog?.loading.has(`${conn.id}:databases`) ?? false
       out.push({
         type: 'connection',
@@ -350,8 +546,28 @@ export function Explorer({
         expanded,
         loading: connected && (dbsLoading || catalog?.databases === undefined)
       })
-      if (expanded && catalog) {
-        out.push(...flattenCatalog(conn.id, catalog, actions, collectionSort))
+      if ((expanded || searching) && catalog) {
+        const children = flattenCatalog(conn.id, catalog, actions, collectionSort, searching)
+        out.push(
+          ...(connected
+            ? children
+            : children.map((row) => ({
+                ...row,
+                cached: true,
+                tooltip: `${row.label} — ${t('explorer.cachedCatalog')}`,
+                expandable: false,
+                loading: false,
+                onClick: undefined,
+                onToggle: undefined,
+                onDoubleClick: row.collection
+                  ? async () => {
+                      await connect(conn.id)
+                      if (useAppStore.getState().statuses[conn.id]?.state === 'connected')
+                        row.onDoubleClick?.()
+                    }
+                  : undefined
+              })))
+        )
       }
     }
     return out
@@ -359,22 +575,122 @@ export function Explorer({
     orderedConnections,
     statuses,
     catalogs,
+    catalogSearchSnapshots,
+    searching,
+    connect,
     expandedConnections,
     collectionSort,
     toggleNode,
     setActiveConnection,
-    setActiveDatabase,
-    browseCollection
+    browseCollection,
+    inspectIndex,
+    t
   ])
-  const visibleRows = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase()
-    if (!query) return rows
-    return rows.filter((row) =>
-      row.type === 'connection'
-        ? `${row.conn.name} ${row.conn.host}`.toLocaleLowerCase().includes(query)
-        : row.label.toLocaleLowerCase().includes(query)
+  const searchIndex = useMemo(
+    () => createCatalogSearch(searching ? searchEntries(rows) : []),
+    [rows, searching]
+  )
+  const matches = useMemo(() => searchIndex(search), [searchIndex, search])
+  const visibleRows = useMemo(
+    () => filterExplorerRows(rows, search, matches, searchExpansion),
+    [rows, search, matches, searchExpansion]
+  )
+  const toggleRow = (row: Row): void => {
+    if (searching) {
+      const expanded = !row.expanded
+      setSearchExpansion((current) => new Map(current).set(row.id, expanded))
+      // Search can reveal collapsed ancestors without querying. Only explicit
+      // expansion loads children, through the same action as ordinary browsing.
+      const storedExpanded =
+        row.type === 'connection'
+          ? expandedConnections.has(row.id)
+          : (catalogs[row.connId]?.expanded.has(row.id) ?? false)
+      if (storedExpanded === expanded) return
+    }
+    if (row.type === 'connection') toggleConnectionExpanded(row.id)
+    else row.onToggle?.()
+  }
+  const connectionIndices = useMemo(
+    () => visibleRows.flatMap((row, index) => (row.type === 'connection' ? [index] : [])),
+    [visibleRows]
+  )
+  const stickyIndex = useRef(0)
+  const virtualizer = useVirtualizer({
+    count: visibleRows.length,
+    initialRect: { width: 0, height: 600 },
+    getScrollElement: () => bodyRef.current,
+    getItemKey: (index) => visibleRows[index].id,
+    estimateSize: (index) => (visibleRows[index].type === 'connection' ? 44 : 28),
+    overscan: 8,
+    enabled: view === 'connections',
+    rangeExtractor: (range) => {
+      stickyIndex.current = 0
+      for (const index of connectionIndices) {
+        if (index > range.startIndex) break
+        stickyIndex.current = index
+      }
+      return [...new Set([stickyIndex.current, ...defaultRangeExtractor(range)])].sort((a, b) => a - b)
+    }
+  })
+  const handledReveal = useRef<CatalogDestination | null>(null)
+  useLayoutEffect(() => {
+    if (!reveal || handledReveal.current === reveal || view !== 'connections') return
+    if (search || searchOpen) {
+      setSearch('')
+      setSearchOpen(false)
+      setSearchExpansion(new Map())
+      return
+    }
+    const index = visibleRows.findIndex((row) => row.id === reveal.rowId)
+    if (index < 0) return
+    handledReveal.current = reveal
+    setSelectedRowId(reveal.rowId)
+    virtualizer.scrollToIndex(index, { align: 'center' })
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const target = [...(bodyRef.current?.querySelectorAll<HTMLElement>('[data-explorer-row]') ?? [])].find(
+          (row) => row.dataset.explorerRow === reveal.rowId
+        )
+        if (!hasOpenShortcutLayer()) target?.focus({ preventScroll: true })
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [reveal, view, search, searchOpen, visibleRows])
+  const activateRow = (id: string): void => {
+    setSelectedRowId(id)
+    recordSearchVisit(searchId('connections', id))
+  }
+  const renderRow = (row: Row): React.JSX.Element =>
+    row.type === 'connection' ? (
+      <ConnectionRow
+        key={row.id}
+        row={row}
+        match={matches.get(row.id)}
+        isActive={selectedRowId === row.id}
+        onActivate={() => activateRow(row.id)}
+        onToggle={() => toggleRow(row)}
+        onConnect={() => void connect(row.id)}
+        onMove={moveConnection}
+        onContextMenu={(e) => openConnMenu(e, row)}
+      />
+    ) : (
+      <CatalogRow
+        key={row.id}
+        row={
+          searching && !row.cached
+            ? {
+                ...row,
+                onToggle: row.onToggle ? () => toggleRow(row) : undefined,
+                onClick: row.onClick ? () => toggleRow(row) : undefined
+              }
+            : row
+        }
+        match={matches.get(row.id)}
+        isActive={selectedRowId === row.id}
+        onActivate={() => activateRow(row.id)}
+        onContextMenu={openCatalogMenu}
+      />
     )
-  }, [rows, search])
   const moveConnection = (sourceId: string, targetId: string, edge: DropEdge): void => {
     const ids = orderedConnections.map((connection) => connection.id)
     const next = reorderConnectionIds(ids, sourceId, targetId, edge)
@@ -387,91 +703,103 @@ export function Explorer({
         <div className="app-brand">
           <span>AMDM</span>
         </div>
-        <button
-          className="side-head-action"
-          data-tip={t('explorer.collapse')}
-          aria-label={t('explorer.collapse')}
-          onClick={onCollapse}
-        >
+        <button className="side-head-action" aria-label={t('explorer.collapse')} onClick={onCollapse}>
           <PanelLeftClose size={16} />
         </button>
       </div>
 
       <nav className="explorer-nav" aria-label={t('navigation.title')}>
-        <button
-          className={view === 'connections' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
-          data-tip={view === 'connections' ? undefined : t('navigation.data')}
-          aria-label={t('navigation.data')}
-          aria-current={view === 'connections' ? 'page' : undefined}
-          onClick={() => onViewChange('connections')}
-        >
-          <Database size={17} />
-          {view === 'connections' && <span>{t('navigation.data')}</span>}
-        </button>
-        <button
-          className={view === 'savedQueries' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
-          data-tip={view === 'savedQueries' ? undefined : t('navigation.saved')}
-          aria-label={t('navigation.saved')}
-          aria-current={view === 'savedQueries' ? 'page' : undefined}
-          onClick={() => onViewChange('savedQueries')}
-        >
-          <Bookmark size={17} />
-          {view === 'savedQueries' && <span>{t('navigation.saved')}</span>}
-        </button>
-        <button
-          className={view === 'history' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
-          data-tip={view === 'history' ? undefined : t('navigation.history')}
-          aria-label={t('navigation.history')}
-          aria-current={view === 'history' ? 'page' : undefined}
-          onClick={() => onViewChange('history')}
-        >
-          <Clock3 size={17} />
-          {view === 'history' && <span>{t('navigation.history')}</span>}
-        </button>
+        <Tooltip content={t('navigation.data')}>
+          <button
+            className={view === 'connections' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+            aria-label={t('navigation.data')}
+            aria-current={view === 'connections' ? 'page' : undefined}
+            onClick={() => onViewChange('connections')}
+          >
+            <Database size={17} />
+            <span className="explorer-nav-label" aria-hidden="true">
+              <span>{t('navigation.data')}</span>
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip content={t('navigation.saved')}>
+          <button
+            className={view === 'savedQueries' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+            aria-label={t('navigation.saved')}
+            aria-current={view === 'savedQueries' ? 'page' : undefined}
+            onClick={() => onViewChange('savedQueries')}
+          >
+            <Bookmark size={17} />
+            <span className="explorer-nav-label" aria-hidden="true">
+              <span>{t('navigation.saved')}</span>
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip content={t('navigation.history')}>
+          <button
+            className={view === 'history' ? 'explorer-nav-item is-active' : 'explorer-nav-item'}
+            aria-label={t('navigation.history')}
+            aria-current={view === 'history' ? 'page' : undefined}
+            onClick={() => onViewChange('history')}
+          >
+            <Clock3 size={17} />
+            <span className="explorer-nav-label" aria-hidden="true">
+              <span>{t('navigation.history')}</span>
+            </span>
+          </button>
+        </Tooltip>
       </nav>
-
-      {view === 'connections' && searchOpen && (
-        <div className="explorer-search">
-          <Search size={14} aria-hidden />
-          <input
-            autoFocus
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t('explorer.searchPlaceholder')}
-            aria-label={t('explorer.search')}
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              aria-label={t('explorer.clearSearch')}
-              data-tip={t('explorer.clearSearch')}
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-      )}
 
       {view === 'connections' ? (
         <>
           <div className="side-section side-section--conns">
-            <div className="side-section-head">
-              <span className="side-section-title">Connections</span>
-              <span className="library-count">· {connections.length}</span>
-              <button
-                className={searchOpen ? 'side-head-action is-active' : 'side-head-action'}
-                data-tip={t('explorer.search')}
-                aria-label={t('explorer.search')}
-                aria-pressed={searchOpen}
-                onClick={() => {
-                  if (searchOpen) setSearch('')
-                  setSearchOpen((open) => !open)
-                }}
-              >
-                <Search size={16} />
-              </button>
+            <div className={searchOpen ? 'side-section-head is-searching' : 'side-section-head'}>
+              <div className="side-search-slot">
+                <div className="side-search-heading" aria-hidden={searchOpen}>
+                  <span className="side-section-title">Connections</span>
+                  <span className="library-count">· {connections.length}</span>
+                </div>
+                <div className="explorer-search" inert={!searchOpen} aria-hidden={!searchOpen}>
+                  <Search size={14} aria-hidden />
+                  <input
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={(event) => changeSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        closeSearch()
+                      }
+                    }}
+                    placeholder={t('explorer.searchPlaceholder')}
+                    aria-label={t('explorer.search')}
+                  />
+                  {search && (
+                    <Tooltip content={t('explorer.clearSearch')}>
+                      <button onClick={() => setSearch('')} aria-label={t('explorer.clearSearch')}>
+                        <X size={13} />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
+              </div>
+              <Tooltip content={t(searchOpen ? 'explorer.closeSearch' : 'explorer.search')}>
+                <button
+                  ref={searchToggleRef}
+                  className="side-head-action side-search-toggle"
+                  aria-label={t(searchOpen ? 'explorer.closeSearch' : 'explorer.search')}
+                  aria-expanded={searchOpen}
+                  onClick={() => {
+                    if (searchOpen) closeSearch()
+                    else setSearchOpen(true)
+                  }}
+                >
+                  {searchOpen ? t('common.cancel') : <Search size={16} />}
+                </button>
+              </Tooltip>
             </div>
-            <div className="explorer-body">
+            <div className="explorer-body" ref={bodyRef}>
               {connections.length === 0 && (
                 <div className="explorer-empty">No connections. Click "New" to add one.</div>
               )}
@@ -480,35 +808,42 @@ export function Explorer({
                 <div className="explorer-empty">{t('explorer.noSearchResults')}</div>
               )}
 
-              {visibleRows.map((row) =>
-                row.type === 'connection' ? (
-                  <ConnectionRow
-                    key={row.id}
-                    row={row}
-                    isActive={selectedRowId === row.id}
-                    onActivate={() => setSelectedRowId(row.id)}
-                    onSelect={() => setActiveConnection(row.id)}
-                    onToggle={() => toggleConnectionExpanded(row.id)}
-                    onConnect={() => void connect(row.id)}
-                    onMove={moveConnection}
-                    onContextMenu={(e) => openConnMenu(e, row)}
-                  />
-                ) : (
-                  <CatalogRow
-                    key={row.id}
-                    row={row}
-                    isActive={selectedRowId === row.id}
-                    onActivate={() => setSelectedRowId(row.id)}
-                    onContextMenu={openCatalogMenu}
-                  />
-                )
+              {(
+                <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+                  {virtualizer.getVirtualItems().map((item) => (
+                    <div
+                      key={item.key}
+                      ref={virtualizer.measureElement}
+                      data-index={item.index}
+                      className="explorer-search-row"
+                      style={{
+                        position: item.index === stickyIndex.current ? 'sticky' : 'absolute',
+                        top: 0,
+                        width: '100%',
+                        zIndex: item.index === stickyIndex.current ? 4 : undefined,
+                        transform:
+                          item.index === stickyIndex.current ? undefined : `translateY(${item.start}px)`
+                      }}
+                    >
+                      {renderRow(visibleRows[item.index])}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
 
           <div className="explorer-create">
             <button className="btn-new-conn" onClick={() => setConnForm({ open: true })}>
-              <Plus size={15} />
+              <ShortcutHint
+                shortcut={
+                  isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'newConnection')
+                    ? `${primaryKey}N`
+                    : undefined
+                }
+              >
+                <Plus size={15} />
+              </ShortcutHint>
               <span>{t('explorer.newConnection')}</span>
             </button>
           </div>
@@ -521,56 +856,101 @@ export function Explorer({
 
       {/* App-level controls stay in the quiet footer. */}
       <div className="side-foot">
-        <button
-          className="theme-cycle"
-          data-tip={
+        <Tooltip
+          content={
             theme === 'system'
               ? t('explorer.theme.system')
               : theme === 'light'
                 ? t('explorer.theme.light')
                 : t('explorer.theme.dark')
           }
-          aria-label={t('explorer.toggleTheme')}
-          onClick={() =>
-            void updateSettings({
-              theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
-            })
-          }
         >
-          {theme === 'system' ? (
-            <Monitor size={16} />
-          ) : theme === 'light' ? (
-            <Sun size={16} />
-          ) : (
-            <Moon size={16} />
-          )}
-        </button>
-        <span className="side-foot-build" title={__BUILD_ID__}>
-          {__BUILD_ID__}
-        </span>
-        <button
-          className="theme-cycle"
-          data-tip={t('common.settings')}
-          aria-label={t('common.settings')}
-          onClick={onSettings}
-        >
-          <Settings size={16} />
-        </button>
+          <button
+            className="theme-cycle"
+            aria-label={t('explorer.toggleTheme')}
+            onClick={() =>
+              void updateSettings({
+                theme: theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
+              })
+            }
+          >
+            {theme === 'system' ? <Monitor size={16} /> : theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </Tooltip>
+        {availableVersion ? (
+          <button
+            type="button"
+            className="side-foot-update"
+            title={
+              updateState.phase === 'downloaded'
+                ? t('updates.restartToUpdate')
+                : t('updates.newVersion', { version: availableVersion })
+            }
+            aria-label={
+              updateState.phase === 'downloaded'
+                ? t('updates.restartToUpdate')
+                : t('updates.updateTo', { version: availableVersion })
+            }
+            disabled={updateState.phase === 'downloading'}
+            onClick={() => void showAvailableUpdate()}
+          >
+            {updateState.phase === 'downloading' ? (
+              <Loader2 className="animate-spin" size={13} aria-hidden />
+            ) : updateState.phase === 'downloaded' ? (
+              <RefreshCw size={13} aria-hidden />
+            ) : (
+              <Download size={13} aria-hidden />
+            )}
+            <span className="side-foot-update-label">
+              {updateState.phase === 'downloading'
+                ? t('updates.downloading', {
+                    percent: Math.round(updateState.downloadProgress?.percent ?? 0)
+                  })
+                : updateState.phase === 'downloaded'
+                  ? t('updates.restartToUpdate')
+                  : t('updates.updateTo', { version: availableVersion })}
+            </span>
+          </button>
+        ) : (
+          <span className="side-foot-version" title={__APP_VERSION__}>
+            {__APP_VERSION__}
+          </span>
+        )}
+        <Tooltip content={t('common.settings')}>
+          <button className="theme-cycle" aria-label={t('common.settings')} onClick={onSettings}>
+            <ShortcutHint
+              shortcut={
+                isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'openSettings')
+                  ? `${primaryKey},`
+                  : undefined
+              }
+            >
+              <Settings size={16} />
+            </ShortcutHint>
+          </button>
+        </Tooltip>
       </div>
 
       {connForm.open && (
-        <ConnectionForm editing={connForm.editing} onClose={() => setConnForm({ open: false })} />
+        <ConnectionForm
+          editing={connForm.editing}
+          copyFromId={connForm.copyFromId}
+          onClose={() => setConnForm({ open: false })}
+        />
       )}
 
-      {!IS_WEB && ioModal && ioModal.mode === 'export' && (
+      {ioModal && ioModal.mode === 'export' && (
         <ExportModal
-          connectionId={ioModal.connId}
-          database={ioModal.db}
-          collection={ioModal.collection}
+          source={{
+            kind: 'collection',
+            connectionId: ioModal.connId,
+            database: ioModal.db,
+            collection: ioModal.collection
+          }}
           onClose={() => setIoModal(null)}
         />
       )}
-      {!IS_WEB && ioModal && ioModal.mode === 'import' && (
+      {ioModal && ioModal.mode === 'import' && (
         <ImportModal
           connectionId={ioModal.connId}
           database={ioModal.db}
@@ -578,71 +958,58 @@ export function Explorer({
           onClose={() => setIoModal(null)}
         />
       )}
-      {!IS_WEB && schemaTarget && (
-        <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
+      {schemaTarget && (
+        <Suspense fallback={<div className="px-3 text-[12px] text-muted-foreground">{t('schema.loading')}</div>}>
+          <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
+        </Suspense>
       )}
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          items={ctxMenu.items}
-          onClose={() => setCtxMenu(null)}
-        />
-      )}
+      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
     </div>
   )
 }
 
 function ConnectionRow({
   row,
+  match,
   isActive,
   onActivate,
-  onSelect,
   onToggle,
   onConnect,
   onMove,
   onContextMenu
 }: {
   row: ConnRow
+  match?: CatalogSearchMatch
   isActive: boolean
   onActivate: () => void
-  onSelect: () => void
   onToggle: () => void
   onConnect: () => void
   onMove: (sourceId: string, targetId: string, edge: DropEdge) => void
   onContextMenu: (e: MouseEvent) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [dragging, setDragging] = useState(false)
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
   const { conn, state, error, expandable, expanded } = row
   const isConnected = state === 'connected'
-  const sub =
-    conn.useSrv ? `srv · ${conn.host}` : formatMongoHosts(conn.host, conn.port ?? 27017)
+  const sub = connectionSubtitle(conn)
 
   // The lone surviving piece of chrome: a single status signal whose color +
   // glow carry the live state. Actions stay in the right-click menu.
   const signalClass = `conn-signal conn-signal--${
-    state === 'connected'
-      ? 'on'
-      : state === 'error'
-        ? 'error'
-        : state === 'connecting'
-          ? 'connecting'
-          : 'off'
+    state === 'connected' ? 'on' : state === 'error' ? 'error' : state === 'connecting' ? 'connecting' : 'off'
   }`
   const statusLabel =
-    state === 'error' && error
-      ? `${t('connection.status.error')}: ${error}`
-      : t(`connection.status.${state}`)
+    state === 'error' && error ? `${t('connection.status.error')}: ${error}` : t(`connection.status.${state}`)
 
   return (
     <div
       className={`conn-item${isActive ? ' active' : ''}${dragging ? ' dragging' : ''}${dropEdge ? ` drop-${dropEdge}` : ''}`}
+      data-explorer-row={row.id}
+      tabIndex={-1}
       draggable
       aria-grabbed={dragging}
       onClickCapture={onActivate}
-      onClick={onSelect}
       onDoubleClick={() => (isConnected ? onToggle() : state !== 'connecting' && onConnect())}
       onDragStart={(e: DragEvent<HTMLDivElement>) => {
         e.dataTransfer.effectAllowed = 'move'
@@ -687,37 +1054,46 @@ function ConnectionRow({
       <div className="conn-text">
         <div
           className="conn-name"
-          style={{ color: conn.color ? `color-mix(in srgb, ${conn.color} 60%, var(--text-secondary))` : undefined }}
+          style={{
+            color: conn.color ? `color-mix(in srgb, ${conn.color} 60%, var(--text-secondary))` : undefined
+          }}
         >
-          {conn.name}
+          {match ? (
+            <SearchLabel text={conn.name} ranges={match.text} approximate={match.approximate} />
+          ) : (
+            conn.name
+          )}
         </div>
-        <div className="conn-sub" data-tip={sub} data-tip-overflow="">
-          {sub}
-        </div>
+        <Tooltip content={sub} overflowOnly>
+          <div className="conn-sub">
+            {match ? <SearchLabel text={sub} ranges={match.detail} approximate={match.approximate} /> : sub}
+          </div>
+        </Tooltip>
       </div>
-      <span
-        className="conn-status"
-        role="status"
-        aria-label={statusLabel}
-        data-tip={statusLabel}
-      >
-        <span className={signalClass} />
-      </span>
+      {state !== 'disconnected' && (
+        <Tooltip content={statusLabel}>
+          <span className="conn-status" role="status" aria-label={statusLabel}>
+            <span className={signalClass} />
+          </span>
+        </Tooltip>
+      )}
     </div>
   )
 }
 
 function CatalogRow({
   row,
+  match,
   isActive,
   onActivate,
   onContextMenu
 }: {
   row: TreeRow
+  match?: CatalogSearchMatch
   isActive: boolean
   onActivate: () => void
   onContextMenu: (e: MouseEvent, row: TreeRow) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const coll = row.collection
   const isNote = row.kind === 'leaf'
   const className =
@@ -725,13 +1101,23 @@ function CatalogRow({
     (isActive ? ' active' : '') +
     (row.empty ? ' tree-node--empty' : '') +
     (isNote ? ' tree-node--note' : '')
+  const tooltipContent = isNote
+    ? undefined
+    : (row.tooltip ?? (row.empty ? `${row.label} — empty (no collections yet)` : row.label))
   return (
     <div
       className={className}
+      data-explorer-row={row.id}
+      tabIndex={-1}
       style={{ paddingLeft: 8 + row.depth * 14 }}
-      onClickCapture={row.onClick ? onActivate : undefined}
+      onClickCapture={row.icon ? onActivate : undefined}
       onClick={row.onClick}
-      onContextMenu={row.kind === 'database' || coll ? (e) => onContextMenu(e, row) : undefined}
+      onDoubleClick={row.onDoubleClick}
+      onContextMenu={
+        !row.cached && (row.kind === 'database' || row.kind === 'indexes' || row.kind === 'index' || coll)
+          ? (e) => onContextMenu(e, row)
+          : undefined
+      }
     >
       <span
         className="tree-twisty"
@@ -751,15 +1137,15 @@ function CatalogRow({
           <TreeIcon name={row.icon} />
         </span>
       )}
-      <span
-        className="tree-label"
-        data-tip={
-          isNote ? undefined : row.empty ? `${row.label} — empty (no collections yet)` : row.label
-        }
-        data-tip-overflow={isNote || row.empty ? undefined : ''}
-      >
-        {row.label}
-      </span>
+      <Tooltip content={tooltipContent} overflowOnly={!isNote && !row.empty && !row.tooltip && !row.cached}>
+        <span className="tree-label">
+          {match ? (
+            <SearchLabel text={row.label} ranges={match.text} approximate={match.approximate} />
+          ) : (
+            row.label
+          )}
+        </span>
+      </Tooltip>
       {typeof row.count === 'number' && (
         <span className="tree-count">
           ({row.approximateCount ? '~' : ''}
@@ -776,16 +1162,50 @@ function CatalogRow({
   )
 }
 
+function SearchLabel({
+  text,
+  ranges = [],
+  approximate
+}: {
+  text: string
+  ranges?: MatchRange[]
+  approximate?: boolean
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const parts: React.ReactNode[] = []
+  let offset = 0
+  for (const [start, end] of ranges) {
+    parts.push(text.slice(offset, start))
+    parts.push(
+      <mark
+        key={start}
+        className="search-match"
+        data-approximate={approximate || undefined}
+        title={approximate ? t('explorer.approximateMatch') : undefined}
+      >
+        {text.slice(start, end + 1)}
+      </mark>
+    )
+    offset = end + 1
+  }
+  parts.push(text.slice(offset))
+  return <>{parts}</>
+}
+
 /** Browse a collection (seed its tab), making its connection active first. */
 function browseCollection(a: RowActions, connId: string, db: string, coll: string): void {
   a.setActiveConnection(connId)
   a.browseCollection(db, coll)
 }
 
-/** Toggle a database node and sync the work area's active connection + db. */
-function openDatabase(a: RowActions, connId: string, db: string, nodeId: string): void {
+/** Query one index's complete definition, making its connection active first. */
+function inspectIndex(a: RowActions, connId: string, db: string, coll: string, indexName: string): void {
   a.setActiveConnection(connId)
-  a.setActiveDatabase(db)
+  a.inspectIndex(db, coll, indexName)
+}
+
+/** Toggle a database node without changing the work area's active tab. */
+function openDatabase(a: RowActions, connId: string, db: string, nodeId: string): void {
   void a.toggleNode(connId, nodeId, 'database', { db })
 }
 
@@ -793,11 +1213,12 @@ function openDatabase(a: RowActions, connId: string, db: string, nodeId: string)
  * Flatten one connection's expanded catalog into ordered rows (depth ≥ 1).
  * Mirrors the old CatalogTree builder, offset one level under the connection.
  */
-function flattenCatalog(
+export function flattenCatalog(
   connId: string,
   cat: CatalogState,
   a: RowActions,
-  sort: CollectionSort
+  sort: CollectionSort,
+  includeCollapsed = false
 ): TreeRow[] {
   const byName = (x: { name: string }, y: { name: string }): number => x.name.localeCompare(y.name)
   const rows: TreeRow[] = []
@@ -825,11 +1246,14 @@ function flattenCatalog(
       onClick: () => openDatabase(a, connId, db.name, dbNodeId)
     })
 
-    if (!dbExpanded) continue
+    if (!includeCollapsed && !dbExpanded) continue
 
     const collsRaw = cat.collections[db.name]
-    const colls =
-      collsRaw === undefined ? [] : sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
+    // Do not render the trailing Users folder before collection loading finishes.
+    // Otherwise it appears as the database's first child, then jumps below the
+    // entire collection list when that list arrives, which looks like a re-sort.
+    if (collsRaw === undefined) continue
+    const colls = sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
 
     for (const coll of colls) {
       const collNodeId = `${connId}:coll:${db.name}/${coll.name}`
@@ -840,8 +1264,7 @@ function flattenCatalog(
         connId,
         depth: 2,
         label: coll.name,
-        icon:
-          coll.type === 'view' ? 'view' : coll.type === 'timeseries' ? 'timeseries' : 'collection',
+        icon: coll.type === 'view' ? 'view' : coll.type === 'timeseries' ? 'timeseries' : 'collection',
         kind: 'collection',
         expandable: true,
         expanded: collExpanded,
@@ -849,22 +1272,28 @@ function flattenCatalog(
         count: coll.estimatedCount,
         approximateCount: coll.estimatedCount !== undefined,
         collection: { db: db.name, name: coll.name, type: coll.type },
-        // Toggle expands sub-folders; clicking the row seeds the editor.
+        // Toggle expands sub-folders; double-clicking the row opens the query tab.
         onToggle: () =>
           void a.toggleNode(connId, collNodeId, 'collection', {
             db: db.name,
             coll: coll.name
           }),
-        onClick: () => browseCollection(a, connId, db.name, coll.name)
+        onDoubleClick: () => browseCollection(a, connId, db.name, coll.name)
       })
 
-      if (!collExpanded) continue
+      if (!includeCollapsed && !collExpanded) continue
+
+      const idxKey = `${db.name}/${coll.name}`
+      const idxList = cat.indexes[idxKey]
+      if (includeCollapsed && !collExpanded && idxList === undefined) continue
+      // Initial metadata loading updates the count and indexes atomically. Keep
+      // the subtree closed until both are ready so an empty Indexes folder does
+      // not flash briefly before its count appears.
+      if (cat.loading.has(collNodeId) && idxList === undefined) continue
 
       // Indexes folder
       const idxNodeId = `${connId}:idx:${db.name}/${coll.name}`
       const idxExpanded = cat.expanded.has(idxNodeId)
-      const idxKey = `${db.name}/${coll.name}`
-      const idxList = cat.indexes[idxKey]
       rows.push({
         type: 'tree',
         id: idxNodeId,
@@ -877,6 +1306,7 @@ function flattenCatalog(
         expanded: idxExpanded,
         loading: cat.loading.has(idxNodeId),
         count: idxList?.length,
+        indexCollection: { db: db.name, name: coll.name },
         onToggle: () =>
           void a.toggleNode(connId, idxNodeId, 'indexes', {
             db: db.name,
@@ -888,7 +1318,7 @@ function flattenCatalog(
             coll: coll.name
           })
       })
-      if (idxExpanded && idxList) {
+      if ((includeCollapsed || idxExpanded) && idxList) {
         for (const ix of idxList) {
           const keySpec = Object.entries(ix.key)
             .map(([k, v]) => `${k}: ${formatScalar(v).text}`)
@@ -899,11 +1329,14 @@ function flattenCatalog(
             connId,
             depth: 4,
             label: `${ix.name} { ${keySpec} }${ix.unique ? ' · unique' : ''}`,
+            tooltip: ix.name,
+            indexName: ix.name,
             icon: 'index',
-            kind: 'leaf',
+            kind: 'index',
             expandable: false,
             expanded: false,
-            loading: false
+            loading: false,
+            onDoubleClick: () => inspectIndex(a, connId, db.name, coll.name, ix.name)
           })
         }
         if (idxList.length === 0) {
@@ -912,7 +1345,7 @@ function flattenCatalog(
       }
     }
 
-    if (collsRaw !== undefined && colls.length === 0) {
+    if (colls.length === 0) {
       rows.push(leafNote(`${dbNodeId}:empty`, connId, 2, 'no collections'))
     }
 
@@ -920,6 +1353,7 @@ function flattenCatalog(
     const usersNodeId = `${connId}:users:${db.name}`
     const usersExpanded = cat.expanded.has(usersNodeId)
     const usersList = cat.users[db.name]
+    if (includeCollapsed && !dbExpanded && usersList === undefined) continue
     rows.push({
       type: 'tree',
       id: usersNodeId,
@@ -935,7 +1369,7 @@ function flattenCatalog(
       onToggle: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name }),
       onClick: () => void a.toggleNode(connId, usersNodeId, 'users', { db: db.name })
     })
-    if (usersExpanded && usersList) {
+    if ((includeCollapsed || usersExpanded) && usersList) {
       for (const u of usersList) {
         rows.push({
           type: 'tree',

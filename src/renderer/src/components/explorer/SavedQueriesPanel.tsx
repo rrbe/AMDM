@@ -1,12 +1,17 @@
 /** Saved Queries and History views embedded in the left panel. Both only seed
  * the Shell; running remains an explicit user action. */
-import { useMemo, useState } from 'react'
+import { javascriptLanguage } from '@codemirror/lang-javascript'
+import { highlightCode, tagHighlighter, tags as syntaxTags } from '@lezer/highlight'
+import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, Trash2 } from 'lucide-react'
 import type { HistoryEntry, SavedQuery } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { formatTextPreview } from '@renderer/lib/resultCopy'
+import { searchId } from '@renderer/lib/quickSearch/types'
 
 /** Group saved queries by folder; folders alpha, ungrouped (`''`) last. */
 function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQuery[] }[] {
@@ -26,6 +31,7 @@ function groupByFolder(queries: SavedQuery[]): { folder: string; items: SavedQue
 }
 
 export interface StoredQuerySelection {
+  visitId?: string
   code: string
   connectionId?: string
   connectionName?: string
@@ -39,6 +45,84 @@ function codePreview(code: string): string {
   return trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed
 }
 
+const codePreviewHighlighter = tagHighlighter([
+  {
+    tag: [syntaxTags.keyword, syntaxTags.operatorKeyword, syntaxTags.modifier],
+    class: 'syntax-keyword'
+  },
+  { tag: [syntaxTags.string, syntaxTags.special(syntaxTags.string)], class: 'syntax-string' },
+  { tag: syntaxTags.number, class: 'syntax-number' },
+  { tag: [syntaxTags.bool, syntaxTags.null, syntaxTags.atom], class: 'syntax-keyword' },
+  {
+    tag: [syntaxTags.propertyName, syntaxTags.definition(syntaxTags.propertyName)],
+    class: 'syntax-property'
+  },
+  {
+    tag: [syntaxTags.function(syntaxTags.propertyName), syntaxTags.function(syntaxTags.variableName)],
+    class: 'syntax-function'
+  },
+  {
+    tag: [syntaxTags.variableName, syntaxTags.definition(syntaxTags.variableName)],
+    class: 'syntax-variable'
+  },
+  {
+    tag: [
+      syntaxTags.operator,
+      syntaxTags.punctuation,
+      syntaxTags.separator,
+      syntaxTags.bracket,
+      syntaxTags.brace,
+      syntaxTags.squareBracket,
+      syntaxTags.paren
+    ],
+    class: 'syntax-punctuation'
+  },
+  {
+    tag: [syntaxTags.comment, syntaxTags.lineComment, syntaxTags.blockComment],
+    class: 'syntax-comment'
+  },
+  {
+    tag: [syntaxTags.className, syntaxTags.typeName, syntaxTags.namespace],
+    class: 'syntax-type'
+  },
+  { tag: syntaxTags.regexp, class: 'syntax-keyword' },
+  { tag: syntaxTags.invalid, class: 'syntax-invalid' }
+])
+
+interface HighlightedCodeSegment {
+  text: string
+  className?: string
+}
+
+function highlightCodePreview(code: string): HighlightedCodeSegment[] {
+  const preview = codePreview(code)
+  const segments: HighlightedCodeSegment[] = []
+
+  highlightCode(
+    preview,
+    javascriptLanguage.parser.parse(preview),
+    codePreviewHighlighter,
+    (text, className) => segments.push({ text, className: className || undefined }),
+    () => segments.push({ text: ' ' })
+  )
+
+  return segments
+}
+
+const SyntaxCodePreview = memo(function SyntaxCodePreview({ code }: { code: string }): React.JSX.Element {
+  const segments = useMemo(() => highlightCodePreview(code), [code])
+
+  return (
+    <code className="sq-code">
+      {segments.map((segment, index) => (
+        <span key={index} className={segment.className}>
+          {segment.text}
+        </span>
+      ))}
+    </code>
+  )
+})
+
 /** Relative-ish timestamp, falling back to a locale string. */
 function formatTime(ts: number): string {
   const diff = Date.now() - ts
@@ -51,11 +135,7 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-export function SavedQueriesView({
-  onLoad
-}: {
-  onLoad: (query: StoredQuerySelection) => void
-}): JSX.Element {
+export function SavedQueriesView({ onLoad }: { onLoad: (query: StoredQuerySelection) => void }): React.JSX.Element {
   const { t } = useTranslation()
   const savedQueries = useAppStore((s) => s.savedQueries)
   const connections = useAppStore((s) => s.connections)
@@ -84,11 +164,10 @@ export function SavedQueriesView({
           queries={savedQueries}
           onLoad={(query) =>
             onLoad({
+              visitId: searchId('saved', query.id),
               code: query.code,
               connectionId: query.connectionId,
-              connectionName:
-                connections.find((item) => item.id === query.connectionId)?.name ??
-                query.connectionId,
+              connectionName: connections.find((item) => item.id === query.connectionId)?.name ?? query.connectionId,
               database: query.database
             })
           }
@@ -100,11 +179,7 @@ export function SavedQueriesView({
   )
 }
 
-export function HistoryView({
-  onLoad
-}: {
-  onLoad: (query: StoredQuerySelection) => void
-}): JSX.Element {
+export function HistoryView({ onLoad }: { onLoad: (query: StoredQuerySelection) => void }): React.JSX.Element {
   const { t } = useTranslation()
   const history = useAppStore((s) => s.history)
   const connections = useAppStore((s) => s.connections)
@@ -118,12 +193,7 @@ export function HistoryView({
         <h1>{t('savedQueries.tabHistory')}</h1>
         <span className="library-count">· {history.length}</span>
         {history.length > 0 && (
-          <Button
-            className="ml-auto"
-            variant="danger"
-            size="sm"
-            onClick={() => void clearHistory()}
-          >
+          <Button className="ml-auto" variant="danger" size="sm" onClick={() => void clearHistory()}>
             {t('savedQueries.clearHistory')}
           </Button>
         )}
@@ -133,11 +203,10 @@ export function HistoryView({
           entries={sortedHistory}
           onLoad={(entry) =>
             onLoad({
+              visitId: searchId('history', entry.id),
               code: entry.code,
               connectionId: entry.connectionId,
-              connectionName:
-                connections.find((item) => item.id === entry.connectionId)?.name ??
-                entry.connectionId,
+              connectionName: connections.find((item) => item.id === entry.connectionId)?.name ?? entry.connectionId,
               database: entry.database
             })
           }
@@ -157,8 +226,20 @@ function SavedTab({
   onLoad: (query: SavedQuery) => void
   onDelete: (id: string) => void
   onMove: (q: SavedQuery, folder: string | undefined) => void
-}): JSX.Element {
-  const { t } = useTranslation()
+}): React.JSX.Element {
+  const { t, i18n } = useTranslation()
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
+    [i18n.resolvedLanguage]
+  )
   // Collapsed folder names (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   // Right-click action menu, anchored to a specific query.
@@ -187,9 +268,7 @@ function SavedTab({
 
   const buildMenu = (q: SavedQuery): ContextMenuEntry[] => {
     const targets = folderNames.filter((f) => f !== (q.folder ?? ''))
-    const items: ContextMenuEntry[] = [
-      { label: t('savedQueries.menuLoad'), onClick: () => onLoad(q) }
-    ]
+    const items: ContextMenuEntry[] = [{ label: t('savedQueries.menuLoad'), onClick: () => onLoad(q) }]
     if (targets.length > 0 || q.folder) items.push('separator')
     for (const f of targets)
       items.push({
@@ -209,34 +288,36 @@ function SavedTab({
     return items
   }
 
-  const renderRow = (q: SavedQuery): JSX.Element => (
-    <div
-      key={q.id}
-      className="sq-row"
-      onClick={() => onLoad(q)}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        setMenu({ x: e.clientX, y: e.clientY, q })
-      }}
-      data-tip={q.code}
-    >
-      <div className="sq-name">{q.name}</div>
-      <code className="sq-code">{codePreview(q.code)}</code>
-      <div className="sq-sub muted">
-        {q.database ? `db: ${q.database}` : t('savedQueries.noDb')}
-      </div>
-      <button
-        className="ghost sq-del"
-        data-tip={t('savedQueries.menuDelete')}
-        aria-label={t('savedQueries.menuDelete')}
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete(q.id)
+  const renderRow = (q: SavedQuery): React.JSX.Element => (
+    <Tooltip key={q.id} content={() => formatTextPreview(q.code).text} variant="code">
+      <div
+        className="sq-row"
+        onClick={() => onLoad(q)}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ x: e.clientX, y: e.clientY, q })
         }}
       >
-        <Trash2 size={13} />
-      </button>
-    </div>
+        <div className="sq-name">{q.name}</div>
+        <SyntaxCodePreview code={q.code} />
+        <div className="sq-sub sq-sub--saved muted">
+          <span>{q.database ? `db: ${q.database}` : t('savedQueries.noDb')}</span>
+          <span className="sq-saved-time">{dateFormatter.format(q.createdAt)}</span>
+        </div>
+        <Tooltip content={t('savedQueries.menuDelete')}>
+          <button
+            className="ghost sq-del"
+            aria-label={t('savedQueries.menuDelete')}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(q.id)
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
+        </Tooltip>
+      </div>
+    </Tooltip>
   )
 
   // No real folders yet → flat list (no group chrome), matching the old look.
@@ -252,10 +333,7 @@ function SavedTab({
             return (
               <div key={folder || ' ungrouped'} className="sq-folder">
                 <div className="sq-folder-head" onClick={() => toggle(folder)}>
-                  <ChevronRight
-                    size={13}
-                    className={isCollapsed ? 'twisty-icon' : 'twisty-icon open'}
-                  />
+                  <ChevronRight size={13} className={isCollapsed ? 'twisty-icon' : 'twisty-icon open'} />
                   <span className="sq-folder-name">{label}</span>
                   <span className="sq-folder-count muted">{items.length}</span>
                 </div>
@@ -264,14 +342,7 @@ function SavedTab({
             )
           })}
 
-      {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={buildMenu(menu.q)}
-          onClose={() => setMenu(null)}
-        />
-      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={buildMenu(menu.q)} onClose={() => setMenu(null)} />}
     </div>
   )
 }
@@ -282,7 +353,7 @@ function HistoryTab({
 }: {
   entries: HistoryEntry[]
   onLoad: (entry: HistoryEntry) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { t } = useTranslation()
   if (entries.length === 0) {
     return <div className="sq-empty muted">{t('savedQueries.emptyHistory')}</div>
@@ -290,18 +361,18 @@ function HistoryTab({
   return (
     <div className="sq-list">
       {entries.map((h) => (
-        <div key={h.id} className="sq-row" onClick={() => onLoad(h)} data-tip={h.code}>
-          <code className="sq-code">{codePreview(h.code)}</code>
-          <div className="sq-sub muted">
-            <span>db: {h.database}</span>
-            <span>·</span>
-            <span>{formatTime(h.ranAt)}</span>
-            <span>·</span>
-            <span className={h.ok ? 'lib-ok' : 'lib-err'}>
-              {h.summary ?? (h.ok ? 'ok' : 'error')}
-            </span>
+        <Tooltip key={h.id} content={() => formatTextPreview(h.code).text} variant="code">
+          <div className="sq-row" onClick={() => onLoad(h)}>
+            <SyntaxCodePreview code={h.code} />
+            <div className="sq-sub muted">
+              <span>db: {h.database}</span>
+              <span>·</span>
+              <span>{formatTime(h.ranAt)}</span>
+              <span>·</span>
+              <span className={h.ok ? 'lib-ok' : 'lib-err'}>{h.summary ?? (h.ok ? 'ok' : 'error')}</span>
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ))}
     </div>
   )

@@ -30,11 +30,11 @@ export function Checkbox({
   id,
   name,
   className
-}: CheckboxProps): JSX.Element {
+}: CheckboxProps): React.JSX.Element {
   return (
     <BaseCheckbox.Root
       className={cn(
-        'group m-0 inline-flex w-auto cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left text-[13px] text-foreground/90 outline-none hover:bg-transparent disabled:cursor-default disabled:opacity-55',
+        'group m-0 inline-flex w-auto cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left text-[13px] text-foreground/90 outline-none hover:bg-transparent focus-visible:shadow-none disabled:cursor-default disabled:opacity-55',
         className
       )}
       checked={checked}
@@ -44,7 +44,7 @@ export function Checkbox({
       name={name}
     >
       <span
-        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)] group-focus-visible:border-[var(--primary)] group-focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)]"
         aria-hidden
       >
         <BaseCheckbox.Indicator className="inline-flex text-[var(--primary-foreground)]">

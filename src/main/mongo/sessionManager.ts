@@ -1,8 +1,20 @@
-import { MongoClient } from 'mongodb'
-import type { ConnectionStatus, TestResult } from '../../shared/types'
+import { MongoClient, type TopologyDescriptionChangedEvent } from 'mongodb'
+import type { AuthorizationResult, ConnectionStatus, FailureKind, TestResult } from '../../shared/types'
 import { SshTunnel } from '../ssh/tunnel'
-import { buildTunnelOptions } from '../ssh/tunnelCore'
+import { buildTunnelOptions, classifyConnError } from '../ssh/tunnelCore'
 import { buildClientArgs, type DecryptedConnection } from './uri'
+import { classifyOperationFailure } from './errorCore'
+import { readAuthorization } from './authorization'
+import { AuthorizationCache, authorizationCacheKey } from './authorizationCache'
+import { clearFieldCache } from './catalog'
+import { shellResults } from './shellResults'
+
+function classifyConnectionFailure(error: unknown): FailureKind {
+  const connectionKind = classifyConnError(error).kind
+  if (connectionKind !== 'other') return connectionKind
+  const operationKind = classifyOperationFailure(error)
+  return operationKind === 'execution' ? 'unknown' : operationKind
+}
 
 export interface ConnectionSource {
   getDecrypted(id: string): DecryptedConnection | null
@@ -12,8 +24,10 @@ export interface ConnectionSource {
 
 interface Session {
   client: MongoClient
+  authorizationKey: string
   tunnel?: SshTunnel
   status: ConnectionStatus
+  stopMonitoring: () => void
 }
 
 interface PendingSession {
@@ -21,14 +35,29 @@ interface PendingSession {
   tunnel?: SshTunnel
 }
 
-export const CONNECTION_TEST_TIMEOUT_MS = 30_000
-
 /** Owns all live MongoClient connections and their SSH tunnels. */
 export class SessionManager {
   private sessions = new Map<string, Session>()
+  private authorizationCache = new AuthorizationCache()
   private pending = new Map<string, PendingSession>()
+  private statusListeners = new Set<(status: ConnectionStatus) => void>()
 
-  constructor(private readonly connections?: ConnectionSource) {}
+  constructor(private readonly connections: ConnectionSource) {}
+
+  onStatusChanged(listener: (status: ConnectionStatus) => void): () => void {
+    this.statusListeners.add(listener)
+    return () => this.statusListeners.delete(listener)
+  }
+
+  private publishStatus(status: ConnectionStatus): void {
+    for (const listener of this.statusListeners) {
+      try {
+        listener(status)
+      } catch (error) {
+        console.error('[session status listener]', error)
+      }
+    }
+  }
 
   getStatus(id: string): ConnectionStatus {
     if (this.pending.has(id)) return { id, state: 'connecting' }
@@ -41,6 +70,21 @@ export class SessionManager {
       throw new Error('Connection is not open. Connect first.')
     }
     return s.client
+  }
+
+  cachedAuthorization(dec: DecryptedConnection): AuthorizationResult | null {
+    return this.authorizationCache.get(authorizationCacheKey(dec))
+  }
+
+  async authorization(id: string, expected: DecryptedConnection): Promise<AuthorizationResult> {
+    const client = this.getClient(id)
+    const key = this.sessions.get(id)!.authorizationKey
+    if (key !== authorizationCacheKey(expected)) return {}
+    const cached = this.authorizationCache.get(key)
+    if (cached) return cached
+    const result = await readAuthorization(client)
+    this.authorizationCache.set(key, result)
+    return result
   }
 
   /** Local forwarded port if this connection runs over an SSH tunnel. */
@@ -64,12 +108,13 @@ export class SessionManager {
     // tear down any existing session for this id first
     await this.disconnect(id)
 
-    const dec = this.connections?.getDecrypted(id)
+    const dec = this.connections.getDecrypted(id)
     if (!dec) {
       const status: ConnectionStatus = {
         id,
         state: 'error',
-        error: 'Connection not found'
+        error: 'Connection not found',
+        failureKind: 'unknown'
       }
       return status
     }
@@ -92,13 +137,14 @@ export class SessionManager {
       }
 
       const { uri, options } = buildClientArgs(dec, tunnelPort)
-      client = new MongoClient(uri, options)
-      pending.client = client
-      await client.connect()
-      const info = await this.probe(client)
+      const connectedClient = new MongoClient(uri, options)
+      client = connectedClient
+      pending.client = connectedClient
+      await connectedClient.connect()
+      const info = await this.probe(connectedClient)
 
       if (this.pending.get(id) !== pending) {
-        await client.close().catch(() => {})
+        await connectedClient.close().catch(() => {})
         tunnel?.close()
         return { id, state: 'disconnected' }
       }
@@ -110,13 +156,41 @@ export class SessionManager {
         serverVersion: info.serverVersion
       }
       this.pending.delete(id)
-      this.sessions.set(id, { client, tunnel, status })
+      const session: Session = {
+        client: connectedClient, authorizationKey: authorizationCacheKey(dec), tunnel, status, stopMonitoring: () => {}
+      }
+      const onTopologyChanged = (event: TopologyDescriptionChangedEvent): void => {
+        if (this.sessions.get(id) !== session) return
+        const available = event.newDescription.hasKnownServers
+        if (available === (session.status.state === 'connected')) return
+
+        const topologyError = event.newDescription.error
+        session.status = available
+          ? {
+              id,
+              state: 'connected',
+              topology: event.newDescription.type,
+              serverVersion: status.serverVersion
+            }
+          : {
+              id,
+              state: 'error',
+              error: topologyError?.message ?? 'Connection lost',
+              failureKind: classifyConnectionFailure(topologyError),
+              topology: event.newDescription.type,
+              serverVersion: status.serverVersion
+            }
+        this.publishStatus(session.status)
+      }
+      connectedClient.on('topologyDescriptionChanged', onTopologyChanged)
+      session.stopMonitoring = () => connectedClient.removeListener('topologyDescriptionChanged', onTopologyChanged)
+      this.sessions.set(id, session)
       // TOFU: persist the host key(s) learned on first connect so later connects verify them.
       if (tunnel?.learnedHostKey) {
-        this.connections?.recordSshHostKey?.(id, tunnel.learnedHostKey)
+        this.connections.recordSshHostKey?.(id, tunnel.learnedHostKey)
       }
       if (tunnel?.learnedJumpHostKey) {
-        this.connections?.recordSshJumpHostKey?.(id, tunnel.learnedJumpHostKey)
+        this.connections.recordSshJumpHostKey?.(id, tunnel.learnedJumpHostKey)
       }
       return status
     } catch (err) {
@@ -128,17 +202,21 @@ export class SessionManager {
       const status: ConnectionStatus = {
         id,
         state: 'error',
-        error: err instanceof Error ? err.message : String(err)
+        error: err instanceof Error ? err.message : String(err),
+        failureKind: classifyConnectionFailure(err)
       }
       return status
     }
   }
 
   async disconnect(id: string): Promise<void> {
+    clearFieldCache(id)
     const pending = this.pending.get(id)
     this.pending.delete(id)
     const s = this.sessions.get(id)
     this.sessions.delete(id)
+    s?.stopMonitoring()
+    await shellResults.closeConnection(id)
     pending?.tunnel?.close()
     s?.tunnel?.close()
     try {
@@ -149,57 +227,30 @@ export class SessionManager {
   }
 
   async test(dec: DecryptedConnection): Promise<TestResult> {
+    const key = authorizationCacheKey(dec)
     let tunnel: SshTunnel | undefined
     let client: MongoClient | undefined
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let timedOut = false
-    const timeoutError = new Error(`Connection test timed out after ${CONNECTION_TEST_TIMEOUT_MS / 1000} seconds.`)
-    const ensureActive = (): void => {
-      if (!timedOut) return
-      tunnel?.close()
-      void client?.close().catch(() => {})
-      throw timeoutError
-    }
-    const timeout = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => {
-        timedOut = true
-        reject(timeoutError)
-        tunnel?.close()
-        void client?.close().catch(() => {})
-      }, CONNECTION_TEST_TIMEOUT_MS)
-      timer.unref()
-    })
-
     try {
-      return await Promise.race([
-        (async () => {
-          let tunnelPort: number | undefined
-          if (dec.config.ssh.enabled) {
-            tunnel = new SshTunnel()
-            tunnelPort = await tunnel.open(buildTunnelOptions(dec))
-            ensureActive()
-          }
-          const { uri, options } = buildClientArgs(dec, tunnelPort)
-          client = new MongoClient(uri, options)
-          await client.connect()
-          ensureActive()
-          const info = await this.probe(client)
-          ensureActive()
-          return {
-            ok: true,
-            topology: info.topology,
-            serverVersion: info.serverVersion
-          }
-        })(),
-        timeout
-      ])
+      let tunnelPort: number | undefined
+      if (dec.config.ssh.enabled) {
+        tunnel = new SshTunnel()
+        tunnelPort = await tunnel.open(buildTunnelOptions(dec))
+      }
+      const { uri, options } = buildClientArgs(dec, tunnelPort)
+      client = new MongoClient(uri, options)
+      await client.connect()
+      const info = await this.probe(client)
+      const authorization = await readAuthorization(client)
+      this.authorizationCache.set(key, authorization)
+      return { ok: true, topology: info.topology, serverVersion: info.serverVersion, ...authorization }
     } catch (err) {
+      this.authorizationCache.set(key, {})
       return {
         ok: false,
-        error: err instanceof Error ? err.message : String(err)
+        error: err instanceof Error ? err.message : String(err),
+        failureKind: classifyConnectionFailure(err)
       }
     } finally {
-      if (timer) clearTimeout(timer)
       await client?.close().catch(() => {})
       tunnel?.close()
     }
@@ -208,5 +259,6 @@ export class SessionManager {
   async closeAll(): Promise<void> {
     const ids = new Set([...this.pending.keys(), ...this.sessions.keys()])
     await Promise.all([...ids].map((id) => this.disconnect(id)))
+    this.authorizationCache.clear()
   }
 }

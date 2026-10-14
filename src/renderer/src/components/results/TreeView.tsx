@@ -1,15 +1,9 @@
+import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { CollectionSort } from '@shared/types'
-import {
-  entriesOf,
-  formatScalar,
-  isExpandable,
-  summarize,
-  typeLabel,
-  valueType
-} from '@renderer/lib/ejson'
+import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
+import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeSelection } from '@renderer/lib/selection'
@@ -22,13 +16,15 @@ import {
   toPlainJson,
   toPlainKeyValue,
   toShellText,
-  toStrictEjson,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import i18n from '@renderer/i18n'
 import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
+import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 
 /**
  * Two-column KEY | VALUE tree of the result documents.
@@ -66,6 +62,9 @@ interface FlatNode {
 interface TreeViewProps {
   docs: unknown[]
   fontSize: number
+  selectedDocIndexes: Set<number>
+  onSelectedDocIndexesChange: (selection: Set<number>) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -74,29 +73,35 @@ const DEFAULT_KEY_WIDTH = 280
 const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
-export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element {
+export function TreeView({
+  docs,
+  fontSize,
+  selectedDocIndexes,
+  onSelectedDocIndexesChange,
+  onExport,
+  docCtx
+}: TreeViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   // Index of the document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<{ value: unknown; source?: JsonPreviewSource } | null>(null)
   // Inline edit: which leaf node is being edited, and whether the last commit
   // failed validation (red border).
   const [editing, setEditing] = useState<{ id: string } | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
   // Expanded paths. Top-level docs start collapsed except the first (for
   // context); nested containers always start collapsed.
-  const [expanded, setExpanded] = useState<Set<string>>(() =>
-    docs.length > 0 ? new Set(['0']) : new Set()
-  )
+  const [expanded, setExpanded] = useState<Set<string>>(() => (docs.length > 0 ? new Set(['0']) : new Set()))
   const [keyWidth, setKeyWidth] = useState(DEFAULT_KEY_WIDTH)
   // Click-to-select: the selected node is highlighted and is what Cmd+C copies.
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // Multi-select of TOP-LEVEL documents (depth-0 rows), mirroring the Table's
   // row multi-select: Shift = range, ⌘/Ctrl = toggle. Mutually exclusive with
   // the single-node `selectedId` — selecting one clears the other.
-  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(() => new Set())
+  const selectedDocs = selectedDocIndexes
   const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
@@ -112,13 +117,7 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
   // Flatten visible nodes. Memo keyed by docs identity + expanded set reference.
   const flat = useMemo<FlatNode[]>(() => {
     const out: FlatNode[] = []
-    const walk = (
-      key: string,
-      value: unknown,
-      depth: number,
-      path: string,
-      docIndex?: number
-    ): void => {
+    const walk = (key: string, value: unknown, depth: number, path: string, docIndex?: number): void => {
       const canExpand = isExpandable(value)
       const isOpen = canExpand && expanded.has(path)
       out.push({
@@ -174,6 +173,7 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
   // Cmd/Ctrl+C copies the selected node: a leaf's value (plain), or an
   // expandable node / whole document as plain JSON.
   useCopyHotkey(() => {
+    if (previewDoc) return null
     if (selectedDocs.size > 0) {
       const picked = [...selectedDocs].sort((a, b) => a - b).map((i) => docs[i])
       return picked.length === 1 ? toPlainJson(picked[0]) : toPlainJson(picked)
@@ -190,9 +190,7 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
   // A row is highlighted when its top-level doc is in the multi-doc selection
   // (depth-0 rows only), or when it's the single selected nested node.
   const isRowSelected = (node: FlatNode): boolean =>
-    node.depth === 0
-      ? node.docIndex !== undefined && selectedDocs.has(node.docIndex)
-      : node.id === selectedId
+    node.depth === 0 ? node.docIndex !== undefined && selectedDocs.has(node.docIndex) : node.id === selectedId
 
   // Click a row. Top-level document rows drive the multi-doc selection: plain =
   // just this doc, Shift = range from the anchor, ⌘/Ctrl = toggle. Clicking any
@@ -206,11 +204,11 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
         meta: e.metaKey,
         ctrl: e.ctrlKey
       })
-      setSelectedDocs(selection)
+      onSelectedDocIndexesChange(selection)
       setAnchorDoc(anchor)
     } else {
       setSelectedId(node.id)
-      setSelectedDocs(new Set())
+      onSelectedDocIndexesChange(new Set())
       setAnchorDoc(null)
     }
   }
@@ -261,19 +259,27 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
     // right-clicking inside a multi-doc selection keeps it (for a bulk copy).
     if (!inMultiDoc) {
       if (isDocRow) {
-        setSelectedDocs(new Set([node.docIndex as number]))
+        onSelectedDocIndexesChange(new Set([node.docIndex as number]))
         setSelectedId(null)
         setAnchorDoc(node.docIndex as number)
       } else {
         setSelectedId(node.id)
-        setSelectedDocs(new Set())
+        onSelectedDocIndexesChange(new Set())
         setAnchorDoc(null)
       }
     }
     const picked = [...selectedDocs].sort((a, b) => a - b)
     const rootDoc = rootDocOf(node)
     const selected = inMultiDoc && picked.length > 1 ? picked.map((index) => docs[index]) : [rootDoc]
-    const items: ContextMenuEntry[] = []
+    const source: JsonPreviewSource | undefined = docCtx
+      ? { ...docCtx, ...(docHasId(rootDoc) ? { id: rootDoc._id } : {}) }
+      : undefined
+    const items: ContextMenuEntry[] = [
+      {
+        label: t('result.dataMenu.view'),
+        onClick: () => setPreviewDoc({ value: rootDoc, source })
+      }
+    ]
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
       items.push({
@@ -291,6 +297,10 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
     items.push({
       label: t('result.dataMenu.copy'),
       children: treeCopyMenuItems(node, selected, fieldSort)
+    })
+    if (!IS_WEB) items.push({
+      label: t('result.dataMenu.export'),
+      children: exportMenuItems(selected, onExport)
     })
     if (docCtx && docHasId(rootDoc)) {
       items.push('separator')
@@ -320,8 +330,7 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
       // lands in the inline cell editor so editing keeps focus.
       tabIndex={-1}
       onMouseDown={(e) => {
-        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor'))
-          claimCopyFocus(parentRef.current)
+        if (!(e.target as HTMLElement).closest('input, textarea, .cm-editor')) claimCopyFocus(parentRef.current)
       }}
     >
       <div className="virtual-inner" style={{ height: rowVirtualizer.getTotalSize() }}>
@@ -332,9 +341,7 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
           return (
             <div
               key={node.id}
-              className={`kv-row${node.expandable ? ' expandable' : ''}${
-                isRowSelected(node) ? ' selected' : ''
-              }`}
+              className={`kv-row${node.expandable ? ' expandable' : ''}${isRowSelected(node) ? ' selected' : ''}`}
               style={{ transform: `translateY(${vi.start}px)` }}
               onClick={(e) => onRowClick(node, e)}
               onDoubleClick={() => node.expandable && toggle(node.id)}
@@ -356,9 +363,9 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
                 {node.depth === 0 ? (
                   <span className="doc-badge">{node.keyLabel}</span>
                 ) : (
-                  <span className="kv-key-name" data-tip={node.keyLabel}>
-                    {node.keyLabel}
-                  </span>
+                  <Tooltip content={node.keyLabel}>
+                    <span className="kv-key-name">{node.keyLabel}</span>
+                  </Tooltip>
                 )}
               </div>
               <div className="kv-val">
@@ -395,11 +402,28 @@ export function TreeView({ docs, fontSize, docCtx }: TreeViewProps): JSX.Element
         />
       )}
 
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
+      {previewDoc && (
+        <JsonPreviewModal
+          title={t('result.documentPreviewTitle')}
+          value={previewDoc.value}
+          fontSize={fontSize}
+          documentView
+          source={previewDoc.source}
+          onValueChange={(value) => setPreviewDoc((current) => (current ? { ...current, value } : current))}
+          onClose={() => setPreviewDoc(null)}
+        />
       )}
+
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
+}
+
+function exportMenuItems(
+  documents: unknown[],
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+): ContextMenuEntry[] {
+  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy submenu for a tree field / document selection. */
@@ -425,30 +449,28 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
     },
     'separator',
     {
-      label: i18n.t('result.dataMenu.copyPureJson'),
-      onClick: () => void copyText(toPlainJson(formatted))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyMongoShell'),
-      onClick: () => void copyText(toShellText(formatted))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyExtendedJson'),
-      onClick: () => void copyText(toStrictEjson(formatted))
-    },
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copyCsv'),
-      onClick: () => void copyText(toCsv(docs, fieldSort))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyTsv'),
-      onClick: () => void copyText(toTsv(docs, fieldSort))
+      label: i18n.t('result.dataMenu.copySelectedDocuments'),
+      children: [
+        ...jsonCopyMenuItems(docs, (text) => void copyText(text)),
+        {
+          label: i18n.t('result.dataMenu.copyMongoShell'),
+          onClick: () => void copyText(toShellText(formatted))
+        },
+        'separator',
+        {
+          label: i18n.t('result.dataMenu.copyCsv'),
+          onClick: () => void copyText(toCsv(docs, fieldSort))
+        },
+        {
+          label: i18n.t('result.dataMenu.copyTsv'),
+          onClick: () => void copyText(toTsv(docs, fieldSort))
+        }
+      ]
     }
   ]
 }
 
-function ValueCell({ node }: { node: FlatNode }): JSX.Element {
+function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.
@@ -457,8 +479,8 @@ function ValueCell({ node }: { node: FlatNode }): JSX.Element {
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
   const { text, type } = formatScalar(node.value)
   return (
-    <span className={`tree-val v-${type}`} data-tip={text}>
-      {text}
-    </span>
+    <Tooltip content={text}>
+      <span className={`tree-val v-${type}`}>{text}</span>
+    </Tooltip>
   )
 }

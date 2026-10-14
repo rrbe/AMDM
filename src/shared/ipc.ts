@@ -5,6 +5,7 @@
  */
 import type {
   AppSettings,
+  AuthorizationResult,
   CollectionInfo,
   ConnectionConfig,
   ConnectionInput,
@@ -14,11 +15,15 @@ import type {
   DiagnoseStage,
   OpenFileOptions,
   DataOpResult,
+  DocReadRequest,
+  DocReadResult,
   DocMutateRequest,
   DocMutateResult,
   DocSetFieldRequest,
   DocUpdateRequest,
-  ExportRequest,
+  ExportDirectorySelection,
+  ExportFileRequest,
+  ExportProgress,
   HistoryEntry,
   ImportRequest,
   IndexInfo,
@@ -28,8 +33,11 @@ import type {
   SchemaModel,
   SchemaTarget,
   ShellRequest,
+  ShellPageRequest,
   ShellResult,
+  ShellResultTotal,
   TestResult,
+  UpdateState,
   UserInfo
 } from './types'
 
@@ -38,16 +46,20 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsDelete: 'connections:delete',
   connectionsTest: 'connections:test',
+  connectionsCachedAuthorization: 'connections:cachedAuthorization',
   connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
 
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
   sessionStatus: 'session:status',
+  sessionAuthorization: 'session:authorization',
+  sessionStatusChanged: 'session:statusChanged',
 
   catalogDatabases: 'catalog:databases',
   catalogCollections: 'catalog:collections',
   catalogCollectionCount: 'catalog:collectionCount',
+  catalogDropCollection: 'catalog:dropCollection',
   catalogIndexes: 'catalog:indexes',
   catalogUsers: 'catalog:users',
   catalogSampleFields: 'catalog:sampleFields',
@@ -59,6 +71,9 @@ export const IPC = {
 
   shellExecute: 'shell:execute',
   shellAbort: 'shell:abort',
+  shellPage: 'shell:page',
+  shellTotal: 'shell:total',
+  shellRelease: 'shell:release',
 
   queriesList: 'queries:list',
   queriesSave: 'queries:save',
@@ -70,8 +85,15 @@ export const IPC = {
   docUpdate: 'doc:update',
   docSetField: 'doc:setField',
   docDelete: 'doc:delete',
+  docRead: 'doc:read',
+  docReadCancel: 'doc:readCancel',
 
   ioExport: 'io:export',
+  ioChooseExportDirectory: 'io:chooseExportDirectory',
+  ioExportCancel: 'io:exportCancel',
+  ioExportProgress: 'io:exportProgress',
+  ioOpenExportedFile: 'io:openExportedFile',
+  ioRevealExportedFile: 'io:revealExportedFile',
   ioImport: 'io:import',
 
   settingsGet: 'settings:get',
@@ -80,6 +102,11 @@ export const IPC = {
   appOpenSettings: 'app:openSettings',
 
   updatesCheck: 'updates:check',
+  updatesGetState: 'updates:getState',
+  updatesSetAutomaticChecks: 'updates:setAutomaticChecks',
+  updatesShowAvailable: 'updates:showAvailable',
+  updatesCancelDownload: 'updates:cancelDownload',
+  updatesStateChanged: 'updates:stateChanged',
 
   dialogOpenFile: 'dialog:openFile'
 } as const
@@ -94,6 +121,7 @@ export interface Api {
     save(input: ConnectionInput): Promise<ConnectionConfig>
     delete(id: string): Promise<void>
     test(input: ConnectionInput): Promise<TestResult>
+    cachedAuthorization(input: ConnectionInput): Promise<AuthorizationResult | null>
     /** Single-hop SSH connectivity check (`scope`: the target host or the jump host). */
     diagnose(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
     /**
@@ -109,11 +137,15 @@ export interface Api {
     connect(connectionId: string): Promise<ConnectionStatus>
     disconnect(connectionId: string): Promise<void>
     status(connectionId: string): Promise<ConnectionStatus>
+    authorization(connectionId: string, input: ConnectionInput): Promise<AuthorizationResult>
+    /** Driver topology monitoring reports unexpected disconnects and recovery here. */
+    onStatusChanged(listener: (status: ConnectionStatus) => void): () => void
   }
   catalog: {
     databases(connectionId: string): Promise<DatabaseInfo[]>
     collections(connectionId: string, database: string): Promise<CollectionInfo[]>
     collectionCount(connectionId: string, database: string, collection: string): Promise<number>
+    dropCollection(connectionId: string, database: string, collection: string): Promise<void>
     indexes(connectionId: string, database: string, collection: string): Promise<IndexInfo[]>
     users(connectionId: string, database: string): Promise<UserInfo[]>
     /** Bounded, cached field-name sampling for autocomplete. */
@@ -129,6 +161,9 @@ export interface Api {
   }
   shell: {
     execute(request: ShellRequest): Promise<ShellResult>
+    page(request: ShellPageRequest): Promise<ShellResult>
+    total(resultId: string): Promise<ShellResultTotal>
+    release(resultId: string): Promise<void>
     /** Cancel an in-flight run by its `execId`. Resolves true if a matching
         run was found and signalled, false if it had already finished. */
     abort(execId: string): Promise<boolean>
@@ -143,13 +178,23 @@ export interface Api {
     clear(): Promise<void>
   }
   docs: {
+    read(request: DocReadRequest): Promise<DocReadResult>
+    cancelRead(taskId: string): Promise<boolean>
     update(request: DocUpdateRequest): Promise<DocMutateResult>
     setField(request: DocSetFieldRequest): Promise<DocMutateResult>
     delete(request: DocMutateRequest): Promise<DocMutateResult>
   }
   io: {
-    /** Export a collection; opens a save dialog and returns the chosen path. */
-    export(request: ExportRequest): Promise<DataOpResult>
+    /** Let the user grant an owner-scoped directory for subsequent exports. */
+    chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+    /** Export a collection or bounded Renderer result to the granted destination. */
+    export(request: ExportFileRequest): Promise<DataOpResult>
+    cancelExport(taskId: string): Promise<boolean>
+    onExportProgress(listener: (progress: ExportProgress) => void): () => void
+    /** Open this Renderer owner's latest completed export in its default application. */
+    openExportedFile(taskId: string): Promise<string | null>
+    /** Reveal this Renderer owner's latest completed export in the platform file manager. */
+    revealExportedFile(taskId: string): Promise<string | null>
     /** Import into a collection; opens an open dialog for the source file. */
     import(request: ImportRequest): Promise<DataOpResult>
   }
@@ -159,8 +204,15 @@ export interface Api {
     update(patch: Partial<AppSettings>): Promise<AppSettings>
   }
   updates: {
-    /** Returns false when Sparkle is unavailable in this build. */
+    /** Returns false when updates are unavailable in this build. */
     checkForUpdates(): Promise<boolean>
+    getState(): Promise<UpdateState>
+    setAutomaticChecks(enabled: boolean): Promise<UpdateState>
+    /** Show the native macOS updater, download an update, or restart to install it. */
+    showAvailableUpdate(): Promise<boolean>
+    /** Cancel an active Windows/Linux update download. */
+    cancelDownload(): Promise<boolean>
+    onStateChanged(listener: (state: UpdateState) => void): () => void
   }
   dialog: {
     /** Native open-file picker; resolves the chosen absolute path, or null if cancelled. */
