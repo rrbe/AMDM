@@ -70,13 +70,11 @@ test(
       mongo = new MongoClient(database.getUri());
       await mongo.connect();
       const password = "browser-password-never-persisted";
-      await mongo
-        .db("webstorage")
-        .command({
-          createUser: "browser",
-          pwd: password,
-          roles: [{ role: "readWrite", db: "webstorage" }],
-        });
+      await mongo.db("webstorage").command({
+        createUser: "browser",
+        pwd: password,
+        roles: [{ role: "readWrite", db: "webstorage" }],
+      });
       await mongo
         .db("webstorage")
         .collection("items")
@@ -184,17 +182,21 @@ test(
         }),
       );
       application = await launchPackaged(root, profile);
+      // Wait for normal app startup before creating a window through the main inspector.
+      await waitForTarget(
+        application.rendererPort,
+        (target) => target.type === "page" && target.url.startsWith("file://"),
+      );
       main = await DebuggerClient.connect(
         (await waitForTarget(application.mainPort, () => true))
           .webSocketDebuggerUrl,
       );
       clients.push(main);
       // A browser page has no Electron preload. Use the app's actual Renderer engine with the same boundary.
-      await main.evaluate(`(async () => {
-      const { app, BrowserWindow } = process.getBuiltinModule('module').createRequire(${JSON.stringify(join(root, "package.json"))})('electron');
-      await app.whenReady();
+      await main.evaluate(`(() => {
+      const { BrowserWindow } = process.getBuiltinModule('module').createRequire(${JSON.stringify(join(root, "package.json"))})('electron');
       globalThis.webStorageTestWindow = new BrowserWindow({ width: 1440, height: 900, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true } });
-      await globalThis.webStorageTestWindow.loadURL(${JSON.stringify(origin)}); return true;
+      void globalThis.webStorageTestWindow.loadURL(${JSON.stringify(origin)}); return true;
     })()`);
       renderer = await DebuggerClient.connect(
         (
