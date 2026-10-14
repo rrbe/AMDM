@@ -56,6 +56,7 @@ test(
     let database, mongo, proxy, backend, application, renderer, main;
     let backendLog = "";
     let phase = "start services";
+    let evaluation = "";
     const diagnostics = join(root, "dist/e2e-validation/web-storage");
     try {
       await mkdir(diagnostics, { recursive: true });
@@ -212,6 +213,15 @@ test(
         ).webSocketDebuggerUrl,
       );
       clients.push(renderer);
+      const evaluate = renderer.evaluate.bind(renderer);
+      renderer.evaluate = async (expression) => {
+        evaluation =
+          expression.match(/window\.api\.[a-zA-Z]+\.[a-zA-Z]+/)?.[0] ??
+          (expression.includes("requestAnimationFrame")
+            ? "click layout frames"
+            : "DOM evaluation");
+        return evaluate(expression);
+      };
       await renderer.call("Page.enable");
       await waitForUi(renderer);
       await waitForExpression(
@@ -309,10 +319,12 @@ test(
         ssh: { enabled: false },
         tls: { enabled: false },
       };
+      phase = "save browser connection";
       const saved = await renderer.evaluate(
         `window.api.connections.save(${JSON.stringify(localInput)})`,
       );
       assert.equal(saved.hasPassword, false);
+      phase = "copy browser connection";
       const copy = await renderer.evaluate(
         `window.api.connections.save(${JSON.stringify({ ...localInput, id: "", copyFromId: saved.id, name: "Copy" })})`,
       );
@@ -321,11 +333,13 @@ test(
       await renderer.evaluate(
         'window.api.queries.save({ name: "Browser-only query", code: "db.items.find({n:1})" })',
       );
+      phase = "reload browser metadata";
       await reload();
       await waitForExpression(
         renderer,
         'document.querySelector(".side-foot-version")?.textContent.includes("Browser")',
       );
+      phase = "close settings after reload";
       await clickButton("Back");
       await waitForExpression(
         renderer,
@@ -359,10 +373,12 @@ test(
         renderer,
         '!!document.querySelector(".conn-status[aria-label=Connected]")',
       );
+      phase = "execute browser query";
       const result = await renderer.evaluate(
         `window.api.shell.execute({ connectionId: ${JSON.stringify(saved.id)}, database: 'webstorage', code: 'db.items.find({}).sort({n:1})', pageSize: 2, execId: crypto.randomUUID() })`,
       );
       assert.equal(result.count, 2);
+      phase = "page browser query";
       const page = await renderer.evaluate(
         `window.api.shell.page({ resultId: ${JSON.stringify(result.resultId)}, skip: 2, pageSize: 2, execId: crypto.randomUUID() })`,
       );
@@ -372,6 +388,7 @@ test(
         database: "webstorage",
         collection: "items",
       };
+      phase = "analyze browser schema";
       await renderer.evaluate(
         `window.api.schemas.analyze(${JSON.stringify(target)})`,
       );
@@ -382,6 +399,7 @@ test(
         (await renderer.evaluate("window.api.history.list()")).length,
         1,
       );
+      phase = "inspect persisted IndexedDB";
       const persisted = await renderer.evaluate(`(async () => {
       const db = await new Promise((resolve, reject) => { const request = indexedDB.open('amdm-web:${userId}'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
       const data = await Promise.all([...db.objectStoreNames].map((name) => new Promise((resolve, reject) => { const request = db.transaction(name).objectStore(name).getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); })));
@@ -396,6 +414,7 @@ test(
             request.method === "session.connect",
         )
         .at(-1).clientId;
+      phase = "reconnect after reload";
       await reload();
       if (
         await renderer.evaluate(
@@ -548,9 +567,10 @@ test(
       await quitPackaged(application, main, clients);
       application = undefined;
     } catch (error) {
+      error.message = `${phase} (${evaluation}): ${error.message}`;
       await writeFile(
         join(diagnostics, "failure.log"),
-        `Phase: ${phase}\n${error.stack}\n${backendLog}\n${application?.logs ?? ""}`,
+        `Phase: ${phase}\nEvaluation: ${evaluation}\nRequests: ${JSON.stringify(requests)}\n${error.stack}\n${backendLog}\n${application?.logs ?? ""}`,
       );
       throw error;
     } finally {
