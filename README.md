@@ -4,9 +4,7 @@
 
 A lean, performance-first MongoDB desktop GUI, powered by Electron.
 
-> Still under development — don't use it for anything important; no liability for data loss.
-
-![AMDM light theme with an aggregation query and table results](./docs/screenshots/table-light.png)
+![AMDM light theme with an aggregation query, table results, and collection schema](./docs/screenshots/table-light.png)
 
 <details>
 <summary>More screenshots: document tree, dark theme, and visual explain</summary>
@@ -57,5 +55,3 @@ macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. 
 ## License
 
 [GNU GPL v3.0](./LICENSE)
-
-> AMDM is an unofficial MongoDB client and is not affiliated with MongoDB, Inc. in any way.

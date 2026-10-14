@@ -4,9 +4,7 @@
 
 一个精简、性能优先的 MongoDB 桌面 GUI，Electron 驱动
 
-> 尚在开发中，请勿用在重要场合，不对数据丢失负责
-
-![AMDM 浅色主题：聚合查询与表格结果](./docs/screenshots/table-light.png)
+![AMDM 浅色主题：聚合查询、表格结果与集合结构](./docs/screenshots/table-light.png)
 
 <details>
 <summary>更多截图：文档树、深色主题与可视化 Explain</summary>
@@ -57,5 +55,3 @@ macOS 版本通过 Sparkle 更新,使用 ad-hoc 签名且未经 Apple 公证。�
 ## 许可证
 
 [GNU GPL v3.0](./LICENSE)
-
-> AMDM 是非官方 MongoDB 客户端,与 MongoDB, Inc. 无关。
