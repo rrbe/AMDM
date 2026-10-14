@@ -81,14 +81,18 @@ describe('settingsStore', () => {
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],
       sidebarWidth: 270,
+      contextPanelWidth: 300,
+      contextPanelOpen: false,
       editorHeight: 142,
       acknowledgedUpdateVersion: null,
       automaticUpdateChecks: true
     })
   })
   it('merges + persists an update', () => {
-    const next = settingsStore.update({ queryLimit: 100 })
+    const next = settingsStore.update({ queryLimit: 100, contextPanelWidth: 420 })
     expect(next.queryLimit).toBe(100)
+    settingsStore.init()
+    expect(settingsStore.get().contextPanelWidth).toBe(420)
     expect(settingsStore.get().theme).toBe('system') // untouched
   })
 
@@ -133,7 +137,9 @@ describe('settingsStore', () => {
       queryLimit: 50,
       queryTimeoutMS: 30_000,
       historyLimit: 200,
-      sidebarWidth: 270
+      sidebarWidth: 270,
+      contextPanelWidth: 300,
+      contextPanelOpen: false
     })
   })
 
@@ -141,6 +147,15 @@ describe('settingsStore', () => {
     settingsStore.update({ connectionOrder: ['b', 'a'] })
     settingsStore.init()
     expect(settingsStore.get().connectionOrder).toEqual(['b', 'a'])
+  })
+
+  it('remembers both expanded and collapsed Details sidebar states', () => {
+    settingsStore.update({ contextPanelOpen: true })
+    settingsStore.init()
+    expect(settingsStore.get().contextPanelOpen).toBe(true)
+    settingsStore.update({ contextPanelOpen: false })
+    settingsStore.init()
+    expect(settingsStore.get().contextPanelOpen).toBe(false)
   })
 
   it('persists named editor color schemes', () => {

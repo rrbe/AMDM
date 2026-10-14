@@ -9,6 +9,7 @@
 }
 
 .shell-body {
+  container-type: inline-size;
   position: relative;
   flex: 1;
   min-height: 0;
@@ -25,9 +26,8 @@
 }
 .context-rail {
   height: 100%;
-  width: 300px;
-  max-width: 32vw;
-  flex: 0 0 300px;
+  width: min(var(--context-panel-width, 300px), 50cqw, max(0px, calc(100cqw - 481px)));
+  flex: 0 0 auto;
   min-width: 0;
   display: flex;
   border-left: 1px solid var(--separator);
@@ -815,7 +815,8 @@
 
 /* Keep the data workspace usable at compact window widths. */
 @media (max-width: 1199px) {
-  .context-disclosure {
+  .context-disclosure,
+  .context-resize-handle {
     display: none;
   }
   .context-toggle {
@@ -825,7 +826,13 @@
 
 .context-disclosure {
   --panel-offset: 6px;
-  max-width: 32vw;
+  max-width: min(50cqw, max(0px, calc(100cqw - 481px)));
+}
+.context-disclosure:not([data-starting-style]):not([data-ending-style]) {
+  width: var(--context-panel-width, 300px);
+}
+.shell-body:has(> .context-resize-handle.dragging) .context-disclosure {
+  transition-property: opacity, transform;
 }
 
 .document-tab-strip-container {

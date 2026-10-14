@@ -453,6 +453,7 @@
     "title": "详情",
     "open": "显示详情栏",
     "close": "关闭详情栏",
+    "resize": "调整详情侧栏宽度",
     "schema": {
       "label": "结构",
       "collectionInfo": "信息",

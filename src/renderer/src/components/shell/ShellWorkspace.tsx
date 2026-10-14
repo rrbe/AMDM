@@ -74,6 +74,8 @@ export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
   const stopShell = useAppStore((s) => s.stopShell)
   const runExplain = useAppStore((s) => s.runExplain)
   const editorHeight = useAppStore((s) => s.settings.editorHeight)
+  const contextPanelWidth = useAppStore((s) => s.settings.contextPanelWidth)
+  const contextOpen = useAppStore((s) => s.settings.contextPanelOpen)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -81,9 +83,9 @@ export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
 
   const [showSave, setShowSave] = useState(false)
-  const [contextOpen, setContextOpen] = useState(false)
   const [expandedRegion, setExpandedRegion] = useState<'query' | 'results' | null>(null)
   const editorRef = useRef<ShellEditorHandle>(null)
+  const shellBodyRef = useRef<HTMLDivElement>(null)
 
   const conn = connections.find((c) => c.id === activeConnectionId)
   const targetCollection = useAppStore((s) => tabCollection(getActiveTab(s)))
@@ -140,9 +142,9 @@ export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
         onQuickSearch={onQuickSearch}
         showShortcutHints={shortcutHints === 'query-tabs'}
         contextOpen={contextOpen}
-        onContextToggle={() => setContextOpen((open) => !open)}
+        onContextToggle={() => void updateSettings({ contextPanelOpen: !contextOpen })}
       />
-      <div className="shell-body">
+      <div className="shell-body" ref={shellBodyRef}>
         <main className={`shell-main${expandedRegion ? ` ${expandedRegion}-expanded` : ''}`}>
           <div className="work-header">
             <div className="work-breadcrumb">
@@ -272,6 +274,23 @@ export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
           />
         </main>
 
+        {contextOpen && (
+          <ResizeHandle
+            axis="x"
+            direction={-1}
+            cssVar="--context-panel-width"
+            className="resize-handle--col context-resize-handle"
+            value={contextPanelWidth}
+            min={240}
+            getMax={() => {
+              const width = shellBodyRef.current!.clientWidth
+              // The divider occupies 1px after its overlapping margins.
+              return Math.max(0, Math.min(width / 2, width - 481))
+            }}
+            onCommit={(px) => void updateSettings({ contextPanelWidth: px })}
+            ariaLabel={t('context.resize')}
+          />
+        )}
         <Collapsible open={contextOpen} axis="horizontal" className="context-disclosure">
           <aside className="context-rail">
             <ContextPanel />

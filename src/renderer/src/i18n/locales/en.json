@@ -453,6 +453,7 @@
     "title": "Details",
     "open": "Show details",
     "close": "Close details",
+    "resize": "Resize details sidebar",
     "schema": {
       "label": "Schema",
       "collectionInfo": "Info",

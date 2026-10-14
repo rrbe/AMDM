@@ -594,6 +594,10 @@ export interface AppSettings {
   language: Language
   /** Explorer sidebar width in px (drag-resizable; clamped at the UI). */
   sidebarWidth: number
+  /** Details sidebar width in px (drag-resizable; clamped at the UI). */
+  contextPanelWidth: number
+  /** Remember whether the Details sidebar is expanded. */
+  contextPanelOpen: boolean
   /** Shell editor pane height in px (drag-resizable; clamped at the UI). */
   editorHeight: number
   /** Initial display page size for new results; does not change query limits. */
@@ -663,6 +667,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   language: 'system',
   sidebarWidth: 270,
+  contextPanelWidth: 300,
+  contextPanelOpen: false,
   editorHeight: 142,
   queryLimit: 50,
   queryTimeoutMS: 30_000,

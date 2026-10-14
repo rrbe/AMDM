@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react'
 interface ResizeHandleProps {
   /** 'x' resizes width (a vertical bar, col-resize); 'y' resizes height (a horizontal bar). */
   axis: 'x' | 'y'
+  /** Right/bottom panels grow opposite to pointer movement. */
+  direction?: 1 | -1
   /** CSS custom property on :root that drives the resized element's size. */
   cssVar: string
   /** Persisted size in px — the drag baseline and the source of truth at rest. */
@@ -27,6 +29,7 @@ interface ResizeHandleProps {
  */
 export function ResizeHandle({
   axis,
+  direction = 1,
   cssVar,
   value,
   min,
@@ -49,7 +52,8 @@ export function ResizeHandle({
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
     e.preventDefault()
     ref.current?.setPointerCapture(e.pointerId)
-    drag.current = { start: axis === 'x' ? e.clientX : e.clientY, base: value, last: value }
+    const base = Math.min(Math.max(value, min), getMax())
+    drag.current = { start: axis === 'x' ? e.clientX : e.clientY, base, last: base }
     ref.current?.classList.add('dragging')
     document.body.style.cursor = axis === 'x' ? 'col-resize' : 'row-resize'
     document.body.style.userSelect = 'none'
@@ -59,7 +63,7 @@ export function ResizeHandle({
     const d = drag.current
     if (!d) return
     const pos = axis === 'x' ? e.clientX : e.clientY
-    const next = Math.min(Math.max(d.base + (pos - d.start), min), getMax())
+    const next = Math.min(Math.max(d.base + (pos - d.start) * direction, min), getMax())
     d.last = next
     document.documentElement.style.setProperty(cssVar, `${next}px`)
   }
