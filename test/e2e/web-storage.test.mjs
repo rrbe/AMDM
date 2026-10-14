@@ -55,6 +55,7 @@ test(
     const requests = [];
     let database, mongo, proxy, backend, application, renderer, main;
     let backendLog = "";
+    let phase = "start services";
     const diagnostics = join(root, "dist/e2e-validation/web-storage");
     try {
       await mkdir(diagnostics, { recursive: true });
@@ -193,11 +194,14 @@ test(
       );
       clients.push(main);
       // A browser page has no Electron preload. Use the app's actual Renderer engine with the same boundary.
-      await main.evaluate(`(() => {
+      phase = "create Web window";
+      // Native window work must run on Electron's event loop outside inspector evaluation.
+      await main.evaluate(`setTimeout(() => {
       const { BrowserWindow } = process.getBuiltinModule('module').createRequire(${JSON.stringify(join(root, "package.json"))})('electron');
       globalThis.webStorageTestWindow = new BrowserWindow({ width: 1440, height: 900, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true } });
-      void globalThis.webStorageTestWindow.loadURL(${JSON.stringify(origin)}); return true;
-    })()`);
+      void globalThis.webStorageTestWindow.loadURL(${JSON.stringify(origin)});
+    }, 0); true`);
+      phase = "attach Web Renderer";
       renderer = await DebuggerClient.connect(
         (
           await waitForTarget(
@@ -279,6 +283,7 @@ test(
         );
         await waitForUi(renderer);
       };
+      phase = "switch to browser mode";
       await switchMode("Browser storage");
       assert.deepEqual(
         await renderer.evaluate("window.api.connections.list()"),
@@ -538,7 +543,7 @@ test(
     } catch (error) {
       await writeFile(
         join(diagnostics, "failure.log"),
-        `${error.stack}\n${backendLog}\n${application?.logs ?? ""}`,
+        `Phase: ${phase}\n${error.stack}\n${backendLog}\n${application?.logs ?? ""}`,
       );
       throw error;
     } finally {
