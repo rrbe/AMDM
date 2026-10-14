@@ -196,9 +196,10 @@ test(
       // A browser page has no Electron preload. Use the app's actual Renderer engine with the same boundary.
       phase = "create Web window";
       // Native window work must run on Electron's event loop outside inspector evaluation.
+      // Keep animation-frame click checks active if the desktop window takes focus.
       await main.evaluate(`setTimeout(() => {
       const { BrowserWindow } = process.getBuiltinModule('module').createRequire(${JSON.stringify(join(root, "package.json"))})('electron');
-      globalThis.webStorageTestWindow = new BrowserWindow({ width: 1440, height: 900, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true } });
+      globalThis.webStorageTestWindow = new BrowserWindow({ width: 1440, height: 900, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false } });
       void globalThis.webStorageTestWindow.loadURL(${JSON.stringify(origin)});
     }, 0); true`);
       phase = "attach Web Renderer";
@@ -248,16 +249,21 @@ test(
           `[...document.querySelectorAll('button')].find((button) => button.textContent.trim() === ${JSON.stringify(label)})`,
         );
       const switchMode = async (label) => {
+        phase = `open settings for ${label}`;
         await renderer.evaluate("window.api.app.openSettings()");
+        phase = `select Storage section for ${label}`;
         await clickButton("Storage");
+        phase = `open storage dropdown for ${label}`;
         await clickElement(
           renderer,
           `document.querySelector(${JSON.stringify('[role="combobox"][aria-label="Storage location"]')})`,
         );
+        phase = `select ${label}`;
         await clickElement(
           renderer,
           `[...document.querySelectorAll('[role=option]')].find((option) => option.textContent.trim() === ${JSON.stringify(label)})`,
         );
+        phase = `confirm ${label}`;
         const dialogs = renderer.events.filter(
           (event) => event.method === "Page.javascriptDialogOpening",
         ).length;
@@ -282,6 +288,7 @@ test(
           "Storage mode did not reload",
         );
         await waitForUi(renderer);
+        phase = `verify ${label}`;
       };
       phase = "switch to browser mode";
       await switchMode("Browser storage");
