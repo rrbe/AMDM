@@ -30,6 +30,8 @@ Keep CodeMirror's JavaScript parser for syntax and local scopes. Shell semantic 
 
 The TypeScript service and declaration graph load in a worker when the editor receives focus. Only small API-member metadata is loaded with the editor. Inline value hints remain local and must not appear inside comments or string literals.
 
+Query diagnostics share this worker and run after a 350 ms input pause. They report JavaScript syntax errors, unresolved names/members, and calls to non-functions using the official Mongosh declarations. Collection warnings use only the selected connection/database's loaded catalog; an unloaded catalog is not an empty database. These warnings do not prevent writes to new collections. Analysis never executes a query or fetches metadata. Top-level `show`/`use` commands retain their source offsets, and switching database inside a script suspends catalog checks until it returns to the selected database. Editor changes, catalog updates, and tab/connection/database switches invalidate pending replies. Hover shows details; F8 moves to the next problem and Cmd/Ctrl+Shift+M opens the problems panel.
+
 ## UI validation
 
 Debug and validate against the currently running Electron Renderer. Use Electron DevTools/CDP to inspect DOM, computed styles, events, focus, scrolling, and state. If attachment is unavailable, enable a remote debugging port for Electron or use its built-in DevTools; do not launch a regular Chrome instance as a substitute.

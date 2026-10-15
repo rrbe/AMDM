@@ -9,16 +9,23 @@
  * falls back to the regex completion source, so completion never breaks.
  */
 import { buildCollectionDecls } from '@renderer/lib/tsAutocomplete/mongoBaseDts'
-import type { TsWorkerResponse, TsCompletionEntry } from '@renderer/lib/tsAutocomplete/protocol'
+import type {
+  TsWorkerRequest,
+  TsWorkerResponse,
+  TsCompletionEntry,
+  TsDiagnostic,
+  TsDiagnosticContext
+} from '@renderer/lib/tsAutocomplete/protocol'
 
 export interface TsCompletionResult {
   entries: TsCompletionEntry[]
   replacementSpan?: { from: number }
 }
 
-/** A `complete()` promise awaiting its worker reply, with its timeout handle. */
+/** A completion or diagnostics request awaiting its worker reply. */
 type PendingEntry = {
-  resolve: (result: TsCompletionResult | null) => void
+  type: 'complete' | 'diagnose'
+  resolve: (result: TsWorkerResponse | null) => void
   timer: ReturnType<typeof setTimeout>
 }
 
@@ -32,7 +39,7 @@ class TsAutocompleteClient {
   private pending = new Map<number, PendingEntry>()
 
   /** Resolve and remove a pending request, clearing its timeout. No-op if already settled. */
-  private settle(seq: number, result: TsCompletionResult | null): void {
+  private settle(seq: number, result: TsWorkerResponse | null): void {
     const entry = this.pending.get(seq)
     if (!entry) return
     this.pending.delete(seq)
@@ -49,8 +56,8 @@ class TsAutocompleteClient {
       })
       this.worker.onmessage = (e: MessageEvent<TsWorkerResponse>): void => {
         const msg = e.data
-        if (msg.type === 'result') {
-          this.settle(msg.seq, { entries: msg.entries, replacementSpan: msg.replacementSpan })
+        if (msg.type === 'result' || msg.type === 'diagnostics') {
+          this.settle(msg.seq, msg)
         }
       }
       this.worker.onerror = (): void => this.die()
@@ -92,26 +99,42 @@ class TsAutocompleteClient {
   }
 
   /** Request completions at `pos` in `code`. Resolves null on failure/timeout/cancel. */
-  complete(code: string, pos: number): Promise<TsCompletionResult | null> {
+  async complete(code: string, pos: number): Promise<TsCompletionResult | null> {
+    const result = await this.request({ type: 'complete', seq: ++this.seq, code, pos })
+    return result?.type === 'result'
+      ? { entries: result.entries, replacementSpan: result.replacementSpan }
+      : null
+  }
+
+  async diagnose(code: string, context: TsDiagnosticContext): Promise<TsDiagnostic[] | null> {
+    const result = await this.request({ type: 'diagnose', seq: ++this.seq, code, context })
+    return result?.type === 'diagnostics' ? result.diagnostics : null
+  }
+
+  private request(
+    message: Extract<TsWorkerRequest, { seq: number }>
+  ): Promise<TsWorkerResponse | null> {
     this.ensure()
     if (!this.worker || this.failed) return Promise.resolve(null)
-    const seq = ++this.seq
+    const { seq, type } = message
     return new Promise((resolve) => {
       const timer = setTimeout(() => this.settle(seq, null), REQUEST_TIMEOUT)
-      this.pending.set(seq, { resolve, timer })
-      this.worker!.postMessage({ type: 'complete', seq, code, pos })
+      this.pending.set(seq, { type, resolve, timer })
+      this.worker!.postMessage(message)
     })
   }
 
   /**
-   * Drop every in-flight request (resolve null → caller uses the regex source).
+   * Drop in-flight completions (resolve null → caller uses the regex source).
    * Wired to CodeMirror's abort (fires on doc change), so requests don't pile up
    * as the user types: the worker still answers the stale seqs, but `settle` has
    * already removed them, so those replies are ignored. Nothing to abort
    * worker-side — it's FIFO and fast, so a worker-side cancel isn't worth it.
    */
   cancel(): void {
-    for (const seq of [...this.pending.keys()]) this.settle(seq, null)
+    for (const [seq, entry] of this.pending) {
+      if (entry.type === 'complete') this.settle(seq, null)
+    }
   }
 }
 

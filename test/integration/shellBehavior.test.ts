@@ -877,6 +877,25 @@ describe('REPL commands (show / use)', () => {
     expect(r.useDatabase).toBe('reporting')
   })
 
+  it('accepts Unicode database names in use commands', async () => {
+    const r = await run('use 数据库')
+    expect(r.kind).toBe('value')
+    expect(r.useDatabase).toBe('数据库')
+  })
+
+  it('switches databases through the global use function', async () => {
+    const r = await run('use("other"); db.getName()')
+    expect(r.kind).toBe('value')
+    expect(r.data).toBe('other')
+    expect(r.useDatabase).toBe('other')
+  })
+
+  it('resolves dotted collection access to the complete namespace', async () => {
+    const r = await run('db.system.views.getName()')
+    expect(r.kind).toBe('value')
+    expect(r.data).toBe('system.views')
+  })
+
   it('does not treat ordinary JS as a REPL command', async () => {
     const r = await run('db.nums.find({})')
     expect(r.kind).toBe('documents')

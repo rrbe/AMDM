@@ -391,6 +391,11 @@
     "close": "关闭"
   },
   "shell": {
+    "diagnostics": {
+      "title": "问题",
+      "empty": "没有发现问题",
+      "unknownCollection": "数据库「{{database}}」已加载的目录中没有集合「{{name}}」。请检查名称或刷新集合列表；写入新集合仍可正常执行。"
+    },
     "fallbackConnTitle": "Shell",
     "noDatabase": "（无数据库）",
     "saveQueryTip": "保存当前查询",

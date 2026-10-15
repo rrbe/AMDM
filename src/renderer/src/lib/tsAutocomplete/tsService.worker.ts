@@ -1,5 +1,5 @@
 /** Official declarations and the language service stay in this lazy Worker. */
-import { complete, setFile } from './tsService'
+import { complete, diagnose, setFile } from './tsService'
 import type { TsWorkerRequest, TsWorkerResponse, TsCompletionEntry } from './protocol'
 
 const scope = self as unknown as {
@@ -16,6 +16,10 @@ scope.onmessage = (e): void => {
   }
   if (msg.type === 'decls') {
     setFile('/decls.d.ts', msg.text)
+    return
+  }
+  if (msg.type === 'diagnose') {
+    scope.postMessage({ type: 'diagnostics', seq: msg.seq, diagnostics: diagnose(msg.code, msg.context) })
     return
   }
   if (msg.type === 'complete') {
