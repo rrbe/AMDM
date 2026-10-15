@@ -647,12 +647,35 @@ function serveStatic(
     res.writeHead(404).end();
     return;
   }
+  const extension = extname(path);
+  const accepted = new Map(
+    (req.headers["accept-encoding"] ?? "").toLowerCase().split(",").map((entry) => {
+      const [name, ...parameters] = entry.trim().split(";");
+      const quality = parameters.find((value) => value.trim().startsWith("q="));
+      const weight = quality ? Number(quality.trim().slice(2)) : 1;
+      return [name.trim(), Number.isFinite(weight) && weight >= 0 && weight <= 1 ? weight : 0];
+    }),
+  );
+  const variants = [
+    { encoding: "br", suffix: ".br" },
+    { encoding: "gzip", suffix: ".gz" },
+  ].map((variant) => ({ ...variant, quality: accepted.get(variant.encoding) ?? accepted.get("*") ?? 0 }))
+    .filter((variant) => variant.quality > 0 && variant.quality >= (accepted.get("identity") ?? 0))
+    .sort((a, b) => b.quality - a.quality);
+  const variant = variants.find((variant) => existsSync(path + variant.suffix));
+  if (!variant && (accepted.get("identity") === 0 || (!accepted.has("identity") && accepted.get("*") === 0))) {
+    res.writeHead(406, { vary: "Accept-Encoding" }).end();
+    return;
+  }
+  if (variant) path += variant.suffix;
   const size = statSync(path).size;
   res.writeHead(200, {
-    "content-type": MIME[extname(path)] ?? "application/octet-stream",
+    "content-type": MIME[extension] ?? "application/octet-stream",
     "content-length": size,
+    ...(variant ? { "content-encoding": variant.encoding } : {}),
+    vary: "Accept-Encoding",
     "cache-control":
-      extname(path) === ".html"
+      extension === ".html"
         ? "no-cache"
         : "public, max-age=31536000, immutable",
     "content-security-policy":

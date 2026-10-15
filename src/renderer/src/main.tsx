@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import App from '@renderer/App'
-import { SettingsWindow } from '@renderer/components/settings/SettingsWindow'
 import { ErrorBoundary } from '@renderer/components/common/ErrorBoundary'
 // Fonts.
 // UI chrome uses the platform system font.
@@ -18,6 +17,10 @@ import { WebPasswordPrompt } from '@renderer/components/web/WebPasswordPrompt'
 import { currentWebStorageMode } from '@renderer/lib/web/storageContext'
 import { webApi } from '@renderer/webApi'
 import './styles/index.css'
+
+const SettingsWindow = lazy(async () => ({
+  default: (await import('@renderer/components/settings/SettingsWindow')).SettingsWindow
+}))
 
 if (__WEB__) window.api = webApi
 
@@ -90,7 +93,11 @@ function WebRoot(): React.JSX.Element {
         <App />
       </div>
       <WebPasswordPrompt />
-      {settingsOpen && createPortal(<SettingsWindow onClose={closeSettings} />, document.body)}
+      {settingsOpen && createPortal(
+        <Suspense fallback={null}>
+          <SettingsWindow onClose={closeSettings} />
+        </Suspense>, document.body
+      )}
     </>
   )
 }
@@ -100,7 +107,9 @@ const Root = __WEB__ ? WebRoot : window.location.hash === '#settings' ? Settings
 createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <Root />
+      <Suspense fallback={null}>
+        <Root />
+      </Suspense>
     </ErrorBoundary>
   </React.StrictMode>
 )

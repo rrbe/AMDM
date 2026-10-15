@@ -52,11 +52,14 @@ import { Tooltip } from '@renderer/components/ui/Tooltip'
 import type { CatalogDestination } from '@renderer/lib/quickSearch/documents'
 import { searchId } from '@renderer/lib/quickSearch/types'
 import { recordSearchVisit } from '@renderer/lib/quickSearch/visits'
-import {
-  HistoryView,
-  SavedQueriesView,
-  type StoredQuerySelection
-} from '@renderer/components/explorer/SavedQueriesPanel'
+import type { StoredQuerySelection } from '@renderer/components/explorer/SavedQueriesPanel'
+
+const SavedQueriesView = lazy(async () => ({
+  default: (await import('./SavedQueriesPanel')).SavedQueriesView
+}))
+const HistoryView = lazy(async () => ({
+  default: (await import('./SavedQueriesPanel')).HistoryView
+}))
 
 const SchemaModelModal = lazy(async () => ({
   default: (await import('@renderer/components/schema/SchemaModelModal')).SchemaModelModal
@@ -850,9 +853,9 @@ export function Explorer({
           </div>
         </>
       ) : view === 'savedQueries' ? (
-        <SavedQueriesView onLoad={onQueryLoad} />
+        <Suspense fallback={null}><SavedQueriesView onLoad={onQueryLoad} /></Suspense>
       ) : (
-        <HistoryView onLoad={onQueryLoad} />
+        <Suspense fallback={null}><HistoryView onLoad={onQueryLoad} /></Suspense>
       )}
 
       {/* App-level controls stay in the quiet footer. */}

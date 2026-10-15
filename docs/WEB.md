@@ -42,6 +42,15 @@ pnpm start:web
 
 构建产物为 `out/web/` 和 `out/web-server/`，后者包含独立 mongosh runtime 和序列化 worker。运行环境使用 Node 24.11 或更新版本，并安装生产依赖。
 
+浏览器客户端、浏览器 Worker、Node 服务端和 mongosh runtime 使用 ESM 输出。
+设置页、查询历史/收藏视图和完整 Shell 编辑器分别按需加载；Web 补全 Worker
+在编辑器首次获得焦点时启动。编辑器本身仍会随工作区显示而加载。
+
+客户端构建会为大于等于 1 KB 且压缩后更小的 JS、CSS、HTML、JSON 和 SVG
+生成 `.br`、`.gz` 文件，包括浏览器 Worker。部署时保留这些文件；Node 静态服务
+根据 `Accept-Encoding` 选择预压缩版本并发送 `Vary: Accept-Encoding`，请求时不做实时压缩。
+HTML 使用 `no-cache`，带哈希的资源使用一年期 `immutable` 缓存。
+
 服务默认只监听 `127.0.0.1:4173`。可用 `AMDM_WEB_HOST`、`AMDM_WEB_PORT` 和 `AMDM_WEB_STATIC_DIR` 覆盖，但不要把服务直接暴露到网络。
 
 `AMDM_WEB_MASTER_KEY` 必须是 32 字节随机值的 Base64 编码。丢失或更换它会使已保存的 MongoDB 密码无法解密；请放在 Secret Manager 中备份，不要提交到仓库。
