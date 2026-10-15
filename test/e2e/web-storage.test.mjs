@@ -225,7 +225,19 @@ test(
             : "DOM evaluation");
         return evaluate(expression);
       };
+      const activateWebRenderer = async () => {
+        await main.evaluate(`setTimeout(() => {
+          globalThis.webStorageTestWindow.show();
+          globalThis.webStorageTestWindow.focus();
+          globalThis.webStorageTestWindow.webContents.focus();
+        }, 0); true`);
+        await waitForExpression(
+          renderer,
+          'document.hasFocus() && document.visibilityState === "visible"',
+        );
+      };
       await renderer.call("Page.enable");
+      await activateWebRenderer();
       await waitForUi(renderer);
       await waitForExpression(
         renderer,
@@ -254,6 +266,7 @@ test(
             ).length > previous,
           "Web page did not reload",
         );
+        await activateWebRenderer();
         await waitForUi(renderer);
       };
       const clickButton = (label) =>
@@ -300,6 +313,7 @@ test(
             ).length > loads,
           "Storage mode did not reload",
         );
+        await activateWebRenderer();
         await waitForUi(renderer);
         phase = `verify ${label}`;
       };
@@ -570,10 +584,21 @@ test(
       await quitPackaged(application, main, clients);
       application = undefined;
     } catch (error) {
-      error.message = `${phase} (${evaluation}): ${error.message}`;
+      const failedEvaluation = evaluation;
+      error.message = `${phase} (${failedEvaluation}): ${error.message}`;
+      const [pageState] = await Promise.allSettled([
+        renderer?.evaluate(`({
+          url: location.href,
+          focused: document.hasFocus(),
+          visibility: document.visibilityState,
+          history: window.history.state,
+          dialogs: [...document.querySelectorAll('[role=dialog]')].map(dialog => dialog.textContent),
+          activeElement: document.activeElement?.outerHTML
+        })`),
+      ]);
       await writeFile(
         join(diagnostics, "failure.log"),
-        `Phase: ${phase}\nEvaluation: ${evaluation}\nRequests: ${JSON.stringify(requests)}\n${error.stack}\n${backendLog}\n${application?.logs ?? ""}`,
+        `Phase: ${phase}\nEvaluation: ${failedEvaluation}\nPage: ${JSON.stringify(pageState)}\nRequests: ${JSON.stringify(requests)}\n${error.stack}\n${backendLog}\n${application?.logs ?? ""}`,
       );
       throw error;
     } finally {
