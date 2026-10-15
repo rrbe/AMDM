@@ -1,5 +1,6 @@
 import * as ts from 'typescript'
 import { files as officialFiles, modules, roots } from 'virtual:mongosh-types'
+import methods from 'virtual:mongosh-methods'
 import type { TsCompletionEntry, TsDiagnostic, TsDiagnosticContext } from './protocol'
 import { DATABASE_RESERVED } from './mongoBaseDts'
 
@@ -76,6 +77,7 @@ const SEMANTIC_ERRORS = new Set([
   2304, 2339, 2349, 2551, 2552 // Unresolved names/members and non-callable values.
 ])
 const MAX_DIAGNOSTICS = 100
+const COLLECTION_RESERVED = new Set(methods.Collection)
 
 /** Parse-only analysis in the existing worker; never evaluates query code. */
 export function diagnose(code: string, context: TsDiagnosticContext): TsDiagnostic[] {
@@ -95,7 +97,7 @@ export function diagnose(code: string, context: TsDiagnosticContext): TsDiagnost
     const argument = match[2]
     if (
       match[1] === 'use'
-        ? !/^[\w.$-]+$/.test(argument)
+        ? /[/\\. "\u0000]/u.test(argument)
         : !/^(dbs|databases|collections|tables|users|roles|profile|logs|log\s+\S+)$/.test(argument)
     )
       continue
@@ -110,11 +112,67 @@ export function diagnose(code: string, context: TsDiagnosticContext): TsDiagnost
       normalized.slice(command.to)
   }
   setFile(MAIN, normalized)
+  const program = service.getProgram()!
+  const source = program.getSourceFile(MAIN)!
+  const checker = program.getTypeChecker()
+  const isGlobal = (node: ts.Expression, name: string): boolean =>
+    ts.isIdentifier(node) &&
+    node.text === name &&
+    !!checker
+      .getSymbolAtLocation(node)
+      ?.declarations?.every((decl) => decl.getSourceFile() !== source)
+  const collectionPath = (node: ts.Expression): string | undefined => {
+    if (!ts.isPropertyAccessExpression(node)) return undefined
+    if (isGlobal(node.expression, 'db')) {
+      return DATABASE_RESERVED.has(node.name.text) ? undefined : node.name.text
+    }
+    if (COLLECTION_RESERVED.has(node.name.text)) return undefined
+    const parent = collectionPath(node.expression)
+    return parent === undefined ? undefined : `${parent}.${node.name.text}`
+  }
+  const members = new Map<number, ts.PropertyAccessExpression>()
+  const switches = commands.filter((command) => command.database !== undefined)
+  const collect = (node: ts.Node): void => {
+    if (ts.isPropertyAccessExpression(node)) members.set(node.name.getStart(source), node)
+    if (ts.isCallExpression(node) && isGlobal(node.expression, 'use')) {
+      const target = node.arguments[0]
+      switches.push({
+        from: node.end,
+        to: node.end,
+        database: target && ts.isStringLiteralLike(target) ? target.text : undefined
+      })
+    }
+    ts.forEachChild(node, collect)
+  }
+  collect(source)
+  switches.sort((a, b) => a.from - b.from)
   const diagnostics: TsDiagnostic[] = [
     ...service.getSyntacticDiagnostics(MAIN),
     ...service
       .getSemanticDiagnostics(MAIN)
-      .filter((item) => SEMANTIC_ERRORS.has(item.code))
+      .filter((item) => {
+        if (!SEMANTIC_ERRORS.has(item.code)) return false
+        if (item.code !== 2339 && item.code !== 2551) return true
+        const member = members.get(item.start!)
+        if (!member) return true
+        // Shell automatically awaits API results, including values assigned to
+        // locals. Only suppress members that exist on the resolved value.
+        const type = checker.getTypeAtLocation(member.expression)
+        const awaited = checker.getAwaitedType(type)
+        const property = awaited && awaited !== type
+          ? checker.getPropertyOfType(awaited, member.name.text)
+          : undefined
+        if (property) {
+          const called = ts.isCallExpression(member.parent) && member.parent.expression === member
+          return called && checker.getTypeOfSymbolAtLocation(property, member).getCallSignatures().length === 0
+        }
+        // Non-called Collection properties extend the namespace in Mongosh's
+        // proxy, e.g. db.system.views refers to the collection system.views.
+        return (
+          collectionPath(member) === undefined ||
+          (ts.isCallExpression(member.parent) && member.parent.expression === member)
+        )
+      })
   ]
     .filter((item) => item.start !== undefined)
     .slice(0, MAX_DIAGNOSTICS)
@@ -129,24 +187,13 @@ export function diagnose(code: string, context: TsDiagnosticContext): TsDiagnost
         message: ts.flattenDiagnosticMessageText(item.messageText, '\n')
       }
     })
-  if (context.collections === null || diagnostics.length >= MAX_DIAGNOSTICS) return diagnostics
-
-  const program = service.getProgram()!
-  const source = program.getSourceFile(MAIN)!
-  const checker = program.getTypeChecker()
-  const names = new Set(context.collections)
-  const isGlobal = (node: ts.Expression, name: string): boolean =>
-    ts.isIdentifier(node) &&
-    node.text === name &&
-    !!checker
-      .getSymbolAtLocation(node)
-      ?.declarations?.every((decl) => decl.getSourceFile() !== source)
+  const names = new Set(context.collections ?? [])
   const checkCollection = (node: ts.Node, name: string): void => {
-    if (names.has(name)) return
-    let database = context.database
-    for (const command of commands) {
+    if (context.collections === null || names.has(name) || diagnostics.length >= MAX_DIAGNOSTICS) return
+    let database: string | undefined = context.database
+    for (const command of switches) {
       if (command.from >= node.getStart(source)) break
-      if (command.database !== undefined) database = command.database
+      database = command.database
     }
     if (database !== context.database) return
     diagnostics.push({
@@ -161,11 +208,14 @@ export function diagnose(code: string, context: TsDiagnosticContext): TsDiagnost
     if (diagnostics.length >= MAX_DIAGNOSTICS) return
     if (
       ts.isPropertyAccessExpression(node) &&
-      isGlobal(node.expression, 'db') &&
-      !DATABASE_RESERVED.has(node.name.text) &&
+      collectionPath(node) !== undefined &&
+      !(
+        ts.isPropertyAccessExpression(node.parent) && collectionPath(node.parent) !== undefined &&
+        !(ts.isCallExpression(node.parent.parent) && node.parent.parent.expression === node.parent)
+      ) &&
       !(ts.isCallExpression(node.parent) && node.parent.expression === node)
     ) {
-      checkCollection(node.name, node.name.text)
+      checkCollection(node.name, collectionPath(node)!)
     } else if (
       ts.isElementAccessExpression(node) &&
       isGlobal(node.expression, 'db') &&
@@ -175,6 +225,17 @@ export function diagnose(code: string, context: TsDiagnosticContext): TsDiagnost
       checkCollection(node.argumentExpression, node.argumentExpression.text)
     } else if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
       const member = node.expression
+      const path = collectionPath(member.expression)
+      // A dotted namespace is absent from the TS declarations, so TS loses its
+      // receiver type after the first segment. Keep checking its called method.
+      if (path?.includes('.') && !COLLECTION_RESERVED.has(member.name.text)) {
+        diagnostics.push({
+          from: member.name.getStart(source),
+          to: member.name.end,
+          severity: 'error',
+          message: `Property '${member.name.text}' does not exist on type 'Collection'.`
+        })
+      }
       if (
         (isGlobal(member.expression, 'db') && member.name.text === 'getCollection') ||
         (isGlobal(member.expression, 'driverDb') && member.name.text === 'collection')

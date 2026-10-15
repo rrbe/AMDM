@@ -16,6 +16,9 @@ describe('Query syntax and method diagnostics', () => {
     ['const cursor = db.users.find(); cursor.limt(10)', 'limt'],
     ['const collection = db.users; collection.fidn()', 'fidn'],
     ['db.getCollection("users").fidn()', 'fidn'],
+    ['db.system.views.fidn()', 'fidn'],
+    ['const docs = db.users.find().toArray(); docs.lenght', 'lenght'],
+    ['const docs = db.users.find().toArray(); docs.length()', 'length'],
     ['db.getSiblingDB("other").users.fidn()', 'fidn'],
     ['driverDb.collection("users").fidn()', 'fidn'],
     ['db.getMongo().startSession().withTransacton(() => {})', 'withTransacton'],
@@ -43,6 +46,11 @@ describe('Query syntax and method diagnostics', () => {
   it.each([
     'await db.users.find({ name: "Ada", $expr: { $gte: ["$age", 18] } }).sort({ name: 1 }).limit(10).toArray()',
     'db.getCollection("system.views").find({})',
+    'db.system.views.find({})',
+    'const docs = db.users.find().toArray(); docs.length',
+    'db.users.find().toArray().map(doc => doc.name)',
+    'const names = db.getCollectionNames(); names.filter(name => name.length)',
+    'const count = db.users.countDocuments({}); count.toFixed(0)',
     'db.getMongo().startSession().withTransaction(async () => {})',
     'ObjectId(); ISODate(); NumberLong("1"); print("hello"); printjson({}); sleep(10)',
     'let value = 1; value = "text"; const doc = await db.users.findOne({}); doc.name',
@@ -127,6 +135,21 @@ describe('Collection catalog diagnostics', () => {
       { severity: 'warning', collectionName: 'newCollection' }
     ])
   })
+
+  it('checks the complete dotted collection name and retains method diagnostics', () => {
+    expect(diagnose('db.system.views.find()', context)).toEqual([])
+    expect(diagnose('db.system.views.getName()', context)).toEqual([])
+    expect(diagnose('db.system.viwes.find()', context)).toMatchObject([
+      { severity: 'warning', collectionName: 'system.viwes' }
+    ])
+    expect(diagnose('db.system.views.fidn()', context)).toMatchObject([
+      { severity: 'error', message: expect.stringContaining('fidn') }
+    ])
+    expect(diagnose('db.system.views.find()', { ...context, collections: null })).toEqual([])
+    expect(diagnose('db.system.views.fidn()', { ...context, collections: null })).toMatchObject([
+      { severity: 'error', message: expect.stringContaining('fidn') }
+    ])
+  })
 })
 
 describe('Mongosh command syntax', () => {
@@ -136,6 +159,9 @@ describe('Mongosh command syntax', () => {
     'show databases\r\nshow tables',
     'show users\nshow roles\nshow profile\nshow logs\nshow log global',
     'use app\ndb.users.find()',
+    'use 数据库',
+    'use 数据库\r\ndb.onlyThere.find()',
+    'use café\ndb.onlyThere.find()',
     'const text = `\nshow dbs\nuse other\n`; db.users.find()',
     '/*\nshow dbs\nuse other\n*/ db.users.find()'
   ])('handles %s without false syntax errors', (code) => {
@@ -152,6 +178,25 @@ describe('Mongosh command syntax', () => {
     const code = 'use other\ndb.somewhereElse.find()\nuse app\ndb.usres.find()'
     expect(diagnose(code, context)).toMatchObject([
       { severity: 'warning', collectionName: 'usres' }
+    ])
+  })
+
+  it.each([
+    'use("other"); db.onlyThere.find(); use("app"); db.usres.find()',
+    'const target = "other"; use(target); db.onlyThere.find(); use("app"); db.usres.find()',
+    'use(`other`); db.onlyThere.find();\nuse app\ndb.usres.find()',
+    'use 数据库\ndb.onlyThere.find()\nuse app\ndb.usres.find()'
+  ])('tracks database switches in %s', (code) => {
+    expect(diagnose(code, context)).toMatchObject([
+      { severity: 'warning', collectionName: 'usres' }
+    ])
+  })
+
+  it('continues catalog checks for the selected database and locally shadowed use', () => {
+    expect(warnings('use("app"); db.usres.find()')).toHaveLength(1)
+    expect(warnings('function use(name) {} use("other"); db.usres.find()')).toHaveLength(1)
+    expect(warnings('db.usres.find(); use("other"); db.onlyThere.find()')).toMatchObject([
+      { collectionName: 'usres' }
     ])
   })
 
