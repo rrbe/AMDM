@@ -4,6 +4,23 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.4](https://github.com/rrbe/AMDM/releases/tag/v26.10.4) — 2026-10-15
+
+### 新功能
+
+- 新增内部 Web 版，采用桌面版现有界面和功能
+- 支持调整 Details 侧栏宽度，并记住宽度和展开状态
+- 新增分组式快速搜索，可搜索连接、查询标签页、数据标签页、已保存查询和历史记录
+
+### 修复
+
+- 统一 Schema 分析操作图标
+- 明确 Schema 编辑操作和搜索快捷键提示
+
+### 其他更新
+
+- 更新截图并精简中英文 README
+
 ## [v26.10.3](https://github.com/rrbe/AMDM/releases/tag/v26.10.3) — 2026-10-12
 
 ### 新功能

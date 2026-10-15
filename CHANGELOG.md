@@ -4,6 +4,23 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.4](https://github.com/rrbe/AMDM/releases/tag/v26.10.4) — 2026-10-15
+
+### Features
+
+- Add an internal Web edition with the current desktop interface and feature set
+- Resize the Details sidebar and remember its width and open state
+- Add grouped quick search across connections, query tabs, data tabs, saved queries, and history
+
+### Fixes
+
+- Unify icons for Schema analysis actions
+- Clarify Schema editing actions and the search shortcut hint
+
+### Other Updates
+
+- Refresh screenshots and simplify the readmes
+
 ## [v26.10.3](https://github.com/rrbe/AMDM/releases/tag/v26.10.3) — 2026-10-12
 
 ### Features
