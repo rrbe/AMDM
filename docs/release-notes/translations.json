@@ -1,4 +1,28 @@
 {
+  "add web edition with current desktop interface and features (#29)": {
+    "en": "Add an internal Web edition with the current desktop interface and feature set",
+    "zh": "新增内部 Web 版，采用桌面版现有界面和功能"
+  },
+  "refresh screenshots and streamline readmes": {
+    "en": "Refresh screenshots and simplify the readmes",
+    "zh": "更新截图并精简中英文 README"
+  },
+  "allow resizing and remember details sidebar state": {
+    "en": "Resize the Details sidebar and remember its width and open state",
+    "zh": "支持调整 Details 侧栏宽度，并记住宽度和展开状态"
+  },
+  "unify schema analysis icons": {
+    "en": "Unify icons for Schema analysis actions",
+    "zh": "统一 Schema 分析操作图标"
+  },
+  "clarify schema editing actions and search shortcut hint": {
+    "en": "Clarify Schema editing actions and the search shortcut hint",
+    "zh": "明确 Schema 编辑操作和搜索快捷键提示"
+  },
+  "add grouped quick search for connections and queries": {
+    "en": "Add grouped quick search across connections, query tabs, data tabs, saved queries, and history",
+    "zh": "新增分组式快速搜索，可搜索连接、查询标签页、数据标签页、已保存查询和历史记录"
+  },
   "separate result pagination from query limits": {
     "en": "Separate display pagination from query limits, reuse query results when changing pages or page size, and show result totals",
     "zh": "将结果分页与查询条数限制分离，翻页或调整每页条数时复用查询结果，并显示结果总数"
