@@ -17,7 +17,7 @@ import {
   waitForTarget,
   waitForUi,
   waitForExpression,
-  clickElement,
+  clickElement as clickWithFrames,
   assertRuntimeHealthy,
   quitPackaged,
 } from "../helpers/packagedElectron.mjs";
@@ -26,6 +26,9 @@ const root = resolve(import.meta.dirname, "../..");
 const user = "web-storage-e2e";
 const userId = createHash("sha256").update(user).digest("hex");
 const fixtureClient = crypto.randomUUID();
+// These controls are static; Linux's embedded page can suspend animation frames after reload.
+const clickElement = (client, expression, clickCount = 1) =>
+  clickWithFrames(client, expression, clickCount, false);
 
 async function until(predicate, message) {
   const deadline = Date.now() + 15_000;
