@@ -55,3 +55,7 @@ macOS 版本通过 Sparkle 更新,使用 ad-hoc 签名且未经 Apple 公证。�
 ## 许可证
 
 [GNU GPL v3.0](./LICENSE)
+
+## Web 版本
+
+内网浏览器版本的开发、部署和安全边界见 [AMDM Web](docs/WEB.md)。

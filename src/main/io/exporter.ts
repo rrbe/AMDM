@@ -30,7 +30,7 @@ import {
   tabularSpreadsheetCell,
   tabularTextCell
 } from '../../shared/tabularExport'
-import { sessionManager } from '../mongo/sessionManager'
+import { sessionManager } from '../mongo/desktopSession'
 import { streamBsonToFile, writeChunk } from './bsonWriteCore'
 
 interface ExportTask {

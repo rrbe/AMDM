@@ -12,6 +12,7 @@ import { mongoshEditorPlugin } from './scripts/mongosh-editor-types.mjs'
 // import the harness, so they never start mongod.
 export default defineConfig({
   plugins: [mongoshEditorPlugin()],
+  define: { __WEB__: 'false' },
   resolve: {
     alias: {
       '@shared': resolve(import.meta.dirname, 'src/shared'),

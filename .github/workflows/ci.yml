@@ -63,6 +63,12 @@ jobs:
       - name: Production build benchmark
         run: pnpm bench:build --iterations 3
 
+      - name: Web production build
+        run: pnpm build:web
+
+      - name: Web runtime
+        run: pnpm test:web
+
       - name: Prepare Sparkle
         if: runner.os == 'macOS'
         run: pnpm prepare:sparkle
@@ -71,6 +77,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
+          pnpm exec install-electron
           node --input-type=module <<'JS'
           import { spawnSync } from 'node:child_process';
           import { createRequire } from 'node:module';

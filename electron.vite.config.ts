@@ -83,7 +83,8 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     define: {
-      __APP_VERSION__: JSON.stringify(version)
+      __APP_VERSION__: JSON.stringify(version),
+      __WEB__: 'false'
     },
     resolve: {
       alias: {

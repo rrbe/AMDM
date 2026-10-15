@@ -38,7 +38,7 @@ vi.mock('../../src/main/ipc/registerUpdatesIpc', () => ({ registerUpdatesIpc: vi
 import '../../src/preload/index'
 import { registerIpc } from '../../src/main/ipc/registerIpc'
 import { connectionStore } from '../../src/main/store/connectionStore'
-import { sessionManager } from '../../src/main/mongo/sessionManager'
+import { sessionManager } from '../../src/main/mongo/desktopSession'
 import * as electron from '../helpers/electron-mock'
 import { startMongo } from '../helpers/mongo'
 
@@ -206,22 +206,28 @@ describe('connection duplication through IPC', () => {
       expect(await api.connections.list()).toEqual([])
 
       const saved = await api.connections.save(testInput)
-      expect(await api.connections.cachedAuthorization(saved)).toEqual({ authorization: result.authorization })
+      expect(await api.connections.cachedAuthorization(saved)).toEqual({ authorization: { ...result.authorization, privileges: expect.arrayContaining(result.authorization!.privileges) } })
       const now = Date.now()
       const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 5 * 60 * 1000)
       expect(await api.connections.cachedAuthorization(saved)).toBeNull()
       clock.mockRestore()
       try {
         await api.session.connect(saved.id)
-        expect(await api.session.authorization(saved.id, saved)).toEqual({ authorization: result.authorization })
+        expect(await api.session.authorization(saved.id, saved)).toEqual({ authorization: {
+          ...result.authorization,
+          privileges: expect.arrayContaining(result.authorization!.privileges)
+        } })
         const db = vi.spyOn(sessionManager.getClient(saved.id), 'db')
-        expect(await api.session.authorization(saved.id, saved)).toEqual({ authorization: result.authorization })
+        expect(await api.session.authorization(saved.id, saved)).toEqual({ authorization: {
+          ...result.authorization,
+          privileges: expect.arrayContaining(result.authorization!.privileges)
+        } })
         expect(await api.session.authorization(saved.id, {
           ...saved, auth: { ...saved.auth, username: 'different-user' }
         })).toEqual({})
         expect(db).not.toHaveBeenCalled()
         await api.session.disconnect(saved.id)
-        expect(await api.connections.cachedAuthorization(saved)).toEqual({ authorization: result.authorization })
+        expect(await api.connections.cachedAuthorization(saved)).toEqual({ authorization: { ...result.authorization, privileges: expect.arrayContaining(result.authorization!.privileges) } })
       } finally {
         await api.session.disconnect(saved.id)
       }

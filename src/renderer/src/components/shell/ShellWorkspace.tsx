@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import {
   Brush,
   ChevronDown,
@@ -18,7 +18,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useAppStore, getActiveTab } from '@renderer/store/useAppStore'
 import { tabCollection, tabLabel } from '@renderer/lib/tabs'
-import { ShellEditor, type ShellEditorHandle } from './ShellEditor'
+import type { ShellEditorHandle } from './ShellEditor'
 import { SaveQueryModal } from './SaveQueryModal'
 import { Collapsible } from '@renderer/components/ui/Collapsible'
 import { ContextPanel } from './ContextPanel'
@@ -45,6 +45,8 @@ import {
   tabShortcutLabel,
   type ShortcutHintModifier
 } from '@renderer/lib/keyboardShortcuts'
+
+const ShellEditor = lazy(async () => ({ default: (await import('./ShellEditor')).ShellEditor }))
 
 /**
  * The main work area: a tab strip, header (active connection + database +
@@ -237,21 +239,27 @@ export function ShellWorkspace({ shortcutHints, onSearch, onQuickSearch }: {
           {/* Key the editor by tab id so each tab gets its own CodeMirror
               instance (isolated undo history / selection). */}
           <div className="editor-row">
-            <ShellEditor
-              ref={editorRef}
-              key={activeTabId}
-              value={code}
-              onChange={setCode}
-              onRun={(selected) => void runShell(selected)}
-              onRunStatement={(c) => void runShell(c)}
-              onSave={() => setShowSave(true)}
-              onExplain={() => void runExplain()}
-              onFormat={() => void formatCode()}
-              onStop={() => void stopShell()}
-              running={running}
-              busy={busy}
-              saveBusy={contentBusy}
-            />
+            <Suspense fallback={
+              <div className="editor-wrap">
+                <div className="editor-loading">{t('shell.loadingEditor')}</div>
+              </div>
+            }>
+              <ShellEditor
+                ref={editorRef}
+                key={activeTabId}
+                value={code}
+                onChange={setCode}
+                onRun={(selected) => void runShell(selected)}
+                onRunStatement={(c) => void runShell(c)}
+                onSave={() => setShowSave(true)}
+                onExplain={() => void runExplain()}
+                onFormat={() => void formatCode()}
+                onStop={() => void stopShell()}
+                running={running}
+                busy={busy}
+                saveBusy={contentBusy}
+              />
+            </Suspense>
           </div>
 
           <ResizeHandle

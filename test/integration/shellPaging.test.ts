@@ -1,3 +1,4 @@
+import type { SessionManager } from '../../src/main/mongo/sessionManager'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Collection, MongoClient } from 'mongodb'
 import { EJSON } from 'bson'
@@ -6,12 +7,11 @@ import { executeShell, readShellPage, readShellTotal, releaseShellResult } from 
 import { shellResults } from '../../src/main/mongo/shellResults'
 import type { ShellResult } from '../../src/shared/types'
 
-vi.mock('../../src/main/mongo/sessionManager', () => ({ sessionManager: { getClient: () => client } }))
 let replicaSet: MongoMemoryReplSet
 let client: MongoClient
 const owner = 7
-const run = (code: string, pageSize = 2) => executeShell({ connectionId: 'paging', database: 'paging', code, pageSize }, owner)
-const page = (result: ShellResult, skip: number, pageSize = 2) => readShellPage({ resultId: result.resultId!, skip, pageSize, execId: 'page' }, owner)
+const run = (code: string, pageSize = 2) => executeShell({ connectionId: 'paging', database: 'paging', code, pageSize }, owner, { getClient: () => client } as unknown as SessionManager)
+const page = (result: ShellResult, skip: number, pageSize = 2) => readShellPage({ resultId: result.resultId!, skip, pageSize, execId: 'page' }, owner, { getClient: () => client } as unknown as SessionManager)
 const numbers = (result: ShellResult) => (EJSON.deserialize(result.data) as { n: number }[]).map((doc) => doc.n)
 
 beforeAll(async () => {

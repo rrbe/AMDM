@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
 
-const outputDirectory = resolve("out/main");
+const outputDirectory = resolve(process.argv[2] ?? "out/main");
 const common = {
   bundle: true,
   format: "esm",

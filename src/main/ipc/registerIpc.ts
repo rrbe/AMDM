@@ -25,7 +25,7 @@ import { connectionStore } from '../store/connectionStore'
 import { queryStore } from '../store/queryStore'
 import { settingsStore } from '../store/settingsStore'
 import { schemaStore } from '../store/schemaStore'
-import { sessionManager } from '../mongo/sessionManager'
+import { sessionManager } from '../mongo/desktopSession'
 import { diagnoseConnection } from '../ssh/tunnel'
 import type { DecryptedConnection } from '../mongo/uri'
 import {
@@ -189,10 +189,10 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   )
 
   // catalog
-  ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id))
-  ipcMain.handle(IPC.catalogCollections, (_e, id: string, db: string) => listCollections(id, db))
+  ipcMain.handle(IPC.catalogDatabases, (_e, id: string) => listDatabases(id, sessionManager))
+  ipcMain.handle(IPC.catalogCollections, (_e, id: string, db: string) => listCollections(id, db, sessionManager))
   ipcMain.handle(IPC.catalogCollectionCount, (_e, id: string, db: string, coll: string) =>
-    estimateCollectionCount(id, db, coll)
+    estimateCollectionCount(id, db, coll, sessionManager)
   )
   ipcMain.handle(IPC.catalogDropCollection, async (event, id: string, db: string, coll: string) => {
     const controller = new AbortController()
@@ -202,17 +202,17 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
       await dropCollection(id, db, coll, {
         timeoutMS: DEFAULT_SETTINGS.queryTimeoutMS,
         signal: controller.signal
-      })
+      }, sessionManager)
     } finally {
       event.sender.removeListener('destroyed', cancel)
     }
   })
   ipcMain.handle(IPC.catalogIndexes, (_e, id: string, db: string, coll: string) =>
-    listIndexes(id, db, coll)
+    listIndexes(id, db, coll, sessionManager)
   )
-  ipcMain.handle(IPC.catalogUsers, (_e, id: string, db: string) => listUsers(id, db))
+  ipcMain.handle(IPC.catalogUsers, (_e, id: string, db: string) => listUsers(id, db, sessionManager))
   ipcMain.handle(IPC.catalogSampleFields, (_e, id: string, db: string, coll: string) =>
-    sampleFields(id, db, coll)
+    sampleFields(id, db, coll, sessionManager)
   )
 
   // local Schema analysis + editable model
@@ -234,7 +234,7 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
       const ownerId = event.sender.id
       event.sender.once('destroyed', () => { void shellResults.closeOwner(ownerId) })
     }
-    const result = await executeShell(req, event.sender.id)
+    const result = await executeShell(req, event.sender.id, sessionManager)
     queryStore.addHistory(
       {
         code: req.code,

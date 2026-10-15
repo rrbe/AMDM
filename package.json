@@ -30,7 +30,14 @@
     "dist:prepare": "pnpm clean && pnpm build && pnpm prepare:sparkle",
     "dist": "pnpm dist:prepare && electron-builder",
     "dist:dir": "pnpm dist:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
-    "install:mac": "pnpm dist:dir --mac --arm64 --config.electronDist=node_modules/electron/dist && if pgrep -x AMDM >/dev/null; then osascript -e 'tell application \"AMDM\" to quit'; while pgrep -x AMDM >/dev/null; do sleep 0.1; done; fi && rm -rf /Applications/AMDM.app && ditto dist/mac-arm64/AMDM.app /Applications/AMDM.app && open /Applications/AMDM.app"
+    "install:mac": "pnpm dist:dir --mac --arm64 --config.electronDist=node_modules/electron/dist && if pgrep -x AMDM >/dev/null; then osascript -e 'tell application \"AMDM\" to quit'; while pgrep -x AMDM >/dev/null; do sleep 0.1; done; fi && rm -rf /Applications/AMDM.app && ditto dist/mac-arm64/AMDM.app /Applications/AMDM.app && open /Applications/AMDM.app",
+    "predev:web": "pnpm build:mongosh-runtime",
+    "dev:web": "vite --configLoader runner --config vite.web-dev.config.mts",
+    "build:web": "pnpm build:web:client && pnpm build:web:server",
+    "build:web:client": "vite build --config vite.web.config.mts",
+    "build:web:server": "vite build --config vite.web-server.config.mts && node scripts/build-mongosh-runtime.mjs out/web-server",
+    "start:web": "node out/web-server/index.mjs",
+    "test:web": "node --test test/web/*.test.mjs"
   },
   "dependencies": {
     "@babel/parser": "^8.0.7",

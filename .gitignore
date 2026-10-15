@@ -5,7 +5,11 @@ build/sparkle/
 *.log
 .DS_Store
 .vite/
+.web-data/
 *.tsbuildinfo
 
 # Test coverage reports
 coverage/
+
+# Repository-local worktrees
+.worktrees/

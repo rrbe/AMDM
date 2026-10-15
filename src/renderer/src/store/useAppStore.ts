@@ -71,6 +71,7 @@ import {
   type NotificationSource,
   type NotificationVariant
 } from '@renderer/lib/notifications'
+import { randomUuid } from '@renderer/lib/randomUuid'
 import i18n from '@renderer/i18n'
 import { catalogSearchSnapshot, type CatalogSearchSnapshot } from '@renderer/lib/catalogSearch'
 import { patchSchemaPanel, releaseSchemaPanels, schemaPanelKey, type SchemaPanelState } from '@renderer/lib/schemaPanel'
@@ -319,17 +320,17 @@ function shellFailureNotice(result: ShellResult, tabId: string): NotificationInp
 
 /** Opaque per-run id so a run can be cancelled via `shell.abort` (Stop). */
 function newExecId(): string {
-  return crypto.randomUUID()
+  return randomUuid()
 }
 
 /** Stable id for a new tab. */
 function newTabId(): string {
-  return crypto.randomUUID()
+  return randomUuid()
 }
 
 /** Stable id for a new result tab. */
 function newResultId(): string {
-  return crypto.randomUUID()
+  return randomUuid()
 }
 
 /** The focused tab. Always defined — the store guarantees ≥1 tab exists; the
@@ -390,7 +391,7 @@ function appendExecutionResult(
             'query',
             `query:${tabId}:resultRetention`
           ),
-          { id: crypto.randomUUID(), now: Date.now() }
+          { id: randomUuid(), now: Date.now() }
         )
       : s.notifications
   }
@@ -1533,7 +1534,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   notify(input) {
     set((state) => ({
       notifications: enqueueNotification(state.notifications, input, {
-        id: crypto.randomUUID(),
+        id: randomUuid(),
         now: Date.now()
       })
     }))

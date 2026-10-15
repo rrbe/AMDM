@@ -1,5 +1,5 @@
 import type { ShellPageRequest, ShellRequest, ShellResult, ShellResultTotal } from '../../shared/types'
-import { sessionManager } from './sessionManager'
+import type { SessionManager } from './sessionManager'
 import { runMongoshOnClient } from './mongoshCore'
 import { shellResults } from './shellResults'
 import { classifyOperationFailure } from './errorCore'
@@ -31,8 +31,8 @@ class ShellAbortError extends Error {
  * `getClient` may throw if the connection isn't open; that propagates as a
  * rejected IPC call (the renderer store surfaces it), matching prior behavior.
  */
-export async function executeShell(req: ShellRequest, ownerId = 0): Promise<ShellResult> {
-  const client = sessionManager.getClient(req.connectionId)
+export async function executeShell(req: ShellRequest, ownerId: number | string, sessions: SessionManager): Promise<ShellResult> {
+  const client = sessions.getClient(req.connectionId)
   const pageSize = validatePageSize(req.pageSize ?? 50)
   const controller = new AbortController()
   const session = shellResults.create(req.connectionId, ownerId, controller, req.timeoutMS ?? 30_000)
@@ -61,7 +61,7 @@ function validatePageSize(pageSize: number): number {
   return pageSize
 }
 
-export async function readShellPage(req: ShellPageRequest, ownerId: number): Promise<ShellResult> {
+export async function readShellPage(req: ShellPageRequest, ownerId: number | string): Promise<ShellResult> {
   const pageSize = validatePageSize(req.pageSize)
   if (!Number.isSafeInteger(req.skip) || req.skip < 0) throw new Error('Invalid page offset')
   const session = shellResults.get(req.resultId, ownerId)
@@ -82,11 +82,11 @@ export async function readShellPage(req: ShellPageRequest, ownerId: number): Pro
   }
 }
 
-export async function readShellTotal(resultId: string, ownerId: number): Promise<ShellResultTotal> {
+export async function readShellTotal(resultId: string, ownerId: number | string): Promise<ShellResultTotal> {
   return shellResults.get(resultId, ownerId).getTotal()
 }
 
-export function releaseShellResult(resultId: string, ownerId: number): Promise<void> {
+export function releaseShellResult(resultId: string, ownerId: number | string): Promise<void> {
   return shellResults.release(resultId, ownerId)
 }
 

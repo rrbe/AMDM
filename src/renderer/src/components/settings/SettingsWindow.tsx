@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Code2, Database, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
+import { ArrowLeft, Code2, Database, HardDrive, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -26,8 +26,10 @@ import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNe
 import { EditorColorSchemeSettings } from '@renderer/components/settings/EditorColorSchemeSettings'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { cn } from '@renderer/lib/utils'
+import { WebStorageSettings } from '@renderer/components/web/WebStorageSettings'
+import { IS_WEB } from '@renderer/lib/platform'
 
-type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts'
+type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts' | 'storage'
 
 interface UpdateAvailableDotProps {
   version: string
@@ -48,7 +50,7 @@ export function UpdateAvailableDot({ version, className }: UpdateAvailableDotPro
   )
 }
 
-export function SettingsWindow(): React.JSX.Element {
+export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const settings = useAppStore((s) => s.settings)
   const updateState = useAppStore((s) => s.updateState)
@@ -67,6 +69,7 @@ export function SettingsWindow(): React.JSX.Element {
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl'
 
   const sections = [
+    ...(IS_WEB ? [{ id: 'storage' as const, label: t('webStorage.section'), icon: HardDrive, keywords: [t('webStorage.section'), t('webStorage.server'), t('webStorage.browser')] }] : []),
     {
       id: 'appearance',
       label: t('settings.sectionAppearance'),
@@ -166,7 +169,9 @@ export function SettingsWindow(): React.JSX.Element {
       ]
     }
   ] as const
-  const visibleSections = sections.filter((section) => matchesSettingsSearch(section.keywords, searchQuery))
+  const visibleSections = sections.filter(
+    (section) => (!IS_WEB || !['updates', 'export'].includes(section.id)) && matchesSettingsSearch(section.keywords, searchQuery)
+  )
   const displayedSection = visibleSections.find((section) => section.id === activeSection) ?? visibleSections[0]
   const displayedSectionId = displayedSection?.id
 
@@ -192,8 +197,21 @@ export function SettingsWindow(): React.JSX.Element {
   }, [settings.theme])
 
   useEffect(() => {
+    const previousTitle = document.title
     document.title = t('settings.title')
+    return () => {
+      document.title = previousTitle
+    }
   }, [t])
+
+  useEffect(() => {
+    if (!onClose) return
+    const close = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !event.defaultPrevented) onClose()
+    }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [onClose])
 
   const runUpdateCheck = async (): Promise<void> => {
     if (updateState.phase === 'available' || updateState.phase === 'downloaded') {
@@ -234,11 +252,24 @@ export function SettingsWindow(): React.JSX.Element {
   }
 
   return (
-    <div className="grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground">
+    <div
+      role={onClose ? 'dialog' : undefined}
+      aria-modal={onClose ? true : undefined}
+      aria-label={onClose ? t('settings.title') : undefined}
+      className={cn(
+        'grid h-screen grid-cols-[210px_minmax(0,1fr)] overflow-hidden bg-card text-foreground',
+        onClose && 'fixed inset-0 z-[1000]'
+      )}
+    >
       <nav
         className="app-drag flex flex-col gap-1 border-r border-border bg-secondary px-3 pb-4 pt-[52px]"
         aria-label={t('settings.title')}
       >
+        {onClose && (
+          <Button type="button" variant="ghost" className="mb-2 justify-start" autoFocus onClick={onClose}>
+            <ArrowLeft aria-hidden /> {t('common.back')}
+          </Button>
+        )}
         <label className="relative mb-3 block">
           <Search
             size={15}
@@ -285,6 +316,8 @@ export function SettingsWindow(): React.JSX.Element {
           <h1 className="mb-7 text-[22px] font-semibold tracking-[-0.01em]">
             {displayedSection?.label ?? t('settings.searchNoResults')}
           </h1>
+
+          {__WEB__ && displayedSectionId === 'storage' && <WebStorageSettings />}
 
           {displayedSectionId === 'appearance' && (
             <>

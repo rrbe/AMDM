@@ -1,3 +1,4 @@
+import { randomUuid } from '@renderer/lib/randomUuid'
 import { Activity, Fragment, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Check, ChevronRight, Copy, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -115,7 +116,7 @@ export function JsonPreviewModal({
 
   const refresh = async (): Promise<void> => {
     if (!canRefresh || !source) return
-    const taskId = `document-refresh:${crypto.randomUUID()}`
+    const taskId = `document-refresh:${randomUuid()}`
     refreshTask.current = taskId
     setRefreshing(true)
     const result = await readDocument({

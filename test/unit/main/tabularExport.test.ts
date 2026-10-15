@@ -3,8 +3,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import ExcelJS from 'exceljs'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExportProgressPhase, ResultExportRequest } from '../../../src/shared/types'
+
+vi.mock('electron', () => ({ app: {}, dialog: {}, shell: {} }))
+vi.mock('../../../src/main/mongo/desktopSession', () => ({
+  sessionManager: { getClient: vi.fn() }
+}))
+
 import { exportTabularToFile } from '../../../src/main/io/exporter'
 
 const OID = '64b7f0f0f0f0f0f0f0f0f0f0'

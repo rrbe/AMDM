@@ -1,5 +1,6 @@
 {
   "common": {
+    "back": "返回",
     "close": "关闭",
     "cancel": "取消",
     "dismiss": "关闭",
@@ -736,5 +737,24 @@
     "keyboardHint": "↑ ↓ 选择 · Enter 打开 · Esc 关闭",
     "previous": "上一页",
     "next": "下一页"
+  },
+  "webStorage": {
+    "browserShort": "本地",
+    "serverShort": "服务端",
+    "section": "存储",
+    "mode": "存储位置",
+    "modeHint": "选择连接配置、保存查询、历史、设置和 Schema 的保存位置。",
+    "server": "服务端存储（默认）",
+    "browser": "浏览器本地存储",
+    "serverDescription": "数据按账号保存在服务端。连接密码在服务端加密保存，同一账号可在不同浏览器中使用。",
+    "browserDescription": "数据保存在当前浏览器中。连接密码不保存，每次连接时输入。清理网站数据会删除本地数据。服务端仍负责执行查询和记录操作审计。",
+    "switchHint": "两种模式各自保留数据。切换时关闭本页连接并重新载入工作区，已有保存数据留在原位置。",
+    "switchConfirm": "切换存储模式并重新载入？当前连接会关闭，未保存的查询标签页内容会丢失。两种模式各自保留已有保存数据。",
+    "apply": "应用并重新载入",
+    "passwordTitle": "连接密码",
+    "passwordDescription": "请输入“{{name}}”的密码以连接数据库。",
+    "browserPasswordHint": "密码仅用于当次连接，不会保存在浏览器或服务端。",
+    "serverPasswordHint": "密码按账号在服务端加密保存。",
+    "connect": "连接"
   }
 }

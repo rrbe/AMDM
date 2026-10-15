@@ -3,7 +3,7 @@ import { dialog, type BrowserWindow } from 'electron'
 import ExcelJS from 'exceljs'
 import type { Document } from 'mongodb'
 import type { DataOpResult, ImportRequest } from '../../shared/types'
-import { sessionManager } from '../mongo/sessionManager'
+import { sessionManager } from '../mongo/desktopSession'
 import { decodeBsonFile } from './bsonFileCore'
 import { detectImportFileFormat, parseJsonDocuments, type ImportFileFormat } from './importCore'
 

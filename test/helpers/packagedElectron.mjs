@@ -194,7 +194,7 @@ export function waitForUi(client) {
 }
 
 // Send input through Electron's real Renderer, retaining event/focus behavior.
-export async function clickElement(client, expression, clickCount = 1) {
+export async function clickElement(client, expression, clickCount = 1, settleFrames = true) {
   for (let count = 1; count <= clickCount; count++) {
     const point = await waitForExpression(
       client,
@@ -203,7 +203,7 @@ export async function clickElement(client, expression, clickCount = 1) {
     if (!element || element.disabled || element.getAttribute('aria-disabled') === 'true') return null;
     element.scrollIntoView({block:'nearest', inline:'nearest'});
     // Scrolling can update virtualized rows before native input arrives.
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (${settleFrames}) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const target = ${expression};
     if (!target) return null;
     const r = target.getBoundingClientRect();

@@ -1,4 +1,5 @@
-import { Suspense, forwardRef, lazy, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import CodeMirror from '@uiw/react-codemirror'
 import { useTranslation } from 'react-i18next'
 import { javascript } from '@codemirror/lang-javascript'
 import {
@@ -27,8 +28,7 @@ import { ContextMenu, type ContextMenuEntry } from '@renderer/components/Context
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 
 /**
- * CodeMirror is heavy, so we lazy-load it — it stays out of
- * the initial bundle and only loads when the shell workspace first renders.
+ * ShellWorkspace lazy-loads this module with all CodeMirror dependencies.
  *
  * Shortcuts live INSIDE CodeMirror as a high-precedence keymap (not on a React
  * wrapper). A wrapper keydown fires in the bubble phase, after CodeMirror has
@@ -39,8 +39,6 @@ import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
  * preventDefaults, while every other default binding (Cmd/Opt+Arrow navigation,
  * word/line motion, etc.) stays intact.
  */
-const CodeMirror = lazy(() => import('@uiw/react-codemirror'))
-
 // The React wrapper reconfigures CodeMirror whenever this object identity
 // changes. Keep it stable so a store update does not discard active snippets.
 const BASIC_SETUP = {
@@ -269,30 +267,30 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
   return (
     <div
       className="editor-wrap"
+      onFocus={() => {
+        if (__WEB__) tsAutocomplete.warm()
+      }}
       onContextMenu={(e) => {
         if (!viewRef.current) return
         e.preventDefault()
         setMenu({ x: e.clientX, y: e.clientY })
       }}
     >
-      <Suspense fallback={<div className="editor-loading">{t('shell.loadingEditor')}</div>}>
-        <CodeMirror
-          value={value}
-          height="100%"
-          theme={isDark ? pineDark : pineLight}
-          extensions={extensions}
-          indentWithTab={false}
-          onChange={onChange}
-          onCreateEditor={(view) => {
-            viewRef.current = view
-            updateQueryRunBusy(view, handlers.current.busy)
-            // Pre-spawn the TS-service worker so the heavy `typescript` chunk
-            // loads off the critical path and the service is warm by first use.
-            tsAutocomplete.warm()
-          }}
-          basicSetup={BASIC_SETUP}
-        />
-      </Suspense>
+      <CodeMirror
+        value={value}
+        height="100%"
+        theme={isDark ? pineDark : pineLight}
+        extensions={extensions}
+        indentWithTab={false}
+        onChange={onChange}
+        onCreateEditor={(view) => {
+          viewRef.current = view
+          updateQueryRunBusy(view, handlers.current.busy)
+          // Desktop prewarms locally; Web waits for editor focus before downloading the service.
+          if (!__WEB__) tsAutocomplete.warm()
+        }}
+        basicSetup={BASIC_SETUP}
+      />
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={buildMenu()} onClose={() => setMenu(null)} />
       )}

@@ -7,7 +7,7 @@ import type {
   DocUpdateRequest
 } from '../../shared/types'
 import type { WebContents } from 'electron'
-import { sessionManager } from './sessionManager'
+import { sessionManager } from './desktopSession'
 import { replaceDocumentOnDb, setFieldOnDb, deleteDocumentOnDb, readDocumentOnDb } from './docOpsCore'
 import { serializerPool } from '../workers/serializerPool'
 

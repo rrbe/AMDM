@@ -22,6 +22,8 @@ import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { copyText } from '@renderer/lib/resultCopy'
 import { cn } from '@renderer/lib/utils'
+import { currentWebStorageMode } from '@renderer/lib/web/storageContext'
+import { IS_WEB } from '@renderer/lib/platform'
 import { isMacPlatform } from '@renderer/lib/keyboardShortcuts'
 import { ConnectionPermissions } from './ConnectionPermissions'
 import {
@@ -217,7 +219,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   const [passwordTouched, setPasswordTouched] = useState(false)
 
   // ---- SSH ----
-  const [sshEnabled, setSshEnabled] = useState(editing?.ssh.enabled ?? false)
+  const [sshEnabled, setSshEnabled] = useState(!IS_WEB && (editing?.ssh.enabled ?? false))
   const [sshHost, setSshHost] = useState(editing?.ssh.host ?? '')
   const [sshPort, setSshPort] = useState(String(editing?.ssh.port ?? 22))
   const [sshUser, setSshUser] = useState(editing?.ssh.username ?? '')
@@ -391,7 +393,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
           mechanism: authType === 'scram' ? mechanism : undefined
         },
         ssh: {
-          enabled: sshEnabled,
+          enabled: !IS_WEB && sshEnabled,
           host: sshHost.trim() || undefined,
           port: Number(sshPort) || 22,
           username: sshUser.trim() || undefined,
@@ -586,7 +588,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
           items={[
             { value: 'general', label: tFn('connection.tab.general') },
             { value: 'auth', label: tFn('connection.tab.auth') },
-            { value: 'ssh', label: 'SSH' },
+            ...(!IS_WEB ? [{ value: 'ssh' as const, label: 'SSH' }] : []),
             { value: 'tls', label: 'TLS' }
           ]}
         />
@@ -917,7 +919,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
       {tab === 'auth' && (
         <>
           <div className="mb-3 text-[11px] text-[var(--fg-3)]">
-            {tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
+            {IS_WEB ? tFn(currentWebStorageMode() === 'browser' ? 'webStorage.browserPasswordHint' : 'webStorage.serverPasswordHint') : tFn(`connection.auth.passwordStorage.${passwordStoragePlatform}`)}
           </div>
           <div className="form-grid">
             <Field label={tFn('connection.auth.username')} error={authError}>

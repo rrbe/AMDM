@@ -34,7 +34,7 @@ export class ShellResultSession {
 
   constructor(
     readonly connectionId: string,
-    readonly ownerId: number,
+    readonly ownerId: number | string,
     readonly controller: AbortController,
     private timeoutMS: number
   ) {}
@@ -191,19 +191,19 @@ export class ShellResultSession {
 class ShellResults {
   private results = new Map<string, ShellResultSession>()
 
-  create(connectionId: string, ownerId: number, controller: AbortController, timeoutMS: number): ShellResultSession {
+  create(connectionId: string, ownerId: number | string, controller: AbortController, timeoutMS: number): ShellResultSession {
     const result = new ShellResultSession(connectionId, ownerId, controller, timeoutMS)
     this.results.set(result.id, result)
     return result
   }
 
-  get(id: string, ownerId: number): ShellResultSession {
+  get(id: string, ownerId: number | string): ShellResultSession {
     const result = this.results.get(id)
     if (!result || result.ownerId !== ownerId) throw new Error('Result is closed. Run the query again.')
     return result
   }
 
-  async release(id: string, ownerId: number): Promise<void> {
+  async release(id: string, ownerId: number | string): Promise<void> {
     const result = this.results.get(id)
     if (!result || result.ownerId !== ownerId) return
     this.results.delete(id)
@@ -214,7 +214,7 @@ class ShellResults {
     await Promise.all([...this.results.values()].filter((r) => r.connectionId === connectionId).map((r) => this.release(r.id, r.ownerId)))
   }
 
-  async closeOwner(ownerId: number): Promise<void> {
+  async closeOwner(ownerId: number | string): Promise<void> {
     await Promise.all([...this.results.values()].filter((r) => r.ownerId === ownerId).map((r) => this.release(r.id, ownerId)))
   }
 }

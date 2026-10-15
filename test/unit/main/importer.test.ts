@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
   dialog: { showOpenDialog: io.showOpenDialog }
 }))
 
-vi.mock('../../../src/main/mongo/sessionManager', () => ({
+vi.mock('../../../src/main/mongo/desktopSession', () => ({
   sessionManager: {
     getClient: () => ({
       db: () => ({

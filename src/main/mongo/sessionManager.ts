@@ -1,12 +1,12 @@
 import { MongoClient, type TopologyDescriptionChangedEvent } from 'mongodb'
 import type { AuthorizationResult, ConnectionStatus, FailureKind, TestResult } from '../../shared/types'
-import { connectionStore } from '../store/connectionStore'
 import { SshTunnel } from '../ssh/tunnel'
 import { buildTunnelOptions, classifyConnError } from '../ssh/tunnelCore'
 import { buildClientArgs, type DecryptedConnection } from './uri'
 import { classifyOperationFailure } from './errorCore'
 import { readAuthorization } from './authorization'
 import { AuthorizationCache, authorizationCacheKey } from './authorizationCache'
+import { clearFieldCache } from './catalog'
 import { shellResults } from './shellResults'
 
 function classifyConnectionFailure(error: unknown): FailureKind {
@@ -14,6 +14,12 @@ function classifyConnectionFailure(error: unknown): FailureKind {
   if (connectionKind !== 'other') return connectionKind
   const operationKind = classifyOperationFailure(error)
   return operationKind === 'execution' ? 'unknown' : operationKind
+}
+
+export interface ConnectionSource {
+  getDecrypted(id: string): DecryptedConnection | null
+  recordSshHostKey?(id: string, fingerprint: string): void
+  recordSshJumpHostKey?(id: string, fingerprint: string): void
 }
 
 interface Session {
@@ -35,6 +41,8 @@ export class SessionManager {
   private authorizationCache = new AuthorizationCache()
   private pending = new Map<string, PendingSession>()
   private statusListeners = new Set<(status: ConnectionStatus) => void>()
+
+  constructor(private readonly connections: ConnectionSource) {}
 
   onStatusChanged(listener: (status: ConnectionStatus) => void): () => void {
     this.statusListeners.add(listener)
@@ -100,7 +108,7 @@ export class SessionManager {
     // tear down any existing session for this id first
     await this.disconnect(id)
 
-    const dec = connectionStore.getDecrypted(id)
+    const dec = this.connections.getDecrypted(id)
     if (!dec) {
       const status: ConnectionStatus = {
         id,
@@ -179,10 +187,10 @@ export class SessionManager {
       this.sessions.set(id, session)
       // TOFU: persist the host key(s) learned on first connect so later connects verify them.
       if (tunnel?.learnedHostKey) {
-        connectionStore.recordSshHostKey(id, tunnel.learnedHostKey)
+        this.connections.recordSshHostKey?.(id, tunnel.learnedHostKey)
       }
       if (tunnel?.learnedJumpHostKey) {
-        connectionStore.recordSshJumpHostKey(id, tunnel.learnedJumpHostKey)
+        this.connections.recordSshJumpHostKey?.(id, tunnel.learnedJumpHostKey)
       }
       return status
     } catch (err) {
@@ -202,6 +210,7 @@ export class SessionManager {
   }
 
   async disconnect(id: string): Promise<void> {
+    clearFieldCache(id)
     const pending = this.pending.get(id)
     this.pending.delete(id)
     const s = this.sessions.get(id)
@@ -253,5 +262,3 @@ export class SessionManager {
     this.authorizationCache.clear()
   }
 }
-
-export const sessionManager = new SessionManager()

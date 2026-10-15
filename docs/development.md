@@ -37,6 +37,9 @@ CDP to verify both window bridges, concurrent first queries, transactions, BSON,
 the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
 
+The packaging step explicitly runs `pnpm exec install-electron` before using
+`node_modules/electron/dist`; unit tests do not install the Electron binary.
+
 The UI E2E also runs on all three platforms, with reports, Electron logs, and
 screenshots under `dist/e2e-validation/`. Test files run serially because native
 Electron windows share desktop focus; parallel instances can disrupt mouse,
@@ -63,6 +66,10 @@ The minimum supported macOS version is 13 Ventura for both arm64 and x64. The ap
 `pnpm install:mac` builds and installs the arm64 app using the Electron distribution already installed in `node_modules/electron/dist`. Install dependencies first with `pnpm install` on an Apple Silicon Mac. This local command avoids Electron archive downloads and online checksum requests during packaging; it still builds the app and signs the bundle. Sparkle is downloaded only when its prepared framework is missing or its pinned version changes.
 
 ## Main-process dependency packaging
+
+Electron packages only `out/main/`, `out/preload/`, and `out/renderer/`.
+Web builds remain in `out/web/` and `out/web-server/`; existing Web output does
+not enter desktop packages. The packaged runtime check verifies this boundary.
 
 The package uses `type: module`. Electron Vite emits ESM for main and workers,
 and `out/preload/index.mjs` for preload (Electron requires `.mjs` for ESM
@@ -149,3 +156,12 @@ from the first published tag.
 | MongoDB behavior, writes, or IPC | The above plus relevant integration tests                |
 | Build configuration or main deps | The above plus `pnpm build` and target unpacked artifact |
 | Renderer interaction or styling  | The above plus validation in the current Electron app    |
+
+## Internal Web edition
+
+`pnpm dev:web` starts the shared Renderer and the Web RPC adapter with HMR.
+`pnpm build:web` builds the browser client, Node server, serializer worker, and
+isolated mongosh runtime; `pnpm start:web` starts that server.
+`pnpm test:web` launches the compiled server against MongoDB from an isolated
+working directory and checks HTTP, pagination, workers, and shutdown. See
+[AMDM Web](WEB.md) for SSO, persistence, capabilities, and deployment.

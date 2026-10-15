@@ -55,3 +55,7 @@ macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. 
 ## License
 
 [GNU GPL v3.0](./LICENSE)
+
+## Web edition
+
+For the internal browser edition, see [AMDM Web](docs/WEB.md).

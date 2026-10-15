@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { MongoJsonSchema, SchemaAnalysis, SchemaModel, SchemaTarget } from '../../shared/types'
-import { cloneMongoJsonSchema, schemaTargetKey } from './schemaStoreCore'
+import { modelWithAnalysis, modelWithDraft, schemaTargetKey } from '../../shared/schemaStoreCore'
 
 interface SchemaFile {
   version: 1
@@ -36,12 +36,7 @@ class SchemaStore {
   saveAnalysis(target: SchemaTarget, analysis: SchemaAnalysis): SchemaModel {
     const key = schemaTargetKey(target)
     const previous = this.data.models[key]
-    const model: SchemaModel = {
-      target,
-      analysis,
-      draft: previous?.draft ?? cloneMongoJsonSchema(analysis.generated),
-      draftUpdatedAt: previous?.draftUpdatedAt ?? analysis.analyzedAt
-    }
+    const model = modelWithAnalysis(target, analysis, previous)
     this.data.models[key] = model
     this.persist()
     return model
@@ -50,12 +45,7 @@ class SchemaStore {
   saveDraft(target: SchemaTarget, draft: MongoJsonSchema): SchemaModel {
     const key = schemaTargetKey(target)
     const previous = this.data.models[key]
-    if (!previous) throw new Error('Analyze the collection before saving a Schema.')
-    const model = {
-      ...previous,
-      draft: cloneMongoJsonSchema(draft),
-      draftUpdatedAt: Date.now()
-    }
+    const model = modelWithDraft(previous, draft)
     this.data.models[key] = model
     this.persist()
     return model
@@ -64,12 +54,7 @@ class SchemaStore {
   overwriteDraft(target: SchemaTarget): SchemaModel {
     const key = schemaTargetKey(target)
     const previous = this.data.models[key]
-    if (!previous) throw new Error('Analyze the collection before overwriting the draft.')
-    const model = {
-      ...previous,
-      draft: cloneMongoJsonSchema(previous.analysis.generated),
-      draftUpdatedAt: Date.now()
-    }
+    const model = modelWithDraft(previous)
     this.data.models[key] = model
     this.persist()
     return model

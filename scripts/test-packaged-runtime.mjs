@@ -34,6 +34,10 @@ try {
     (await waitForTarget(application.mainPort, () => true)).webSocketDebuggerUrl
   )
   debuggers.push(main)
+  report.outputDirectories = await main.evaluate(
+    "process.getBuiltinModule('fs').readdirSync(process.resourcesPath + '/app.asar/out').sort()"
+  )
+  assert.deepEqual(report.outputDirectories, ['main', 'preload', 'renderer'])
   await main.call('NodeWorker.enable', { waitForDebuggerOnStart: false })
   await main.call('Profiler.enable')
   await main.call('Profiler.startPreciseCoverage', { callCount: true, detailed: true })

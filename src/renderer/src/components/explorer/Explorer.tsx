@@ -38,6 +38,8 @@ import { formatScalar } from '@renderer/lib/ejson'
 import { formatMongoHosts } from '@renderer/lib/connectionUri'
 import { createCatalogSearch, type CatalogSearchMatch, type MatchRange } from '@renderer/lib/catalogSearch'
 import { formatBytes } from '@renderer/lib/formatBytes'
+import { currentWebStorageMode } from '@renderer/lib/web/storageContext'
+import { IS_WEB } from '@renderer/lib/platform'
 import { copyText } from '@renderer/lib/resultCopy'
 import { applyConnectionOrder, reorderConnectionIds, type DropEdge } from '@renderer/lib/connectionOrder'
 import { ConnectionForm } from '@renderer/components/sidebar/ConnectionForm'
@@ -50,11 +52,14 @@ import { Tooltip } from '@renderer/components/ui/Tooltip'
 import type { CatalogDestination } from '@renderer/lib/quickSearch/documents'
 import { searchId } from '@renderer/lib/quickSearch/types'
 import { recordSearchVisit } from '@renderer/lib/quickSearch/visits'
-import {
-  HistoryView,
-  SavedQueriesView,
-  type StoredQuerySelection
-} from '@renderer/components/explorer/SavedQueriesPanel'
+import type { StoredQuerySelection } from '@renderer/components/explorer/SavedQueriesPanel'
+
+const SavedQueriesView = lazy(async () => ({
+  default: (await import('./SavedQueriesPanel')).SavedQueriesView
+}))
+const HistoryView = lazy(async () => ({
+  default: (await import('./SavedQueriesPanel')).HistoryView
+}))
 
 const SchemaModelModal = lazy(async () => ({
   default: (await import('@renderer/components/schema/SchemaModelModal')).SchemaModelModal
@@ -457,6 +462,7 @@ export function Explorer({
               collection: coll.name
             })
         },
+        ...(!IS_WEB ? [
         'separator',
         {
           label: t('io.exportCollection'),
@@ -480,6 +486,7 @@ export function Explorer({
               collection: coll.name
             })
         },
+        ] as ContextMenuEntry[] : []),
         'separator',
         {
           label: t('explorer.dropCollection'),
@@ -846,9 +853,9 @@ export function Explorer({
           </div>
         </>
       ) : view === 'savedQueries' ? (
-        <SavedQueriesView onLoad={onQueryLoad} />
+        <Suspense fallback={null}><SavedQueriesView onLoad={onQueryLoad} /></Suspense>
       ) : (
-        <HistoryView onLoad={onQueryLoad} />
+        <Suspense fallback={null}><HistoryView onLoad={onQueryLoad} /></Suspense>
       )}
 
       {/* App-level controls stay in the quiet footer. */}
@@ -910,7 +917,7 @@ export function Explorer({
           </button>
         ) : (
           <span className="side-foot-version" title={__APP_VERSION__}>
-            {__APP_VERSION__}
+            {__APP_VERSION__}{IS_WEB && ` · ${t(currentWebStorageMode() === 'browser' ? 'webStorage.browserShort' : 'webStorage.serverShort')}`}
           </span>
         )}
         <Tooltip content={t('common.settings')}>

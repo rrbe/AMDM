@@ -79,6 +79,7 @@ vi.mock('../../../src/main/store/connectionStore', () => ({
   }
 }))
 
+import { connectionStore } from '../../../src/main/store/connectionStore'
 import { SessionManager } from '../../../src/main/mongo/sessionManager'
 
 describe('SessionManager', () => {
@@ -89,7 +90,7 @@ describe('SessionManager', () => {
   })
 
   it('disconnects an in-flight connection attempt without publishing an error', async () => {
-    const manager = new SessionManager()
+    const manager = new SessionManager(connectionStore)
     const connecting = manager.connect('c1')
     await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
 
@@ -105,7 +106,7 @@ describe('SessionManager', () => {
   })
 
   it('returns a stable timeout kind for a failed connection attempt', async () => {
-    const manager = new SessionManager()
+    const manager = new SessionManager(connectionStore)
     const connecting = manager.connect('c1')
     await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
 
@@ -123,7 +124,7 @@ describe('SessionManager', () => {
       if (command.connectionStatus) throw new Error('command not supported')
       return {}
     })
-    const testing = new SessionManager().test({ config })
+    const testing = new SessionManager(connectionStore).test({ config })
     await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
     fake.finishConnect()
     await expect(testing).resolves.toMatchObject({ ok: true, authorizationError: 'command not supported' })
@@ -134,7 +135,7 @@ describe('SessionManager', () => {
   })
 
   it('publishes driver topology loss and recovery without discarding the client', async () => {
-    const manager = new SessionManager()
+    const manager = new SessionManager(connectionStore)
     const statuses: Array<{ state: string; error?: string }> = []
     manager.onStatusChanged((status) => statuses.push(status))
 

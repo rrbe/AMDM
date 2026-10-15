@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
   shell: { openPath: electron.openPath, showItemInFolder: electron.showItemInFolder }
 }))
 
-vi.mock('../../../src/main/mongo/sessionManager', () => ({
+vi.mock('../../../src/main/mongo/desktopSession', () => ({
   sessionManager: { getCollection: vi.fn() }
 }))
 

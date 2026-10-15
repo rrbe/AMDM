@@ -1,3 +1,4 @@
+import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -297,7 +298,7 @@ export function TreeView({
       label: t('result.dataMenu.copy'),
       children: treeCopyMenuItems(node, selected, fieldSort)
     })
-    items.push({
+    if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
       children: exportMenuItems(selected, onExport)
     })

@@ -1,3 +1,4 @@
+import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
@@ -367,7 +368,7 @@ export function TableView({
       label: t('result.dataMenu.copy'),
       children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
     })
-    items.push({
+    if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
       children: exportMenuItems(
         selectedIndexes.map((index) => docs[index]),

@@ -1,5 +1,6 @@
 {
   "common": {
+    "back": "Back",
     "close": "Close",
     "cancel": "Cancel",
     "dismiss": "Dismiss",
@@ -736,5 +737,24 @@
     "keyboardHint": "↑ ↓ Select · Enter Open · Esc Close",
     "previous": "Previous",
     "next": "Next"
+  },
+  "webStorage": {
+    "browserShort": "Browser",
+    "serverShort": "Server",
+    "section": "Storage",
+    "mode": "Storage location",
+    "modeHint": "Choose where connections, saved queries, history, settings and schemas are kept.",
+    "server": "Server storage (default)",
+    "browser": "Browser storage",
+    "serverDescription": "Data is saved on the server under your account. Connection passwords are encrypted on the server and can be reused across browsers.",
+    "browserDescription": "Data stays in this browser. Connection passwords are not saved and must be entered for every connection. Clearing site data deletes your local data. The server still executes queries and records operation audits.",
+    "switchHint": "Each mode keeps its own data. Switching closes this page’s connections and reloads the workspace; saved data is preserved in its original location.",
+    "switchConfirm": "Switch storage mode and reload? Current connections will close and unsaved query tabs will be lost. Each mode keeps its existing saved data.",
+    "apply": "Apply and reload",
+    "passwordTitle": "Connection password",
+    "passwordDescription": "Enter the password for “{{name}}” to connect.",
+    "browserPasswordHint": "Passwords are used only for the current connection and are not saved in the browser or on the server.",
+    "serverPasswordHint": "Passwords are encrypted and saved on the server under your account.",
+    "connect": "Connect"
   }
 }

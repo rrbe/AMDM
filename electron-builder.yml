@@ -8,7 +8,9 @@ directories:
 
 # electron-builder adds production dependencies separately.
 files:
-  - out/**/*
+  - out/main/**/*
+  - out/preload/**/*
+  - out/renderer/**/*
   - package.json
 
 # The Sparkle addon is built as a stable N-API module; JS dependencies still do
