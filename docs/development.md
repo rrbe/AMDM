@@ -37,6 +37,9 @@ CDP to verify both window bridges, concurrent first queries, transactions, BSON,
 the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
 
+The packaging step explicitly runs `pnpm exec install-electron` before using
+`node_modules/electron/dist`; unit tests do not install the Electron binary.
+
 The UI E2E also runs on all three platforms, with reports, Electron logs, and
 screenshots under `dist/e2e-validation/`. Test files run serially because native
 Electron windows share desktop focus; parallel instances can disrupt mouse,
