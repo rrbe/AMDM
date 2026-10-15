@@ -231,6 +231,8 @@ test(
           globalThis.webStorageTestWindow.focus();
           globalThis.webStorageTestWindow.webContents.focus();
         }, 0); true`);
+        // Hosted desktops can deny native foreground focus even when the page is visible.
+        await renderer.call("Emulation.setFocusEmulationEnabled", { enabled: true });
         await waitForExpression(
           renderer,
           'document.hasFocus() && document.visibilityState === "visible"',
