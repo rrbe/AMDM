@@ -43,8 +43,14 @@ pnpm clean                           # 清理构建产物
 - `vm` 沙箱 Shell，运行 mongosh 风格的 JS（`find` / `aggregate` / `runCommand` …）
 - 支持自动补全，保存常用查询、查看历史
 - 原生导入 / 导出 JSON / CSV / XLSX / BSON
+- 连接备份、MongoDB URL 列表及其他客户端的连接格式适配
 - Tree / JSON / Table 结果视图
 - 可视化 explain
+
+桌面版可右键 Connections 标题或空白处导入／导出连接，也可右键某个连接单独导出。
+支持 AMDM 备份、纯 URL 列表、Compass JSON、Studio 3T URI 文件、NoSQLBooster URI
+列表，以及供 Robo 3T 粘贴使用的 URL。默认不包含密码；AMDM 备份可整体加密。
+SSH 私钥和 TLS 证书仅保留路径，文件需另外迁移；标准 URL 不包含 SSH 隧道、连接名称和颜色。
 
 ## macOS 安装
 

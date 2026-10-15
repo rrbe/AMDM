@@ -43,8 +43,16 @@ pnpm clean                           # remove generated build files
 - A `vm`-sandboxed shell that runs mongosh-style JS (`find` / `aggregate` / `runCommand` …)
 - Autocomplete, saved queries, and history
 - Native import / export for JSON / JSONL / CSV / TSV / XLSX / BSON
+- Connection backups, MongoDB URL lists, and client-specific connection transfers
 - Tree / JSON / Table result views
 - Visual explain
+
+On desktop, right-click the Connections heading or empty space to import/export
+connections, or a connection row to export that connection. Choose an AMDM backup,
+plain URL list, Compass JSON, Studio 3T URI file, NoSQLBooster URI list, or a Robo 3T
+URL for pasting. Passwords are excluded by default; AMDM backups can encrypt the
+entire contents. SSH private keys and TLS certificates are referenced by path and
+must be moved separately. Standard URLs omit SSH tunnels, names, and colors.
 
 ## macOS installation
 
