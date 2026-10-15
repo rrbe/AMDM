@@ -33,7 +33,7 @@ interface TooltipChildProps {
   'aria-label'?: string
 }
 
-const SHOW_DELAY = 700
+const SHOW_DELAY = 300
 const tooltipHandle = BaseTooltip.createHandle<TooltipPayload>()
 const OVERFLOW_ONLY_ATTR = 'data-tooltip-overflow-only'
 
