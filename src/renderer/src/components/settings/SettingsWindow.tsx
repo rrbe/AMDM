@@ -317,7 +317,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
             {displayedSection?.label ?? t('settings.searchNoResults')}
           </h1>
 
-          {displayedSectionId === 'storage' && <WebStorageSettings />}
+          {__WEB__ && displayedSectionId === 'storage' && <WebStorageSettings />}
 
           {displayedSectionId === 'appearance' && (
             <>

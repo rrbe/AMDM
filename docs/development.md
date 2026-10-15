@@ -67,6 +67,10 @@ The minimum supported macOS version is 13 Ventura for both arm64 and x64. The ap
 
 ## Main-process dependency packaging
 
+Electron packages only `out/main/`, `out/preload/`, and `out/renderer/`.
+Web builds remain in `out/web/` and `out/web-server/`; existing Web output does
+not enter desktop packages. The packaged runtime check verifies this boundary.
+
 The package uses `type: module`. Electron Vite emits ESM for main and workers,
 and `out/preload/index.mjs` for preload (Electron requires `.mjs` for ESM
 preloads). Application TypeScript uses `ESNext` with `Bundler` resolution.
