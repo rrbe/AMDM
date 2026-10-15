@@ -391,6 +391,11 @@
     "close": "Close"
   },
   "shell": {
+    "diagnostics": {
+      "title": "Problems",
+      "empty": "No problems",
+      "unknownCollection": "Collection '{{name}}' is not in the loaded catalog for '{{database}}'. Check its name, or refresh the collection list. Writing to a new collection is still allowed."
+    },
     "fallbackConnTitle": "Shell",
     "noDatabase": "(no database)",
     "saveQueryTip": "Save current query",

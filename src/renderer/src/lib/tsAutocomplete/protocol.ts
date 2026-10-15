@@ -12,11 +12,27 @@ export interface TsCompletionEntry {
   sortText: string
 }
 
+export interface TsDiagnostic {
+  from: number
+  to: number
+  severity: 'error' | 'warning'
+  message: string
+  collectionName?: string
+}
+
+export interface TsDiagnosticContext {
+  database: string
+  /** null means the catalog has not loaded; an empty array is a known empty database. */
+  collections: string[] | null
+}
+
 export type TsWorkerRequest =
   | { type: 'init' }
   | { type: 'decls'; text: string }
   | { type: 'complete'; seq: number; code: string; pos: number }
+  | { type: 'diagnose'; seq: number; code: string; context: TsDiagnosticContext }
 
 export type TsWorkerResponse =
   | { type: 'ready' }
   | { type: 'result'; seq: number; entries: TsCompletionEntry[]; replacementSpan?: { from: number } }
+  | { type: 'diagnostics'; seq: number; diagnostics: TsDiagnostic[] }

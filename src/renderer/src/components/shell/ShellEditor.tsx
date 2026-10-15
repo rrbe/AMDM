@@ -13,11 +13,13 @@ import { EditorView, keymap } from '@codemirror/view'
 import { Prec, EditorState, EditorSelection } from '@codemirror/state'
 import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
+import { openLintPanel } from '@codemirror/lint'
 import { indentUnit, getIndentUnit } from '@codemirror/language'
 import { shellCompletionSource } from '@renderer/lib/shellCompletion'
 import { tsAutocomplete } from '@renderer/lib/tsAutocomplete/tsAutocompleteClient'
 import { ghostText, acceptGhost } from '@renderer/lib/ghostText'
 import { shellSemanticHighlight } from '@renderer/lib/shellSemanticHighlight'
+import { shellDiagnostics } from '@renderer/lib/shellDiagnostics'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { pineLight, pineDark } from '@renderer/lib/pineEditorTheme'
 import { useIsDark } from '@renderer/lib/useIsDark'
@@ -174,6 +176,7 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
     () => [
       javascript({ typescript: false }),
       shellSemanticHighlight,
+      shellDiagnostics((name, database) => t('shell.diagnostics.unknownCollection', { name, database })),
       queryRunGutter({
         label: runStatementLabel,
         onRun: (code) => {
@@ -206,7 +209,9 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
         'by word': t('shell.search.wholeWord'),
         replace: t('shell.search.replaceAction'),
         'replace all': t('shell.search.replaceAll'),
-        close: t('shell.search.close')
+        close: t('shell.search.close'),
+        Diagnostics: t('shell.diagnostics.title'),
+        'No diagnostics': t('shell.diagnostics.empty')
       }),
       // Editor preferences applied as extensions: font size cascades from the
       // editor root; tab width drives both the visual tab + the spaces Tab inserts.
@@ -372,6 +377,11 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
       { label: t('shell.menu.format'), shortcut: '⌘⇧F', onClick: () => formatNow() },
       'separator',
       { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
+      {
+        label: t('shell.diagnostics.title'),
+        shortcut: isMacPlatform() ? '⌘⇧M' : 'Ctrl+Shift+M',
+        onClick: () => withView((v) => openLintPanel(v))
+      },
       'separator',
       { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isSaveBusy, onClick: () => saveIfReady() },
       'separator',

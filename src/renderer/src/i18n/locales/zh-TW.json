@@ -391,6 +391,11 @@
     "close": "關閉"
   },
   "shell": {
+    "diagnostics": {
+      "title": "問題",
+      "empty": "沒有發現問題",
+      "unknownCollection": "資料庫「{{database}}」已載入的目錄中沒有集合「{{name}}」。請檢查名稱或重新整理集合清單；仍可正常寫入新集合。"
+    },
     "fallbackConnTitle": "Shell",
     "noDatabase": "（無資料庫）",
     "saveQueryTip": "儲存目前查詢",

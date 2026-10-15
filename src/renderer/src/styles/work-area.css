@@ -682,6 +682,80 @@
   background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
+/* ---- Query diagnostics ---- */
+.editor-wrap .cm-lintRange-error,
+.editor-wrap .cm-lintRange-warning {
+  background-image: none;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-underline-offset: 3px;
+}
+.editor-wrap .cm-lintRange-error {
+  text-decoration-color: var(--err);
+}
+.editor-wrap .cm-lintRange-warning {
+  text-decoration-color: var(--warn);
+}
+.editor-wrap .cm-lintRange-active {
+  background-color: var(--interaction-pressed);
+}
+.editor-wrap .cm-tooltip.cm-tooltip-lint {
+  max-width: min(520px, 80vw);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-popover);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.editor-wrap .cm-diagnostic {
+  padding: 6px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.editor-wrap .cm-diagnostic-error {
+  border-left-color: var(--err);
+}
+.editor-wrap .cm-diagnostic-warning {
+  border-left-color: var(--warn);
+}
+.editor-wrap .cm-panel.cm-panel-lint {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.editor-wrap .cm-panel.cm-panel-lint ul {
+  max-height: 140px;
+  padding-right: 28px;
+}
+.editor-wrap .cm-panel.cm-panel-lint ul:focus {
+  outline: none;
+}
+.editor-wrap .cm-panel.cm-panel-lint ul [aria-selected],
+.editor-wrap .cm-panel.cm-panel-lint ul:focus [aria-selected] {
+  background: var(--interaction-selected);
+  color: var(--text-primary);
+}
+.editor-wrap .cm-panel.cm-panel-lint [name='close'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+.editor-wrap .cm-panel.cm-panel-lint [name='close']:hover {
+  background: var(--interaction-hover);
+}
+
 /* ---- Completion dropdown ----
    Use the same popover shell for the suggestion list and its documentation.
    Scope the selectors to the editor so they outrank CodeMirror's
