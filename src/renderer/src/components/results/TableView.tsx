@@ -40,6 +40,7 @@ import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { useResultTimeZone } from './ResultTimeZone'
 
 /**
  * Virtualized table.
@@ -65,7 +66,6 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 interface TableViewProps {
   docs: unknown[]
   fontSize: number
-  timeZone?: string
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
   onDocumentOrderChange: (sourceIndexes: number[]) => void
@@ -97,7 +97,6 @@ function columnStyle(width: number, index: number): CSSProperties {
 export function TableView({
   docs,
   fontSize,
-  timeZone,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
   onDocumentOrderChange,
@@ -486,7 +485,6 @@ export function TableView({
                     key={col.id}
                     doc={doc}
                     column={col}
-                    timeZone={timeZone}
                     style={hasPinnedId && item.index === 0
                       ? style
                       : { ...style, position: 'absolute', left: item.start }
@@ -536,7 +534,6 @@ export function TableView({
           title={preview.title}
           value={preview.value}
           fontSize={fontSize}
-          timeZone={timeZone}
           documentView={preview.documentView}
           documentId={preview.documentId}
           source={preview.source}
@@ -671,7 +668,6 @@ function tableCopyMenuItems(
 function Cell({
   doc,
   column,
-  timeZone,
   style,
   selected,
   editing,
@@ -685,7 +681,6 @@ function Cell({
 }: {
   doc: unknown
   column: TableColumn
-  timeZone?: string
   style: CSSProperties
   selected: boolean
   editing: boolean
@@ -697,6 +692,7 @@ function Cell({
   onCancel: () => void
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { present, value } = cellValue(doc, column.path)
   const cellCls = `tbl-td${column.path[0] === '_id' ? ' tbl-pinned-id' : ''}${selected ? ' selected' : ''}`
 

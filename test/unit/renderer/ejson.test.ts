@@ -69,6 +69,10 @@ describe('formatScalar edge cases', () => {
       'ISODate("2024-07-01T05:00:00.000-07:00")'
     )
   })
+  it('keeps BSON dates outside the JavaScript Date range readable', () => {
+    expect(formatScalar({ $date: { $numberLong: '9223372036854775807' } }, 'Asia/Shanghai').text)
+      .toBe('ISODate("9223372036854775807")')
+  })
   it('a number wrapper with extra keys is NOT a number — falls back to object', () => {
     const s = formatScalar({ $numberLong: '5', extra: 1 })
     expect(s.type).toBe('object')

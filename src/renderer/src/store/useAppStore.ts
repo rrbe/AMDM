@@ -642,12 +642,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   async deleteConnection(id) {
     try {
       await window.api.connections.delete(id)
-      const timeZoneOverrides = get().settings.connectionDateTimeZones
-      if (Object.prototype.hasOwnProperty.call(timeZoneOverrides, id)) {
-        const nextOverrides = { ...timeZoneOverrides }
-        delete nextOverrides[id]
-        await get().updateSettings({ connectionDateTimeZones: nextOverrides })
-      }
       set((s) => {
         const { [id]: _removedCatalog, ...catalogs } = s.catalogs
         const { [id]: _removedSnapshot, ...catalogSearchSnapshots } = s.catalogSearchSnapshots

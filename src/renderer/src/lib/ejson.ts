@@ -83,23 +83,16 @@ function numberInner(v: unknown): string {
 
 /** Render a `$date` payload (string or { $numberLong }) as an ISO string. */
 export function formatEjsonDate(payload: unknown, timeZone?: string): string {
-  if (typeof payload === 'string') {
-    if (!timeZone) return payload
-    const date = new Date(payload)
-    return Number.isNaN(date.getTime()) ? payload : formatDateInTimeZone(date, timeZone)
+  const raw = isPlainObject(payload) && hasKey(payload, '$numberLong')
+    ? Number(payload['$numberLong'])
+    : payload
+  if (typeof raw !== 'string' && typeof raw !== 'number') return String(payload)
+  const date = new Date(raw)
+  // BSON dates cover int64 milliseconds, beyond JavaScript Date's range.
+  if (!Number.isFinite(date.getTime())) {
+    return isPlainObject(payload) && hasKey(payload, '$numberLong') ? String(payload['$numberLong']) : String(raw)
   }
-  if (isPlainObject(payload) && hasKey(payload, '$numberLong')) {
-    const ms = Number(payload['$numberLong'])
-    if (!Number.isNaN(ms)) {
-      const date = new Date(ms)
-      return timeZone ? formatDateInTimeZone(date, timeZone) : date.toISOString()
-    }
-  }
-  if (typeof payload === 'number') {
-    const date = new Date(payload)
-    return timeZone ? formatDateInTimeZone(date, timeZone) : date.toISOString()
-  }
-  return String(payload)
+  return timeZone ? formatDateInTimeZone(date, timeZone) : date.toISOString()
 }
 
 /**

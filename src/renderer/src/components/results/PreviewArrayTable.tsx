@@ -8,6 +8,7 @@ import { previewArrayCell, previewArrayColumns } from '@renderer/lib/previewArra
 import { formatJsonPreview } from '@renderer/lib/resultCopy'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { useResultTimeZone } from './ResultTimeZone'
 
 const INDEX_WIDTH = 56
 const COLUMN_WIDTH = 200
@@ -16,11 +17,11 @@ const COLUMN_WIDTH = 200
 interface PreviewArrayTableProps {
   value: unknown[]
   fontSize: number
-  timeZone?: string
   onOpen: (value: unknown, label: string, trigger: HTMLElement) => void
 }
 
-export function PreviewArrayTable({ value, fontSize, timeZone, onOpen }: PreviewArrayTableProps): React.JSX.Element {
+export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTableProps): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { t } = useTranslation()
   const openLabel = t('result.previewOpen')
   const openHint = t('result.previewOpenHint')

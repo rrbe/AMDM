@@ -18,14 +18,13 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toJsonLines } from '@renderer/lib/format'
-import { copyDisplayDatesAsUtc } from '@renderer/lib/dateTimeZone'
 import { parseExplain, type StageTreeNode } from '@renderer/lib/explain'
+import { useResultTimeZone } from './ResultTimeZone'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 interface ExplainViewProps {
   plan: unknown
   fontSize: number
-  timeZone?: string
   folding?: JsonFoldingState
 }
 
@@ -34,7 +33,8 @@ function fmtNum(v: number | undefined): string {
   return v === undefined ? '—' : v.toLocaleString()
 }
 
-export function ExplainView({ plan, fontSize, timeZone, folding }: ExplainViewProps): React.JSX.Element {
+export function ExplainView({ plan, fontSize, folding }: ExplainViewProps): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
   const rawLines = useMemo(() => toJsonLines(plan, timeZone), [plan, timeZone])
@@ -76,7 +76,6 @@ export function ExplainView({ plan, fontSize, timeZone, folding }: ExplainViewPr
             lines={rawLines}
             fontSize={fontSize}
             controlsContainer={foldControls}
-            onCopy={copyDisplayDatesAsUtc}
           />
         </div>
       </details>

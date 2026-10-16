@@ -26,7 +26,6 @@ export function mergeWebSettings(
     next.editorTabSize,
     next.contextPanelWidth,
   ];
-  const connectionDateTimeZones = next.connectionDateTimeZones;
   if (
     !Array.isArray(next.connectionOrder) ||
     !next.connectionOrder.every((item) => typeof item === "string") ||
@@ -34,10 +33,6 @@ export function mergeWebSettings(
     !["light", "dark", "system"].includes(next.theme) ||
     !["system", "en", "zh-CN", "zh-TW"].includes(next.language) ||
     !(next.dateTimeZone === "system" || isValidTimeZone(next.dateTimeZone)) ||
-    typeof connectionDateTimeZones !== "object" ||
-    connectionDateTimeZones === null ||
-    Array.isArray(connectionDateTimeZones) ||
-    Object.values(connectionDateTimeZones).some((zone) => !isValidTimeZone(zone)) ||
     numbers.some((item) => !Number.isFinite(item)) ||
     !QUERY_LIMITS.includes(next.queryLimit as (typeof QUERY_LIMITS)[number]) ||
     !QUERY_TIMEOUTS_MS.includes(

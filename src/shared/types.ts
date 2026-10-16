@@ -594,8 +594,6 @@ export interface AppSettings {
   language: Language
   /** BSON Date result display zone; 'system' follows the OS. */
   dateTimeZone: string
-  /** Per-connection result display zones, omitted when using the app default. */
-  connectionDateTimeZones: Record<string, string>
   /** Explorer sidebar width in px (drag-resizable; clamped at the UI). */
   sidebarWidth: number
   /** Details sidebar width in px (drag-resizable; clamped at the UI). */
@@ -671,7 +669,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   language: 'system',
   dateTimeZone: 'system',
-  connectionDateTimeZones: {},
   sidebarWidth: 270,
   contextPanelWidth: 300,
   contextPanelOpen: false,

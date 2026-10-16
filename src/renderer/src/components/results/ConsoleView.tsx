@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { ShellOutputLine } from '@shared/types'
 import { consoleText, toConsoleLines } from '@renderer/lib/consoleOutput'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
-import { copyDisplayDatesAsUtc } from '@renderer/lib/dateTimeZone'
+import { useResultTimeZone } from './ResultTimeZone'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 /**
@@ -17,14 +17,14 @@ import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 interface ConsoleViewProps {
   output: ShellOutputLine[]
   fontSize: number
-  timeZone?: string
   folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
   /** True when the engine dropped lines beyond the capture cap. */
   truncated?: boolean
 }
 
-export function ConsoleView({ output, fontSize, timeZone, truncated, controlsContainer, folding }: ConsoleViewProps): React.JSX.Element {
+export function ConsoleView({ output, fontSize, truncated, controlsContainer, folding }: ConsoleViewProps): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { t } = useTranslation()
   const lines = useMemo(() => toConsoleLines(output, timeZone), [output, timeZone])
 
@@ -38,7 +38,6 @@ export function ConsoleView({ output, fontSize, timeZone, truncated, controlsCon
         fontSize={fontSize}
         folding={folding}
         controlsContainer={controlsContainer}
-        onCopy={copyDisplayDatesAsUtc}
         includeRootInCollapseAll
         rowClassName={(line) => `console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
       />

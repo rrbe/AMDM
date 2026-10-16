@@ -6,6 +6,13 @@
 
 Global notifications use the bounded `notifications` queue in the store. Producers must report a non-cancelled, user-relevant asynchronous failure exactly once, with a stable `source` and `dedupeKey` when it can repeat. Keep contextual details in their owning result, form, or progress UI as well; the toast is the attention layer, not the only error record. Do not notify for expected cancellation, inline validation, owner cleanup, or best-effort background decoration such as autocomplete sampling. Classify timeout/network/auth failures in main and carry the stable failure kind over IPC instead of parsing localized or driver-generated messages in Renderer.
 
+Result date display uses the app's time zone preference (which may follow the system). `ResultTimeZoneContext` scopes it to all result views
+and preview portals. Pure formatters receive the resolved zone explicitly; source
+EJSON stays unchanged. Copy/export/edit operations use UTC source values. JSON and
+structured Console selections carry UTC copy text on BSON Date tokens; complete
+tokens copy that value, while partial selections and plain output retain the selected
+characters. Never infer BSON types by matching rendered text.
+
 Zustand selectors must return stable references:
 
 - Update `Set`, arrays, and nested records immutably.

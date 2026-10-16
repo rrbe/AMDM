@@ -354,11 +354,6 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                 <TimeZoneSelect
                   value={settings.dateTimeZone}
                   onChange={(dateTimeZone) => void updateSettings({ dateTimeZone })}
-                  label={t('settings.timeZone')}
-                  systemOptionLabel={t('settings.timeZoneSystem')}
-                  header={t('settings.timeZoneHeader')}
-                  placeholder={t('settings.timeZoneSearchPlaceholder')}
-                  emptyMessage={t('settings.timeZoneEmpty')}
                 />
               </Field>
             </>

@@ -28,6 +28,20 @@ describe('toJsonLines', () => {
     expect(toInlineJsonTokens({ createdAt: { $date: '2026-10-15T09:50:05.154Z' } }, 'Asia/Shanghai')
       .map((token) => token.text).join('')).toBe('{ createdAt: ISODate("2026-10-15T17:50:05.154+08:00") }')
   })
+  it('attaches source copy values only to BSON Date tokens', () => {
+    const instant = '1900-01-01T00:00:00.000Z'
+    const literal = 'ISODate("1900-01-01T05:21:10.000+05:21:10")'
+    const lines = toJsonLines({ date: { $date: instant }, literal }, 'Asia/Kolkata')
+    const tokens = lines.flatMap((line) => line.tokens)
+    expect(tokens.filter((token) => token.copyText)).toEqual([{
+      text: literal,
+      cls: 'v-date',
+      copyText: `ISODate("${instant}")`
+    }])
+    expect(tokens.find((token) => token.cls === 'v-string')).toEqual({
+      text: JSON.stringify(literal), cls: 'v-string'
+    })
+  })
   it('flattens an object with trailing commas on all but the last entry', () => {
     expect(texts({ a: 1, b: 2 })).toEqual(['{', '"a": 1,', '"b": 2', '}'])
   })

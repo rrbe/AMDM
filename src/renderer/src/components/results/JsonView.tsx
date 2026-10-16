@@ -5,8 +5,9 @@ import { toJsonLines } from '@renderer/lib/format'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { copyText, toPlainJson, toShellText } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
-import { copyDisplayDatesAsUtc, normalizeDisplayDatesForCopy } from '@renderer/lib/dateTimeZone'
+import { resultSelectionText } from '@renderer/lib/resultTextSelection'
 import { jsonCopyMenuItems } from './documentFormatMenus'
+import { useResultTimeZone } from './ResultTimeZone'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 /**
@@ -33,12 +34,12 @@ import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 interface JsonViewProps {
   value: unknown
   fontSize: number
-  timeZone?: string
   folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
 }
 
-export function JsonView({ value, fontSize, timeZone, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
+export function JsonView({ value, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { t } = useTranslation()
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
@@ -69,16 +70,15 @@ export function JsonView({ value, fontSize, timeZone, controlsContainer, folding
   // falls through to native copy inside useCopyHotkey.
   useCopyHotkey(() => toPlainJson(value))
 
-  const openMenu = (e: MouseEvent): void => {
+  const openMenu = (e: MouseEvent<HTMLDivElement>): void => {
     e.preventDefault()
-    const sel = window.getSelection()
-    const selText = sel && !sel.isCollapsed ? sel.toString() : ''
+    const selText = resultSelectionText(e.currentTarget)
     const documents = Array.isArray(value) ? value : [value]
     const items: ContextMenuEntry[] = [
       ...jsonCopyMenuItems(documents, (text) => void copyText(text)),
       { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(value)) }
     ]
-    if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(normalizeDisplayDatesForCopy(selText)) })
+    if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
@@ -93,7 +93,6 @@ export function JsonView({ value, fontSize, timeZone, controlsContainer, folding
         fontSize={fontSize}
         folding={folding}
         controlsContainer={controlsContainer}
-        onCopy={copyDisplayDatesAsUtc}
         allSelected={allSelected}
         onMouseDown={() => setAllSelected(false)}
         onContextMenu={openMenu}

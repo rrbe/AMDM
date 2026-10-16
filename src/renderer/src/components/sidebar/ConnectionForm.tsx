@@ -18,7 +18,6 @@ import { Tabs } from '@renderer/components/ui/Tabs'
 import { Field } from '@renderer/components/ui/Field'
 import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
-import { TimeZoneSelect } from '@renderer/components/ui/TimeZoneSelect'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { copyText } from '@renderer/lib/resultCopy'
@@ -165,7 +164,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   const pickFile = useAppStore((s) => s.pickFile)
   const diagnoseConnection = useAppStore((s) => s.diagnoseConnection)
   const updateSettings = useAppStore((s) => s.updateSettings)
-  const connectionDateTimeZones = useAppStore((s) => s.settings.connectionDateTimeZones)
   // Remembered "To URL" password choice (persisted in settings.json).
   const rememberedIncludePassword = useAppStore((s) => s.settings.exportIncludeRealPassword)
 
@@ -208,9 +206,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   )
   const [replicaSet, setReplicaSet] = useState(editing?.replicaSet ?? '')
   const [defaultDatabase, setDefaultDatabase] = useState(editing?.defaultDatabase ?? '')
-  const [connectionTimeZone, setConnectionTimeZone] = useState(() =>
-    editing ? connectionDateTimeZones[editing.id] ?? 'default' : 'default'
-  )
   const [readPreference, setReadPreference] = useState(() => splitConnectionOptions(editing?.options).readPreference)
   const [customOptions, setCustomOptions] = useState<OptionRow[]>(() =>
     optionRows(splitConnectionOptions(editing?.options).custom)
@@ -517,13 +512,7 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
     setSaving(true)
     const saved = await saveConnection(buildInput())
     setSaving(false)
-    if (saved) {
-      const overrides = { ...useAppStore.getState().settings.connectionDateTimeZones }
-      if (connectionTimeZone === 'default') delete overrides[saved.id]
-      else overrides[saved.id] = connectionTimeZone
-      await updateSettings({ connectionDateTimeZones: overrides })
-      onClose()
-    }
+    if (saved) onClose()
   }
 
   const runTest = async (): Promise<void> => {
@@ -835,21 +824,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
                   value={defaultDatabase}
                   onChange={(e) => setDefaultDatabase(e.target.value)}
                   placeholder={tFn('connection.optional')}
-                />
-              </Field>
-              <Field
-                label={tFn('connection.general.dateTimeZone')}
-                hint={tFn('connection.general.dateTimeZoneHint')}
-                className="mb-0"
-              >
-                <TimeZoneSelect
-                  value={connectionTimeZone}
-                  onChange={setConnectionTimeZone}
-                  label={tFn('connection.general.dateTimeZone')}
-                  defaultOptionLabel={tFn('connection.general.dateTimeZoneDefault')}
-                  header={tFn('settings.timeZoneHeader')}
-                  placeholder={tFn('settings.timeZoneSearchPlaceholder')}
-                  emptyMessage={tFn('settings.timeZoneEmpty')}
                 />
               </Field>
             </div>

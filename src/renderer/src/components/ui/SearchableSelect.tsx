@@ -16,6 +16,8 @@ export interface SearchableSelectOption<T extends string> {
   value: T
   label: ReactNode
   filterText: string
+  /** Keep the option visible when the list scrolls. */
+  pinned?: boolean
 }
 
 export interface SearchableSelectHandle {
@@ -128,7 +130,10 @@ function SearchableSelectInner<T extends string>(
                   <Combobox.Item
                     key={option.value}
                     value={option.value}
-                    className="flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[var(--interaction-hover)] data-[highlighted]:text-foreground"
+                    className={cn(
+                      'flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[var(--interaction-hover)] data-[highlighted]:text-foreground',
+                      option.pinned && 'sticky top-0 z-10 bg-[var(--surface-elevated)]'
+                    )}
                   >
                     <span className="min-w-0 flex-1">{option.label}</span>
                     <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">

@@ -15,6 +15,8 @@ export interface JsonToken {
   text: string
   /** CSS class: 'json-key' | 'json-punct' | `v-${ValueType}` for scalars. */
   cls: string
+  /** Original UTC shell value when display text uses a result time zone. */
+  copyText?: string
 }
 
 export interface JsonLine {
@@ -39,23 +41,12 @@ function punct(text: string): JsonToken {
   return { text, cls: 'json-punct' }
 }
 
-/** Render a primitive/extended scalar as its JSON-line representation. */
-function scalarText(value: unknown, timeZone?: string): string {
+/** Build display tokens with source UTC copy values for BSON Dates. */
+function scalarToken(value: unknown, timeZone?: string): JsonToken {
   const { type, text } = formatScalar(value, timeZone)
-  switch (type) {
-    case 'string':
-      return JSON.stringify(text)
-    case 'number':
-    case 'int':
-    case 'double':
-    case 'boolean':
-    case 'null':
-    case 'undefined':
-      return text
-    default:
-      // ObjectId("..")/ISODate("..")/NumberLong("..") etc. render verbatim.
-      return text
-  }
+  const token: JsonToken = { text: type === 'string' ? JSON.stringify(text) : text, cls: `v-${type}` }
+  if (type === 'date' && timeZone) token.copyText = formatScalar(value).text
+  return token
 }
 
 const INLINE_PREVIEW_ITEMS = 5
@@ -70,9 +61,8 @@ function inlineValue(value: unknown, timeZone?: string): JsonToken {
   if (typeof value === 'object' && value !== null && !isExtended(value)) {
     return { text: Object.keys(value).length ? '{ … }' : '{}', cls: 'v-object' }
   }
-  const { type } = formatScalar(value, timeZone)
-  const text = typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(scalarText(value, timeZone))
-  return { text, cls: `v-${type}` }
+  const token = scalarToken(value, timeZone)
+  return { ...token, text: typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(token.text) }
 }
 
 /** One level of an object/array, with bounded entries and text for Table cells. */
@@ -136,12 +126,12 @@ function pushLines(
     isArray || (typeof value === 'object' && value !== null && !isExtended(value))
 
   if (!isContainer) {
-    const { type } = formatScalar(value, timeZone)
-    const valText = scalarText(value, timeZone)
+    const token = scalarToken(value, timeZone)
+    const valText = token.text
     out.push({
       depth,
       text: `${keyPrefix}${valText}${comma}`,
-      tokens: [...keyToks, { text: valText, cls: `v-${type}` }, ...commaToks]
+      tokens: [...keyToks, token, ...commaToks]
     })
     return
   }

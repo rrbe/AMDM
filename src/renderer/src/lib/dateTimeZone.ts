@@ -1,5 +1,4 @@
 import type { AppSettings } from '@shared/types'
-import type { ClipboardEvent as ReactClipboardEvent } from 'react'
 
 const formatters = new Map<string, Intl.DateTimeFormat>()
 
@@ -33,7 +32,7 @@ function partsFor(date: Date, timeZone: string): Map<string, string> {
 }
 
 function offsetFromParts(parts: Map<string, string>): string {
-  const name = parts.get('timeZoneName') ?? 'GMT'
+  const name = parts.get('timeZoneName')!
   const match = /^(?:GMT|UTC)(?:([+-])(\d{2}):(\d{2})(?::(\d{2}))?)?$/i.exec(name)
   if (!match) throw new RangeError(`Unsupported time zone offset: ${name}`)
   if (!match[1]) return '+00:00'
@@ -50,56 +49,29 @@ function isoYear(year: string, era: string | undefined): string {
 /** Render one instant as an ISO wall time with that zone's numeric offset. */
 export function formatDateInTimeZone(date: Date, timeZone: string): string {
   const parts = partsFor(date, timeZone)
-  const year = isoYear(parts.get('year') ?? '0', parts.get('era'))
-  const month = parts.get('month') ?? '01'
-  const day = parts.get('day') ?? '01'
-  const hour = parts.get('hour') ?? '00'
-  const minute = parts.get('minute') ?? '00'
-  const second = parts.get('second') ?? '00'
+  const year = isoYear(parts.get('year')!, parts.get('era'))
+  const month = parts.get('month')!
+  const day = parts.get('day')!
+  const hour = parts.get('hour')!
+  const minute = parts.get('minute')!
+  const second = parts.get('second')!
   const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0')
   return `${year}-${month}-${day}T${hour}:${minute}:${second}.${milliseconds}${offsetFromParts(parts)}`
-}
-
-export function formatTimeZoneOffset(date: Date, timeZone: string): string {
-  return `UTC${offsetFromParts(partsFor(date, timeZone))}`
 }
 
 export function getSystemTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
-export function resolveResultTimeZone(
-  dateTimeZone: AppSettings['dateTimeZone'],
-  connectionDateTimeZones: AppSettings['connectionDateTimeZones'],
-  connectionId?: string | null
-): string {
-  const selected = (connectionId && connectionDateTimeZones[connectionId]) || dateTimeZone
-  return selected === 'system' ? getSystemTimeZone() : selected
+export function formatTimeZoneLabel(timeZone: string, date: Date, locale = 'en'): string {
+  const offset = `UTC${offsetFromParts(partsFor(date, timeZone))}`
+  const name = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'long' })
+    .formatToParts(date).find((part) => part.type === 'timeZoneName')!.value
+  // ICU supplies the date's standard/daylight name, including regional exceptions.
+  const detail = timeZone === 'UTC' || /^(?:GMT|UTC)(?:[+-]|$)/.test(name) ? offset : `${offset} · ${name}`
+  return `${timeZone} (${detail})`
 }
 
-export function formatResultTimeZoneLabel(timeZone: string): string {
-  return `${timeZone} (${formatTimeZoneOffset(new Date(), timeZone)})`
-}
-
-/** Keep native selections from JSON/Console in the UTC form used by explicit copy actions. */
-export function normalizeDisplayDatesForCopy(text: string): string {
-  return text.replace(/ISODate\("([^"\n]+)"\)/g, (token, value: string) => {
-    const match = /^([+-]?\d{4,6})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})([+-])(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value)
-    if (!match) return token
-    const [, year, month, day, hour, minute, second, millisecond, sign, offsetHour, offsetMinute, offsetSecond = '0'] = match
-    const date = new Date(0)
-    date.setUTCFullYear(Number(year), Number(month) - 1, Number(day))
-    date.setUTCHours(Number(hour), Number(minute), Number(second), Number(millisecond))
-    const offset = (Number(offsetHour) * 3600 + Number(offsetMinute) * 60 + Number(offsetSecond)) * 1000
-    const utc = date.getTime() - (sign === '+' ? offset : -offset)
-    const utcDate = new Date(utc)
-    return Number.isNaN(utcDate.getTime()) ? token : `ISODate("${utcDate.toISOString()}")`
-  })
-}
-
-export function copyDisplayDatesAsUtc(event: ReactClipboardEvent<HTMLDivElement>): void {
-  const selected = window.getSelection()
-  if (!selected || selected.isCollapsed) return
-  event.clipboardData.setData('text/plain', normalizeDisplayDatesForCopy(selected.toString()))
-  event.preventDefault()
+export function resolveResultTimeZone(dateTimeZone: AppSettings['dateTimeZone']): string {
+  return dateTimeZone === 'system' ? getSystemTimeZone() : dateTimeZone
 }

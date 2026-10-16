@@ -24,7 +24,6 @@ interface JsonPreviewModalProps {
   title: string
   value: unknown
   fontSize: number
-  timeZone?: string
   documentView?: boolean
   documentId?: unknown
   source?: JsonPreviewSource
@@ -43,7 +42,6 @@ export function JsonPreviewModal({
   title,
   value,
   fontSize,
-  timeZone,
   documentView = false,
   documentId,
   source,
@@ -269,11 +267,11 @@ export function JsonPreviewModal({
           {levels.map((level, index) => (
             <Fragment key={index}>
               <Activity mode={index === levels.length - 1 && !(level.view === 'table' && Array.isArray(level.value)) ? 'visible' : 'hidden'}>
-                <JsonView value={level.value} fontSize={fontSize} timeZone={timeZone} controlsContainer={null} />
+                <JsonView value={level.value} fontSize={fontSize} controlsContainer={null} />
               </Activity>
               {Array.isArray(level.value) && (
                 <Activity mode={index === levels.length - 1 && level.view === 'table' ? 'visible' : 'hidden'}>
-                  <PreviewArrayTable value={level.value} fontSize={fontSize} timeZone={timeZone} onOpen={openNested} />
+                  <PreviewArrayTable value={level.value} fontSize={fontSize} onOpen={openNested} />
                 </Activity>
               )}
             </Fragment>

@@ -25,6 +25,7 @@ import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { useResultTimeZone } from './ResultTimeZone'
 
 /**
  * Two-column KEY | VALUE tree of the result documents.
@@ -62,7 +63,6 @@ interface FlatNode {
 interface TreeViewProps {
   docs: unknown[]
   fontSize: number
-  timeZone?: string
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
   onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
@@ -77,7 +77,6 @@ const MAX_KEY_WIDTH = 680
 export function TreeView({
   docs,
   fontSize,
-  timeZone,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
   onExport,
@@ -382,7 +381,7 @@ export function TreeView({
                     }}
                   />
                 ) : (
-                  <ValueCell node={node} timeZone={timeZone} />
+                  <ValueCell node={node} />
                 )}
               </div>
               <div className={`kv-type v-${valueType(node.value)}`}>
@@ -409,7 +408,6 @@ export function TreeView({
           title={t('result.documentPreviewTitle')}
           value={previewDoc.value}
           fontSize={fontSize}
-          timeZone={timeZone}
           documentView
           source={previewDoc.source}
           onValueChange={(value) => setPreviewDoc((current) => (current ? { ...current, value } : current))}
@@ -473,7 +471,8 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
   ]
 }
 
-function ValueCell({ node, timeZone }: { node: FlatNode; timeZone?: string }): React.JSX.Element {
+function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.
