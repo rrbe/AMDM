@@ -122,7 +122,8 @@ async function typeInto(renderer, expression, text) {
 async function rightClick(renderer, selector, position = 'center') {
   const point = await waitForExpression(
     renderer,
-    `(() => {
+    `(async () => {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const el = document.querySelector(${JSON.stringify(selector)});
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -175,6 +176,7 @@ async function openTransfer(
 async function escapeDialog(renderer) {
   await pressKey(renderer, 'Escape', 'Escape', 27)
   await waitForExpression(renderer, `!${dialog} && !document.querySelector('[role=menu]')`)
+  await renderer.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
 }
 
 async function chooseFormat(renderer, label) {
@@ -262,7 +264,7 @@ test(
       )
       clients.push(main)
       await waitForUi(renderer)
-      report.applicationPid = await main.evaluate(`(() => {
+      report.processIds = await main.evaluate(`(() => {
       const electron = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron');
       const realpath = process.getBuiltinModule('fs').realpathSync;
       if (realpath(electron.app.getPath('userData')) !== realpath(${JSON.stringify(profile)})) throw new Error('Not the isolated E2E profile');
@@ -297,7 +299,7 @@ test(
         window.focus();
         window.webContents.focus();
       }, 0);
-      return process.pid;
+      return { main: process.pid, renderer: electron.BrowserWindow.getAllWindows()[0].webContents.getOSProcessId() };
     })()`)
       phase = 'save fake credentials through the real bridge'
       const saved =
@@ -597,12 +599,13 @@ test(
       await waitForExpression(renderer, `(${button('Export connections')})?.disabled === true`)
       await clickElement(renderer, button('Select all'))
       await waitForExpression(renderer, `${dialog}.innerText.includes('206 of 206 selected')`)
-      const scrollPoint = await renderer.evaluate(`(() => {
+      const scrollPoint = await waitForExpression(renderer, `(async () => {
       const list = ${dialog}.querySelector('[data-index]').closest('.overflow-y-auto');
+      list.scrollIntoView({ block: 'center' });
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const r = list.getBoundingClientRect();
       const point = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      if (!list.contains(document.elementFromPoint(point.x, point.y))) throw new Error('Virtual list is obscured');
-      return point;
+      return list.contains(document.elementFromPoint(point.x, point.y)) ? point : null;
     })()`)
       await renderer.call('Input.dispatchMouseEvent', {
         type: 'mouseMoved',
@@ -635,8 +638,11 @@ test(
       report.phase = phase
       report.error = error.stack
       if (process.platform === 'darwin' && /Debugger timeout: Input/.test(error.message)) {
-        const sample = spawnSync('sample', [String(report.applicationPid), '1', '-file', join(diagnostics, 'main-hang.sample')], { timeout: 5_000, encoding: 'utf8' })
-        report.sample = { status: sample.status, error: sample.error?.message }
+        report.samples = {}
+        for (const [name, pid] of Object.entries(report.processIds)) {
+          const sample = spawnSync('sample', [String(pid), '1', '-file', join(diagnostics, `${name}-hang.sample`)], { timeout: 5_000, encoding: 'utf8' })
+          report.samples[name] = { status: sample.status, error: sample.error?.message }
+        }
       }
       if (renderer) {
         await screenshot(renderer, 'failure').catch(() => undefined)
