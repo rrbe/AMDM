@@ -175,6 +175,7 @@
     "importWarning": "导入完成，但有需要注意的信息",
     "unknown": "未知",
     "clipboardUnavailable": "复制失败：剪贴板不可用",
+    "pasteFailed": "粘贴失败：无法读取剪贴板",
     "copied": "已复制到剪贴板",
     "buildUriFailed": "生成连接串失败：{{error}}",
     "pickFileFailed": "打开文件选择器失败：{{error}}",

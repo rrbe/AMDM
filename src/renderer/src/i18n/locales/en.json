@@ -175,6 +175,7 @@
     "importWarning": "Import completed with a warning",
     "unknown": "unknown",
     "clipboardUnavailable": "Copy failed: clipboard unavailable",
+    "pasteFailed": "Paste failed: could not read the clipboard",
     "copied": "Copied to clipboard",
     "buildUriFailed": "Failed to build connection string: {{error}}",
     "pickFileFailed": "Failed to open the file picker: {{error}}",

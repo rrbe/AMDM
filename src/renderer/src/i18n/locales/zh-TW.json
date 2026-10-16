@@ -175,6 +175,7 @@
     "importWarning": "匯入完成，但有需要注意的資訊",
     "unknown": "未知",
     "clipboardUnavailable": "複製失敗：剪貼簿不可用",
+    "pasteFailed": "貼上失敗：無法讀取剪貼簿",
     "copied": "已複製到剪貼簿",
     "buildUriFailed": "產生連線字串失敗：{{error}}",
     "pickFileFailed": "開啟檔案選擇器失敗：{{error}}",

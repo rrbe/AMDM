@@ -11,7 +11,7 @@ import {
 } from '@codemirror/autocomplete'
 import { EditorView, keymap } from '@codemirror/view'
 import { Prec, EditorState, EditorSelection } from '@codemirror/state'
-import { indentLess, insertTab, redo, selectAll, toggleComment, undo } from '@codemirror/commands'
+import { indentLess, insertTab, redo, redoDepth, selectAll, toggleComment, undo, undoDepth } from '@codemirror/commands'
 import { openSearchPanel, search } from '@codemirror/search'
 import { openLintPanel } from '@codemirror/lint'
 import { indentUnit, getIndentUnit } from '@codemirror/language'
@@ -297,7 +297,19 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
         basicSetup={BASIC_SETUP}
       />
       {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={buildMenu()} onClose={() => setMenu(null)} />
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={buildMenu()}
+          onClose={() => {
+            setMenu(null)
+            requestAnimationFrame(() => {
+              const active = document.activeElement
+              if (active === document.body || active?.closest('.ctx-menu')) viewRef.current?.focus()
+            })
+          }}
+          finalFocus={false}
+        />
       )}
     </div>
   )
@@ -340,58 +352,91 @@ export const ShellEditor = forwardRef<ShellEditorHandle, ShellEditorProps>(funct
     return true
   }
 
-  // Focus the editor first so native clipboard ops (execCommand) and CodeMirror
-  // commands act on the editor's selection rather than the menu button.
+  // Run after the modal menu closes so its focus trap cannot take focus back
+  // from the editor or the Search/Problems panel opened by the command.
   function withView(fn: (v: EditorView) => void): void {
     const v = viewRef.current
     if (!v) return
-    v.focus()
-    fn(v)
+    requestAnimationFrame(() => {
+      if (!v.dom.isConnected) return
+      v.focus()
+      fn(v)
+    })
+  }
+
+  async function paste(): Promise<void> {
+    const view = viewRef.current
+    if (!view) return
+    let text: string
+    try {
+      text = await navigator.clipboard.readText()
+    } catch {
+      useAppStore.getState().notify({
+        variant: 'error',
+        title: t('notify.pasteFailed'),
+        source: 'system',
+        dedupeKey: 'clipboard:read'
+      })
+      return
+    }
+    if (!text || !view.dom.isConnected) return
+    // Replace CodeMirror's selection directly; execCommand('paste') is blocked
+    // by Chromium. Keep the operation in the editor's normal undo history.
+    view.dispatch({
+      ...view.state.replaceSelection(text),
+      scrollIntoView: true,
+      userEvent: 'input.paste'
+    })
+    view.focus()
   }
 
   function buildMenu(): ContextMenuEntry[] {
     const { busy: isBusy, saveBusy: isSaveBusy, running: isRunning } = handlers.current
-    const hasSel = viewRef.current ? !viewRef.current.state.selection.main.empty : false
+    const view = viewRef.current
+    const hasSel = view ? !view.state.selection.main.empty : false
+    const hasText = !!view?.state.doc.length
+    const isMac = isMacPlatform()
+    const primary = isMac ? '⌘' : 'Ctrl+'
+    const primaryShift = isMac ? '⌘⇧' : 'Ctrl+Shift+'
     return [
+      { label: t('shell.menu.cut'), shortcut: `${primary}X`, disabled: !hasText, onClick: () => withView(() => document.execCommand('cut')) },
+      { label: t('shell.menu.copy'), shortcut: `${primary}C`, disabled: !hasText, onClick: () => withView(() => document.execCommand('copy')) },
+      { label: t('shell.menu.paste'), shortcut: `${primary}V`, onClick: () => void paste() },
+      { label: t('shell.menu.selectAll'), shortcut: `${primary}A`, disabled: !hasText, onClick: () => withView((v) => selectAll(v)) },
+      'separator',
+      { label: t('shell.menu.undo'), shortcut: `${primary}Z`, disabled: !view || undoDepth(view.state) === 0, onClick: () => withView((v) => undo(v)) },
+      { label: t('shell.menu.redo'), shortcut: isMac ? '⌘⇧Z' : 'Ctrl+Y', disabled: !view || redoDepth(view.state) === 0, onClick: () => withView((v) => redo(v)) },
+      'separator',
+      { label: t('shell.menu.findReplace'), shortcut: `${primary}F`, onClick: () => withView((v) => openSearchPanel(v)) },
+      { label: t('shell.menu.format'), shortcut: `${primaryShift}F`, disabled: !value.trim(), onClick: () => formatNow() },
+      { label: t('shell.menu.saveAs'), shortcut: `${primary}S`, disabled: isSaveBusy, onClick: () => saveIfReady() },
+      'separator',
       {
         label: t('shell.menu.runScript'),
-        shortcut: hasSel ? undefined : '⌘↵',
+        shortcut: hasSel ? undefined : isMac ? '⌘↵' : 'Ctrl+Enter',
         disabled: isBusy,
         onClick: () => runScriptIfReady()
       },
       {
         label: hasSel ? t('shell.menu.runSelected') : t('shell.menu.runStatement'),
         shortcut: 'F6',
-        disabled: isBusy,
+        disabled: isBusy || !view || !statementCode(view),
         onClick: () => runStatementIfReady()
       },
       {
         label: t('shell.menu.explain'),
-        shortcut: isMacPlatform() ? '⌘⇧E' : 'Ctrl+Shift+E',
+        shortcut: `${primaryShift}E`,
         disabled: isBusy,
         onClick: () => explainIfReady()
       },
       // Enabled only mid-run; cancels the in-flight find/aggregate server-side.
       { label: t('shell.menu.stop'), disabled: !isRunning, onClick: () => handlers.current.onStop() },
       'separator',
-      { label: t('shell.menu.format'), shortcut: '⌘⇧F', onClick: () => formatNow() },
-      'separator',
-      { label: t('shell.menu.findReplace'), shortcut: '⌘F', onClick: () => withView((v) => openSearchPanel(v)) },
       {
         label: t('shell.diagnostics.title'),
-        shortcut: isMacPlatform() ? '⌘⇧M' : 'Ctrl+Shift+M',
+        shortcut: `${primaryShift}M`,
         onClick: () => withView((v) => openLintPanel(v))
-      },
-      'separator',
-      { label: t('shell.menu.saveAs'), shortcut: '⌘S', disabled: isSaveBusy, onClick: () => saveIfReady() },
-      'separator',
-      { label: t('shell.menu.undo'), shortcut: '⌘Z', onClick: () => withView((v) => undo(v)) },
-      { label: t('shell.menu.redo'), shortcut: '⇧⌘Z', onClick: () => withView((v) => redo(v)) },
-      'separator',
-      { label: t('shell.menu.cut'), shortcut: '⌘X', onClick: () => withView(() => document.execCommand('cut')) },
-      { label: t('shell.menu.copy'), shortcut: '⌘C', onClick: () => withView(() => document.execCommand('copy')) },
-      { label: t('shell.menu.paste'), shortcut: '⌘V', onClick: () => withView(() => document.execCommand('paste')) },
-      { label: t('shell.menu.selectAll'), shortcut: '⌘A', onClick: () => withView((v) => selectAll(v)) }
+      }
     ]
   }
 })
