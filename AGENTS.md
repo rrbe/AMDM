@@ -74,7 +74,7 @@ Use pnpm exclusively. The project has no linter. Choose type-checking and target
 
 ## Validation scope
 
-- By default, run only tests relevant to the current change. Reuse valid results when the tested code has not changed; do not repeat full local suites for every feature or commit. Documentation-only changes do not need tests.
+- During local development, run only test files relevant to the current change. Reuse valid results when the tested code has not changed; a commit or push alone is not a reason to rerun tests. Full suites belong in CI, not the default local gate. Documentation-only changes do not need tests.
 - Run the relevant integration tests for changes to real MongoDB behavior, write paths, or IPC handlers.
 - Run a production build for dependency, main-build, or packaging changes. For main-process runtime dependencies, also inspect and launch the unpacked artifact for the target architecture.
 - Run `pnpm test:packaged` for main/preload/worker runtime or packaging changes. E2E is not a default local gate: run only relevant scenarios when explicitly requested or when a change is complex enough to warrant end-to-end verification. Routine UI adjustments do not require rebuilding the app and running E2E each time.

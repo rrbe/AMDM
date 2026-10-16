@@ -45,6 +45,7 @@ pnpm clean                           # 清理构建产物
 - 原生导入 / 导出 JSON / CSV / XLSX / BSON
 - Tree / JSON / Table 结果视图
 - 可视化 explain
+- 支持内网浏览器访问的 [Web 版本](docs/WEB.md)
 
 ## macOS 安装
 
@@ -55,7 +56,3 @@ macOS 版本通过 Sparkle 更新,使用 ad-hoc 签名且未经 Apple 公证。�
 ## 许可证
 
 [GNU GPL v3.0](./LICENSE)
-
-## Web 版本
-
-内网浏览器版本的开发、部署和安全边界见 [AMDM Web](docs/WEB.md)。

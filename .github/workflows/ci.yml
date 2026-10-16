@@ -1,10 +1,12 @@
 name: CI
 
-# Validate source, ESM builds, and packaged Electron runtimes on every platform.
+# Fast checks for PRs and master pushes; native E2E and benchmarks run daily.
 on:
   push:
     branches: [master]
+    paths-ignore: ['**/*.md', 'docs/screenshots/**']
   pull_request:
+    paths-ignore: ['**/*.md', 'docs/screenshots/**']
 
 # Supersede older PR checks while keeping master push runs independent.
 concurrency:
@@ -13,12 +15,8 @@ concurrency:
 
 jobs:
   check:
-    name: Check (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    name: Check (ubuntu-latest)
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
       run:
@@ -60,65 +58,11 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
-      - name: Production build benchmark
-        run: pnpm bench:build --iterations 3
+      - name: Production build
+        run: pnpm build
 
       - name: Web production build
         run: pnpm build:web
 
       - name: Web runtime
         run: pnpm test:web
-
-      - name: Prepare Sparkle
-        if: runner.os == 'macOS'
-        run: pnpm prepare:sparkle
-
-      - name: Package native architecture
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: |
-          pnpm exec install-electron
-          node --input-type=module <<'JS'
-          import { spawnSync } from 'node:child_process';
-          import { createRequire } from 'node:module';
-          const cli = createRequire(import.meta.url).resolve('electron-builder/out/cli/cli.js');
-          const result = spawnSync(process.execPath, [cli, '--dir', '--' + process.arch,
-            '--config.electronDist=node_modules/electron/dist'], { stdio: 'inherit' });
-          if (result.error) throw result.error;
-          process.exit(result.status ?? 1);
-          JS
-
-      - name: Packaged ESM runtime (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum pnpm test:packaged
-
-      - name: Packaged ESM runtime (macOS / Windows)
-        if: runner.os != 'Linux'
-        run: pnpm test:packaged
-
-      - name: UI E2E (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum pnpm test:e2e
-
-      - name: UI E2E (macOS / Windows)
-        if: runner.os != 'Linux'
-        run: pnpm test:e2e
-
-      - name: Runtime benchmark (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum pnpm bench:runtime --iterations 3 --warm-queries 3
-
-      - name: Runtime benchmark (macOS / Windows)
-        if: runner.os != 'Linux'
-        run: pnpm bench:runtime --iterations 3 --warm-queries 3
-
-      - name: Runtime diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: esm-runtime-${{ runner.os }}-${{ runner.arch }}
-          path: |
-            dist/runtime-validation/
-            dist/e2e-validation/
-            dist/benchmarks/
-          if-no-files-found: ignore

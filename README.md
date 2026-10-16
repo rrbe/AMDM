@@ -45,6 +45,7 @@ pnpm clean                           # remove generated build files
 - Native import / export for JSON / JSONL / CSV / TSV / XLSX / BSON
 - Tree / JSON / Table result views
 - Visual explain
+- Internal [Web edition](docs/WEB.md) for browser access
 
 ## macOS installation
 
@@ -55,7 +56,3 @@ macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. 
 ## License
 
 [GNU GPL v3.0](./LICENSE)
-
-## Web edition
-
-For the internal browser edition, see [AMDM Web](docs/WEB.md).
