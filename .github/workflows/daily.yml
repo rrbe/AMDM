@@ -77,15 +77,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
           pnpm exec install-electron
-          node --input-type=module <<'JS'
-          import { spawnSync } from 'node:child_process';
-          import { createRequire } from 'node:module';
-          const cli = createRequire(import.meta.url).resolve('electron-builder/out/cli/cli.js');
-          const result = spawnSync(process.execPath, [cli, '--dir', '--' + process.arch,
-            '--config.electronDist=node_modules/electron/dist'], { stdio: 'inherit' });
-          if (result.error) throw result.error;
-          process.exit(result.status ?? 1);
-          JS
+          pnpm package:dir
 
       - name: Packaged ESM runtime (Linux)
         if: runner.os == 'Linux'

@@ -1,6 +1,6 @@
 name: CI
 
-# Fast checks for PRs and master pushes; native E2E and benchmarks run daily.
+# Core checks and UI smoke for PRs/master; full cross-platform regression runs daily.
 on:
   push:
     branches: [master]
@@ -66,3 +66,21 @@ jobs:
 
       - name: Web runtime
         run: pnpm test:web
+
+      - name: Package native architecture
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          pnpm exec install-electron
+          pnpm package:dir
+
+      - name: Core UI E2E
+        run: xvfb-run --auto-servernum pnpm test:e2e:smoke
+
+      - name: UI smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-smoke-${{ runner.os }}-${{ runner.arch }}
+          path: dist/e2e-validation/smoke-shell/
+          if-no-files-found: ignore

@@ -14,9 +14,10 @@
 - Integration: Shell, write paths, and core operations validated against real MongoDB behavior.
 - Packaged smoke: native Electron startup, preload/IPC boundaries, transactions,
   BSON, workers, and updater initialization (`pnpm test:packaged`).
-- UI E2E: real Electron mouse/keyboard input to connect through Explorer, enter
-  and execute queries, render results in JSON/Table, use the Run shortcut, and
-  open Settings (`pnpm test:e2e`).
+- Core UI E2E: real Electron input to connect through Explorer, execute queries
+  using Run/the keyboard shortcut, and render JSON/Table (`pnpm test:e2e:smoke`).
+- Full UI E2E: core smoke plus pagination/write-once behavior, Settings isolation,
+  quick search, and Web scenarios (`pnpm test:e2e`).
 - Benchmarks: repeated production builds and packaged startup/query timings
   (`pnpm bench:build`, `pnpm bench:runtime`) plus native quick-search UI latency
   (`pnpm bench:search`), with raw samples and summaries.
@@ -43,7 +44,8 @@ Integration tests prefer a locally cached `mongod` binary and may need to downlo
 
 The `CI` workflow runs on pushes to `master` and on pull requests, using one
 Linux runner for type checking, unit/contract and integration tests, desktop/Web
-production builds, and Web runtime tests. Changes limited to Markdown or
+production builds, Web runtime tests, native packaging, and core UI E2E.
+Changes limited to Markdown or
 `docs/screenshots/` skip this workflow. Feature branch pushes do not trigger a
 second run alongside PR checks. New runs for the same PR cancel older runs;
 `master` push runs remain independent. Version tags trigger Release only.
@@ -56,7 +58,8 @@ target; GitHub may delay a run when runners are busy.
 
 The daily/manual workflow retains the full macOS, Windows, and Linux suite:
 type checking, unit/contract and integration tests, desktop/Web builds, Web
-runtime, native packaging, packaged smoke, UI E2E, and build/runtime benchmarks.
+runtime, native packaging, packaged smoke, full UI E2E (including core smoke),
+and build/runtime benchmarks.
 Both workflows cache MongoDB 8.2.1. Daily packaging targets the host architecture
 using the installed Electron distribution. `pnpm test:packaged`
 then launches that unpacked application with isolated user data and uses Electron
@@ -65,8 +68,25 @@ the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by the
 daily/manual workflow.
 
-The packaging step explicitly runs `pnpm exec install-electron` before using
-`node_modules/electron/dist`; unit tests do not install the Electron binary.
+Both workflows explicitly run `pnpm exec install-electron`, then
+`pnpm package:dir` to package the existing build for the host platform and
+architecture using `node_modules/electron/dist`. This packaging command expects
+`pnpm build` first and `pnpm prepare:sparkle` on macOS; it does not rebuild or
+clean output. Unit tests do not install the Electron binary.
+
+PR smoke reports, Electron logs, and screenshots are uploaded from
+`dist/e2e-validation/smoke-shell/`, including on failure.
+
+Keep new core E2E small and focused on essential user paths. Broader UI cases
+belong to full regression. Each scenario owns its profile, MongoDB fixture, app,
+and diagnostics; shared setup/cleanup lives in `test/helpers/`. Shell execution,
+pagination, and Settings are separate tests and can each run by name:
+
+```bash
+pnpm test:e2e:smoke
+node --test --test-name-pattern='Shell pagination' test/e2e/shell.test.mjs
+node --test --test-name-pattern='Settings opens' test/e2e/shell.test.mjs
+```
 
 The daily/manual UI E2E runs on all three platforms, with reports, Electron logs,
 and screenshots under `dist/e2e-validation/`. Test files run serially because native
