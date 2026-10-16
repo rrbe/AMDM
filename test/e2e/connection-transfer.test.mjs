@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -264,7 +263,7 @@ test(
       )
       clients.push(main)
       await waitForUi(renderer)
-      report.processIds = await main.evaluate(`(() => {
+      await main.evaluate(`(() => {
       const electron = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron');
       const realpath = process.getBuiltinModule('fs').realpathSync;
       if (realpath(electron.app.getPath('userData')) !== realpath(${JSON.stringify(profile)})) throw new Error('Not the isolated E2E profile');
@@ -299,7 +298,7 @@ test(
         window.focus();
         window.webContents.focus();
       }, 0);
-      return { main: process.pid, renderer: electron.BrowserWindow.getAllWindows()[0].webContents.getOSProcessId() };
+      return true;
     })()`)
       phase = 'save fake credentials through the real bridge'
       const saved =
@@ -637,13 +636,7 @@ test(
     } catch (error) {
       report.phase = phase
       report.error = error.stack
-      if (process.platform === 'darwin' && /Debugger timeout: Input/.test(error.message)) {
-        report.samples = {}
-        for (const [name, pid] of Object.entries(report.processIds)) {
-          const sample = spawnSync('sample', [String(pid), '1', '-file', join(diagnostics, `${name}-hang.sample`)], { timeout: 5_000, encoding: 'utf8' })
-          report.samples[name] = { status: sample.status, error: sample.error?.message }
-        }
-      }
+      report.dialogs = renderer?.events.filter((event) => event.method === 'Page.javascriptDialogOpening')
       if (renderer) {
         await screenshot(renderer, 'failure').catch(() => undefined)
         report.dom = await renderer.evaluate('document.body.innerText').catch(() => undefined)
