@@ -3,6 +3,7 @@ import test from 'node:test'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import {
   assertRuntimeHealthy,
   clickElement,
@@ -131,22 +132,19 @@ async function rightClick(renderer, selector, position = 'center') {
     return point;
   })()`
   )
-  await renderer.call('Input.dispatchMouseEvent', {
-    type: 'mouseMoved',
-    ...point
-  })
-  await renderer.call('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    button: 'right',
-    clickCount: 1,
-    ...point
-  })
-  await renderer.call('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    button: 'right',
-    clickCount: 1,
-    ...point
-  })
+  // Queue the full gesture before waiting for acknowledgements so native menu
+  // handling cannot block the release event on macOS.
+  await Promise.all([
+    renderer.call('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', buttons: 0, ...point
+    }),
+    renderer.call('Input.dispatchMouseEvent', {
+      type: 'mousePressed', button: 'right', buttons: 2, clickCount: 1, ...point
+    }),
+    renderer.call('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', button: 'right', buttons: 0, clickCount: 1, ...point
+    })
+  ])
   await waitForExpression(renderer, '!!document.querySelector("[role=menu]")')
 }
 
@@ -182,10 +180,16 @@ async function chooseFormat(renderer, label) {
 }
 
 async function reload(renderer, expectedCount, theme) {
-  // A marker distinguishes the new document from the UI that Page.reload replaces.
-  await renderer.evaluate('window.connectionTransferReloadMarker = true')
+  await renderer.call('Page.enable')
+  const loads = () => renderer.events.filter((event) => event.method === 'Page.loadEventFired').length
+  const previousLoads = loads()
   await renderer.call('Page.reload', { ignoreCache: true })
-  await waitForExpression(renderer, '!window.connectionTransferReloadMarker && !!window.api')
+  // Wait outside the page: evaluating during navigation can target the destroyed context.
+  const deadline = Date.now() + 15_000
+  while (loads() === previousLoads) {
+    assert.ok(Date.now() < deadline, 'Renderer reload timed out')
+    await delay(25)
+  }
   await waitForUi(renderer)
   await renderer.call('Page.bringToFront')
   // Hosted desktops may show the window without granting it native focus.
