@@ -525,17 +525,6 @@
       "csv": "Copy as CSV",
       "tsv": "Copy as TSV"
     },
-    "export": {
-      "plainJson": "Plain JSON",
-      "relaxedEjson": "Relaxed EJSON",
-      "canonicalEjson": "Canonical EJSON",
-      "jsonl": "JSONL / NDJSON",
-      "bson": "BSON",
-      "csv": "CSV",
-      "tsv": "TSV",
-      "xlsx": "Excel",
-      "moreOptions": "More export options…"
-    },
     "dataMenu": {
       "view": "View",
       "edit": "Edit",

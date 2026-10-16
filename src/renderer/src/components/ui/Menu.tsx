@@ -16,7 +16,7 @@ import { Tooltip } from './Tooltip'
 interface MenuItemBase {
   label: string
   icon?: ReactNode
-  /** Optional explanation opened from a help icon at the end of the item. */
+  /** Optional explanation shown when the action is hovered or focused. */
   description?: ReactNode
   /** Greyed-out + unclickable. */
   disabled?: boolean
@@ -102,6 +102,7 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
           <Tooltip
             key={index}
             content={item.description}
+            disabled={item.disabled}
             variant="text"
             side="right"
             delay={500}

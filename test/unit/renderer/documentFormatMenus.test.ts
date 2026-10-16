@@ -4,7 +4,7 @@ vi.mock('@renderer/i18n', () => ({
   default: { t: (key: string) => key }
 }))
 
-import { jsonCopyMenuItems, resultExportMenuItems } from '@renderer/components/results/documentFormatMenus'
+import { jsonCopyMenuItems } from '@renderer/components/results/documentFormatMenus'
 
 describe('document format menus', () => {
   it('copies JSON encodings and JSONL directly from one submenu level', () => {
@@ -22,31 +22,18 @@ describe('document format menus', () => {
     expect(copy).toHaveBeenCalledWith('{"name":"Ada"}\n{"name":"Grace"}')
   })
 
-  it('offers export presets and a separate route to the full export options', () => {
-    const exportDocuments = vi.fn()
-    const items = resultExportMenuItems([], exportDocuments)
+  it.each([
+    [0, [{ _id: '64b7f0f0f0f0f0f0f0f0f0f0', count: 42 }]],
+    [1, [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: 42 }]],
+    [2, [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '42' } }]]
+  ])('copies the BSON representation chosen by action %i', (index, expected) => {
+    const copy = vi.fn()
+    const documents = [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '42' } }]
+    const item = jsonCopyMenuItems(documents, copy)[index as number]
 
-    expect(items.map((item) => (item === 'separator' ? item : item.label))).toEqual([
-      'result.export.plainJson',
-      'result.export.relaxedEjson',
-      'result.export.canonicalEjson',
-      'separator',
-      'result.export.jsonl',
-      'result.export.bson',
-      'result.export.csv',
-      'result.export.tsv',
-      'result.export.xlsx',
-      'separator',
-      'result.export.moreOptions'
-    ])
-    const relaxed = items[1]
-    if (relaxed !== 'separator' && relaxed && 'onClick' in relaxed) relaxed.onClick()
-    expect(exportDocuments).toHaveBeenCalledWith('json', [], 'relaxed')
-    const jsonLines = items[4]
-    if (jsonLines !== 'separator' && jsonLines && 'onClick' in jsonLines) jsonLines.onClick()
-    expect(exportDocuments).toHaveBeenCalledWith('jsonl', [], 'plain')
-    const moreOptions = items[10]
-    if (moreOptions !== 'separator' && moreOptions && 'onClick' in moreOptions) moreOptions.onClick()
-    expect(exportDocuments).toHaveBeenCalledWith(null, [])
+    expect(item).toHaveProperty('onClick')
+    if (item === 'separator' || !item || !('onClick' in item)) throw new Error('Expected copy action')
+    item.onClick()
+    expect(JSON.parse(copy.mock.calls[0][0])).toEqual(expected)
   })
 })

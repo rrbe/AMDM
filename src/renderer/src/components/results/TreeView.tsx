@@ -2,7 +2,7 @@ import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
+import type { CollectionSort } from '@shared/types'
 import { Copy, Download, Trash2 } from 'lucide-react'
 import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
@@ -25,7 +25,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { jsonCopyMenuItems } from './documentFormatMenus'
 
 /**
  * Two-column KEY | VALUE tree of the result documents.
@@ -65,7 +65,7 @@ interface TreeViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (documents: unknown[]) => void
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -303,7 +303,7 @@ export function TreeView({
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
       icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
-      children: exportMenuItems(selected, onExport)
+      onClick: () => onExport(selected)
     })
     if (docCtx && docHasId(rootDoc)) {
       items.push('separator')
@@ -421,13 +421,6 @@ export function TreeView({
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
-}
-
-function exportMenuItems(
-  documents: unknown[],
-  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
-): ContextMenuEntry[] {
-  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy submenu for a tree field / document selection. */

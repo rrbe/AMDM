@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, ChevronsUpDown, Copy, Download, Trash2 } from 'lucide-react'
-import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
+import type { CollectionSort } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
 import {
@@ -39,7 +39,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { jsonCopyMenuItems } from './documentFormatMenus'
 
 /**
  * Virtualized table.
@@ -67,8 +67,7 @@ interface TableViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onDocumentOrderChange: (sourceIndexes: number[]) => void
-  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (documents: unknown[]) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -98,7 +97,6 @@ export function TableView({
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
-  onDocumentOrderChange,
   onExport,
   docCtx
 }: TableViewProps): React.JSX.Element {
@@ -193,10 +191,6 @@ export function TableView({
     const sort = tableSort && column ? { ...tableSort, column: column.path } : null
     return sortTableRows(docs, sort, tableI18n.resolvedLanguage ?? tableI18n.language)
   }, [docs, columns, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
-
-  useEffect(() => {
-    onDocumentOrderChange(rows.map((row) => row.sourceIndex))
-  }, [onDocumentOrderChange, rows])
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -372,10 +366,7 @@ export function TableView({
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
       icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
-      children: exportMenuItems(
-        selectedIndexes.map((index) => docs[index]),
-        onExport
-      )
+      onClick: () => onExport(selectedIndexes.map((index) => docs[index]))
     })
     if (docCtx && docHasId(doc)) {
       items.push('separator')
@@ -605,13 +596,6 @@ function TableColumnHeader({
       <span className="tbl-col-resizer" onMouseDown={onResize} />
     </div>
   )
-}
-
-function exportMenuItems(
-  documents: unknown[],
-  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
-): ContextMenuEntry[] {
-  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy menu for a table cell / row(s). */

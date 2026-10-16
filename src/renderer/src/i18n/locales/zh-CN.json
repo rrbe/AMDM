@@ -525,17 +525,6 @@
       "csv": "复制为 CSV",
       "tsv": "复制为 TSV"
     },
-    "export": {
-      "plainJson": "Plain JSON",
-      "relaxedEjson": "Relaxed EJSON",
-      "canonicalEjson": "Canonical EJSON",
-      "jsonl": "JSONL / NDJSON",
-      "bson": "BSON",
-      "csv": "CSV",
-      "tsv": "TSV",
-      "xlsx": "Excel",
-      "moreOptions": "更多导出选项…"
-    },
     "dataMenu": {
       "view": "查看",
       "edit": "编辑",
