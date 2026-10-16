@@ -6,8 +6,7 @@
    `position: fixed` below). No backdrop element anymore. */
 .ctx-menu {
   position: fixed;
-  width: max-content;
-  min-width: min(240px, calc(100vw - 16px));
+  min-width: 180px;
   max-width: calc(100vw - 16px);
   background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
   backdrop-filter: blur(28px) saturate(1.35);
@@ -25,8 +24,8 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 34px;
-  padding: 6px 9px;
+  min-height: 28px;
+  padding: 5px 9px;
   border: none;
   background: transparent;
   color: var(--text-primary);
@@ -46,10 +45,7 @@
 }
 .ctx-icon {
   display: flex;
-  width: 20px;
-  flex: 0 0 20px;
   align-items: center;
-  justify-content: center;
   color: var(--text-primary);
 }
 .ctx-item:hover .ctx-icon {
@@ -72,12 +68,7 @@
   font-variant-numeric: tabular-nums;
 }
 .ctx-submenu-arrow {
-  display: inline-flex;
-  width: 20px;
-  flex: 0 0 20px;
-  margin-left: auto;
-  align-items: center;
-  justify-content: center;
+  margin-left: 16px;
   color: var(--text-primary);
   font-size: 16px;
   line-height: 1;

@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
+import { useMemo, type ComponentProps, type ReactNode } from 'react'
 import { ContextMenu as BaseContextMenu } from '@base-ui/react/context-menu'
 import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { Tooltip } from './Tooltip'
@@ -49,8 +49,6 @@ interface MenuProps {
 }
 
 function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: MenuFinalFocus }): React.JSX.Element {
-  const hasIcons = items.some((item) => item !== 'separator' && item.icon != null)
-
   return (
     <>
       {items.map((item, index) => {
@@ -60,7 +58,7 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
         if ('children' in item) {
           const submenuTrigger = (
             <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
-              {hasIcons && <span className="ctx-icon">{item.icon}</span>}
+              {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
               <span className="ctx-label">{item.label}</span>
               <span className="ctx-submenu-arrow" aria-hidden="true">
                 ›
@@ -93,7 +91,7 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
             disabled={item.disabled}
             onClick={() => item.onClick()}
           >
-            {hasIcons && <span className="ctx-icon">{item.icon}</span>}
+            {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
             <span className="ctx-label">{item.label}</span>
             {item.shortcut != null && <span className="ctx-shortcut">{item.shortcut}</span>}
           </BaseMenu.Item>
