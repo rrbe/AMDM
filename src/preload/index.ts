@@ -7,6 +7,12 @@ import { IPC, type Api } from '../shared/ipc'
  * around a channel declared in the shared IPC contract.
  */
 const api: Api = {
+  connectionTransfer: {
+    export: (request) => ipcRenderer.invoke(IPC.connectionsExport, request),
+    preview: (request) => ipcRenderer.invoke(IPC.connectionsImportPreview, request),
+    apply: (request) => ipcRenderer.invoke(IPC.connectionsImportApply, request),
+    release: (token) => ipcRenderer.invoke(IPC.connectionsImportRelease, token)
+  },
   app: {
     openSettings: () => ipcRenderer.invoke(IPC.appOpenSettings)
   },

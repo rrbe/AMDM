@@ -67,6 +67,8 @@ CDP to verify both window bridges, concurrent first queries, transactions, BSON,
 the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by the
 daily/manual workflow.
+On macOS, the shared packaged-test launcher uses `--use-mock-keychain` to keep
+ad-hoc test builds from blocking on system Keychain authorization prompts.
 
 Both workflows explicitly run `pnpm exec install-electron`, then
 `pnpm package:dir` to package the existing build for the host platform and

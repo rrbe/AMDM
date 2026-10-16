@@ -57,6 +57,15 @@ Scripts that need Node Driver method signatures use `driverDb`. It resolves to t
 ## State and resource ownership
 
 - Store connection passwords and SSH passphrases with Electron secure storage. The Renderer should receive only non-sensitive state such as whether a secret exists.
+- Desktop connection transfers use owner-scoped, expiring import previews. Imported
+  source text and decrypted credentials stay in main; the Renderer receives only
+  sanitized rows, secret-presence flags, and validation messages. Export writes
+  directly to a native-selected file or the system clipboard. AMDM backups may
+  encrypt the entire payload; client-specific exports follow that client's format.
+  Import validates the entire selection before atomically replacing the connection
+  file. New connections retain source order and receive unique names; replacement
+  requires a disconnected target and clears credentials absent from the source.
+  SSH private keys and TLS certificate files are referenced by path, never bundled.
 - The component that creates a resource owns its cleanup. Connection, tab, task, and application shutdown paths must release their cursors, MongoClient instances, SSH tunnels, workers, subscriptions, and caches.
 - Disconnecting releases the live catalog, while the Renderer retains a namespace-only snapshot for search during the current app session. Successful reconnection and connection deletion discard that snapshot. Directory search includes loaded descendants regardless of expansion; it does not fetch missing namespaces or persist offline snapshots.
 - Cmd/Ctrl+K searches connected, loaded catalog resources, all open Query/Data tabs, and local saved queries/history. Its lazy Renderer worker receives only search metadata and query code, never result documents or credentials. Index updates are incremental; searches yield between chunks and discard superseded requests. Closing the panel terminates its worker and releases its index. A cooperative inline path retains search behavior if the worker fails.

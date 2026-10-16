@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, safeStorage } from 'electron'
 import type { ConnectionConfig, ConnectionInput } from '../../shared/types'
@@ -94,18 +94,19 @@ class ConnectionStore {
     return this.data.connections.map((c) => this.sanitize(c))
   }
 
-  saveConnection(input: ConnectionInput): ConnectionConfig {
-    const source = input.copyFromId
-      ? this.data.connections.find((c) => c.id === input.copyFromId)
-      : undefined
+  private prepareConnection(
+    input: ConnectionInput,
+    find: (id: string) => StoredConnection | undefined
+  ): StoredConnection {
+    const source = input.copyFromId ? find(input.copyFromId) : undefined
     if (input.copyFromId && !source) throw new Error('Source connection not found')
 
     const now = Date.now()
     const id = input.copyFromId ? randomUUID() : input.id || randomUUID()
-    const existing = this.data.connections.find((c) => c.id === id)
+    const existing = find(id)
     const secrets = source ?? existing
 
-    const stored: StoredConnection = {
+    return {
       id,
       name: input.name,
       color: input.color,
@@ -125,12 +126,46 @@ class ConnectionStore {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
     }
+  }
 
-    const idx = this.data.connections.findIndex((c) => c.id === id)
+  saveConnection(input: ConnectionInput): ConnectionConfig {
+    const stored = this.prepareConnection(input, (id) => this.data.connections.find((c) => c.id === id))
+    const idx = this.data.connections.findIndex((c) => c.id === stored.id)
     if (idx >= 0) this.data.connections[idx] = stored
     else this.data.connections.push(stored)
     this.persist()
     return this.sanitize(stored)
+  }
+
+  /** Prepare all encrypted records before replacing the file or changing memory. */
+  importConnections(inputs: ConnectionInput[]): ConnectionConfig[] {
+    const connections = [...this.data.connections]
+    const byId = new Map(connections.map((connection) => [connection.id, connection]))
+    const indices = new Map(connections.map((connection, index) => [connection.id, index]))
+    const imported = inputs.map((input) => {
+      const stored = this.prepareConnection(input, (id) => byId.get(id))
+      const index = indices.get(stored.id)
+      if (index === undefined) {
+        indices.set(stored.id, connections.length)
+        connections.push(stored)
+      } else connections[index] = stored
+      byId.set(stored.id, stored)
+      return stored
+    })
+    const next: StoreFile = { version: 1, connections }
+    const temporary = `${this.filePath}.${randomUUID()}.tmp`
+    try {
+      writeFileSync(temporary, JSON.stringify(next, null, 2), {
+        encoding: 'utf8',
+        mode: 0o600,
+        flag: 'wx'
+      })
+      renameSync(temporary, this.filePath)
+      this.data = next
+    } finally {
+      rmSync(temporary, { force: true })
+    }
+    return imported.map((connection) => this.sanitize(connection))
   }
 
   deleteConnection(id: string): void {
@@ -154,7 +189,10 @@ class ConnectionStore {
   recordSshJumpHostKey(id: string, fingerprint: string): void {
     const stored = this.data.connections.find((c) => c.id === id)
     if (!stored || !stored.ssh.jump || stored.ssh.jump.pinnedHostKey === fingerprint) return
-    stored.ssh = { ...stored.ssh, jump: { ...stored.ssh.jump, pinnedHostKey: fingerprint } }
+    stored.ssh = {
+      ...stored.ssh,
+      jump: { ...stored.ssh.jump, pinnedHostKey: fingerprint }
+    }
     this.persist()
   }
 
