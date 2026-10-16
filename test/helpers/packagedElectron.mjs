@@ -112,6 +112,8 @@ export async function launchPackaged(root, profile, executable = packagedExecuta
       `--user-data-dir=${profile}`,
       `--remote-debugging-port=${rendererPort}`,
       `--inspect=${mainPort}`,
+      // Ad-hoc test builds must not block on the desktop Keychain access prompt.
+      ...(process.platform === 'darwin' ? ['--use-mock-keychain'] : []),
       ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
     ],
     { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] },

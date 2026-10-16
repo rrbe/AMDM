@@ -188,9 +188,11 @@ async function reload(renderer, expectedCount, theme) {
   await waitForExpression(renderer, '!window.connectionTransferReloadMarker && !!window.api')
   await waitForUi(renderer)
   await renderer.call('Page.bringToFront')
+  // Hosted desktops may show the window without granting it native focus.
+  await renderer.call('Emulation.setFocusEmulationEnabled', { enabled: true })
   await waitForExpression(
     renderer,
-    `document.documentElement.dataset.theme === ${JSON.stringify(theme)} && document.querySelector('.library-count')?.textContent.trim() === '· ${expectedCount}'`
+    `document.hasFocus() && document.visibilityState === 'visible' && document.documentElement.dataset.theme === ${JSON.stringify(theme)} && document.querySelector('.library-count')?.textContent.trim() === '· ${expectedCount}'`
   )
 }
 
@@ -276,7 +278,14 @@ test(
           return response;
         });
       }
-      electron.BrowserWindow.getAllWindows().find(window => !window.isDestroyed()).focus();
+      // Native window activation must run outside the inspector evaluation.
+      setTimeout(() => {
+        const window = electron.BrowserWindow.getAllWindows().find(window => !window.isDestroyed());
+        window.webContents.setBackgroundThrottling(false);
+        window.show();
+        window.focus();
+        window.webContents.focus();
+      }, 0);
       return true;
     })()`)
       phase = 'save fake credentials through the real bridge'
@@ -515,6 +524,11 @@ test(
       phase = 'persisted dark theme, native menu and keyboard focus containment'
       await renderer.evaluate('window.api.settings.update({ theme: "dark" })')
       await reload(renderer, 6, 'dark')
+      // The theme attribute can change before Chromium updates the rendered colors.
+      await waitForExpression(
+        renderer,
+        `getComputedStyle(document.body).backgroundColor !== ${JSON.stringify(report.lightBackground)}`
+      )
       const background = await renderer.evaluate('getComputedStyle(document.body).backgroundColor')
       assert.notEqual(
         background,

@@ -36,6 +36,8 @@ then launches that unpacked application with isolated user data and uses Electro
 CDP to verify both window bridges, concurrent first queries, transactions, BSON,
 the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
 diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
+On macOS, the shared packaged-test launcher uses `--use-mock-keychain` to keep
+ad-hoc test builds from blocking on system Keychain authorization prompts.
 
 The packaging step explicitly runs `pnpm exec install-electron` before using
 `node_modules/electron/dist`; unit tests do not install the Electron binary.
