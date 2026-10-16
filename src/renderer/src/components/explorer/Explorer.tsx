@@ -65,6 +65,10 @@ const SchemaModelModal = lazy(async () => ({
   default: (await import('@renderer/components/schema/SchemaModelModal')).SchemaModelModal
 }))
 
+const ConnectionTransferModal = lazy(async () => ({
+  default: (await import('@renderer/components/sidebar/ConnectionTransferModal')).ConnectionTransferModal
+}))
+
 export type ExplorerView = 'connections' | 'savedQueries' | 'history'
 
 /** Maps a catalog row's semantic icon key to a lucide glyph. */
@@ -307,6 +311,10 @@ export function Explorer({
     open: false
   })
   const [ioModal, setIoModal] = useState<IoModal>(null)
+  const [connectionTransfer, setConnectionTransfer] = useState<{
+    mode: 'export' | 'import'
+    initialSelectedIds?: string[]
+  } | null>(null)
   const [schemaTarget, setSchemaTarget] = useState<SchemaTarget | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{
     x: number
@@ -329,6 +337,7 @@ export function Explorer({
   // Right-click a connection → manage it or refresh only its database list.
   const openConnMenu = (e: MouseEvent, row: ConnRow): void => {
     e.preventDefault()
+    e.stopPropagation()
     const disconnectable = canDisconnectConnection(row.state)
     setCtxMenu({
       x: e.clientX,
@@ -372,6 +381,11 @@ export function Explorer({
             })
           }
         },
+        ...(!IS_WEB ? [{
+          label: t('connectionTransfer.exportSelected'),
+          icon: <Upload size={14} />,
+          onClick: () => setConnectionTransfer({ mode: 'export', initialSelectedIds: [row.id] })
+        }] : []),
         {
           label: t('connection.menu.delete'),
           icon: <Trash2 size={14} />,
@@ -390,6 +404,7 @@ export function Explorer({
   // remain scoped to that collection.
   const openCatalogMenu = (e: MouseEvent, row: TreeRow): void => {
     e.preventDefault()
+    e.stopPropagation()
     const indexName = row.indexName
     if (row.kind === 'index' && indexName !== undefined) {
       setCtxMenu({
@@ -507,6 +522,29 @@ export function Explorer({
               void dropCollection(row.connId, coll.db, coll.name)
             }
           }
+        }
+      ]
+    })
+  }
+
+  const openTransferMenu = (event: MouseEvent): void => {
+    if (IS_WEB || (event.target instanceof Element && event.target.closest('[data-explorer-row], input, textarea, button, [role="textbox"]'))) return
+    event.preventDefault()
+    event.stopPropagation()
+    setCtxMenu({
+      x: event.clientX,
+      y: event.clientY,
+      items: [
+        {
+          label: t('connectionTransfer.importTitle'),
+          icon: <Download size={14} />,
+          onClick: () => setConnectionTransfer({ mode: 'import' })
+        },
+        {
+          label: t('connectionTransfer.exportTitle'),
+          icon: <Upload size={14} />,
+          disabled: connections.length === 0,
+          onClick: () => setConnectionTransfer({ mode: 'export' })
         }
       ]
     })
@@ -757,7 +795,7 @@ export function Explorer({
       {view === 'connections' ? (
         <>
           <div className="side-section side-section--conns">
-            <div className={searchOpen ? 'side-section-head is-searching' : 'side-section-head'}>
+            <div className={searchOpen ? 'side-section-head is-searching' : 'side-section-head'} onContextMenu={openTransferMenu}>
               <div className="side-search-slot">
                 <div className="side-search-heading" aria-hidden={searchOpen}>
                   <span className="side-section-title">Connections</span>
@@ -803,7 +841,7 @@ export function Explorer({
                 </button>
               </Tooltip>
             </div>
-            <div className="explorer-body" ref={bodyRef}>
+            <div className="explorer-body" ref={bodyRef} onContextMenu={openTransferMenu}>
               {connections.length === 0 && (
                 <div className="explorer-empty">No connections. Click "New" to add one.</div>
               )}
@@ -967,6 +1005,11 @@ export function Explorer({
           <SchemaModelModal target={schemaTarget} onClose={() => setSchemaTarget(null)} />
         </Suspense>
       )}
+      {!IS_WEB && connectionTransfer && (
+        <Suspense fallback={null}>
+          <ConnectionTransferModal {...connectionTransfer} onClose={() => setConnectionTransfer(null)} />
+        </Suspense>
+      )}
       {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
     </div>
   )
@@ -1117,11 +1160,12 @@ function CatalogRow({
       onClickCapture={row.icon ? onActivate : undefined}
       onClick={row.onClick}
       onDoubleClick={row.onDoubleClick}
-      onContextMenu={
-        !row.cached && (row.kind === 'database' || row.kind === 'indexes' || row.kind === 'index' || coll)
-          ? (e) => onContextMenu(e, row)
-          : undefined
-      }
+      onContextMenu={(event) => {
+        event.stopPropagation()
+        if (!row.cached && (row.kind === 'database' || row.kind === 'indexes' || row.kind === 'index' || coll)) {
+          onContextMenu(event, row)
+        }
+      }}
     >
       <span
         className="tree-twisty"

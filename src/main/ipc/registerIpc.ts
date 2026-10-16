@@ -51,6 +51,7 @@ import {
 import { importData } from '../io/importer'
 import { registerUpdatesIpc } from './registerUpdatesIpc'
 import { updateSparkleLanguage } from '../sparkle'
+import { registerConnectionTransferIpc } from './registerConnectionTransferIpc'
 
 function historySummary(kind: string, count?: number, elapsedMs?: number, errorName?: string): string {
   if (kind === 'documents') return `${count ?? 0} docs · ${elapsedMs ?? 0}ms`
@@ -132,6 +133,7 @@ function buildConnectionUri(input: ConnectionInput, includePassword: boolean): s
 }
 
 export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void): void {
+  registerConnectionTransferIpc()
   sessionManager.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {

@@ -44,6 +44,13 @@ import type {
   UpdateState,
   UserInfo
 } from '@shared/types'
+import type {
+  ConnectionExportRequest,
+  ConnectionTransferResult,
+  ConnectionImportPreview,
+  ConnectionImportRequest,
+  ConnectionImportResult
+} from '@shared/connectionTransfer'
 import {
   activeResult,
   appendResult,
@@ -160,6 +167,12 @@ interface AppState {
   pickFile(opts?: { title?: string; defaultPath?: string }): Promise<string | null>
   /** Run a single-hop SSH connectivity check (target or jump) for the form fields. */
   diagnoseConnection(input: ConnectionInput, scope: DiagnoseScope): Promise<DiagnoseStage[]>
+
+  // ---- actions: connection transfer (desktop only) ----
+  exportConnections(request: ConnectionExportRequest): Promise<ConnectionTransferResult>
+  previewConnectionImport(request: { token?: string; passphrase?: string }): Promise<ConnectionImportPreview | null>
+  applyConnectionImport(request: ConnectionImportRequest): Promise<ConnectionImportResult>
+  releaseConnectionImport(token: string): Promise<void>
 
   // ---- actions: session ----
   connect(id: string): Promise<void>
@@ -303,6 +316,15 @@ function appNotice(
   detail?: string
 ): NotificationInput {
   return { variant, title, source, dedupeKey, detail }
+}
+
+function connectionTransferNotice(error: string, action: string): NotificationInput {
+  return appNotice(
+    'error',
+    tr(`connectionTransfer.errors.${error}`, { defaultValue: tr('connectionTransfer.errors.generic') }),
+    'connection',
+    `connectionTransfer:${action}:${error}`
+  )
 }
 
 function shellFailureNotice(result: ShellResult, tabId: string): NotificationInput | null {
@@ -535,6 +557,85 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       get().notify(appNotice('error', tr('notify.saveConnectionFailed', { error: errMessage(e) }), 'connection'))
       return null
+    }
+  },
+
+  async exportConnections(request) {
+    let result: ConnectionTransferResult
+    try {
+      result = window.api.connectionTransfer
+        ? await window.api.connectionTransfer.export(request)
+        : { error: 'UNAVAILABLE' }
+    } catch {
+      result = { error: 'UNKNOWN' }
+    }
+    if (result.error && !result.cancelled && result.error !== 'cancelled') get().notify(connectionTransferNotice(result.error, 'export'))
+    return result
+  },
+
+  async previewConnectionImport(request) {
+    let result: ConnectionImportPreview | null
+    try {
+      result = window.api.connectionTransfer
+        ? await window.api.connectionTransfer.preview(request)
+        : { token: '', fileName: '', rows: [], error: 'UNAVAILABLE' }
+    } catch {
+      result = { token: request.token ?? '', fileName: '', rows: [], error: 'UNKNOWN' }
+    }
+    // Password prompts and invalid individual rows are inline validation.
+    if (result?.error && result.error !== 'cancelled' && !result.needsPassword) get().notify(connectionTransferNotice(result.error, 'preview'))
+    return result
+  },
+
+  async applyConnectionImport(request) {
+    let result: ConnectionImportResult
+    try {
+      result = window.api.connectionTransfer
+        ? await window.api.connectionTransfer.apply(request)
+        : { error: 'UNAVAILABLE' }
+    } catch {
+      result = { error: 'UNKNOWN' }
+    }
+    if (result.error && !result.cancelled && result.error !== 'cancelled') get().notify(connectionTransferNotice(result.error, 'import'))
+    if (!result.error && !result.cancelled) {
+      set((s) => {
+        const replacedIds = new Set(result.replacedIds ?? [])
+        if (!replacedIds.size) {
+          return { connections: result.connections ?? s.connections, settings: result.settings ?? s.settings }
+        }
+        const catalogs = { ...s.catalogs }
+        const catalogSearchSnapshots = { ...s.catalogSearchSnapshots }
+        let schemaPanels = s.schemaPanels
+        for (const id of replacedIds) {
+          delete catalogs[id]
+          delete catalogSearchSnapshots[id]
+          schemaPanels = releaseSchemaPanels(schemaPanels, id)
+        }
+        const replacedPrefixes = [...replacedIds].map((id) => `${id}:`)
+        const fieldCache = Object.fromEntries(
+          Object.entries(s.fieldCache).filter(([key]) => !replacedPrefixes.some((prefix) => key.startsWith(prefix)))
+        )
+        return {
+          connections: result.connections ?? s.connections,
+          settings: result.settings ?? s.settings,
+          catalogs,
+          catalogSearchSnapshots,
+          schemaPanels,
+          fieldCache
+        }
+      })
+      get().notify(
+        appNotice('success', tr('connectionTransfer.importSuccess', { count: result.count ?? 0 }), 'connection')
+      )
+    }
+    return result
+  },
+
+  async releaseConnectionImport(token) {
+    try {
+      await window.api.connectionTransfer?.release(token)
+    } catch {
+      // Owner cleanup is best effort and must not produce a notification.
     }
   },
 

@@ -166,7 +166,16 @@ export function Menu({ open, onClose, x, y, items, finalFocus }: MenuProps): Rea
           align="start"
           sideOffset={2}
         >
-          <BaseMenu.Popup className="ctx-menu ui-menu-popup" finalFocus={finalFocus}>
+          <BaseMenu.Popup
+            className="ctx-menu ui-menu-popup"
+            finalFocus={finalFocus}
+            onMouseUpCapture={(event) => {
+              // External openers bypass ContextMenu.Trigger's initial-release guard.
+              if (event.button === 2 && Math.abs(event.clientX - x) <= 1 && Math.abs(event.clientY - y) <= 1) {
+                event.stopPropagation()
+              }
+            }}
+          >
             <MenuEntries items={items} finalFocus={finalFocus} />
           </BaseMenu.Popup>
         </BaseMenu.Positioner>

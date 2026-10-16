@@ -3,6 +3,7 @@
  * bridge. Keep this in sync on both sides — the renderer only ever talks to the
  * main process through this contract.
  */
+import type { ConnectionTransferApi } from './connectionTransfer'
 import type {
   AppSettings,
   AuthorizationResult,
@@ -49,6 +50,10 @@ export const IPC = {
   connectionsCachedAuthorization: 'connections:cachedAuthorization',
   connectionsDiagnose: 'connections:diagnose',
   connectionsBuildUri: 'connections:buildUri',
+  connectionsExport: 'connections:export',
+  connectionsImportPreview: 'connections:importPreview',
+  connectionsImportApply: 'connections:importApply',
+  connectionsImportRelease: 'connections:importRelease',
 
   sessionConnect: 'session:connect',
   sessionDisconnect: 'session:disconnect',
@@ -113,6 +118,7 @@ export const IPC = {
 
 /** The API shape exposed on `window.api` (see preload). */
 export interface Api {
+  connectionTransfer?: ConnectionTransferApi
   app: {
     openSettings(): Promise<void>
   }
