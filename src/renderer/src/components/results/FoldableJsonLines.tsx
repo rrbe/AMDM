@@ -29,6 +29,7 @@ interface Props<T extends FoldableLine> {
   allSelected?: boolean
   includeRootInCollapseAll?: boolean
   onMouseDown?: () => void
+  onCopy?: (event: React.ClipboardEvent<HTMLDivElement>) => void
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
 }
 
@@ -44,6 +45,7 @@ export function FoldableJsonLines<T extends FoldableLine>({
   allSelected = false,
   includeRootInCollapseAll = false,
   onMouseDown,
+  onCopy,
   onContextMenu
 }: Props<T>): React.JSX.Element {
   const { t } = useTranslation()
@@ -112,6 +114,7 @@ export function FoldableJsonLines<T extends FoldableLine>({
         ref={scrollRef}
         className={`virtual-scroller json-body${allSelected ? ' all-selected' : ''}`}
         tabIndex={-1}
+        onCopy={onCopy}
         onMouseDown={(event) => {
           if (event.target instanceof Element && event.target.closest('button')) return
           onMouseDown?.()

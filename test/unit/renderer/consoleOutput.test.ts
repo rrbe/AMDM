@@ -38,6 +38,14 @@ describe('toConsoleLines', () => {
     expect(lines[1].tokens?.length).toBeGreaterThan(0)
   })
 
+  it('formats printjson BSON Dates in the selected display zone', () => {
+    const output: ShellOutputLine[] = [{ kind: 'json', data: { at: { $date: '2026-10-15T09:50:05.154Z' } } }]
+    expect(toConsoleLines(output, 'Asia/Shanghai').map((line) => line.text)).toContain(
+      '"at": ISODate("2026-10-15T17:50:05.154+08:00")'
+    )
+    expect(consoleText(output)).toContain('ISODate("2026-10-15T09:50:05.154Z")')
+  })
+
   it('preserves call order across mixed entries', () => {
     const lines = toConsoleLines([
       { kind: 'text', text: 'before' },

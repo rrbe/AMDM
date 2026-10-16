@@ -60,6 +60,15 @@ describe('formatScalar edge cases', () => {
     )
     expect(formatScalar({ $date: 1704164645000 }).text).toBe('ISODate("2024-01-02T03:04:05.000Z")')
   })
+  it('renders BSON Dates in the requested IANA time zone without changing the instant', () => {
+    expect(formatScalar({ $date: '2026-10-15T09:50:05.154Z' }, 'Asia/Shanghai').text).toBe(
+      'ISODate("2026-10-15T17:50:05.154+08:00")'
+    )
+    expect(formatScalar('2026-10-15T09:50:05.154Z', 'Asia/Shanghai').text).toBe('2026-10-15T09:50:05.154Z')
+    expect(formatScalar({ $date: { $numberLong: '1719835200000' } }, 'America/Los_Angeles').text).toBe(
+      'ISODate("2024-07-01T05:00:00.000-07:00")'
+    )
+  })
   it('a number wrapper with extra keys is NOT a number — falls back to object', () => {
     const s = formatScalar({ $numberLong: '5', extra: 1 })
     expect(s.type).toBe('object')

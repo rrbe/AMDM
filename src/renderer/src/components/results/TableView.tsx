@@ -65,6 +65,7 @@ import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 interface TableViewProps {
   docs: unknown[]
   fontSize: number
+  timeZone?: string
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
   onDocumentOrderChange: (sourceIndexes: number[]) => void
@@ -96,6 +97,7 @@ function columnStyle(width: number, index: number): CSSProperties {
 export function TableView({
   docs,
   fontSize,
+  timeZone,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
   onDocumentOrderChange,
@@ -484,6 +486,7 @@ export function TableView({
                     key={col.id}
                     doc={doc}
                     column={col}
+                    timeZone={timeZone}
                     style={hasPinnedId && item.index === 0
                       ? style
                       : { ...style, position: 'absolute', left: item.start }
@@ -533,6 +536,7 @@ export function TableView({
           title={preview.title}
           value={preview.value}
           fontSize={fontSize}
+          timeZone={timeZone}
           documentView={preview.documentView}
           documentId={preview.documentId}
           source={preview.source}
@@ -667,6 +671,7 @@ function tableCopyMenuItems(
 function Cell({
   doc,
   column,
+  timeZone,
   style,
   selected,
   editing,
@@ -680,6 +685,7 @@ function Cell({
 }: {
   doc: unknown
   column: TableColumn
+  timeZone?: string
   style: CSSProperties
   selected: boolean
   editing: boolean
@@ -710,11 +716,11 @@ function Cell({
     )
   }
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
-  const tokens = expandable ? toInlineJsonTokens(value) : null
-  const scalar = tokens ? null : formatScalar(value)
+  const tokens = expandable ? toInlineJsonTokens(value, timeZone) : null
+  const scalar = tokens ? null : formatScalar(value, timeZone)
   return (
     <Tooltip
-      content={expandable ? () => formatJsonPreview(value).text : scalar!.text}
+      content={expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
       variant={expandable ? 'code' : 'compact'}
     >

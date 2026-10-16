@@ -23,6 +23,7 @@
  */
 import type { CollectionSort } from '@shared/types'
 import { isEjsonWrapper } from '@shared/jsonSerialization'
+import { formatDateInTimeZone } from './dateTimeZone'
 
 export type ValueType =
   | 'objectId'
@@ -81,13 +82,23 @@ function numberInner(v: unknown): string {
 }
 
 /** Render a `$date` payload (string or { $numberLong }) as an ISO string. */
-function formatDate(payload: unknown): string {
-  if (typeof payload === 'string') return payload
+export function formatEjsonDate(payload: unknown, timeZone?: string): string {
+  if (typeof payload === 'string') {
+    if (!timeZone) return payload
+    const date = new Date(payload)
+    return Number.isNaN(date.getTime()) ? payload : formatDateInTimeZone(date, timeZone)
+  }
   if (isPlainObject(payload) && hasKey(payload, '$numberLong')) {
     const ms = Number(payload['$numberLong'])
-    if (!Number.isNaN(ms)) return new Date(ms).toISOString()
+    if (!Number.isNaN(ms)) {
+      const date = new Date(ms)
+      return timeZone ? formatDateInTimeZone(date, timeZone) : date.toISOString()
+    }
   }
-  if (typeof payload === 'number') return new Date(payload).toISOString()
+  if (typeof payload === 'number') {
+    const date = new Date(payload)
+    return timeZone ? formatDateInTimeZone(date, timeZone) : date.toISOString()
+  }
   return String(payload)
 }
 
@@ -97,7 +108,7 @@ function formatDate(payload: unknown): string {
  * `isExtended(value)` or a JSON primitive). For arrays/plain objects this
  * returns a summary placeholder.
  */
-export function formatScalar(value: unknown): ScalarDisplay {
+export function formatScalar(value: unknown, timeZone?: string): ScalarDisplay {
   // Plain JSON primitives.
   if (value === null) return { text: 'null', type: 'null' }
   if (value === undefined) return { text: 'undefined', type: 'undefined' }
@@ -116,7 +127,7 @@ export function formatScalar(value: unknown): ScalarDisplay {
       return { text: `ObjectId("${String(value['$oid'])}")`, type: 'objectId' }
     }
     if (hasKey(value, '$date')) {
-      return { text: `ISODate("${formatDate(value['$date'])}")`, type: 'date' }
+      return { text: `ISODate("${formatEjsonDate(value['$date'], timeZone)}")`, type: 'date' }
     }
     if (hasKey(value, '$numberLong') && Object.keys(value).length === 1) {
       return { text: `NumberLong("${numberInner(value['$numberLong'])}")`, type: 'long' }

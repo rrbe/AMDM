@@ -16,10 +16,11 @@ const COLUMN_WIDTH = 200
 interface PreviewArrayTableProps {
   value: unknown[]
   fontSize: number
+  timeZone?: string
   onOpen: (value: unknown, label: string, trigger: HTMLElement) => void
 }
 
-export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTableProps): React.JSX.Element {
+export function PreviewArrayTable({ value, fontSize, timeZone, onOpen }: PreviewArrayTableProps): React.JSX.Element {
   const { t } = useTranslation()
   const openLabel = t('result.previewOpen')
   const openHint = t('result.previewOpenHint')
@@ -68,8 +69,8 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
               const column = columns[item.index]
               const cell = previewArrayCell(value[row.index], column)
               const nested = cell.present && (Array.isArray(cell.value) || (isPlainObject(cell.value) && !isExtended(cell.value)))
-              const tokens = nested ? toInlineJsonTokens(cell.value) : null
-              const scalar = cell.present && !nested ? formatScalar(cell.value) : null
+              const tokens = nested ? toInlineJsonTokens(cell.value, timeZone) : null
+              const scalar = cell.present && !nested ? formatScalar(cell.value, timeZone) : null
               const path = `[${row.index}]${column.field === null ? '' : `[${JSON.stringify(column.field)}]`}`
               const content = (
                 <div
@@ -100,7 +101,7 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
               return nested ? (
                 <Tooltip
                   key={item.key}
-                  content={() => formatJsonPreview(cell.value).text}
+                  content={() => formatJsonPreview(cell.value, { timeZone }).text}
                   variant="code"
                   footer={openHint}
                 >

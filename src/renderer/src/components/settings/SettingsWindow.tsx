@@ -20,6 +20,7 @@ import { Toaster } from '@renderer/components/common/Toaster'
 import { Field } from '@renderer/components/ui/Field'
 import { Input } from '@renderer/components/ui/Input'
 import { Select } from '@renderer/components/ui/Select'
+import { TimeZoneSelect } from '@renderer/components/ui/TimeZoneSelect'
 import { NumberField } from '@renderer/components/ui/NumberField'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { TableNestedDisplayPreview } from '@renderer/components/settings/TableNestedDisplayPreview'
@@ -78,6 +79,9 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
         t('settings.sectionAppearance'),
         t('settings.language'),
         t('settings.languageSystem'),
+        t('settings.timeZone'),
+        t('settings.timeZoneSystem'),
+        t('settings.timeZoneHint'),
         t('settings.theme'),
         t('settings.themeSystem'),
         t('settings.themeLight'),
@@ -343,6 +347,18 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                     { label: t('settings.themeLight'), value: 'light' },
                     { label: t('settings.themeDark'), value: 'dark' }
                   ]}
+                />
+              </Field>
+
+              <Field label={t('settings.timeZone')} hint={t('settings.timeZoneHint')}>
+                <TimeZoneSelect
+                  value={settings.dateTimeZone}
+                  onChange={(dateTimeZone) => void updateSettings({ dateTimeZone })}
+                  label={t('settings.timeZone')}
+                  systemOptionLabel={t('settings.timeZoneSystem')}
+                  header={t('settings.timeZoneHeader')}
+                  placeholder={t('settings.timeZoneSearchPlaceholder')}
+                  emptyMessage={t('settings.timeZoneEmpty')}
                 />
               </Field>
             </>

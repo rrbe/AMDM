@@ -5,6 +5,7 @@ import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellRes
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
+import { formatResultTimeZoneLabel, resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
@@ -76,6 +77,9 @@ export function ResultPanel({
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
   const view = active?.resultView ?? 'tree'
+  const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
+  const connectionDateTimeZones = useAppStore((s) => s.settings.connectionDateTimeZones)
+  const timeZone = resolveResultTimeZone(dateTimeZone, connectionDateTimeZones, active?.query?.connectionId)
   const fieldSort = useAppStore((s) => s.settings.collectionSort)
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
@@ -225,7 +229,7 @@ export function ResultPanel({
         />
         {hasOutput && (
           <div className="result-body">
-            <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+            <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} timeZone={timeZone} truncated={result.outputTruncated} controlsContainer={foldControls} />
           </div>
         )}
       </div>
@@ -240,12 +244,12 @@ export function ResultPanel({
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
-          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
+          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} timeZone={timeZone} />
           <span className="result-bar-spacer" />
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
-          <ExplainView folding={foldingFor('explain')} plan={result.data} fontSize={dataFontSize} />
+          <ExplainView folding={foldingFor('explain')} plan={result.data} fontSize={dataFontSize} timeZone={timeZone} />
         </div>
       </div>
     )
@@ -309,7 +313,7 @@ export function ResultPanel({
           )}
           <span className="selection-indicator" aria-hidden="true" />
         </div>
-        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
+        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} timeZone={timeZone} />
         <span className="result-bar-spacer" />
         {result.kind === 'documents' && (
           <div className="result-pagination">
@@ -349,25 +353,27 @@ export function ResultPanel({
 
       <div className="result-body">
         {showConsole ? (
-          <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+          <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} timeZone={timeZone} truncated={result.outputTruncated} controlsContainer={foldControls} />
         ) : (
           <>
             {view === 'tree' && (
               <TreeView
                 docs={docs}
                 fontSize={dataFontSize}
+                timeZone={timeZone}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
                 onExport={openSelectionExport}
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} timeZone={timeZone} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}
                 docs={docs}
                 fontSize={dataFontSize}
+                timeZone={timeZone}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
                 onDocumentOrderChange={updateTableDocumentOrder}
@@ -508,11 +514,13 @@ function normalizeDocs(result: ShellResult): unknown[] {
 function ResultMeta({
   result,
   docCount,
-  executedAt
+  executedAt,
+  timeZone
 }: {
   result: ShellResult
   docCount: number
   executedAt: number
+  timeZone: string
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const parts = useMemo(() => {
@@ -534,8 +542,9 @@ function ResultMeta({
     }
     const queryTime = formatQueryTime(executedAt, i18n.resolvedLanguage)
     if (queryTime) out.push({ text: queryTime })
+    out.push({ text: t('result.timeZoneLabel', { timeZone: formatResultTimeZoneLabel(timeZone) }) })
     return out
-  }, [result, docCount, executedAt, i18n.resolvedLanguage, t])
+  }, [result, docCount, executedAt, timeZone, i18n.resolvedLanguage, t])
 
   return (
     <div className="result-meta">

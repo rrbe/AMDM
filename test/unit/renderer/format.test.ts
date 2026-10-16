@@ -19,6 +19,15 @@ describe('toJsonLines', () => {
     expect(line.text).toBe(`ObjectId("${OID}")`)
     expect(line.tokens).toEqual([{ text: `ObjectId("${OID}")`, cls: 'v-objectId' }])
   })
+  it('applies a display time zone recursively to BSON Dates', () => {
+    expect(toJsonLines({ createdAt: { $date: '2026-10-15T09:50:05.154Z' } }, 'Asia/Shanghai').map((line) => line.text)).toEqual([
+      '{',
+      '"createdAt": ISODate("2026-10-15T17:50:05.154+08:00")',
+      '}'
+    ])
+    expect(toInlineJsonTokens({ createdAt: { $date: '2026-10-15T09:50:05.154Z' } }, 'Asia/Shanghai')
+      .map((token) => token.text).join('')).toBe('{ createdAt: ISODate("2026-10-15T17:50:05.154+08:00") }')
+  })
   it('flattens an object with trailing commas on all but the last entry', () => {
     expect(texts({ a: 1, b: 2 })).toEqual(['{', '"a": 1,', '"b": 2', '}'])
   })

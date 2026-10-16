@@ -18,12 +18,14 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toJsonLines } from '@renderer/lib/format'
+import { copyDisplayDatesAsUtc } from '@renderer/lib/dateTimeZone'
 import { parseExplain, type StageTreeNode } from '@renderer/lib/explain'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 interface ExplainViewProps {
   plan: unknown
   fontSize: number
+  timeZone?: string
   folding?: JsonFoldingState
 }
 
@@ -32,10 +34,10 @@ function fmtNum(v: number | undefined): string {
   return v === undefined ? '—' : v.toLocaleString()
 }
 
-export function ExplainView({ plan, fontSize, folding }: ExplainViewProps): React.JSX.Element {
+export function ExplainView({ plan, fontSize, timeZone, folding }: ExplainViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const parsed = useMemo(() => parseExplain(plan), [plan])
-  const rawLines = useMemo(() => toJsonLines(plan), [plan])
+  const rawLines = useMemo(() => toJsonLines(plan, timeZone), [plan, timeZone])
   const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   const rawHeight = Math.min(320, rawLines.length * Math.max(22, fontSize + 8) + 24)
 
@@ -69,7 +71,13 @@ export function ExplainView({ plan, fontSize, folding }: ExplainViewProps): Reac
       <details className="explain-raw">
         <summary>{t('explain.rawJson')}<span className="explain-fold-action" ref={setFoldControls} /></summary>
         <div className="explain-raw-box" style={{ height: rawHeight }}>
-          <FoldableJsonLines folding={folding} lines={rawLines} fontSize={fontSize} controlsContainer={foldControls} />
+          <FoldableJsonLines
+            folding={folding}
+            lines={rawLines}
+            fontSize={fontSize}
+            controlsContainer={foldControls}
+            onCopy={copyDisplayDatesAsUtc}
+          />
         </div>
       </details>
     </div>

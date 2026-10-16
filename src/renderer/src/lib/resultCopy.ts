@@ -13,7 +13,7 @@
  *    (reuses the format.ts line builder).
  *  - STRICT EJSON — the canonical wrapper as-is, round-trippable by the driver.
  */
-import { isExtended } from './ejson'
+import { formatEjsonDate, isExtended } from './ejson'
 import { toJsonLines, indentFor } from './format'
 import { cellValue, deriveColumns, type TableColumnPath } from './tableShape'
 import type { CollectionSort, JsonEncoding } from '@shared/types'
@@ -101,6 +101,7 @@ interface PreviewLimits {
   maxDepth?: number
   maxLines?: number
   maxStringChars?: number
+  timeZone?: string
 }
 
 const DEFAULT_PREVIEW_LIMITS = {
@@ -127,7 +128,8 @@ function buildPreviewValue(
   depth: number,
   budget: { nodes: number; truncated: boolean },
   maxDepth: number,
-  maxStringChars: number
+  maxStringChars: number,
+  timeZone?: string
 ): unknown {
   if (budget.nodes <= 0) {
     budget.truncated = true
@@ -152,7 +154,7 @@ function buildPreviewValue(
     const out: unknown[] = []
     for (const item of value) {
       if (budget.nodes <= 0) break
-      out.push(buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars))
+      out.push(buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars, timeZone))
     }
     if (out.length < value.length) {
       budget.truncated = true
@@ -163,10 +165,13 @@ function buildPreviewValue(
 
   if (isObject(value)) {
     if (isExtended(value)) {
+      if (timeZone && Object.prototype.hasOwnProperty.call(value, '$date')) {
+        return buildPreviewValue(formatEjsonDate(value['$date'], timeZone), depth, budget, maxDepth, maxStringChars)
+      }
       const unwrapped = unwrapEjsonWrapper(value, (nested) =>
-        buildPreviewValue(nested, depth + 1, budget, maxDepth, maxStringChars)
+        buildPreviewValue(nested, depth + 1, budget, maxDepth, maxStringChars, timeZone)
       )
-      return buildPreviewValue(unwrapped, depth, budget, maxDepth, maxStringChars)
+      return buildPreviewValue(unwrapped, depth, budget, maxDepth, maxStringChars, timeZone)
     }
     if (depth >= maxDepth) {
       budget.truncated = true
@@ -180,7 +185,7 @@ function buildPreviewValue(
       if (key.truncated) budget.truncated = true
       let displayKey = key.text
       while (Object.prototype.hasOwnProperty.call(out, displayKey)) displayKey += '…'
-      out[displayKey] = buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars)
+      out[displayKey] = buildPreviewValue(item, depth + 1, budget, maxDepth, maxStringChars, timeZone)
     }
     if (Object.keys(out).length < entries.length) {
       budget.truncated = true
@@ -196,11 +201,11 @@ function buildPreviewValue(
 
 /** Pretty JSON preview that never traverses or renders an unbounded value. */
 export function formatJsonPreview(value: unknown, limits: PreviewLimits = {}): BoundedPreview {
-  const { maxChars, maxDepth, maxLines, maxStringChars } = { ...DEFAULT_PREVIEW_LIMITS, ...limits }
+  const { maxChars, maxDepth, maxLines, maxStringChars, timeZone } = { ...DEFAULT_PREVIEW_LIMITS, ...limits }
 
   for (let nodeLimit = 48; nodeLimit >= 1; nodeLimit -= 1) {
     const budget = { nodes: nodeLimit, truncated: false }
-    const previewValue = buildPreviewValue(value, 0, budget, maxDepth, maxStringChars)
+    const previewValue = buildPreviewValue(value, 0, budget, maxDepth, maxStringChars, timeZone)
     const json = JSON.stringify(previewValue, null, 2) ?? String(previewValue)
     const text = budget.truncated ? `${json}\n…` : json
     if (text.length <= maxChars && text.split('\n').length <= maxLines) {

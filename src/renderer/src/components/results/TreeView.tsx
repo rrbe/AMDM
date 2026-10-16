@@ -62,6 +62,7 @@ interface FlatNode {
 interface TreeViewProps {
   docs: unknown[]
   fontSize: number
+  timeZone?: string
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
   onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
@@ -76,6 +77,7 @@ const MAX_KEY_WIDTH = 680
 export function TreeView({
   docs,
   fontSize,
+  timeZone,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
   onExport,
@@ -380,7 +382,7 @@ export function TreeView({
                     }}
                   />
                 ) : (
-                  <ValueCell node={node} />
+                  <ValueCell node={node} timeZone={timeZone} />
                 )}
               </div>
               <div className={`kv-type v-${valueType(node.value)}`}>
@@ -407,6 +409,7 @@ export function TreeView({
           title={t('result.documentPreviewTitle')}
           value={previewDoc.value}
           fontSize={fontSize}
+          timeZone={timeZone}
           documentView
           source={previewDoc.source}
           onValueChange={(value) => setPreviewDoc((current) => (current ? { ...current, value } : current))}
@@ -470,14 +473,14 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
   ]
 }
 
-function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
+function ValueCell({ node, timeZone }: { node: FlatNode; timeZone?: string }): React.JSX.Element {
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.
     return <span className="tree-summary">{summarize(node.value)}</span>
   }
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
-  const { text, type } = formatScalar(node.value)
+  const { text, type } = formatScalar(node.value, timeZone)
   return (
     <Tooltip content={text}>
       <span className={`tree-val v-${type}`}>{text}</span>

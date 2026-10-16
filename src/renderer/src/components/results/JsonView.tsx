@@ -5,6 +5,7 @@ import { toJsonLines } from '@renderer/lib/format'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { copyText, toPlainJson, toShellText } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { copyDisplayDatesAsUtc, normalizeDisplayDatesForCopy } from '@renderer/lib/dateTimeZone'
 import { jsonCopyMenuItems } from './documentFormatMenus'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
@@ -32,17 +33,18 @@ import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 interface JsonViewProps {
   value: unknown
   fontSize: number
+  timeZone?: string
   folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
 }
 
-export function JsonView({ value, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
+export function JsonView({ value, fontSize, timeZone, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const [allSelected, setAllSelected] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo(() => toJsonLines(value), [value])
+  const lines = useMemo(() => toJsonLines(value, timeZone), [value, timeZone])
 
   // A fresh result clears any lingering "all selected" state.
   useEffect(() => setAllSelected(false), [value])
@@ -76,7 +78,7 @@ export function JsonView({ value, fontSize, controlsContainer, folding }: JsonVi
       ...jsonCopyMenuItems(documents, (text) => void copyText(text)),
       { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(value)) }
     ]
-    if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
+    if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(normalizeDisplayDatesForCopy(selText)) })
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
@@ -91,6 +93,7 @@ export function JsonView({ value, fontSize, controlsContainer, folding }: JsonVi
         fontSize={fontSize}
         folding={folding}
         controlsContainer={controlsContainer}
+        onCopy={copyDisplayDatesAsUtc}
         allSelected={allSelected}
         onMouseDown={() => setAllSelected(false)}
         onContextMenu={openMenu}
