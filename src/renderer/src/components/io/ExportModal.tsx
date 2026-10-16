@@ -6,13 +6,13 @@ import type {
   ExportFileRequest,
   ExportFormat,
   JsonEncoding,
-  ResultExportFormat,
   TabularDelimiter
 } from '@shared/types'
 import { exportFileExtension, sanitizeExportBaseName } from '@shared/exportDestination'
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { Input } from '@renderer/components/ui/Input'
+import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { tabularExportDefaults } from '@renderer/lib/exportDefaults'
@@ -42,8 +42,6 @@ export type ExportModalSource = CollectionExportSource | ResultExportSource
 
 interface ExportModalProps {
   source: ExportModalSource
-  initialFormat?: ExportFormat
-  initialJsonEncoding?: JsonEncoding
   onClose: () => void
 }
 
@@ -57,12 +55,7 @@ function defaultExportFileName(source: ExportModalSource): string {
   )
 }
 
-export function ExportModal({
-  source,
-  initialFormat,
-  initialJsonEncoding,
-  onClose
-}: ExportModalProps): React.JSX.Element {
+export function ExportModal({ source, onClose }: ExportModalProps): React.JSX.Element {
   const { t } = useTranslation()
   const platformDefaults = tabularExportDefaults()
   const chooseExportDirectory = useAppStore((state) => state.chooseExportDirectory)
@@ -73,10 +66,11 @@ export function ExportModal({
   const clearExportProgress = useAppStore((state) => state.clearExportProgress)
   const fieldSort = useAppStore((state) => state.settings.collectionSort)
 
-  const fallbackFormat: ExportFormat = source.kind === 'collection' ? 'json' : 'csv'
-  const initialExportFormat = initialFormat ?? fallbackFormat
-  const [format, setFormat] = useState<ExportFormat>(initialExportFormat)
-  const [jsonEncoding, setJsonEncoding] = useState<JsonEncoding>(initialJsonEncoding ?? 'plain')
+  const [dataFormat, setDataFormat] = useState<Exclude<ExportFormat, 'jsonl'>>('json')
+  const [jsonLayout, setJsonLayout] = useState<'json' | 'jsonl'>('json')
+  const format: ExportFormat = dataFormat === 'json' ? jsonLayout : dataFormat
+  const [jsonEncoding, setJsonEncoding] = useState<JsonEncoding>('plain')
+  const [prettyPrint, setPrettyPrint] = useState(false)
   const [scope, setScope] = useState<'collection' | 'current' | 'selection'>(
     source.kind === 'collection' ? 'collection' : source.fixedSelection ? 'selection' : 'current'
   )
@@ -86,7 +80,7 @@ export function ExportModal({
   const [includeHeader, setIncludeHeader] = useState(true)
   const [utf8Bom, setUtf8Bom] = useState(platformDefaults.utf8Bom)
   const [lineEnding, setLineEnding] = useState<'lf' | 'crlf'>(platformDefaults.lineEnding)
-  const [delimiter, setDelimiter] = useState<TabularDelimiter>(initialExportFormat === 'tsv' ? '\t' : ',')
+  const [delimiter, setDelimiter] = useState<TabularDelimiter>(',')
   const [worksheetName, setWorksheetName] = useState(
     source.kind === 'collection' ? source.collection : (source.collection ?? 'Result')
   )
@@ -147,13 +141,16 @@ export function ExportModal({
     { label: t('io.delimiterPeriod'), value: '.' }
   ] as const
   const formats = [
-    { value: 'json', label: 'JSON Array' },
-    { value: 'jsonl', label: 'JSONL / NDJSON' },
+    { value: 'json', label: 'JSON' },
+    { value: 'bson', label: 'BSON' },
     { value: 'csv', label: 'CSV' },
     { value: 'tsv', label: 'TSV' },
-    { value: 'xlsx', label: 'Excel' },
-    { value: 'bson', label: 'BSON' }
-  ] satisfies Array<{ value: ExportFormat; label: string }>
+    { value: 'xlsx', label: 'Excel' }
+  ] satisfies Array<{ value: Exclude<ExportFormat, 'jsonl'>; label: string }>
+  const layouts = [
+    { value: 'json', label: 'JSON Array', description: t('io.layoutHelp.array') },
+    { value: 'jsonl', label: 'JSONL / NDJSON', description: t('io.layoutHelp.jsonl') }
+  ] satisfies Array<{ value: 'json' | 'jsonl'; label: string; description: string }>
   const jsonEncodings = [
     { value: 'plain', label: 'Plain JSON', description: t('io.encodingHelp.plain') },
     { value: 'relaxed', label: 'Relaxed EJSON', description: t('io.encodingHelp.relaxed') },
@@ -197,10 +194,10 @@ export function ExportModal({
     onClose()
   }
 
-  const onFormatChange = (nextFormat: ExportFormat): void => {
+  const onFormatChange = (nextFormat: Exclude<ExportFormat, 'jsonl'>): void => {
     if (nextFormat === 'csv') setDelimiter(',')
     if (nextFormat === 'tsv') setDelimiter('\t')
-    setFormat(nextFormat)
+    setDataFormat(nextFormat)
   }
 
   const onChooseDirectory = async (): Promise<void> => {
@@ -236,6 +233,7 @@ export function ExportModal({
       delimiter: format === 'csv' || format === 'tsv' ? delimiter : undefined,
       worksheetName: format === 'xlsx' ? worksheetName : undefined,
       jsonEncoding: isJson ? jsonEncoding : undefined,
+      prettyPrint: format === 'json' ? prettyPrint : undefined,
       fieldSort,
       destination: {
         directorySelectionId: directory.selectionId,
@@ -263,7 +261,7 @@ export function ExportModal({
       request = {
         ...common,
         source: 'result',
-        format: format as ResultExportFormat,
+        format,
         documents: resultDocuments
       }
     } else return
@@ -346,16 +344,37 @@ export function ExportModal({
       {canChooseRange && (
         <div className="form-row">
           <label>{t('io.range')}</label>
-          <Select value={scope} onChange={setScope} options={rangeOptions} aria-label={t('io.range')} />
+          <Select disabled={running} value={scope} onChange={setScope} options={rangeOptions} aria-label={t('io.range')} />
         </div>
       )}
 
       <section className="mb-5" aria-labelledby="export-format-heading">
         <h3 id="export-format-heading" className="mb-2 text-xs font-medium text-muted-foreground">
-          {t('io.fileFormat')}
+          {t('io.dataFormat')}
         </h3>
-        <Select value={format} onChange={onFormatChange} options={formats} aria-label={t('io.format')} />
+        <Select
+          disabled={running}
+          value={dataFormat}
+          onChange={onFormatChange}
+          options={formats}
+          aria-label={t('io.dataFormat')}
+        />
       </section>
+
+      {isJson && (
+        <section className="mb-5" aria-labelledby="export-layout-heading">
+          <h3 id="export-layout-heading" className="mb-2 text-xs font-medium text-muted-foreground">
+            {t('io.outputStructure')}
+          </h3>
+          <Select
+            disabled={running}
+            value={jsonLayout}
+            onChange={setJsonLayout}
+            options={layouts}
+            aria-label={t('io.outputStructure')}
+          />
+        </section>
+      )}
 
       {isJson && (
         <section className="mb-5" aria-labelledby="export-json-encoding-heading">
@@ -363,12 +382,26 @@ export function ExportModal({
             {t('io.jsonEncoding')}
           </h3>
           <Select
+            disabled={running}
             value={jsonEncoding}
             onChange={setJsonEncoding}
             options={jsonEncodings}
             aria-label={t('io.jsonEncoding')}
           />
+          <p className="mb-0 mt-2 text-xs leading-relaxed text-muted-foreground">
+            {jsonEncodings.find((option) => option.value === jsonEncoding)?.description}
+          </p>
         </section>
+      )}
+
+      {format === 'json' && (
+        <Checkbox
+          className="mb-5"
+          checked={prettyPrint}
+          onCheckedChange={setPrettyPrint}
+          label={t('io.prettyPrint')}
+          disabled={running}
+        />
       )}
 
       <section className="mb-4" aria-labelledby="export-destination-heading">
@@ -423,6 +456,7 @@ export function ExportModal({
         <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-[var(--separator)] p-3">
           <label className="io-check">
             <input
+              disabled={running}
               type="checkbox"
               checked={includeHeader}
               onChange={(event) => setIncludeHeader(event.target.checked)}
@@ -431,7 +465,7 @@ export function ExportModal({
           </label>
           {(format === 'csv' || format === 'tsv') && (
             <label className="io-check">
-              <input type="checkbox" checked={utf8Bom} onChange={(event) => setUtf8Bom(event.target.checked)} />
+              <input disabled={running} type="checkbox" checked={utf8Bom} onChange={(event) => setUtf8Bom(event.target.checked)} />
               <span>{t('io.utf8Bom')}</span>
             </label>
           )}
@@ -441,6 +475,7 @@ export function ExportModal({
                 {t('io.delimiter')}
               </label>
               <Select
+                disabled={running}
                 id="export-delimiter"
                 value={delimiter}
                 onChange={setDelimiter}
@@ -451,6 +486,7 @@ export function ExportModal({
                 {t('io.lineEnding')}
               </label>
               <Select
+                disabled={running}
                 id="export-line-ending"
                 value={lineEnding}
                 onChange={setLineEnding}
@@ -463,6 +499,7 @@ export function ExportModal({
             <label className="col-span-2 flex items-center gap-2 text-sm text-foreground">
               <span>{t('io.worksheetName')}</span>
               <input
+                disabled={running}
                 className="min-w-0 flex-1"
                 maxLength={64}
                 value={worksheetName}
@@ -478,6 +515,7 @@ export function ExportModal({
           <div className="form-row">
             <label htmlFor="export-query">{t('io.queryFilter')}</label>
             <textarea
+              disabled={running}
               id="export-query"
               className="io-query"
               spellCheck={false}
@@ -489,6 +527,7 @@ export function ExportModal({
           <div className="form-row">
             <label htmlFor="export-limit">{t('io.limit')}</label>
             <input
+              disabled={running}
               id="export-limit"
               type="number"
               min={1}
@@ -503,7 +542,7 @@ export function ExportModal({
       {source.kind === 'collection' && format === 'bson' && (
         <div className="form-row">
           <label className="io-check">
-            <input type="checkbox" checked={gzip} onChange={(event) => setGzip(event.target.checked)} />
+            <input disabled={running} type="checkbox" checked={gzip} onChange={(event) => setGzip(event.target.checked)} />
             <span>{t('io.gzip')}</span>
           </label>
         </div>

@@ -2,8 +2,23 @@ import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
-import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Braces,
+  Copy,
+  Download,
+  Eye,
+  FilePenLine,
+  KeyRound,
+  Pencil,
+  Table2,
+  Terminal,
+  TextCursorInput,
+  Trash2
+} from 'lucide-react'
+import type { CollectionSort } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
 import {
@@ -39,7 +54,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { jsonCopyMenuItems } from './documentFormatMenus'
 
 /**
  * Virtualized table.
@@ -67,8 +82,7 @@ interface TableViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onDocumentOrderChange: (sourceIndexes: number[]) => void
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (documents: unknown[]) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -98,7 +112,6 @@ export function TableView({
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
-  onDocumentOrderChange,
   onExport,
   docCtx
 }: TableViewProps): React.JSX.Element {
@@ -193,10 +206,6 @@ export function TableView({
     const sort = tableSort && column ? { ...tableSort, column: column.path } : null
     return sortTableRows(docs, sort, tableI18n.resolvedLanguage ?? tableI18n.language)
   }, [docs, columns, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
-
-  useEffect(() => {
-    onDocumentOrderChange(rows.map((row) => row.sourceIndex))
-  }, [onDocumentOrderChange, rows])
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -346,16 +355,23 @@ export function TableView({
     const items: ContextMenuEntry[] = [
       {
         label: t('result.dataMenu.view'),
+        icon: <Eye size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => setPreview({ title: t('result.documentPreviewTitle'), value: doc, documentView: true, source })
       }
     ]
     if (docCtx && docHasId(doc)) {
       items.push({
         label: t('result.dataMenu.edit'),
+        icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          { label: t('table.editDoc'), onClick: () => setEditIndex(row) },
+          {
+            label: t('table.editDoc'),
+            icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />,
+            onClick: () => setEditIndex(row)
+          },
           {
             label: t('table.editCell'),
+            icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: col == null || !canEditCell(row, col),
             onClick: () => {
               if (col != null) startEditCell(row, col)
@@ -366,19 +382,19 @@ export function TableView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
     })
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
-      children: exportMenuItems(
-        selectedIndexes.map((index) => docs[index]),
-        onExport
-      )
+      icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
+      onClick: () => onExport(selectedIndexes.map((index) => docs[index]))
     })
     if (docCtx && docHasId(doc)) {
       items.push('separator')
       items.push({
         label: t('table.deleteDoc'),
+        icon: <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, doc._id)
       })
@@ -604,13 +620,6 @@ function TableColumnHeader({
   )
 }
 
-function exportMenuItems(
-  documents: unknown[],
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
-): ContextMenuEntry[] {
-  return resultExportMenuItems(documents, onExport)
-}
-
 /** Right-click copy menu for a table cell / row(s). */
 function tableCopyMenuItems(
   rows: number[],
@@ -628,38 +637,39 @@ function tableCopyMenuItems(
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
+      icon: <KeyRound size={16} strokeWidth={1.8} aria-hidden="true" />,
       disabled: col == null,
       onClick: () => void copyText(col?.path.join('.') ?? '')
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
+      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
       disabled: !hasValue,
       onClick: () => void copyText(plainScalarText(cell.value))
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
+      icon: <Braces size={16} strokeWidth={1.8} aria-hidden="true" />,
       disabled: !hasValue,
       onClick: () => void copyText(toPlainKeyValue(col?.path.join('.') ?? '', cell.value))
     },
     'separator',
+    ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
+    'separator',
     {
-      label: i18n.t('result.dataMenu.copySelectedDocuments'),
-      children: [
-        ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
-        {
-          label: i18n.t('result.dataMenu.copyMongoShell'),
-          onClick: () => void copyText(toShellText(formatted))
-        },
-        'separator',
-        {
-          label: i18n.t('result.dataMenu.copyCsv'),
-          onClick: () => void copyText(toCsv(sel, fieldSort))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyTsv'),
-          onClick: () => void copyText(toTsv(sel, fieldSort))
-        }
-      ]
+      label: i18n.t('result.dataMenu.copyMongoShell'),
+      icon: <Terminal size={16} strokeWidth={1.8} aria-hidden="true" />,
+      onClick: () => void copyText(toShellText(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyCsv'),
+      icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+      onClick: () => void copyText(toCsv(sel, fieldSort))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyTsv'),
+      icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+      onClick: () => void copyText(toTsv(sel, fieldSort))
     }
   ]
 }

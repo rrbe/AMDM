@@ -1,7 +1,6 @@
-import { useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
+import { useMemo, type ComponentProps, type ReactNode } from 'react'
 import { ContextMenu as BaseContextMenu } from '@base-ui/react/context-menu'
 import { Menu as BaseMenu } from '@base-ui/react/menu'
-import { CircleHelp } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 
 /**
@@ -17,7 +16,7 @@ import { Tooltip } from './Tooltip'
 interface MenuItemBase {
   label: string
   icon?: ReactNode
-  /** Optional explanation opened from a help icon at the end of the item. */
+  /** Optional explanation shown when the action is hovered or focused. */
   description?: ReactNode
   /** Greyed-out + unclickable. */
   disabled?: boolean
@@ -49,36 +48,6 @@ interface MenuProps {
   finalFocus?: MenuFinalFocus
 }
 
-function MenuHelp({ label, description }: { label: string; description: ReactNode }): React.JSX.Element {
-  const triggerRef = useRef<HTMLSpanElement>(null)
-
-  return (
-    <Tooltip
-      content={description}
-      variant="text"
-      delay={100}
-      anchor={() => triggerRef.current?.closest('.ctx-menu') ?? null}
-      align="end"
-    >
-      <span
-        ref={triggerRef}
-        className="ctx-menu-help inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center text-[var(--fg-3)] outline-none hover:text-inherit focus-visible:rounded-sm focus-visible:text-inherit focus-visible:shadow-[0_0_0_2px_var(--focus-soft)]"
-        role="button"
-        tabIndex={0}
-        aria-label={typeof description === 'string' ? `${label}: ${description}` : label}
-        onPointerDown={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-        }}
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => event.stopPropagation()}
-      >
-        <CircleHelp size={13} />
-      </span>
-    </Tooltip>
-  )
-}
-
 function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: MenuFinalFocus }): React.JSX.Element {
   return (
     <>
@@ -87,28 +56,18 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
           return <div key={index} className="ctx-sep" role="separator" />
         }
         if ('children' in item) {
+          const submenuTrigger = (
+            <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
+              {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
+              <span className="ctx-label">{item.label}</span>
+              <span className="ctx-submenu-arrow" aria-hidden="true">
+                ›
+              </span>
+            </BaseMenu.SubmenuTrigger>
+          )
           return (
             <BaseMenu.SubmenuRoot key={index}>
-              {item.description != null ? (
-                <div className="ctx-submenu-with-help">
-                  <BaseMenu.SubmenuTrigger className="ctx-item ctx-item-with-help" disabled={item.disabled} openOnHover>
-                    {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
-                    <span className="ctx-label">{item.label}</span>
-                    <MenuHelp label={item.label} description={item.description} />
-                    <span className="ctx-submenu-arrow" aria-hidden="true">
-                      ›
-                    </span>
-                  </BaseMenu.SubmenuTrigger>
-                </div>
-              ) : (
-                <BaseMenu.SubmenuTrigger className="ctx-item" disabled={item.disabled} openOnHover>
-                  {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
-                  <span className="ctx-label">{item.label}</span>
-                  <span className="ctx-submenu-arrow" aria-hidden="true">
-                    ›
-                  </span>
-                </BaseMenu.SubmenuTrigger>
-              )}
+              {submenuTrigger}
               <BaseMenu.Portal>
                 <BaseMenu.Positioner
                   className="ui-menu-positioner"
@@ -125,7 +84,7 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
             </BaseMenu.SubmenuRoot>
           )
         }
-        return (
+        const action = (
           <BaseMenu.Item
             key={index}
             className={item.danger ? 'ctx-item danger' : 'ctx-item'}
@@ -134,9 +93,23 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
           >
             {item.icon != null && <span className="ctx-icon">{item.icon}</span>}
             <span className="ctx-label">{item.label}</span>
-            {item.description != null && <MenuHelp label={item.label} description={item.description} />}
             {item.shortcut != null && <span className="ctx-shortcut">{item.shortcut}</span>}
           </BaseMenu.Item>
+        )
+        return item.description != null ? (
+          <Tooltip
+            key={index}
+            content={item.description}
+            disabled={item.disabled}
+            variant="text"
+            side="right"
+            delay={500}
+            align="start"
+          >
+            {action}
+          </Tooltip>
+        ) : (
+          action
         )
       })}
     </>

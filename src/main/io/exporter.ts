@@ -432,14 +432,16 @@ async function exportJson(
   signal.addEventListener('abort', abort, { once: true })
   const asArray = req.format === 'json'
   const encoding = req.jsonEncoding ?? 'plain'
+  const prettyPrint = asArray && req.prettyPrint === true
   const total = req.source === 'result' ? req.documents.length : undefined
   let count = 0
   report('writing', 0, total, true)
   try {
     if (asArray) await writeChunk(stream, '[\n')
     for await (const document of canonicalDocuments(req, signal)) {
-      const serialized = JSON.stringify(encodeCanonicalJson(document, encoding))
-      await writeChunk(stream, asArray ? `${count ? ',\n' : ''}${serialized}` : `${serialized}\n`)
+      const serialized = JSON.stringify(encodeCanonicalJson(document, encoding), null, prettyPrint ? 2 : undefined)
+      const arrayDocument = prettyPrint ? `  ${serialized.replace(/\n/g, '\n  ')}` : serialized
+      await writeChunk(stream, asArray ? `${count ? ',\n' : ''}${arrayDocument}` : `${serialized}\n`)
       streamErrors.check()
       count += 1
       report('writing', count, total)
