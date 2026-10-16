@@ -520,6 +520,7 @@
       "plainJson": "复制为 Plain JSON",
       "relaxedEjson": "复制为 Relaxed EJSON",
       "canonicalEjson": "复制为 Canonical EJSON",
+      "jsonl": "复制为 JSONL / NDJSON",
       "mongoShell": "复制为 MongoDB 文档",
       "csv": "复制为 CSV",
       "tsv": "复制为 TSV"
@@ -528,10 +529,12 @@
       "plainJson": "Plain JSON",
       "relaxedEjson": "Relaxed EJSON",
       "canonicalEjson": "Canonical EJSON",
+      "jsonl": "JSONL / NDJSON",
       "bson": "BSON",
       "csv": "CSV",
       "tsv": "TSV",
-      "xlsx": "Excel"
+      "xlsx": "Excel",
+      "moreOptions": "更多导出选项…"
     },
     "dataMenu": {
       "view": "查看",
@@ -617,7 +620,7 @@
     "exportCollection": "导出",
     "importCollection": "导入",
     "exportTitle": "导出",
-    "exportDescription": "选择导出范围、文件格式和保存位置；JSON 格式可单独选择 BSON 类型编码。",
+    "exportDescription": "选择导出范围、数据格式和保存位置；JSON 可分别设置输出结构、BSON 类型编码和缩进。",
     "importTitle": "导入 — {{target}}",
     "importDescription": "选择文件后自动识别 JSON、JSONL / NDJSON、Relaxed / Canonical EJSON、CSV、TSV、Excel 和 BSON。",
     "close": "关闭",
@@ -627,7 +630,9 @@
     "exportBtn": "导出",
     "importBtn": "导入",
     "format": "格式",
-    "fileFormat": "文件格式",
+    "dataFormat": "数据格式",
+    "outputStructure": "输出结构",
+    "prettyPrint": "格式化缩进",
     "jsonEncoding": "JSON 编码",
     "encodingHelp": {
       "plain": "ObjectId、Date、Decimal128 等 BSON 类型会转换为字符串或数字；重新导入时不会自动恢复原始类型。",

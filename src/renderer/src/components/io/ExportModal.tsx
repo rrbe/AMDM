@@ -73,10 +73,11 @@ export function ExportModal({
   const clearExportProgress = useAppStore((state) => state.clearExportProgress)
   const fieldSort = useAppStore((state) => state.settings.collectionSort)
 
-  const fallbackFormat: ExportFormat = source.kind === 'collection' ? 'json' : 'csv'
+  const fallbackFormat: ExportFormat = 'json'
   const initialExportFormat = initialFormat ?? fallbackFormat
   const [format, setFormat] = useState<ExportFormat>(initialExportFormat)
   const [jsonEncoding, setJsonEncoding] = useState<JsonEncoding>(initialJsonEncoding ?? 'plain')
+  const [prettyPrint, setPrettyPrint] = useState(false)
   const [scope, setScope] = useState<'collection' | 'current' | 'selection'>(
     source.kind === 'collection' ? 'collection' : source.fixedSelection ? 'selection' : 'current'
   )
@@ -147,13 +148,16 @@ export function ExportModal({
     { label: t('io.delimiterPeriod'), value: '.' }
   ] as const
   const formats = [
-    { value: 'json', label: 'JSON Array' },
-    { value: 'jsonl', label: 'JSONL / NDJSON' },
+    { value: 'json', label: 'JSON' },
+    { value: 'bson', label: 'BSON' },
     { value: 'csv', label: 'CSV' },
     { value: 'tsv', label: 'TSV' },
-    { value: 'xlsx', label: 'Excel' },
-    { value: 'bson', label: 'BSON' }
-  ] satisfies Array<{ value: ExportFormat; label: string }>
+    { value: 'xlsx', label: 'Excel' }
+  ] satisfies Array<{ value: Exclude<ExportFormat, 'jsonl'>; label: string }>
+  const layouts = [
+    { value: 'json', label: 'JSON Array', description: t('io.layoutHelp.array') },
+    { value: 'jsonl', label: 'JSONL / NDJSON', description: t('io.layoutHelp.jsonl') }
+  ] satisfies Array<{ value: 'json' | 'jsonl'; label: string; description: string }>
   const jsonEncodings = [
     { value: 'plain', label: 'Plain JSON', description: t('io.encodingHelp.plain') },
     { value: 'relaxed', label: 'Relaxed EJSON', description: t('io.encodingHelp.relaxed') },
@@ -197,10 +201,18 @@ export function ExportModal({
     onClose()
   }
 
-  const onFormatChange = (nextFormat: ExportFormat): void => {
+  const onFormatChange = (nextFormat: Exclude<ExportFormat, 'jsonl'>): void => {
     if (nextFormat === 'csv') setDelimiter(',')
     if (nextFormat === 'tsv') setDelimiter('\t')
-    setFormat(nextFormat)
+    if (nextFormat === 'json') {
+      setFormat((current) => (current === 'jsonl' ? 'jsonl' : 'json'))
+    } else {
+      setFormat(nextFormat)
+    }
+  }
+
+  const onLayoutChange = (nextLayout: 'json' | 'jsonl'): void => {
+    setFormat(nextLayout)
   }
 
   const onChooseDirectory = async (): Promise<void> => {
@@ -236,6 +248,7 @@ export function ExportModal({
       delimiter: format === 'csv' || format === 'tsv' ? delimiter : undefined,
       worksheetName: format === 'xlsx' ? worksheetName : undefined,
       jsonEncoding: isJson ? jsonEncoding : undefined,
+      prettyPrint: format === 'json' ? prettyPrint : undefined,
       fieldSort,
       destination: {
         directorySelectionId: directory.selectionId,
@@ -352,10 +365,29 @@ export function ExportModal({
 
       <section className="mb-5" aria-labelledby="export-format-heading">
         <h3 id="export-format-heading" className="mb-2 text-xs font-medium text-muted-foreground">
-          {t('io.fileFormat')}
+          {t('io.dataFormat')}
         </h3>
-        <Select value={format} onChange={onFormatChange} options={formats} aria-label={t('io.format')} />
+        <Select
+          value={(isJson ? 'json' : format) as Exclude<ExportFormat, 'jsonl'>}
+          onChange={onFormatChange}
+          options={formats}
+          aria-label={t('io.dataFormat')}
+        />
       </section>
+
+      {isJson && (
+        <section className="mb-5" aria-labelledby="export-layout-heading">
+          <h3 id="export-layout-heading" className="mb-2 text-xs font-medium text-muted-foreground">
+            {t('io.outputStructure')}
+          </h3>
+          <Select
+            value={format}
+            onChange={onLayoutChange}
+            options={layouts}
+            aria-label={t('io.outputStructure')}
+          />
+        </section>
+      )}
 
       {isJson && (
         <section className="mb-5" aria-labelledby="export-json-encoding-heading">
@@ -369,6 +401,13 @@ export function ExportModal({
             aria-label={t('io.jsonEncoding')}
           />
         </section>
+      )}
+
+      {format === 'json' && (
+        <label className="io-check mb-5">
+          <input type="checkbox" checked={prettyPrint} onChange={(event) => setPrettyPrint(event.target.checked)} />
+          <span>{t('io.prettyPrint')}</span>
+        </label>
       )}
 
       <section className="mb-4" aria-labelledby="export-destination-heading">

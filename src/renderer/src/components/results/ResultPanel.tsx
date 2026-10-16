@@ -102,7 +102,7 @@ export function ResultPanel({
     )
   }, [])
   const [exportModal, setExportModal] = useState<{
-    format: ResultExportFormat
+    format?: ResultExportFormat
     jsonEncoding?: JsonEncoding
     fixedDocuments?: unknown[]
   } | null>(null)
@@ -258,8 +258,12 @@ export function ResultPanel({
   const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
     .filter((index) => index >= 0 && index < docs.length)
     .map((index) => docs[index])
-  const openSelectionExport = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding): void => {
-    setExportModal({ format, jsonEncoding, fixedDocuments: documents })
+  const openSelectionExport = (
+    format: ResultExportFormat | null,
+    documents: unknown[],
+    jsonEncoding?: JsonEncoding
+  ): void => {
+    setExportModal({ ...(format != null ? { format } : {}), jsonEncoding, fixedDocuments: documents })
   }
   const closeExport = (): void => {
     setExportModal(null)

@@ -6,7 +6,9 @@
    `position: fixed` below). No backdrop element anymore. */
 .ctx-menu {
   position: fixed;
-  min-width: 180px;
+  width: max-content;
+  min-width: min(240px, calc(100vw - 16px));
+  max-width: min(270px, calc(100vw - 16px));
   background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
   backdrop-filter: blur(28px) saturate(1.35);
   -webkit-backdrop-filter: blur(28px) saturate(1.35);
@@ -23,8 +25,8 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 28px;
-  padding: 5px 9px;
+  min-height: 34px;
+  padding: 6px 9px;
   border: none;
   background: transparent;
   color: var(--text-primary);
@@ -44,7 +46,10 @@
 }
 .ctx-icon {
   display: flex;
+  width: 20px;
+  flex: 0 0 20px;
   align-items: center;
+  justify-content: center;
   color: var(--text-primary);
 }
 .ctx-item:hover .ctx-icon {
@@ -54,7 +59,11 @@
   display: block;
 }
 .ctx-label {
+  min-width: 0;
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ctx-shortcut {
   margin-left: 16px;
@@ -63,30 +72,15 @@
   font-variant-numeric: tabular-nums;
 }
 .ctx-submenu-arrow {
-  margin-left: 16px;
+  display: inline-flex;
+  width: 20px;
+  flex: 0 0 20px;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
   color: var(--text-primary);
   font-size: 16px;
   line-height: 1;
-}
-.ctx-submenu-with-help {
-  position: relative;
-}
-.ctx-submenu-with-help:hover > .ctx-item {
-  background: var(--interaction-hover);
-}
-.ctx-item-with-help {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 20px 20px;
-}
-.ctx-item-with-help .ctx-label {
-  min-width: 0;
-}
-.ctx-item-with-help .ctx-submenu-arrow {
-  display: inline-flex;
-  width: 20px;
-  margin-left: 0;
-  align-items: center;
-  justify-content: center;
 }
 .ctx-item[data-popup-open] .ctx-submenu-arrow,
 .ctx-item[data-highlighted] .ctx-submenu-arrow {

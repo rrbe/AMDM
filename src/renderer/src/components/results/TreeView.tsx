@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
+import { Copy, Download, Trash2 } from 'lucide-react'
 import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
@@ -64,7 +65,7 @@ interface TreeViewProps {
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -296,16 +297,19 @@ export function TreeView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: treeCopyMenuItems(node, selected, fieldSort)
     })
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
+      icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: exportMenuItems(selected, onExport)
     })
     if (docCtx && docHasId(rootDoc)) {
       items.push('separator')
       items.push({
         label: t('tree.deleteDoc'),
+        icon: <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, rootDoc._id)
       })
@@ -421,7 +425,7 @@ export function TreeView({
 
 function exportMenuItems(
   documents: unknown[],
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
 ): ContextMenuEntry[] {
   return resultExportMenuItems(documents, onExport)
 }
@@ -448,24 +452,19 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
       onClick: () => void copyText(toPlainKeyValue(node.keyLabel, node.value))
     },
     'separator',
+    ...jsonCopyMenuItems(docs, (text) => void copyText(text)),
+    'separator',
     {
-      label: i18n.t('result.dataMenu.copySelectedDocuments'),
-      children: [
-        ...jsonCopyMenuItems(docs, (text) => void copyText(text)),
-        {
-          label: i18n.t('result.dataMenu.copyMongoShell'),
-          onClick: () => void copyText(toShellText(formatted))
-        },
-        'separator',
-        {
-          label: i18n.t('result.dataMenu.copyCsv'),
-          onClick: () => void copyText(toCsv(docs, fieldSort))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyTsv'),
-          onClick: () => void copyText(toTsv(docs, fieldSort))
-        }
-      ]
+      label: i18n.t('result.dataMenu.copyMongoShell'),
+      onClick: () => void copyText(toShellText(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyCsv'),
+      onClick: () => void copyText(toCsv(docs, fieldSort))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyTsv'),
+      onClick: () => void copyText(toTsv(docs, fieldSort))
     }
   ]
 }

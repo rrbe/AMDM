@@ -483,6 +483,8 @@ interface ExportOptions {
   worksheetName?: string
   /** JSON/JSONL: how canonical EJSON values are represented in the output. */
   jsonEncoding?: JsonEncoding
+  /** JSON Array: indent each document and nested value for readability. */
+  prettyPrint?: boolean
   /** Keep exported columns consistent with the Table view. */
   fieldSort?: CollectionSort
 }

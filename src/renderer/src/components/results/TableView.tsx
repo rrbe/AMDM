@@ -2,7 +2,7 @@ import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronsUpDown, Copy, Download, Trash2 } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
@@ -68,7 +68,7 @@ interface TableViewProps {
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
   onDocumentOrderChange: (sourceIndexes: number[]) => void
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -366,10 +366,12 @@ export function TableView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
     })
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
+      icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: exportMenuItems(
         selectedIndexes.map((index) => docs[index]),
         onExport
@@ -379,6 +381,7 @@ export function TableView({
       items.push('separator')
       items.push({
         label: t('table.deleteDoc'),
+        icon: <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, doc._id)
       })
@@ -606,7 +609,7 @@ function TableColumnHeader({
 
 function exportMenuItems(
   documents: unknown[],
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+  onExport: (format: ResultExportFormat | null, documents: unknown[], jsonEncoding?: JsonEncoding) => void
 ): ContextMenuEntry[] {
   return resultExportMenuItems(documents, onExport)
 }
@@ -642,24 +645,19 @@ function tableCopyMenuItems(
       onClick: () => void copyText(toPlainKeyValue(col?.path.join('.') ?? '', cell.value))
     },
     'separator',
+    ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
+    'separator',
     {
-      label: i18n.t('result.dataMenu.copySelectedDocuments'),
-      children: [
-        ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
-        {
-          label: i18n.t('result.dataMenu.copyMongoShell'),
-          onClick: () => void copyText(toShellText(formatted))
-        },
-        'separator',
-        {
-          label: i18n.t('result.dataMenu.copyCsv'),
-          onClick: () => void copyText(toCsv(sel, fieldSort))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyTsv'),
-          onClick: () => void copyText(toTsv(sel, fieldSort))
-        }
-      ]
+      label: i18n.t('result.dataMenu.copyMongoShell'),
+      onClick: () => void copyText(toShellText(formatted))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyCsv'),
+      onClick: () => void copyText(toCsv(sel, fieldSort))
+    },
+    {
+      label: i18n.t('result.dataMenu.copyTsv'),
+      onClick: () => void copyText(toTsv(sel, fieldSort))
     }
   ]
 }

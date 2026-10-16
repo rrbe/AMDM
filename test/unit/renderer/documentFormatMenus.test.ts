@@ -7,26 +7,22 @@ vi.mock('@renderer/i18n', () => ({
 import { jsonCopyMenuItems, resultExportMenuItems } from '@renderer/components/results/documentFormatMenus'
 
 describe('document format menus', () => {
-  it('groups JSON copy layouts under the encoding', () => {
+  it('copies JSON encodings and JSONL directly from one submenu level', () => {
     const copy = vi.fn()
-    const items = jsonCopyMenuItems([{ name: 'Ada' }], copy)
+    const items = jsonCopyMenuItems([{ name: 'Ada' }, { name: 'Grace' }], copy)
 
     expect(items.map((item) => (item === 'separator' ? item : item.label))).toEqual([
       'result.copy.plainJson',
       'result.copy.relaxedEjson',
-      'result.copy.canonicalEjson'
+      'result.copy.canonicalEjson',
+      'result.copy.jsonl'
     ])
-    expect(items[0] && items[0] !== 'separator' && 'children' in items[0] ? items[0].children : []).toMatchObject([
-      { label: 'JSON Array', description: 'io.layoutHelp.array' },
-      { label: 'JSONL / NDJSON', description: 'io.layoutHelp.jsonl' }
-    ])
-    const plainLayouts = items[0] && items[0] !== 'separator' && 'children' in items[0] ? items[0].children : []
-    const jsonLines = plainLayouts[1]
+    const jsonLines = items[3]
     if (jsonLines !== 'separator' && jsonLines && 'onClick' in jsonLines) jsonLines.onClick()
-    expect(copy).toHaveBeenCalledWith('{"name":"Ada"}')
+    expect(copy).toHaveBeenCalledWith('{"name":"Ada"}\n{"name":"Grace"}')
   })
 
-  it('groups JSON export layouts under the encoding before other formats', () => {
+  it('offers export presets and a separate route to the full export options', () => {
     const exportDocuments = vi.fn()
     const items = resultExportMenuItems([], exportDocuments)
 
@@ -34,21 +30,23 @@ describe('document format menus', () => {
       'result.export.plainJson',
       'result.export.relaxedEjson',
       'result.export.canonicalEjson',
+      'separator',
+      'result.export.jsonl',
       'result.export.bson',
       'result.export.csv',
       'result.export.tsv',
-      'result.export.xlsx'
+      'result.export.xlsx',
+      'separator',
+      'result.export.moreOptions'
     ])
-    for (const item of items.slice(0, 3)) {
-      expect(item !== 'separator' && 'children' in item ? item.children : []).toMatchObject([
-        { label: 'JSON Array', description: 'io.layoutHelp.array' },
-        { label: 'JSONL / NDJSON', description: 'io.layoutHelp.jsonl' }
-      ])
-    }
     const relaxed = items[1]
-    const relaxedLayouts = relaxed !== 'separator' && relaxed && 'children' in relaxed ? relaxed.children : []
-    const jsonArray = relaxedLayouts[0]
-    if (jsonArray !== 'separator' && jsonArray && 'onClick' in jsonArray) jsonArray.onClick()
+    if (relaxed !== 'separator' && relaxed && 'onClick' in relaxed) relaxed.onClick()
     expect(exportDocuments).toHaveBeenCalledWith('json', [], 'relaxed')
+    const jsonLines = items[4]
+    if (jsonLines !== 'separator' && jsonLines && 'onClick' in jsonLines) jsonLines.onClick()
+    expect(exportDocuments).toHaveBeenCalledWith('jsonl', [], 'plain')
+    const moreOptions = items[10]
+    if (moreOptions !== 'separator' && moreOptions && 'onClick' in moreOptions) moreOptions.onClick()
+    expect(exportDocuments).toHaveBeenCalledWith(null, [])
   })
 })
