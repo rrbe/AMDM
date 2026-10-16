@@ -116,7 +116,7 @@ history, focus restoration, worker cleanup, and the inline failure path.
   before/after data and settings. Keep these measurements separate from IPC
   query duration.
 
-CI runs three build iterations and three launches per cache phase, saving JSON,
-Markdown, logs, and E2E screenshots as artifacts. Use more local samples for
+The daily/manual workflow runs three build iterations and three launches per
+cache phase, saving JSON, Markdown, logs, and E2E screenshots as artifacts. Use more local samples for
 optimization decisions; runner timings from different machines are not paired
 before/after evidence.

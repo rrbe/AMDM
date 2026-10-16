@@ -14,39 +14,88 @@
 - Integration: Shell, write paths, and core operations validated against real MongoDB behavior.
 - Packaged smoke: native Electron startup, preload/IPC boundaries, transactions,
   BSON, workers, and updater initialization (`pnpm test:packaged`).
-- UI E2E: real Electron mouse/keyboard input to connect through Explorer, enter
-  and execute queries, render results in JSON/Table, use the Run shortcut, and
-  open Settings (`pnpm test:e2e`).
+- Core UI E2E: real Electron input to connect through Explorer, execute queries
+  using Run/the keyboard shortcut, and render JSON/Table (`pnpm test:e2e:smoke`).
+- Full UI E2E: core smoke plus pagination/write-once behavior, Settings isolation,
+  quick search, and Web scenarios (`pnpm test:e2e`).
 - Benchmarks: repeated production builds and packaged startup/query timings
   (`pnpm bench:build`, `pnpm bench:runtime`) plus native quick-search UI latency
   (`pnpm bench:search`), with raw samples and summaries.
 
-Test files are outside the application tsconfig includes, so `pnpm typecheck` does not replace the test suite. Run type-checking and unit/contract tests for routine changes; add the relevant integration tests when real database semantics are involved.
+Test files are outside the application tsconfig includes, so `pnpm typecheck` does
+not replace tests. During local development, type-check TypeScript changes and
+run only the affected unit/contract test files. Add relevant integration tests
+when MongoDB behavior, writes, or IPC handlers change. For example:
+
+```bash
+pnpm typecheck
+pnpm exec vitest run test/unit/main/stores.test.ts
+# IPC changes that affect connection handling:
+pnpm exec vitest run test/integration/connectionsIpc.test.ts
+```
+
+Full suites run in CI. Do not rerun them for every feature, commit, or push when
+the affected code already has valid results. Documentation-only changes need
+link/reference checks and `git diff --check`; routine UI changes do not require
+packaging or E2E. Run the relevant native UI scenarios for complex interactions
+or an observed regression, and packaged smoke for runtime/packaging changes.
 
 Integration tests prefer a locally cached `mongod` binary and may need to download one when no cache exists. Worker artifacts are generally not built during tests, so worker-backed modules must support an inline path through the same core.
 
-CI runs on pushes to `master` and on pull requests. Feature branch pushes do not
-trigger a second run alongside PR checks. New runs for the same PR cancel older
-runs; `master` push runs remain independent. Version tags trigger Release only.
+The `CI` workflow runs on pushes to `master` and on pull requests, using one
+Linux runner for type checking, unit/contract and integration tests, desktop/Web
+production builds, Web runtime tests, native packaging, and core UI E2E.
+Changes limited to Markdown or
+`docs/screenshots/` skip this workflow. Feature branch pushes do not trigger a
+second run alongside PR checks. New runs for the same PR cancel older runs;
+`master` push runs remain independent. Version tags trigger Release only.
 
-CI runs type checking, unit/contract tests, integration tests, and a production
-build on macOS, Windows, and Linux. It caches MongoDB 8.2.1 and packages the host
-architecture using the installed Electron distribution. `pnpm test:packaged`
+`Daily checks` runs once a day at 03:17 Asia/Shanghai (19:17 UTC) against the
+latest `master`, and supports manual runs from Actions or
+`gh workflow run daily.yml --ref <branch>`. Scheduling and manual dispatch become
+available after the workflow is merged into `master`. The scheduled time is a
+target; GitHub may delay a run when runners are busy.
+
+The daily/manual workflow retains the full macOS, Windows, and Linux suite:
+type checking, unit/contract and integration tests, desktop/Web builds, Web
+runtime, native packaging, packaged smoke, full UI E2E (including core smoke),
+and build/runtime benchmarks.
+Both workflows cache MongoDB 8.2.1. Daily packaging targets the host architecture
+using the installed Electron distribution. `pnpm test:packaged`
 then launches that unpacked application with isolated user data and uses Electron
 CDP to verify both window bridges, concurrent first queries, transactions, BSON,
 the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
-diagnostics are written under `dist/runtime-validation/` and uploaded by CI.
+diagnostics are written under `dist/runtime-validation/` and uploaded by the
+daily/manual workflow.
 On macOS, the shared packaged-test launcher uses `--use-mock-keychain` to keep
 ad-hoc test builds from blocking on system Keychain authorization prompts.
 
-The packaging step explicitly runs `pnpm exec install-electron` before using
-`node_modules/electron/dist`; unit tests do not install the Electron binary.
+Both workflows explicitly run `pnpm exec install-electron`, then
+`pnpm package:dir` to package the existing build for the host platform and
+architecture using `node_modules/electron/dist`. This packaging command expects
+`pnpm build` first and `pnpm prepare:sparkle` on macOS; it does not rebuild or
+clean output. Unit tests do not install the Electron binary.
 
-The UI E2E also runs on all three platforms, with reports, Electron logs, and
-screenshots under `dist/e2e-validation/`. Test files run serially because native
+PR smoke reports, Electron logs, and screenshots are uploaded from
+`dist/e2e-validation/smoke-shell/`, including on failure.
+
+Keep new core E2E small and focused on essential user paths. Broader UI cases
+belong to full regression. Each scenario owns its profile, MongoDB fixture, app,
+and diagnostics; shared setup/cleanup lives in `test/helpers/`. Shell execution,
+pagination, and Settings are separate tests and can each run by name:
+
+```bash
+pnpm test:e2e:smoke
+node --test --test-name-pattern='Shell pagination' test/e2e/shell.test.mjs
+node --test --test-name-pattern='Settings opens' test/e2e/shell.test.mjs
+```
+
+The daily/manual UI E2E runs on all three platforms, with reports, Electron logs,
+and screenshots under `dist/e2e-validation/`. Test files run serially because native
 Electron windows share desktop focus; parallel instances can disrupt mouse,
 keyboard, and focus assertions. Build and runtime benchmarks run with
-three iterations in CI and upload their reports under `dist/benchmarks/`.
+three iterations in the daily/manual workflow and upload their reports under
+`dist/benchmarks/`.
 Functional failures fail CI; benchmark timings are recorded without absolute
 performance thresholds because shared runner load varies.
 
@@ -151,13 +200,14 @@ from the first published tag.
 
 ## Validation by change type
 
-| Change                           | Minimum validation                                       |
-| -------------------------------- | -------------------------------------------------------- |
-| Documentation or configuration   | Link/reference checks and `git diff --check`             |
-| TypeScript or UI logic           | `pnpm typecheck` and `pnpm test:unit`                    |
-| MongoDB behavior, writes, or IPC | The above plus relevant integration tests                |
-| Build configuration or main deps | The above plus `pnpm build` and target unpacked artifact |
-| Renderer interaction or styling  | The above plus validation in the current Electron app    |
+| Change                           | Local validation                                                     |
+| -------------------------------- | -------------------------------------------------------------------- |
+| Documentation                    | Link/reference checks and `git diff --check`                         |
+| GitHub Actions workflows          | `actionlint` and `git diff --check`                                  |
+| TypeScript or UI logic            | `pnpm typecheck` and affected unit/contract test files                |
+| MongoDB behavior, writes, or IPC  | The above plus relevant integration test files                       |
+| Build configuration or main deps  | The above plus `pnpm build`, target unpacked app, and packaged smoke  |
+| Renderer interaction or styling   | Relevant checks; inspect Electron when runtime validation is needed |
 
 ## Internal Web edition
 

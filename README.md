@@ -46,6 +46,7 @@ pnpm clean                           # remove generated build files
 - Connection backups, MongoDB URL lists, and client-specific connection transfers
 - Tree / JSON / Table result views
 - Visual explain
+- Internal [Web edition](docs/WEB.md) for browser access
 
 On desktop, right-click the Connections heading or empty space to import/export
 connections, or a connection row to export that connection. Choose an AMDM backup,
@@ -63,7 +64,3 @@ macOS builds update through Sparkle, use ad-hoc signing, and are not notarized. 
 ## License
 
 [GNU GPL v3.0](./LICENSE)
-
-## Web edition
-
-For the internal browser edition, see [AMDM Web](docs/WEB.md).

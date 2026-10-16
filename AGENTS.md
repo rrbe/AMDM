@@ -41,11 +41,13 @@ pnpm test:integration              # integration tests with real MongoDB behavio
 pnpm test                          # unit + contract + integration tests
 pnpm test:packaged                 # smoke-test the native unpacked app
 pnpm test:e2e                      # real Electron UI flows (requires unpacked app)
+pnpm test:e2e:smoke                # core UI flow used by PR CI (requires unpacked app)
 pnpm bench:build                   # repeated production builds and output sizes
 pnpm bench:runtime                 # packaged startup and Shell IPC timings
 pnpm bench:search                  # packaged quick-search UI latency under pressure
 pnpm build                         # production build into out/
 pnpm dist:dir --mac --arm64        # build an unpacked macOS arm64 app
+pnpm package:dir                   # package existing output with the installed Electron
 pnpm install:mac                   # build, install, and launch the local macOS app
 pnpm clean                         # remove generated artifacts
 ```
@@ -74,7 +76,9 @@ Use pnpm exclusively. The project has no linter. Choose type-checking and target
 
 ## Validation scope
 
-- By default, run only tests relevant to the current change. Reuse valid results when the tested code has not changed; do not repeat full local suites for every feature or commit. Documentation-only changes do not need tests.
+- Use three validation layers: local development runs affected tests; PR/master CI runs necessary checks plus a small, stable core E2E suite on Linux; daily/manual CI runs full regression on macOS, Windows, and Linux, including core E2E, extended UI cases, packaged smoke, and benchmarks.
+- Keep core E2E focused on startup, connection, query execution, and result rendering. Put broader interaction and feature regressions in the full suite. Every E2E scenario must run independently with its own profile, data, and application lifecycle; reuse shared setup/cleanup, and keep native Electron scenarios serial because they share desktop focus.
+- During local development, run only test files relevant to the current change. Reuse valid results when the tested code has not changed; a commit or push alone is not a reason to rerun tests. Full suites belong in CI, not the default local gate. Documentation-only changes do not need tests.
 - Run the relevant integration tests for changes to real MongoDB behavior, write paths, or IPC handlers.
 - Run a production build for dependency, main-build, or packaging changes. For main-process runtime dependencies, also inspect and launch the unpacked artifact for the target architecture.
 - Run `pnpm test:packaged` for main/preload/worker runtime or packaging changes. E2E is not a default local gate: run only relevant scenarios when explicitly requested or when a change is complex enough to warrant end-to-end verification. Routine UI adjustments do not require rebuilding the app and running E2E each time.
