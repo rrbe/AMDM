@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -135,16 +136,22 @@ async function rightClick(renderer, selector, position = 'center') {
   // Queue the full gesture before waiting for acknowledgements so native menu
   // handling cannot block the release event on macOS.
   await Promise.all([
-    renderer.call('Input.dispatchMouseEvent', {
+    {
       type: 'mouseMoved', buttons: 0, ...point
-    }),
-    renderer.call('Input.dispatchMouseEvent', {
+    },
+    {
       type: 'mousePressed', button: 'right', buttons: 2, clickCount: 1, ...point
-    }),
-    renderer.call('Input.dispatchMouseEvent', {
+    },
+    {
       type: 'mouseReleased', button: 'right', buttons: 0, clickCount: 1, ...point
-    })
-  ])
+    }
+  ].map(async (event) => {
+    try {
+      await renderer.call('Input.dispatchMouseEvent', event)
+    } catch (error) {
+      throw new Error(`Right-click ${selector} ${event.type}: ${error.message}`, { cause: error })
+    }
+  }))
   await waitForExpression(renderer, '!!document.querySelector("[role=menu]")')
 }
 
@@ -255,7 +262,7 @@ test(
       )
       clients.push(main)
       await waitForUi(renderer)
-      await main.evaluate(`(() => {
+      report.applicationPid = await main.evaluate(`(() => {
       const electron = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron');
       const realpath = process.getBuiltinModule('fs').realpathSync;
       if (realpath(electron.app.getPath('userData')) !== realpath(${JSON.stringify(profile)})) throw new Error('Not the isolated E2E profile');
@@ -290,7 +297,7 @@ test(
         window.focus();
         window.webContents.focus();
       }, 0);
-      return true;
+      return process.pid;
     })()`)
       phase = 'save fake credentials through the real bridge'
       const saved =
@@ -350,14 +357,14 @@ test(
       phase = 'save whole-payload encrypted AMDM backup'
       await chooseFormat(renderer, 'AMDM (JSON)')
       await clickElement(renderer, checkbox('Include stored passwords and key passphrases'))
-      assert.equal(await renderer.evaluate(`(${button('Export connections')}).disabled`), true)
+      await waitForExpression(renderer, `(${button('Export connections')})?.disabled === true`)
       await typeInto(renderer, field('Passphrase'), passphrase)
       await typeInto(renderer, field('Confirm passphrase'), 'fake-mismatch')
       await waitForExpression(
         renderer,
         `${dialog}.innerText.includes('The passphrases do not match.')`
       )
-      assert.equal(await renderer.evaluate(`(${button('Export connections')}).disabled`), true)
+      await waitForExpression(renderer, `(${button('Export connections')})?.disabled === true`)
       await typeInto(renderer, field('Confirm passphrase'), passphrase)
       await clickElement(renderer, button('Export connections'))
       await waitForExpression(
@@ -399,7 +406,7 @@ test(
         renderer,
         `!!(${field('Passphrase')}) && ${dialog}.querySelector('[role=alert]')?.innerText === 'Enter the file passphrase to continue.'`
       )
-      assert.equal(await renderer.evaluate(`(${button('Import 0 connections')}).disabled`), true)
+      await waitForExpression(renderer, `(${button('Import 0 connections')})?.disabled === true`)
       await typeInto(renderer, field('Passphrase'), 'fake-wrong-passphrase')
       await clickElement(renderer, button('Unlock file'))
       await waitForExpression(
@@ -435,7 +442,7 @@ test(
       assert.equal(sshPreview.config.hasJumpSshPassphrase, true)
       const dom = await renderer.evaluate('document.documentElement.outerHTML')
       for (const secret of [...Object.values(secrets), passphrase]) assert.ok(!dom.includes(secret))
-      assert.equal(await renderer.evaluate(`(${button('Import 3 connections')}).disabled`), true)
+      await waitForExpression(renderer, `(${button('Import 3 connections')})?.disabled === true`)
       assert.deepEqual(await snapshot(), original)
       await screenshot(renderer, 'light-sanitized-preview')
       await clickElement(
@@ -587,7 +594,7 @@ test(
       assert.ok(mounted < 40, `Export mounted ${mounted} rows for 206 saved connections`)
       await clickElement(renderer, button('Deselect all'))
       await waitForExpression(renderer, `${dialog}.innerText.includes('0 of 206 selected')`)
-      assert.equal(await renderer.evaluate(`(${button('Export connections')}).disabled`), true)
+      await waitForExpression(renderer, `(${button('Export connections')})?.disabled === true`)
       await clickElement(renderer, button('Select all'))
       await waitForExpression(renderer, `${dialog}.innerText.includes('206 of 206 selected')`)
       const scrollPoint = await renderer.evaluate(`(() => {
@@ -627,6 +634,10 @@ test(
     } catch (error) {
       report.phase = phase
       report.error = error.stack
+      if (process.platform === 'darwin' && /Debugger timeout: Input/.test(error.message)) {
+        const sample = spawnSync('sample', [String(report.applicationPid), '1', '-file', join(diagnostics, 'main-hang.sample')], { timeout: 5_000, encoding: 'utf8' })
+        report.sample = { status: sample.status, error: sample.error?.message }
+      }
       if (renderer) {
         await screenshot(renderer, 'failure').catch(() => undefined)
         report.dom = await renderer.evaluate('document.body.innerText').catch(() => undefined)
