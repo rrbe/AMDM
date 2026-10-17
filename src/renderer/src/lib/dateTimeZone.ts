@@ -10,7 +10,8 @@ function formatterFor(timeZone: string): Intl.DateTimeFormat {
     return cached
   }
 
-  const formatter = new Intl.DateTimeFormat('en-u-ca-iso8601-nu-latn', {
+  // Gregorian parts retain BC/AD eras; ICU 78 omits them for the ISO calendar.
+  const formatter = new Intl.DateTimeFormat('en-u-ca-gregory-nu-latn', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
