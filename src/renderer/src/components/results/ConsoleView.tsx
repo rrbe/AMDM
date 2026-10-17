@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { ShellOutputLine } from '@shared/types'
 import { consoleText, toConsoleLines } from '@renderer/lib/consoleOutput'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
+import { useResultTimeZone } from './ResultTimeZone'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 /**
@@ -23,8 +24,9 @@ interface ConsoleViewProps {
 }
 
 export function ConsoleView({ output, fontSize, truncated, controlsContainer, folding }: ConsoleViewProps): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { t } = useTranslation()
-  const lines = useMemo(() => toConsoleLines(output), [output])
+  const lines = useMemo(() => toConsoleLines(output, timeZone), [output, timeZone])
 
   useCopyHotkey(() => consoleText(output))
 

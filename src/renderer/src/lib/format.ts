@@ -15,6 +15,8 @@ export interface JsonToken {
   text: string
   /** CSS class: 'json-key' | 'json-punct' | `v-${ValueType}` for scalars. */
   cls: string
+  /** Original UTC shell value when display text uses a result time zone. */
+  copyText?: string
 }
 
 export interface JsonLine {
@@ -39,23 +41,12 @@ function punct(text: string): JsonToken {
   return { text, cls: 'json-punct' }
 }
 
-/** Render a primitive/extended scalar as its JSON-line representation. */
-function scalarText(value: unknown): string {
-  const { type, text } = formatScalar(value)
-  switch (type) {
-    case 'string':
-      return JSON.stringify(text)
-    case 'number':
-    case 'int':
-    case 'double':
-    case 'boolean':
-    case 'null':
-    case 'undefined':
-      return text
-    default:
-      // ObjectId("..")/ISODate("..")/NumberLong("..") etc. render verbatim.
-      return text
-  }
+/** Build display tokens with source UTC copy values for BSON Dates. */
+function scalarToken(value: unknown, timeZone?: string): JsonToken {
+  const { type, text } = formatScalar(value, timeZone)
+  const token: JsonToken = { text: type === 'string' ? JSON.stringify(text) : text, cls: `v-${type}` }
+  if (type === 'date' && timeZone) token.copyText = formatScalar(value).text
+  return token
 }
 
 const INLINE_PREVIEW_ITEMS = 5
@@ -65,21 +56,20 @@ function inlineText(text: string): string {
   return text.length > INLINE_PREVIEW_TEXT_LENGTH ? `${text.slice(0, INLINE_PREVIEW_TEXT_LENGTH)}…` : text
 }
 
-function inlineValue(value: unknown): JsonToken {
+function inlineValue(value: unknown, timeZone?: string): JsonToken {
   if (Array.isArray(value)) return { text: value.length ? `[ ${value.length} ]` : '[]', cls: 'v-array' }
   if (typeof value === 'object' && value !== null && !isExtended(value)) {
     return { text: Object.keys(value).length ? '{ … }' : '{}', cls: 'v-object' }
   }
-  const { type } = formatScalar(value)
-  const text = typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(scalarText(value))
-  return { text, cls: `v-${type}` }
+  const token = scalarToken(value, timeZone)
+  return { ...token, text: typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(token.text) }
 }
 
 /** One level of an object/array, with bounded entries and text for Table cells. */
-export function toInlineJsonTokens(value: unknown): JsonToken[] {
+export function toInlineJsonTokens(value: unknown, timeZone?: string): JsonToken[] {
   const isArray = Array.isArray(value)
   if (!isArray && (typeof value !== 'object' || value === null || isExtended(value))) {
-    return [inlineValue(value)]
+    return [inlineValue(value, timeZone)]
   }
 
   const tokens: JsonToken[] = [punct(isArray ? '[' : '{')]
@@ -90,7 +80,7 @@ export function toInlineJsonTokens(value: unknown): JsonToken[] {
       const text = inlineText(key)
       tokens.push({ text: /^[A-Za-z_$][\w$]*$/.test(text) ? text : quoteKey(text), cls: 'json-key' }, punct(': '))
     }
-    tokens.push(inlineValue(item))
+    tokens.push(inlineValue(item, timeZone))
   }
 
   if (isArray) {
@@ -119,7 +109,8 @@ function pushLines(
   depth: number,
   keyText: string | null,
   trailingComma: boolean,
-  out: JsonLine[]
+  out: JsonLine[],
+  timeZone?: string
 ): void {
   const comma = trailingComma ? ',' : ''
   const keyPrefix = keyText === null ? '' : `${keyText}: `
@@ -135,12 +126,12 @@ function pushLines(
     isArray || (typeof value === 'object' && value !== null && !isExtended(value))
 
   if (!isContainer) {
-    const { type } = formatScalar(value)
-    const valText = scalarText(value)
+    const token = scalarToken(value, timeZone)
+    const valText = token.text
     out.push({
       depth,
       text: `${keyPrefix}${valText}${comma}`,
-      tokens: [...keyToks, { text: valText, cls: `v-${type}` }, ...commaToks]
+      tokens: [...keyToks, token, ...commaToks]
     })
     return
   }
@@ -163,16 +154,16 @@ function pushLines(
   entries.forEach(([k, v], i) => {
     const last = i === entries.length - 1
     const childKey = isArray ? null : quoteKey(k)
-    pushLines(v, depth + 1, childKey, !last, out)
+    pushLines(v, depth + 1, childKey, !last, out, timeZone)
   })
   out.push({ depth, text: `${close}${comma}`, tokens: [punct(close), ...commaToks] })
   out[start].fold = { end: out.length - 1, closeText: `${close}${comma}` }
 }
 
 /** Flatten any EJSON value into virtualizable lines. */
-export function toJsonLines(value: unknown): JsonLine[] {
+export function toJsonLines(value: unknown, timeZone?: string): JsonLine[] {
   const out: JsonLine[] = []
-  pushLines(value, 0, null, false, out)
+  pushLines(value, 0, null, false, out, timeZone)
   return out
 }
 

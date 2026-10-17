@@ -94,6 +94,13 @@ describe('bounded tooltip previews', () => {
     })
   })
 
+  it('uses the requested zone for displayed BSON Date previews', () => {
+    expect(formatJsonPreview({ date: { $date: '2026-10-15T09:50:05.154Z' } }, { timeZone: 'Asia/Shanghai' })).toEqual({
+      text: '{\n  "date": "2026-10-15T17:50:05.154+08:00"\n}',
+      truncated: false
+    })
+  })
+
   it('bounds JSON by lines, characters, depth, and Unicode-safe string length', () => {
     const preview = formatJsonPreview(
       {

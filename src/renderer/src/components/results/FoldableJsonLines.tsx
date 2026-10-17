@@ -6,6 +6,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import { indentFor, visibleJsonLineIndexes, type JsonLine, type JsonToken } from '@renderer/lib/format'
 import { claimCopyFocus } from '@renderer/lib/useCopyHotkey'
+import { resultSelectionText } from '@renderer/lib/resultTextSelection'
 import { useJsonSelection } from '@renderer/lib/useJsonSelection'
 
 interface FoldableLine {
@@ -112,6 +113,12 @@ export function FoldableJsonLines<T extends FoldableLine>({
         ref={scrollRef}
         className={`virtual-scroller json-body${allSelected ? ' all-selected' : ''}`}
         tabIndex={-1}
+        onCopy={(event) => {
+          const text = resultSelectionText(event.currentTarget)
+          if (text === null) return
+          event.clipboardData.setData('text/plain', text)
+          event.preventDefault()
+        }}
         onMouseDown={(event) => {
           if (event.target instanceof Element && event.target.closest('button')) return
           onMouseDown?.()
@@ -151,7 +158,11 @@ export function FoldableJsonLines<T extends FoldableLine>({
                 <pre>
                   {indentFor(line.depth)}
                   {line.tokens ? line.tokens.map((token, tokenIndex) => (
-                    <span key={tokenIndex} className={token.cls}>{token.text}</span>
+                    <span
+                      key={tokenIndex}
+                      className={token.cls}
+                      data-copy-text={token.copyText}
+                    >{token.text}</span>
                   )) : line.text}
                   {isCollapsed && fold && (
                     <>

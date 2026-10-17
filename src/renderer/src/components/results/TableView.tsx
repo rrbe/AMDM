@@ -40,6 +40,7 @@ import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { useResultTimeZone } from './ResultTimeZone'
 
 /**
  * Virtualized table.
@@ -691,6 +692,7 @@ function Cell({
   onCancel: () => void
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   const { present, value } = cellValue(doc, column.path)
   const cellCls = `tbl-td${column.path[0] === '_id' ? ' tbl-pinned-id' : ''}${selected ? ' selected' : ''}`
 
@@ -710,11 +712,11 @@ function Cell({
     )
   }
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
-  const tokens = expandable ? toInlineJsonTokens(value) : null
-  const scalar = tokens ? null : formatScalar(value)
+  const tokens = expandable ? toInlineJsonTokens(value, timeZone) : null
+  const scalar = tokens ? null : formatScalar(value, timeZone)
   return (
     <Tooltip
-      content={expandable ? () => formatJsonPreview(value).text : scalar!.text}
+      content={expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
       variant={expandable ? 'code' : 'compact'}
     >

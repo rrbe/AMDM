@@ -5,6 +5,7 @@ import {
   QUERY_TIMEOUTS_MS,
   type AppSettings,
 } from "./types";
+import { isValidTimeZone } from "./timeZones";
 
 export function mergeWebSettings(
   current: AppSettings,
@@ -31,6 +32,7 @@ export function mergeWebSettings(
     !["natural", "alpha"].includes(next.collectionSort) ||
     !["light", "dark", "system"].includes(next.theme) ||
     !["system", "en", "zh-CN", "zh-TW"].includes(next.language) ||
+    !(next.dateTimeZone === "system" || isValidTimeZone(next.dateTimeZone)) ||
     numbers.some((item) => !Number.isFinite(item)) ||
     !QUERY_LIMITS.includes(next.queryLimit as (typeof QUERY_LIMITS)[number]) ||
     !QUERY_TIMEOUTS_MS.includes(

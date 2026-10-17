@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Table } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, SlidersHorizontal, Table } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
+import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
@@ -15,6 +16,7 @@ import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
+import { Popover } from '@renderer/components/ui/Popover'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
 import {
@@ -30,8 +32,12 @@ import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
 import { jsonCopyMenuItems } from './documentFormatMenus'
+import { ResultTimeZoneContext } from './ResultTimeZone'
 
 const EMPTY_FOLDED_LINES: number[] = []
+const TimeZoneSelect = lazy(async () => ({
+  default: (await import('@renderer/components/ui/TimeZoneSelect')).TimeZoneSelect
+}))
 
 const QUERY_LIMIT_OPTIONS = QUERY_LIMITS.map((value) => ({
   label: String(value),
@@ -52,6 +58,13 @@ function ViewShortcutHint({ number }: { number: number }): React.JSX.Element {
   )
 }
 
+interface ResultPanelProps {
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
+  showViewShortcutHints: boolean
+  showTabShortcutHints: boolean
+}
+
 /**
  * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
  * Console when the run printed output) + metadata bar for the focused result.
@@ -60,17 +73,22 @@ function ViewShortcutHint({ number }: { number: number }): React.JSX.Element {
  * lands on Console automatically; a run with a real result keeps the data view
  * and offers Console alongside.
  */
-export function ResultPanel({
+export function ResultPanel(props: ResultPanelProps): React.JSX.Element {
+  const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
+  const timeZone = resolveResultTimeZone(dateTimeZone)
+  return (
+    <ResultTimeZoneContext value={timeZone}>
+      <ResultPanelContent {...props} />
+    </ResultTimeZoneContext>
+  )
+}
+
+function ResultPanelContent({
   expanded,
   onExpandedChange,
   showViewShortcutHints,
   showTabShortcutHints
-}: {
-  expanded: boolean
-  onExpandedChange: (expanded: boolean) => void
-  showViewShortcutHints: boolean
-  showTabShortcutHints: boolean
-}): React.JSX.Element {
+}: ResultPanelProps): React.JSX.Element {
   const { t } = useTranslation()
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
@@ -217,7 +235,10 @@ export function ResultPanel({
         <ErrorView
           result={result}
           compact={hasOutput}
-          actions={<span className="inline-flex" ref={setFoldControls} />}
+          actions={<>
+            {hasOutput && <ResultDisplayOptions />}
+            <span className="inline-flex" ref={setFoldControls} />
+          </>}
           copied={copied}
           onCopy={copyWithFeedback}
           expanded={expanded}
@@ -242,6 +263,7 @@ export function ResultPanel({
           <span className="explain-tag">{t('result.explainTag')}</span>
           <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <span className="result-bar-spacer" />
+          <ResultDisplayOptions />
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
         <div className="result-body explain-body">
@@ -325,6 +347,7 @@ export function ResultPanel({
             <ResultPager result={result} />
           </div>
         )}
+        <ResultDisplayOptions />
         <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
@@ -410,6 +433,37 @@ export function ResultPanel({
         />
       )}
     </div>
+  )
+}
+
+function ResultDisplayOptions(): React.JSX.Element {
+  const { t } = useTranslation()
+  const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
+  const updateSettings = useAppStore((s) => s.updateSettings)
+  return (
+    <Popover
+      label={t('result.displayOptions')}
+      trigger={
+        <button
+          type="button"
+          className="ghost result-action shrink-0"
+          aria-label={t('result.displayOptions')}
+          title={t('result.displayOptions')}
+        >
+          <SlidersHorizontal size={14} aria-hidden="true" />
+        </button>
+      }
+    >
+      <div className="min-h-8 w-[256px] max-w-full">
+        <Suspense fallback={null}>
+          <TimeZoneSelect
+            variant="menu"
+            value={dateTimeZone}
+            onChange={(dateTimeZone) => void updateSettings({ dateTimeZone })}
+          />
+        </Suspense>
+      </div>
+    </Popover>
   )
 }
 
