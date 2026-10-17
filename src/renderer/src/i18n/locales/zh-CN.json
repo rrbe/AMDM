@@ -44,8 +44,7 @@
     "timeZone": "结果时区",
     "timeZoneSystem": "跟随系统",
     "timeZoneHint": "只影响结果中 BSON Date 的显示；复制和导出仍使用存储的 UTC 值。",
-    "timeZoneHeader": "IANA 时区",
-    "timeZoneSearchPlaceholder": "按地区或城市搜索",
+    "timeZoneSearchPlaceholder": "搜索城市、时区或 UTC 偏移",
     "timeZoneEmpty": "没有找到时区",
     "theme": "主题",
     "themeSystem": "系统",
@@ -522,6 +521,7 @@
     "copyErrorTip": "复制错误信息",
     "expandResults": "展开结果区",
     "restoreEditor": "恢复编辑区",
+    "displayOptions": "显示选项",
     "copy": {
       "plainJson": "复制为 Plain JSON",
       "relaxedEjson": "复制为 Relaxed EJSON",

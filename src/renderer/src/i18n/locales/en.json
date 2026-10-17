@@ -44,8 +44,7 @@
     "timeZone": "Result time zone",
     "timeZoneSystem": "Follow system",
     "timeZoneHint": "Changes how BSON Date values appear in results. Copy and export keep the stored UTC value.",
-    "timeZoneHeader": "IANA time zones",
-    "timeZoneSearchPlaceholder": "Search by region or city",
+    "timeZoneSearchPlaceholder": "Search city, time zone or UTC offset",
     "timeZoneEmpty": "No time zones found",
     "theme": "Theme",
     "themeSystem": "System",
@@ -522,6 +521,7 @@
     "copyErrorTip": "Copy error details",
     "expandResults": "Expand results",
     "restoreEditor": "Restore editor",
+    "displayOptions": "Display options",
     "copy": {
       "plainJson": "Copy as Plain JSON",
       "relaxedEjson": "Copy as Relaxed EJSON",

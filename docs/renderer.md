@@ -7,11 +7,22 @@
 Global notifications use the bounded `notifications` queue in the store. Producers must report a non-cancelled, user-relevant asynchronous failure exactly once, with a stable `source` and `dedupeKey` when it can repeat. Keep contextual details in their owning result, form, or progress UI as well; the toast is the attention layer, not the only error record. Do not notify for expected cancellation, inline validation, owner cleanup, or best-effort background decoration such as autocomplete sampling. Classify timeout/network/auth failures in main and carry the stable failure kind over IPC instead of parsing localized or driver-generated messages in Renderer.
 
 Result date display uses the app's time zone preference (which may follow the system). `ResultTimeZoneContext` scopes it to all result views
-and preview portals. Pure formatters receive the resolved zone explicitly; source
+and preview portals. The result toolbar's Display options popover and Settings share
+the same persisted time zone preference. Pure formatters receive the resolved zone explicitly; source
 EJSON stays unchanged. Copy/export/edit operations use UTC source values. JSON and
 structured Console selections carry UTC copy text on BSON Date tokens; complete
 tokens copy that value, while partial selections and plain output retain the selected
 characters. Never infer BSON types by matching rendered text.
+
+`TimeZoneSelect` is controlled by `value` / `onChange` and shared by Settings and
+the result toolbar. Its pure catalog/search logic lives in `lib/timeZoneOptions.ts`.
+City metadata comes from `@vvo/tzdb`; `lib/timeZoneCities.json` supplies common
+Chinese city names and additional city aliases. ICU supplies localized time zone
+names and date-specific offsets; labels include the daylight/summer name when
+applicable. City/name search ignores separators and accents. The catalog uses runtime-supported region IDs
+and UTC. Signed offset searches match that sign; an unsigned hour matches either sign. The result
+toolbar loads the selector and its city data on demand. Search results scroll
+inside a fixed-size popup so filtering does not move the input.
 
 Zustand selectors must return stable references:
 

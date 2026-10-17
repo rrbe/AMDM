@@ -24,20 +24,31 @@ describe('date time zone display', () => {
 
   it.each([
     ['America/Los_Angeles', '2026-07-01', 'UTC-07:00', '夏令时间'],
-    ['America/Los_Angeles', '2026-01-01', 'UTC-08:00', '标准时间'],
-    ['Australia/Sydney', '2026-07-01', 'UTC+10:00', '标准时间'],
     ['Australia/Sydney', '2026-01-01', 'UTC+11:00', '夏令时间'],
-    ['Europe/Dublin', '2026-07-01', 'UTC+01:00', '爱尔兰标准时间'],
-    ['Asia/Shanghai', '2026-07-01', 'UTC+08:00', '中国标准时间']
-  ])('labels %s at %s using its actual seasonal name', (zone, date, offset, name) => {
+    ['Europe/London', '2026-07-01', 'UTC+01:00', '夏令时间'],
+    ['Asia/Jerusalem', '2026-07-01', 'UTC+03:00', '夏令时间']
+  ])('labels %s at %s with its summer time name', (zone, date, offset, name) => {
     const label = formatTimeZoneLabel(zone, new Date(date), 'zh-CN')
     expect(label).toContain(offset)
     expect(label).toContain(name)
   })
 
+  it.each([
+    ['America/Los_Angeles', '2026-01-01', '-08:00'],
+    ['Australia/Sydney', '2026-07-01', '+10:00'],
+    ['Europe/Dublin', '2026-07-01', '+01:00'],
+    ['Asia/Shanghai', '2026-07-01', '+08:00'],
+    ['Asia/Hong_Kong', '2026-07-01', '+08:00']
+  ])('keeps %s at %s concise outside a daylight/summer time label', (zone, date, offset) => {
+    for (const locale of ['en', 'zh-CN', 'zh-TW']) {
+      expect(formatTimeZoneLabel(zone, new Date(date), locale)).toBe(`${zone} (UTC${offset})`)
+    }
+  })
+
   it('localizes seasonal names and keeps UTC concise', () => {
     const date = new Date('2026-07-01')
     expect(formatTimeZoneLabel('America/Los_Angeles', date, 'en')).toContain('Pacific Daylight Time')
+    expect(formatTimeZoneLabel('America/Los_Angeles', date, 'zh-TW')).toContain('夏令')
     expect(formatTimeZoneLabel('UTC', date, 'zh-CN')).toBe('UTC (UTC+00:00)')
   })
 })

@@ -63,13 +63,31 @@ export function getSystemTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
-export function formatTimeZoneLabel(timeZone: string, date: Date, locale = 'en'): string {
-  const offset = `UTC${offsetFromParts(partsFor(date, timeZone))}`
-  const name = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'long' })
+export function getTimeZoneDetails(timeZone: string, date: Date, locale = 'en'): {
+  offset: string
+  offsetMinutes: number
+  name: string
+  label: string
+} {
+  const numericOffset = offsetFromParts(partsFor(date, timeZone))
+  const [hours, minutes, seconds = 0] = numericOffset.slice(1).split(':').map(Number)
+  const zoneName = (language: string): string => new Intl.DateTimeFormat(language, { timeZone, timeZoneName: 'long' })
     .formatToParts(date).find((part) => part.type === 'timeZoneName')!.value
-  // ICU supplies the date's standard/daylight name, including regional exceptions.
-  const detail = timeZone === 'UTC' || /^(?:GMT|UTC)(?:[+-]|$)/.test(name) ? offset : `${offset} · ${name}`
-  return `${timeZone} (${detail})`
+  const name = zoneName(locale)
+  const offset = `UTC${numericOffset}`
+  // Classify the English ICU name independently of the display language.
+  const englishName = locale.startsWith('en') ? name : zoneName('en')
+  const detail = /\b(?:Daylight|Summer) Time\b/.test(englishName) ? `${offset} · ${name}` : offset
+  return {
+    offset,
+    offsetMinutes: (numericOffset[0] === '-' ? -1 : 1) * (hours * 60 + minutes + seconds / 60),
+    name,
+    label: `${timeZone} (${detail})`
+  }
+}
+
+export function formatTimeZoneLabel(timeZone: string, date: Date, locale = 'en'): string {
+  return getTimeZoneDetails(timeZone, date, locale).label
 }
 
 export function resolveResultTimeZone(dateTimeZone: AppSettings['dateTimeZone']): string {
