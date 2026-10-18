@@ -13,6 +13,16 @@ function queryMenuItem(label) {
   return `[...document.querySelectorAll('[role=menuitem]')].find(item => item.querySelector('.ctx-label')?.textContent === ${JSON.stringify(label)})`
 }
 
+async function rightClickAt(renderer, point) {
+  // Queue the entire native gesture so menu handling cannot delay its release.
+  await Promise.all([
+    { type: 'mouseMoved', buttons: 0, ...point },
+    { type: 'mousePressed', button: 'right', buttons: 2, clickCount: 1, ...point },
+    { type: 'mouseReleased', button: 'right', buttons: 0, clickCount: 1, ...point },
+  ].map(event => renderer.call('Input.dispatchMouseEvent', event)))
+  await waitForExpression(renderer, '!!document.querySelector(".ctx-menu")')
+}
+
 async function openQueryMenu(renderer) {
   const point = await renderer.evaluate(`(async () => {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -29,10 +39,7 @@ async function openQueryMenu(renderer) {
     if (!document.elementFromPoint(point.x, point.y)?.closest('.editor-wrap')) throw new Error('Query menu point outside editor: ' + JSON.stringify({point, range, rect, active: document.activeElement?.outerHTML}));
     return point;
   })()`)
-  for (const type of ['mousePressed', 'mouseReleased']) {
-    await renderer.call('Input.dispatchMouseEvent', { type, button: 'right', clickCount: 1, ...point })
-  }
-  await waitForExpression(renderer, '!!document.querySelector(".ctx-menu")')
+  await rightClickAt(renderer, point)
 }
 
 async function queryMenuCommand(renderer, label) {
@@ -239,10 +246,9 @@ test('Query context menu execution commands use the correct scope and busy state
       const rect = document.querySelector('.conn-item').getBoundingClientRect();
       return { x: rect.x + 60, y: rect.y + rect.height / 2 };
     })()`)
-    for (const type of ['mousePressed', 'mouseReleased']) {
-      await renderer.call('Input.dispatchMouseEvent', { type, button: 'right', clickCount: 1, ...connectionPoint })
-    }
+    await rightClickAt(renderer, connectionPoint)
     await clickElement(renderer, queryMenuItem('Disconnect'))
+    await waitForExpression(renderer, '!document.querySelector(".ctx-menu")')
     await waitForExpression(renderer, '!document.querySelector(".conn-status[aria-label=Connected]")')
     await clickElement(renderer, 'document.querySelector(".cm-content")')
     await openQueryMenu(renderer)
