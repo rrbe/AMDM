@@ -25,6 +25,7 @@ import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { useResultTimeZone } from './ResultTimeZone'
 
 /**
  * Two-column KEY | VALUE tree of the result documents.
@@ -471,13 +472,14 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
 }
 
 function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
+  const timeZone = useResultTimeZone()
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.
     return <span className="tree-summary">{summarize(node.value)}</span>
   }
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
-  const { text, type } = formatScalar(node.value)
+  const { text, type } = formatScalar(node.value, timeZone)
   return (
     <Tooltip content={text}>
       <span className={`tree-val v-${type}`}>{text}</span>
