@@ -18,7 +18,14 @@ async function openQueryMenu(renderer) {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const range = window.getSelection().getRangeAt(0).getBoundingClientRect();
     const rect = range.height ? range : document.querySelector('.cm-line').getBoundingClientRect();
-    const point = { x: rect.x + Math.max(1, rect.width / 2), y: rect.y + rect.height / 2 };
+    const viewport = document.querySelector('.cm-scroller').getBoundingClientRect();
+    // Long lines can put the cursor or part of the selection outside the viewport.
+    const left = Math.max(rect.left, viewport.left + 2);
+    const right = Math.min(rect.right, viewport.right - 2);
+    const point = {
+      x: Math.max(viewport.left + 2, Math.min(left + Math.max(1, (right - left) / 2), viewport.right - 2)),
+      y: Math.max(viewport.top + 2, Math.min(rect.y + rect.height / 2, viewport.bottom - 2))
+    };
     if (!document.elementFromPoint(point.x, point.y)?.closest('.editor-wrap')) throw new Error('Query menu point outside editor: ' + JSON.stringify({point, range, rect, active: document.activeElement?.outerHTML}));
     return point;
   })()`)
@@ -31,6 +38,7 @@ async function openQueryMenu(renderer) {
 async function queryMenuCommand(renderer, label) {
   await openQueryMenu(renderer)
   await clickElement(renderer, queryMenuItem(label))
+  await waitForExpression(renderer, '!document.querySelector(".ctx-menu")')
 }
 
 function queryMenuState(renderer) {
@@ -45,7 +53,7 @@ test('Query context menu editing commands preserve text, selection, and focus', 
     // Restore every clipboard format after exercising the native clipboard.
     await main.evaluate(`(async () => {
       const { clipboard, ClipboardItem, BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron');
-      const saved = await Promise.all((await clipboard.read()).map(async item =>
+      const saved = await Promise.all((await clipboard.read()).filter(item => item.types.length > 0).map(async item =>
         new ClipboardItem(Object.fromEntries(await Promise.all(item.types.map(async type => [type, await item.getType(type)]))))));
       globalThis.pasteTest = { clipboard, saved, contents: BrowserWindow.getAllWindows()[0].webContents };
     })()`)
@@ -175,7 +183,10 @@ test('Query context menu editing commands preserve text, selection, and focus', 
 )
 
 test('Query context menu execution commands use the correct scope and busy state', { timeout: 90_000 }, () =>
-  runShellScenario('shell-menu-execution', async ({ renderer, mongo, report, enterQuery, key }) => {
+  runShellScenario('shell-menu-execution', async ({ renderer, main, mongo, report, enterQuery, key }) => {
+    // Keep long-line and horizontally scrolled menu interactions covered on large desktops too.
+    await main.evaluate(`process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron')
+      .BrowserWindow.getAllWindows()[0].setContentSize(1008, 640); true`)
     const write = 'db.effects.updateOne({_id:"menu"},{$inc:{runs:1}},{upsert:true});'
     const query = 'db.items.find({n:1})'
     const script = write + query

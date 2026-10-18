@@ -82,6 +82,16 @@ export async function runShellScenario(name, exercise) {
       (await waitForTarget(application.mainPort, () => true)).webSocketDebuggerUrl,
     )
     clients.push(main)
+    // Hosted desktops can show the window without giving it native input focus.
+    await main.evaluate(`setTimeout(() => {
+      const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron');
+      const window = BrowserWindow.getAllWindows()[0];
+      window.show();
+      window.focus();
+      window.webContents.focus();
+    }, 0); true`)
+    await renderer.call('Emulation.setFocusEmulationEnabled', { enabled: true })
+    await waitForExpression(renderer, 'document.hasFocus() && document.visibilityState === "visible"')
     await clickElement(renderer, 'document.querySelector(".conn-item")', 2)
     await waitForExpression(
       renderer,
