@@ -21,13 +21,13 @@ export interface ConsoleLine {
 }
 
 /** Flatten output entries into individual display lines, in call order. */
-export function toConsoleLines(output: ShellOutputLine[]): ConsoleLine[] {
+export function toConsoleLines(output: ShellOutputLine[], timeZone?: string): ConsoleLine[] {
   const lines: ConsoleLine[] = []
   for (const entry of output) {
     const level = entry.level ?? 'log'
     if (entry.kind === 'json') {
       const offset = lines.length
-      for (const jl of toJsonLines(entry.data)) {
+      for (const jl of toJsonLines(entry.data, timeZone)) {
         lines.push({
           depth: jl.depth,
           text: jl.text,

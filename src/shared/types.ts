@@ -594,6 +594,8 @@ export interface AppSettings {
   theme: ThemeMode
   /** UI language. 'system' (default) follows the OS/app locale. */
   language: Language
+  /** BSON Date result display zone; 'system' follows the OS. */
+  dateTimeZone: string
   /** Explorer sidebar width in px (drag-resizable; clamped at the UI). */
   sidebarWidth: number
   /** Details sidebar width in px (drag-resizable; clamped at the UI). */
@@ -668,6 +670,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   collectionSort: 'alpha',
   theme: 'system',
   language: 'system',
+  dateTimeZone: 'system',
   sidebarWidth: 270,
   contextPanelWidth: 300,
   contextPanelOpen: false,

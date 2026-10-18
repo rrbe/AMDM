@@ -16,6 +16,8 @@ export interface SearchableSelectOption<T extends string> {
   value: T
   label: ReactNode
   filterText: string
+  /** Keep the option visible when the list scrolls. */
+  pinned?: boolean
 }
 
 export interface SearchableSelectHandle {
@@ -26,13 +28,13 @@ interface SearchableSelectProps<T extends string> {
   value: T
   onChange: (value: T) => void
   options: ReadonlyArray<SearchableSelectOption<T>>
-  matches: (filterText: string, query: string) => boolean
+  matches: (option: SearchableSelectOption<T>, query: string) => boolean
   triggerContent: ReactNode
-  header: ReactNode
   placeholder: string
   emptyMessage: string
   className?: string
   popupClassName?: string
+  side?: 'bottom' | 'right'
   'aria-label': string
 }
 
@@ -43,11 +45,11 @@ function SearchableSelectInner<T extends string>(
     options,
     matches,
     triggerContent,
-    header,
     placeholder,
     emptyMessage,
     className,
     popupClassName,
+    side = 'bottom',
     'aria-label': ariaLabel
   }: SearchableSelectProps<T>,
   ref: ForwardedRef<SearchableSelectHandle>
@@ -57,7 +59,7 @@ function SearchableSelectInner<T extends string>(
   const inputRef = useRef<HTMLInputElement>(null)
   const optionByValue = useMemo(() => new Map(options.map((option) => [option.value, option])), [options])
   const filteredValues = useMemo(
-    () => options.filter((option) => matches(option.filterText, query)).map((option) => option.value),
+    () => options.filter((option) => matches(option, query)).map((option) => option.value),
     [matches, options, query]
   )
 
@@ -98,7 +100,7 @@ function SearchableSelectInner<T extends string>(
         {triggerContent}
       </Combobox.Trigger>
       <Combobox.Portal>
-        <Combobox.Positioner className="z-[2000]" side="bottom" align="start" sideOffset={4}>
+        <Combobox.Positioner className="z-[2000]" side={side} align="start" sideOffset={4}>
           <Combobox.Popup
             initialFocus={inputRef}
             className={cn(
@@ -106,7 +108,7 @@ function SearchableSelectInner<T extends string>(
               popupClassName
             )}
           >
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search
                 size={15}
                 className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -119,7 +121,6 @@ function SearchableSelectInner<T extends string>(
                 className="h-10 w-full rounded-none border-0 bg-transparent py-1 pl-8 pr-3 text-[13px] text-foreground shadow-none outline-none placeholder:text-[var(--fg-3)] focus:border-0 focus:bg-transparent focus:shadow-none"
               />
             </div>
-            <div className="px-2 py-2 text-[11px] font-medium text-muted-foreground">{header}</div>
             <Combobox.List className="min-h-0 overflow-y-auto">
               {(optionValue: T) => {
                 const option = optionByValue.get(optionValue)
@@ -128,7 +129,10 @@ function SearchableSelectInner<T extends string>(
                   <Combobox.Item
                     key={option.value}
                     value={option.value}
-                    className="flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[var(--interaction-hover)] data-[highlighted]:text-foreground"
+                    className={cn(
+                      'flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[linear-gradient(var(--interaction-hover),var(--interaction-hover))] data-[highlighted]:text-foreground',
+                      option.pinned && 'sticky top-0 z-10 bg-[var(--surface-elevated)]'
+                    )}
                   >
                     <span className="min-w-0 flex-1">{option.label}</span>
                     <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
