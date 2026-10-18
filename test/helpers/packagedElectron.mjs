@@ -207,7 +207,9 @@ export async function clickElement(client, expression, clickCount = 1, settleFra
     // Scrolling can update virtualized rows before native input arrives.
     if (${settleFrames}) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const target = ${expression};
-    if (!target) return null;
+    // Floating menus exist at temporary coordinates with an opacity-zero ancestor
+    // until positioning finishes. Hit testing alone still accepts those elements.
+    if (!target?.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return null;
     const r = target.getBoundingClientRect();
     const point = {x:r.x+r.width/2, y:r.y+r.height/2};
     return r.width && r.height && target.contains(document.elementFromPoint(point.x, point.y)) ? point : null;
