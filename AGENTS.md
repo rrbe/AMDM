@@ -5,7 +5,7 @@ This file contains only repository-level non-negotiable rules. Read the relevant
 ## Git workflow
 
 1. Commit only when the user explicitly asks; otherwise leave changes in the working tree.
-2. Use Conventional Commits: `<type>: <summary>`.
+2. Write all commit messages in English and use Conventional Commits: `<type>: <summary>`.
 3. Work directly on `master`; do not create feature branches or pull requests, and never force-push.
 
 ## Releases
