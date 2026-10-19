@@ -6,23 +6,25 @@ import { settingsStore } from './store/settingsStore'
 import { serializerPool } from './workers/serializerPool'
 import { ShutdownController } from './shutdownCore'
 
+const CLEANUP_TIMEOUT_MS = 10_000
+
 const messages = {
   en: {
     message: 'Close AMDM?',
     detail:
-      'All database connections will be disconnected and running queries will be cancelled. Query tabs, results, and unsaved content will not be restored.',
+      'All database connections will be disconnected and running queries will be cancelled. Open tabs and unsaved content will not be restored.',
     buttons: ['Cancel', 'Close AMDM'],
     error: 'Unable to close AMDM'
   },
   'zh-CN': {
     message: '关闭 AMDM？',
-    detail: '将断开所有数据库连接并取消正在执行的查询。查询标签页、结果和未保存的内容不会恢复。',
+    detail: '将断开所有数据库连接并取消正在执行的查询。已打开的标签页和未保存的内容不会恢复。',
     buttons: ['取消', '关闭 AMDM'],
     error: '无法关闭 AMDM'
   },
   'zh-TW': {
     message: '關閉 AMDM？',
-    detail: '將中斷所有資料庫連線並取消正在執行的查詢。查詢分頁、結果和未儲存的內容不會還原。',
+    detail: '將中斷所有資料庫連線並取消正在執行的查詢。已開啟的分頁和未儲存的內容不會還原。',
     buttons: ['取消', '關閉 AMDM'],
     error: '無法關閉 AMDM'
   }
@@ -60,10 +62,16 @@ const shutdown = new ShutdownController({
       win.setEnabled(false)
       win.setProgressBar(2)
     }
+    // A stalled Driver cursor/client close must not keep the process and its resources alive.
+    const deadline = setTimeout(() => {
+      console.error('[app shutdown] Resource cleanup timed out; forcing process exit')
+      app.exit(1)
+    }, CLEANUP_TIMEOUT_MS)
     try {
       await sessionManager.shutdown()
       serializerPool.dispose()
     } finally {
+      clearTimeout(deadline)
       for (const win of windows) {
         if (!win.isDestroyed()) {
           win.setEnabled(true)

@@ -134,6 +134,57 @@ describe('SessionManager', () => {
     expect(fake.clients).toHaveLength(0)
   })
 
+  it.each(['closeAll', 'shutdown'] as const)(
+    '%s waits for an already-started disconnect to finish closing its client',
+    async (method) => {
+      const manager = new SessionManager(connectionStore)
+      const connecting = manager.connect('c1')
+      await vi.waitFor(() => expect(fake.clients).toHaveLength(1))
+      fake.finishConnect()
+      await connecting
+      let finish!: () => void
+      fake.clients[0].close.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve }))
+      const disconnecting = manager.disconnect('c1')
+      expect(manager.disconnect('c1')).toBe(disconnecting)
+      await vi.waitFor(() => expect(fake.clients[0].close).toHaveBeenCalledOnce())
+      expect(manager.getStatus('c1').state).toBe('disconnected')
+      expect(manager.hasActiveSessions()).toBe(true)
+
+      let closed = false
+      const closing = manager[method]().then(() => { closed = true })
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(closed).toBe(false)
+      finish()
+      await Promise.all([disconnecting, closing])
+      expect(closed).toBe(true)
+      expect(manager.hasActiveSessions()).toBe(false)
+    }
+  )
+
+  it('waits for other disconnects even when result cleanup fails', async () => {
+    const manager = new SessionManager(connectionStore)
+    for (const id of ['c1', 'c2']) {
+      const connecting = manager.connect(id)
+      await vi.waitFor(() => expect(fake.clients).toHaveLength(id === 'c1' ? 1 : 2))
+      fake.finishConnect()
+      await connecting
+    }
+    let finish!: () => void
+    fake.clients[1].close.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve }))
+    const release = vi.spyOn(shellResults, 'closeConnection').mockRejectedValueOnce(new Error('cache cleanup failed'))
+    try {
+      let failed = false
+      const closing = manager.shutdown().catch((error: unknown) => { failed = true; return error })
+      await vi.waitFor(() => expect(fake.clients[1].close).toHaveBeenCalledOnce())
+      expect(failed).toBe(false)
+      finish()
+      expect(await closing).toEqual(new Error('cache cleanup failed'))
+      expect(manager.hasActiveSessions()).toBe(false)
+    } finally {
+      release.mockRestore()
+    }
+  })
+
   it('still closes its client if result cleanup fails', async () => {
     const manager = new SessionManager(connectionStore)
     const connecting = manager.connect('c1')

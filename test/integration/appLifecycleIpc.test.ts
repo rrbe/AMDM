@@ -1,9 +1,12 @@
 import { EventEmitter } from 'node:events'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Api } from '../../src/shared/ipc'
 
 const fake = vi.hoisted(() => ({
-  app: undefined as unknown as EventEmitter & { quit: ReturnType<typeof vi.fn> },
+  app: undefined as unknown as EventEmitter & {
+    quit: ReturnType<typeof vi.fn>
+    exit: ReturnType<typeof vi.fn>
+  },
   windows: [] as TestWindow[],
   handlers: new Map<string, (...args: unknown[]) => void>(),
   api: undefined as Api | undefined,
@@ -36,6 +39,7 @@ vi.mock('electron', () => ({
   app: {
     on: (...args: Parameters<EventEmitter['on']>) => fake.app.on(...args),
     quit: () => fake.app.quit(),
+    exit: (code: number) => fake.app.exit(code),
     getPreferredSystemLanguages: () => ['zh-CN']
   },
   BrowserWindow: {
@@ -74,7 +78,7 @@ describe('desktop close and quit through the preload bridge', () => {
     vi.resetModules()
     vi.clearAllMocks()
     fake.handlers.clear()
-    fake.app = Object.assign(new EventEmitter(), { quit: vi.fn() })
+    fake.app = Object.assign(new EventEmitter(), { quit: vi.fn(), exit: vi.fn() })
     fake.app.quit.mockImplementation(() => {
       const event = { preventDefault: vi.fn() }
       fake.app.emit('before-quit', event)
@@ -91,6 +95,44 @@ describe('desktop close and quit through the preload bridge', () => {
     lifecycle.registerAppLifecycle()
     lifecycle.trackMainWindow(main as never)
     await import('../../src/preload/index')
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('forces process exit when resource cleanup stalls beyond its deadline', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    fake.shutdown.mockImplementation(() => new Promise<void>(() => {}))
+    main.close()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fake.shutdown).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(fake.app.exit).not.toHaveBeenCalled()
+    main.close()
+    fake.app.quit()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fake.app.exit).toHaveBeenCalledExactlyOnceWith(1)
+    expect(fake.shutdown).toHaveBeenCalledOnce()
+    expect(main.destroyed).toBe(false)
+  })
+
+  it('starts the cleanup deadline after confirmation and clears it after successful cleanup', async () => {
+    vi.useFakeTimers()
+    fake.hasActiveSessions.mockReturnValue(true)
+    let confirm!: (result: { response: number }) => void
+    fake.confirm.mockImplementation(() => new Promise((resolve) => { confirm = resolve }))
+    main.close()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(fake.shutdown).not.toHaveBeenCalled()
+    expect(fake.app.exit).not.toHaveBeenCalled()
+    confirm({ response: 1 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(main.destroyed).toBe(true)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(fake.app.exit).not.toHaveBeenCalled()
   })
 
   it('preserves query state and connections when closing the workspace is cancelled', async () => {

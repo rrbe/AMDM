@@ -22,6 +22,16 @@ let automaticTimer: ReturnType<typeof setTimeout> | null = null
 let checkInFlight: Promise<boolean> | null = null
 let downloadInFlight: Promise<boolean> | null = null
 let downloadToken: CancellationToken | null = null
+let installRequested = false
+let installFailed = false
+
+function finishFailedInstall(): void {
+  installFailed = true
+  installRequested = false
+  // Cleanup has committed shutdown. Exit without retrying the failed installer on quit.
+  autoUpdater.autoInstallOnAppQuit = false
+  app.quit()
+}
 
 function updaterAvailable(): boolean {
   return canUseElectronUpdater(app.isPackaged, process.platform, process.env['APPIMAGE'])
@@ -83,6 +93,7 @@ export function startElectronUpdater(): void {
   autoUpdater.on('update-cancelled', (info) => transition({ type: 'available', version: info.version }))
   autoUpdater.on('error', (error) => {
     console.error('[updater] operation failed', error)
+    if (installRequested) finishFailedInstall()
     if (state.phase === 'downloading' || state.phase === 'checking') transition({ type: 'failed' })
   })
 
@@ -124,8 +135,16 @@ export async function showAvailableElectronUpdate(): Promise<boolean> {
   if (!state.available) return Promise.resolve(false)
   if (state.phase === 'downloaded') {
     if (!await prepareAppQuit()) return false
-    autoUpdater.quitAndInstall(false, true)
-    return Promise.resolve(true)
+    if (installRequested) return true
+    installRequested = true
+    installFailed = false
+    try {
+      autoUpdater.quitAndInstall(false, true)
+    } catch (error) {
+      finishFailedInstall()
+      throw error
+    }
+    return !installFailed
   }
   if (state.phase === 'downloading') return downloadInFlight ?? Promise.resolve(true)
   if (state.phase !== 'available' || !state.availableVersion) return Promise.resolve(false)

@@ -1,15 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fake = vi.hoisted(() => ({
-  listeners: new Map<string, (info: { version: string }) => void>(),
+  listeners: new Map<string, (info: { version: string } | Error) => void>(),
   prepare: vi.fn(),
-  install: vi.fn()
+  install: vi.fn(),
+  quit: vi.fn()
 }))
-vi.mock('electron', () => ({ app: { isPackaged: true } }))
+vi.mock('electron', () => ({ app: { isPackaged: true, quit: fake.quit } }))
 vi.mock('electron-updater', () => ({
   default: {
     autoUpdater: {
-      on: (event: string, listener: (info: { version: string }) => void) =>
+      on: (event: string, listener: (info: { version: string } | Error) => void) =>
         fake.listeners.set(event, listener),
       quitAndInstall: fake.install
     }
@@ -27,9 +28,12 @@ vi.mock('../../../src/main/store/settingsStore', () => ({
 describe('update installation shutdown', () => {
   beforeEach(() => {
     vi.resetModules()
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     fake.listeners.clear()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
   })
+
+  afterEach(() => vi.restoreAllMocks())
 
   async function downloadedUpdate() {
     const updater = await import('../../../src/main/electronUpdater')
@@ -60,5 +64,42 @@ describe('update installation shutdown', () => {
     finish(true)
     expect(await installing).toBe(true)
     expect(fake.install).toHaveBeenCalledWith(false, true)
+    expect(fake.quit).not.toHaveBeenCalled()
+  })
+
+  it('finishes quitting when the installer emits an error instead of throwing', async () => {
+    const updater = await downloadedUpdate()
+    fake.prepare.mockResolvedValue(true)
+    fake.install.mockImplementation(() => {
+      fake.listeners.get('error')!(new Error('AppImage directory is not writable'))
+    })
+    expect(await updater.showAvailableElectronUpdate()).toBe(false)
+    const { default: { autoUpdater } } = await import('electron-updater')
+    expect(autoUpdater.autoInstallOnAppQuit).toBe(false)
+    expect(fake.quit).toHaveBeenCalledOnce()
+  })
+
+  it('finishes quitting when installer startup fails asynchronously', async () => {
+    const updater = await downloadedUpdate()
+    fake.prepare.mockResolvedValue(true)
+    expect(await updater.showAvailableElectronUpdate()).toBe(true)
+    fake.listeners.get('error')!(new Error('Failed to spawn installer'))
+    expect(fake.quit).toHaveBeenCalledOnce()
+    const { default: { autoUpdater } } = await import('electron-updater')
+    expect(autoUpdater.autoInstallOnAppQuit).toBe(false)
+  })
+
+  it('finishes quitting and reports an exception thrown by the installer', async () => {
+    const updater = await downloadedUpdate()
+    fake.prepare.mockResolvedValue(true)
+    fake.install.mockImplementation(() => { throw new Error('Installer unavailable') })
+    await expect(updater.showAvailableElectronUpdate()).rejects.toThrow('Installer unavailable')
+    expect(fake.quit).toHaveBeenCalledOnce()
+  })
+
+  it('does not quit on update errors before shutdown is committed', async () => {
+    await downloadedUpdate()
+    fake.listeners.get('error')!(new Error('Download failed'))
+    expect(fake.quit).not.toHaveBeenCalled()
   })
 })
