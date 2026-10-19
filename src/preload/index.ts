@@ -14,7 +14,8 @@ const api: Api = {
     release: (token) => ipcRenderer.invoke(IPC.connectionsImportRelease, token)
   },
   app: {
-    openSettings: () => ipcRenderer.invoke(IPC.appOpenSettings)
+    openSettings: () => ipcRenderer.invoke(IPC.appOpenSettings),
+    workspaceChanged: (hasContent) => ipcRenderer.send(IPC.appWorkspaceChanged, hasContent)
   },
   connections: {
     list: () => ipcRenderer.invoke(IPC.connectionsList),

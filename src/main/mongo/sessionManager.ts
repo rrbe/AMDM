@@ -41,8 +41,13 @@ export class SessionManager {
   private authorizationCache = new AuthorizationCache()
   private pending = new Map<string, PendingSession>()
   private statusListeners = new Set<(status: ConnectionStatus) => void>()
+  private shuttingDown = false
 
   constructor(private readonly connections: ConnectionSource) {}
+
+  hasActiveSessions(): boolean {
+    return this.sessions.size > 0 || this.pending.size > 0
+  }
 
   onStatusChanged(listener: (status: ConnectionStatus) => void): () => void {
     this.statusListeners.add(listener)
@@ -65,6 +70,7 @@ export class SessionManager {
   }
 
   getClient(id: string): MongoClient {
+    if (this.shuttingDown) throw new Error('Application is closing.')
     const s = this.sessions.get(id)
     if (!s || s.status.state !== 'connected') {
       throw new Error('Connection is not open. Connect first.')
@@ -105,8 +111,10 @@ export class SessionManager {
   }
 
   async connect(id: string): Promise<ConnectionStatus> {
+    if (this.shuttingDown) return { id, state: 'disconnected' }
     // tear down any existing session for this id first
     await this.disconnect(id)
+    if (this.shuttingDown) return { id, state: 'disconnected' }
 
     const dec = this.connections.getDecrypted(id)
     if (!dec) {
@@ -216,13 +224,12 @@ export class SessionManager {
     const s = this.sessions.get(id)
     this.sessions.delete(id)
     s?.stopMonitoring()
-    await shellResults.closeConnection(id)
-    pending?.tunnel?.close()
-    s?.tunnel?.close()
     try {
-      await Promise.all([pending?.client?.close(), s?.client.close()])
-    } catch {
-      /* ignore */
+      await shellResults.closeConnection(id)
+    } finally {
+      pending?.tunnel?.close()
+      s?.tunnel?.close()
+      await Promise.all([pending?.client?.close(), s?.client.close()]).catch(() => {})
     }
   }
 
@@ -260,5 +267,10 @@ export class SessionManager {
     const ids = new Set([...this.pending.keys(), ...this.sessions.keys()])
     await Promise.all([...ids].map((id) => this.disconnect(id)))
     this.authorizationCache.clear()
+  }
+
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true
+    await this.closeAll()
   }
 }

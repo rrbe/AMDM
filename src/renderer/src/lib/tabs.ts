@@ -39,6 +39,13 @@ export interface ResultTab {
     lands because each result can hold a full page of EJSON docs. */
 export const MAX_RESULT_TABS = 8
 
+/** State that a destroyed desktop workspace cannot restore. */
+export function hasWorkspaceContent(tabs: readonly QueryTab[]): boolean {
+  return tabs.length > 1 || tabs.some((tab) =>
+    !!tab.code.trim() || tab.results.length > 0 || tab.running
+  )
+}
+
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 const DB_MEMBERS = new Set([
   'getCollection',

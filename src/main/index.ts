@@ -7,8 +7,7 @@ import { settingsStore } from './store/settingsStore'
 import { schemaStore } from './store/schemaStore'
 import { windowStateStore } from './store/windowStateStore'
 import { resolveWindowBounds } from './store/windowStateCore'
-import { sessionManager } from './mongo/desktopSession'
-import { serializerPool } from './workers/serializerPool'
+import { registerAppLifecycle, trackMainWindow } from './appLifecycle'
 import { registerIpc } from './ipc/registerIpc'
 import { startUpdates } from './updater'
 import { bringWindowToFront } from './windowOpenCore'
@@ -87,6 +86,7 @@ function createWindow(): void {
       sandbox: false
     }
   })
+  trackMainWindow(win)
 
   // Full screen and maximize are mutually exclusive; full screen wins so the
   // restored geometry matches how the window was left.
@@ -175,6 +175,7 @@ app.whenReady().then(() => {
   settingsStore.init()
   schemaStore.init()
   windowStateStore.init()
+  registerAppLifecycle()
   registerIpc(openSettingsWindow)
   createWindow()
   startUpdates()
@@ -186,11 +187,4 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
-})
-
-// Clean up all clients + SSH tunnels + the serializer worker on quit
-// so no processes or threads survive application shutdown.
-app.on('will-quit', () => {
-  void sessionManager.closeAll()
-  serializerPool.dispose()
 })

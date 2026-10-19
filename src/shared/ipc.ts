@@ -105,6 +105,7 @@ export const IPC = {
   settingsUpdate: 'settings:update',
 
   appOpenSettings: 'app:openSettings',
+  appWorkspaceChanged: 'app:workspaceChanged',
 
   updatesCheck: 'updates:check',
   updatesGetState: 'updates:getState',
@@ -121,6 +122,8 @@ export interface Api {
   connectionTransfer?: ConnectionTransferApi
   app: {
     openSettings(): Promise<void>
+    /** Desktop-only workspace loss warning; carries no query text or credentials. */
+    workspaceChanged(hasContent: boolean): void
   }
   connections: {
     list(): Promise<ConnectionConfig[]>

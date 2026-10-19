@@ -3,6 +3,7 @@ import electronUpdater, { type CancellationToken } from 'electron-updater'
 import type { UpdateState } from '../shared/types'
 import { canUseElectronUpdater, nextElectronUpdateState } from './electronUpdaterCore'
 import { settingsStore } from './store/settingsStore'
+import { prepareAppQuit } from './appLifecycle'
 
 const FIRST_CHECK_DELAY_MS = 30_000
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -119,9 +120,10 @@ export function checkElectronForUpdates(): Promise<boolean> {
   return checkInFlight
 }
 
-export function showAvailableElectronUpdate(): Promise<boolean> {
+export async function showAvailableElectronUpdate(): Promise<boolean> {
   if (!state.available) return Promise.resolve(false)
   if (state.phase === 'downloaded') {
+    if (!await prepareAppQuit()) return false
     autoUpdater.quitAndInstall(false, true)
     return Promise.resolve(true)
   }
