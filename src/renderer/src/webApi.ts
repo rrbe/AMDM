@@ -24,6 +24,7 @@ function unavailable(): Promise<never> {
 
 export const webApi: Api = {
   app: {
+    workspaceChanged: () => {},
     openSettings: async () => {
       if (window.location.hash === "#settings") return;
       window.history.pushState(
