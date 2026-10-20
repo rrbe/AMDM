@@ -1,78 +1,48 @@
-import type { JsonEncoding, ResultExportFormat } from '@shared/types'
+import type { JsonEncoding } from '@shared/types'
+import { Braces } from 'lucide-react'
+import { createElement } from 'react'
 import i18n from '@renderer/i18n'
 import type { ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { toEncodedJsonArray, toEncodedJsonLines } from '@renderer/lib/resultCopy'
 
 type CopyDocuments = (text: string) => void
-export type ExportDocuments = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
+const iconProps = { size: 16, strokeWidth: 1.8, 'aria-hidden': true } as const
 
 const JSON_ENCODINGS = [
-  { value: 'plain', helpKey: 'io.encodingHelp.plain' },
-  { value: 'relaxed', helpKey: 'io.encodingHelp.relaxed' },
-  { value: 'canonical', helpKey: 'io.encodingHelp.canonical' }
-] as const satisfies ReadonlyArray<{ value: JsonEncoding; helpKey: string }>
-
-function layoutEntries(select: (format: 'json' | 'jsonl') => void): ContextMenuEntry[] {
-  return [
-    {
-      label: 'JSON Array',
-      description: i18n.t('io.layoutHelp.array'),
-      onClick: () => select('json')
-    },
-    {
-      label: 'JSONL / NDJSON',
-      description: i18n.t('io.layoutHelp.jsonl'),
-      onClick: () => select('jsonl')
-    }
-  ]
-}
-
-function encodingLabel(scope: 'copy' | 'export', encoding: JsonEncoding): string {
-  if (scope === 'copy') {
-    if (encoding === 'plain') return i18n.t('result.copy.plainJson')
-    if (encoding === 'relaxed') return i18n.t('result.copy.relaxedEjson')
-    return i18n.t('result.copy.canonicalEjson')
+  {
+    value: 'plain',
+    labelKey: 'result.copy.plainJson',
+    helpKey: 'io.encodingHelp.plain'
+  },
+  {
+    value: 'relaxed',
+    labelKey: 'result.copy.relaxedEjson',
+    helpKey: 'io.encodingHelp.relaxed'
+  },
+  {
+    value: 'canonical',
+    labelKey: 'result.copy.canonicalEjson',
+    helpKey: 'io.encodingHelp.canonical'
   }
-  if (encoding === 'plain') return i18n.t('result.export.plainJson')
-  if (encoding === 'relaxed') return i18n.t('result.export.relaxedEjson')
-  return i18n.t('result.export.canonicalEjson')
-}
-
-function encodingEntries(
-  scope: 'copy' | 'export',
-  select: (encoding: JsonEncoding, format: 'json' | 'jsonl') => void
-): ContextMenuEntry[] {
-  return JSON_ENCODINGS.map(({ value, helpKey }) => ({
-    label: encodingLabel(scope, value),
-    description: i18n.t(helpKey),
-    children: layoutEntries((format) => select(value, format))
-  }))
-}
+] as const satisfies ReadonlyArray<{
+  value: JsonEncoding
+  labelKey: string
+  helpKey: string
+}>
 
 export function jsonCopyMenuItems(documents: unknown[], copy: CopyDocuments): ContextMenuEntry[] {
-  return encodingEntries('copy', (encoding, format) =>
-    copy(format === 'json' ? toEncodedJsonArray(documents, encoding) : toEncodedJsonLines(documents, encoding))
-  )
-}
-
-export function resultExportMenuItems(documents: unknown[], exportDocuments: ExportDocuments): ContextMenuEntry[] {
   return [
-    ...encodingEntries('export', (encoding, format) => exportDocuments(format, documents, encoding)),
+    ...JSON_ENCODINGS.map(({ value, labelKey, helpKey }) => ({
+      label: i18n.t(labelKey),
+      icon: createElement(Braces, iconProps),
+      description: i18n.t(helpKey),
+      onClick: () => copy(toEncodedJsonArray(documents, value))
+    })),
     {
-      label: i18n.t('result.export.bson'),
-      onClick: () => exportDocuments('bson', documents)
-    },
-    {
-      label: i18n.t('result.export.csv'),
-      onClick: () => exportDocuments('csv', documents)
-    },
-    {
-      label: i18n.t('result.export.tsv'),
-      onClick: () => exportDocuments('tsv', documents)
-    },
-    {
-      label: i18n.t('result.export.xlsx'),
-      onClick: () => exportDocuments('xlsx', documents)
+      label: i18n.t('result.copy.jsonl'),
+      icon: createElement(Braces, iconProps),
+      description: i18n.t('io.layoutHelp.jsonl'),
+      onClick: () => copy(toEncodedJsonLines(documents, 'plain'))
     }
   ]
 }

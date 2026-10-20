@@ -1,7 +1,20 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, SlidersHorizontal, Table } from 'lucide-react'
+import {
+  Braces,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Maximize2,
+  Minimize2,
+  Network,
+  SlidersHorizontal,
+  Table,
+  Table2,
+  Terminal
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
+import { QUERY_LIMITS, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
@@ -9,7 +22,6 @@ import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
-import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
 import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
@@ -111,19 +123,7 @@ function ResultPanelContent({
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
   const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
-  const [tableDocumentOrder, setTableDocumentOrder] = useState<number[] | null>(null)
-  const updateTableDocumentOrder = useCallback((next: number[]) => {
-    setTableDocumentOrder((current) =>
-      current?.length === next.length && current.every((sourceIndex, index) => sourceIndex === next[index])
-        ? current
-        : next
-    )
-  }, [])
-  const [exportModal, setExportModal] = useState<{
-    format: ResultExportFormat
-    jsonEncoding?: JsonEncoding
-    fixedDocuments?: unknown[]
-  } | null>(null)
+  const [exportDocuments, setExportDocuments] = useState<unknown[] | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const copiedTimer = useRef<number | null>(null)
   const copyAttempt = useRef(0)
@@ -204,10 +204,6 @@ function ResultPanelContent({
     setSelectedDocIndexes(new Set())
   }, [active?.id, result?.data])
 
-  useEffect(() => {
-    if (view !== 'table') setTableDocumentOrder(null)
-  }, [view])
-
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
   const strip =
@@ -276,15 +272,8 @@ function ResultPanelContent({
   // Normalize to a documents array for the three views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = normalizeDocs(result)
-  const documentOrder = view === 'table' && tableDocumentOrder ? tableDocumentOrder : docs.map((_, index) => index)
-  const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
-    .filter((index) => index >= 0 && index < docs.length)
-    .map((index) => docs[index])
-  const openSelectionExport = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding): void => {
-    setExportModal({ format, jsonEncoding, fixedDocuments: documents })
-  }
   const closeExport = (): void => {
-    setExportModal(null)
+    setExportDocuments(null)
     window.requestAnimationFrame(() => copyButtonRef.current?.focus())
   }
 
@@ -381,7 +370,7 @@ function ResultPanelContent({
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
-                onExport={openSelectionExport}
+                onExport={setExportDocuments}
                 docCtx={docCtx}
               />
             )}
@@ -393,8 +382,7 @@ function ResultPanelContent({
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
-                onDocumentOrderChange={updateTableDocumentOrder}
-                onExport={openSelectionExport}
+                onExport={setExportDocuments}
                 docCtx={docCtx}
               />
             )}
@@ -409,26 +397,36 @@ function ResultPanelContent({
           onClose={() => setCopyMenu(null)}
           items={[
             ...jsonCopyMenuItems(docs, copyWithFeedback),
-            { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
-            { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
-            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
+            {
+              label: t('result.copy.mongoShell'),
+              icon: <Terminal size={16} strokeWidth={1.8} aria-hidden="true" />,
+              onClick: () => copyWithFeedback(toShellText(docs))
+            },
+            {
+              label: t('result.copy.csv'),
+              icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+              onClick: () => copyWithFeedback(toCsv(docs, fieldSort))
+            },
+            {
+              label: t('result.copy.tsv'),
+              icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+              onClick: () => copyWithFeedback(toTsv(docs, fieldSort))
+            }
           ]}
         />
       )}
-      {exportModal && (
+      {exportDocuments && (
         <ExportModal
           source={{
             kind: 'result',
-            documents: exportModal.fixedDocuments ?? docs,
-            selectedDocuments: exportModal.fixedDocuments ?? selectedDocuments,
-            fixedSelection: exportModal.fixedDocuments != null,
+            documents: exportDocuments,
+            selectedDocuments: exportDocuments,
+            fixedSelection: true,
             connectionId: docCtx?.connectionId ?? active?.query?.connectionId,
             database: docCtx?.database ?? active?.query?.database,
             collection: docCtx?.collection,
             suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
           }}
-          initialFormat={exportModal.format}
-          initialJsonEncoding={exportModal.jsonEncoding}
           onClose={closeExport}
         />
       )}

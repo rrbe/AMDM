@@ -526,18 +526,10 @@
       "plainJson": "Copy as Plain JSON",
       "relaxedEjson": "Copy as Relaxed EJSON",
       "canonicalEjson": "Copy as Canonical EJSON",
+      "jsonl": "Copy as JSONL / NDJSON",
       "mongoShell": "Copy as MongoDB Document",
       "csv": "Copy as CSV",
       "tsv": "Copy as TSV"
-    },
-    "export": {
-      "plainJson": "Plain JSON",
-      "relaxedEjson": "Relaxed EJSON",
-      "canonicalEjson": "Canonical EJSON",
-      "bson": "BSON",
-      "csv": "CSV",
-      "tsv": "TSV",
-      "xlsx": "Excel"
     },
     "dataMenu": {
       "view": "View",
@@ -623,7 +615,7 @@
     "exportCollection": "Export",
     "importCollection": "Import",
     "exportTitle": "Export",
-    "exportDescription": "Choose an export range, file format, and destination. JSON formats provide a separate BSON type encoding choice.",
+    "exportDescription": "Choose an export range, data format, and destination. JSON lets you set its output structure, BSON type encoding, and indentation separately.",
     "importTitle": "Import — {{target}}",
     "importDescription": "Choose a file to automatically detect JSON, JSONL / NDJSON, Relaxed / Canonical EJSON, CSV, TSV, Excel, or BSON.",
     "close": "Close",
@@ -633,7 +625,9 @@
     "exportBtn": "Export",
     "importBtn": "Import",
     "format": "Format",
-    "fileFormat": "File format",
+    "dataFormat": "Data format",
+    "outputStructure": "Output structure",
+    "prettyPrint": "Pretty print",
     "jsonEncoding": "JSON encoding",
     "encodingHelp": {
       "plain": "BSON types such as ObjectId, Date, and Decimal128 become strings or numbers and are not restored automatically when imported again.",
