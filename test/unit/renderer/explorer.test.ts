@@ -191,6 +191,17 @@ describe('explorer search grouping', () => {
 })
 
 describe('explorer catalog rows', () => {
+  it('sorts databases and collections descending without changing the catalog', () => {
+    const catalog: CatalogState = {
+      databases: [{ name: 'a' }, { name: 'z' }],
+      collections: { a: [{ name: 'a', type: 'collection' }, { name: 'z', type: 'collection' }] },
+      indexes: {}, users: {}, expanded: new Set(), loading: new Set()
+    }
+    const actions = { toggleNode: vi.fn(), setActiveConnection: vi.fn(), browseCollection: vi.fn(), inspectIndex: vi.fn() }
+    expect(flattenCatalog('c1', catalog, actions, 'alphaDesc', true).map((row) => row.label)).toEqual(['z', 'a', 'z', 'a'])
+    expect(catalog.databases?.map((db) => db.name)).toEqual(['a', 'z'])
+  })
+
   it('searches loaded descendants of collapsed databases without fetching or changing expansion', () => {
     const catalog: CatalogState = {
       databases: [{ name: 'shop' }, { name: 'unloaded' }],

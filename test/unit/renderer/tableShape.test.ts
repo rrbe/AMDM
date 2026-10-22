@@ -356,3 +356,13 @@ describe('sortTableRows', () => {
     ])
   })
 })
+
+it('sorts grouped fields descending and makes identity ordering optional', () => {
+  const docs = [{ a: { a: 1, z: 2, _id: 3 }, _id: 4, z: 5 }]
+  const groups = deriveTableColumnGroups(docs, 'grouped', 'alphaDesc', true)
+  expect(groups.map((group) => group.key)).toEqual(['_id', 'z', 'a'])
+  expect(groups[2].columns.map((column) => column.label)).toEqual(['_id', 'z', 'a'])
+  expect(orderTableColumns(['z', 'a', '_id'], [], false)).toEqual(['z', 'a', '_id'])
+  expect(orderTableColumns(['z', 'a', '_id'], ['a', '_id', 'z'], false)).toEqual(['a', '_id', 'z'])
+  expect(Object.keys(docs[0])).toEqual(['a', '_id', 'z'])
+})

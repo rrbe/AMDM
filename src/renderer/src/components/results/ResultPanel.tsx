@@ -95,7 +95,7 @@ function ResultPanelContent({
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
   const view = active?.resultView ?? 'tree'
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)

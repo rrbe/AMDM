@@ -241,13 +241,12 @@ export function isExpandable(value: unknown): boolean {
  * entries; arrays yield index→value. EJSON wrappers (and primitives) are leaves
  * and yield nothing.
  */
-export function entriesOf(value: unknown, sort: CollectionSort = 'natural'): Array<[string, unknown]> {
+export function entriesOf(value: unknown, sort: CollectionSort = 'natural', idFirst = false): Array<[string, unknown]> {
   if (Array.isArray(value)) {
     return value.map((v, i) => [String(i), v] as [string, unknown])
   }
   if (isPlainObject(value) && !isExtended(value)) {
-    const entries = Object.entries(value)
-    return sort === 'alpha' ? entries.sort(([a], [b]) => a.localeCompare(b)) : entries
+    return orderFieldNames(Object.keys(value), sort, idFirst).map((key) => [key, value[key]])
   }
   return []
 }
@@ -262,4 +261,11 @@ export function summarize(value: unknown): string {
     return `{ ${Object.keys(value).length} fields }`
   }
   return formatScalar(value).text
+}
+
+export function orderFieldNames(keys: string[], sort: CollectionSort, idFirst = false): string[] {
+  const ordered = sort === 'natural' ? [...keys] : [...keys].sort((a, b) =>
+    sort === 'alphaDesc' ? b.localeCompare(a) : a.localeCompare(b))
+  if (idFirst && ordered.includes('_id')) return ['_id', ...ordered.filter((key) => key !== '_id')]
+  return ordered
 }

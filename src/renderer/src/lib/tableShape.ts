@@ -6,7 +6,7 @@
  * objects use inline previews by default; arrays and BSON wrappers stay in one cell.
  */
 import type { CollectionSort, TableNestedDisplay } from '@shared/types'
-import { formatScalar, isExtended } from '@renderer/lib/ejson'
+import { formatScalar, isExtended, orderFieldNames } from '@renderer/lib/ejson'
 
 type Dict = Record<string, unknown>
 
@@ -62,7 +62,7 @@ export function cellValue(doc: unknown, column: TableColumnPath): { present: boo
 }
 
 /** Derive the ordered column list for a set of documents. */
-export function deriveColumns(docs: unknown[], sort: CollectionSort = 'alpha'): string[] {
+export function deriveColumns(docs: unknown[], sort: CollectionSort = 'alpha', idFirst = false): string[] {
   const seen = new Set<string>()
   const cols: string[] = []
   let sawNonObject = false
@@ -79,17 +79,18 @@ export function deriveColumns(docs: unknown[], sort: CollectionSort = 'alpha'): 
     }
   }
   if (sawNonObject && cols.length === 0) cols.push('(value)')
-  return sort === 'alpha' ? cols.sort((a, b) => a.localeCompare(b)) : cols
+  return orderFieldNames(cols, sort, idFirst)
 }
 
 /** Expand one object level only when every present value is a plain object. */
 export function deriveTableColumnGroups(
   docs: unknown[],
   display: TableNestedDisplay,
-  sort: CollectionSort = 'alpha'
+  sort: CollectionSort = 'alpha',
+  idFirst = false
 ): TableColumnGroup[] {
   const column = (path: string[]): TableColumn => ({ id: JSON.stringify(path), label: path[path.length - 1], path })
-  return deriveColumns(docs, sort).map((key) => {
+  return deriveColumns(docs, sort, idFirst).map((key) => {
     const single = { key, columns: [column([key])] }
     if (display === 'inline' || key === '_id') return single
     const children = new Set<string>()
@@ -106,19 +107,18 @@ export function deriveTableColumnGroups(
     }
     const keys = [...children]
     if (keys.length === 0) return single
-    if (sort === 'alpha') keys.sort((a, b) => a.localeCompare(b))
-    return { key, columns: keys.map((child) => column([key, child])) }
+    return { key, columns: orderFieldNames(keys, sort, idFirst).map((child) => column([key, child])) }
   })
 }
 
 /** Keep the document identity first, then apply the tab's order to other fields. */
-export function orderTableColumns(columns: string[], order: string[]): string[] {
+export function orderTableColumns(columns: string[], order: string[], idFirst = true): string[] {
   const available = new Set(columns)
   const remembered = new Set(order)
   return [
-    ...(available.has('_id') ? ['_id'] : []),
-    ...order.filter((column) => column !== '_id' && available.has(column)),
-    ...columns.filter((column) => column !== '_id' && !remembered.has(column))
+    ...(idFirst && available.has('_id') ? ['_id'] : []),
+    ...order.filter((column) => (!idFirst || column !== '_id') && available.has(column)),
+    ...columns.filter((column) => (!idFirst || column !== '_id') && !remembered.has(column))
   ]
 }
 

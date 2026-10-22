@@ -141,3 +141,13 @@ describe('isExpandable / entriesOf / summarize on containers', () => {
     expect(summarize({ a: 1, b: 2 })).toBe('{ 2 fields }')
   })
 })
+
+it('orders object fields independently of array indexes and BSON wrappers', () => {
+  const value = { b: 1, _id: 2, a: 3 }
+  expect(entriesOf(value, 'alphaDesc').map(([key]) => key)).toEqual(['b', 'a', '_id'])
+  expect(entriesOf(value, 'alphaDesc', true).map(([key]) => key)).toEqual(['_id', 'b', 'a'])
+  expect(entriesOf(value, 'natural', true).map(([key]) => key)).toEqual(['_id', 'b', 'a'])
+  expect(entriesOf([value, 42], 'alphaDesc', true)).toEqual([['0', value], ['1', 42]])
+  expect(entriesOf({ $numberLong: '123' }, 'alphaDesc', true)).toEqual([])
+  expect(Object.keys(value)).toEqual(['b', '_id', 'a'])
+})

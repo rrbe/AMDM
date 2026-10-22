@@ -76,7 +76,7 @@ export function ExportModal({
   const openExportedFile = useAppStore((state) => state.openExportedFile)
   const revealExportedFile = useAppStore((state) => state.revealExportedFile)
   const clearExportProgress = useAppStore((state) => state.clearExportProgress)
-  const fieldSort = useAppStore((state) => state.settings.collectionSort)
+  const fieldSort = useAppStore((state) => state.settings.resultFieldSort)
 
   const initialExportFormat = initialFormat ?? 'json'
   const [format, setFormat] = useState<ExportFormat>(initialExportFormat)

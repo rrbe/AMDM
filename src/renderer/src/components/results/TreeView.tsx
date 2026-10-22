@@ -85,7 +85,8 @@ export function TreeView({
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   // Index of the document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [previewDoc, setPreviewDoc] = useState<{ value: unknown; source?: JsonPreviewSource } | null>(null)
@@ -132,7 +133,7 @@ export function TreeView({
         docIndex
       })
       if (isOpen) {
-        for (const [childKey, childVal] of entriesOf(value, fieldSort)) {
+        for (const [childKey, childVal] of entriesOf(value, fieldSort, idFirst)) {
           walk(childKey, childVal, depth + 1, `${path}.${childKey}`)
         }
       }
@@ -141,7 +142,7 @@ export function TreeView({
     // expand state and child paths).
     docs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
     return out
-  }, [docs, expanded, fieldSort])
+  }, [docs, expanded, fieldSort, idFirst])
 
   const rowVirtualizer = useVirtualizer({
     count: flat.length,

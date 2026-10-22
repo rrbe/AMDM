@@ -106,7 +106,8 @@ export function TableView({
   const { t, i18n: tableI18n } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   const nestedDisplay = useAppStore((s) => s.settings.tableNestedDisplay)
   const columnOrder = useAppStore((s) => getActiveTab(s).tableColumnOrder)
   const setColumnOrder = useAppStore((s) => s.setTableColumnOrder)
@@ -163,15 +164,15 @@ export function TableView({
   }
 
   const derivedGroups = useMemo(
-    () => deriveTableColumnGroups(docs, nestedDisplay, fieldSort),
-    [docs, nestedDisplay, fieldSort]
+    () => deriveTableColumnGroups(docs, nestedDisplay, fieldSort, idFirst),
+    [docs, nestedDisplay, fieldSort, idFirst]
   )
   const groups = useMemo(() => {
     const byKey = new Map(derivedGroups.map((group) => [group.key, group]))
-    return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
-  }, [derivedGroups, columnOrder])
+    return orderTableColumns([...byKey.keys()], columnOrder, idFirst).map((key) => byKey.get(key)!)
+  }, [derivedGroups, columnOrder, idFirst])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
-  const hasPinnedId = groups[0]?.key === '_id'
+  const hasPinnedId = idFirst && groups[0]?.key === '_id'
   const groupStyle = (width: number, groupIndex: number): CSSProperties =>
     hasPinnedId && groupIndex === 0
       ? { width, left: INDEX_COL_WIDTH }
@@ -431,7 +432,7 @@ export function TableView({
           {groups.map((group, groupIndex) => (
             <div
               key={group.key}
-              className={`tbl-column-group${group.key === '_id' ? ' tbl-pinned-id' : ''}`}
+              className={`tbl-column-group${idFirst && group.key === '_id' ? ' tbl-pinned-id' : ''}`}
               data-column={group.key}
               style={groupStyle(
                 group.columns.reduce((sum, col) => sum + widthOf(col), 0),

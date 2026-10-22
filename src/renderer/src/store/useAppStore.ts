@@ -2169,6 +2169,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 // Result ownership follows the tab/result lifecycle, including automatic eviction.
 useAppStore.subscribe((state, previous) => {
+  if (
+    state.settings.resultFieldSort !== previous.settings.resultFieldSort ||
+    state.settings.resultIdFirst !== previous.settings.resultIdFirst
+  ) {
+    useAppStore.setState({
+      tabs: state.tabs.map((tab) => ({
+        ...tab,
+        tableColumnOrder: [],
+        results: tab.results.map((result) => ({
+          ...result,
+          foldedLines: { ...result.foldedLines, json: [], console: [] }
+        }))
+      }))
+    })
+  }
   if (state.tabs === previous.tabs) return
   for (const tab of previous.tabs) {
     const next = state.tabs.find((item) => item.id === tab.id)

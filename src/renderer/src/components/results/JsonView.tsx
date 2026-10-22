@@ -1,3 +1,4 @@
+import { useAppStore } from '@renderer/store/useAppStore'
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toJsonLines } from '@renderer/lib/format'
@@ -40,13 +41,15 @@ interface JsonViewProps {
 
 export function JsonView({ value, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   const { t } = useTranslation()
   const [allSelected, setAllSelected] = useState(false)
   const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo(() => toJsonLines(value, timeZone), [value, timeZone])
+  const lines = useMemo(() => toJsonLines(value, timeZone, fieldSort, idFirst), [value, timeZone, fieldSort, idFirst])
 
   // A fresh result clears any lingering "all selected" state.
   useEffect(() => setAllSelected(false), [value])

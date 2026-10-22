@@ -548,10 +548,10 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   return (
     <Modal
       title={tFn(copyFromId ? 'connection.menu.duplicate' : editing ? 'connection.title.edit' : 'connection.title.new')}
-      description={tFn('connection.description')}
       onClose={handleModalClose}
       size="lg"
-      lockTop
+      className="h-[840px] max-h-[calc(100vh-48px)]"
+      bodyClassName="flex-1"
       headerActions={
         <>
           <Button
@@ -1153,7 +1153,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
             <DialogTitle id={fromUrlTitleId} render={<span className="text-[13px] font-semibold" />}>
               {tFn('connection.uri.fromUrlTitle')}
             </DialogTitle>
-            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.fromUrlHint')}</span>
           </div>
         </div>
         <textarea
@@ -1199,7 +1198,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
             <DialogTitle id={toUrlTitleId} render={<span className="text-[13px] font-semibold" />}>
               {tFn('connection.uri.toUrlTitle')}
             </DialogTitle>
-            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.toUrlHint')}</span>
           </div>
         </div>
         {/* Editable: regenerated on open / password-toggle, but the user can tweak
