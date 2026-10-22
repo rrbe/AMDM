@@ -486,6 +486,9 @@
       "disconnected": "Disconnected. Connect to analyze again.",
       "viewUnsupported": "Schema analysis is not available for views",
       "sampleInfo": "Sampling info",
+      "displayFieldsHint": "Check fields to display in the current query tab.",
+      "displayFieldsUnavailable": "Run a query for this collection to select display fields.",
+      "displayField": "Display {{field}}",
       "sampleHint": "Fields and types are inferred from a random sample. Rare fields or types may be missed."
     },
     "target": "Current Context",

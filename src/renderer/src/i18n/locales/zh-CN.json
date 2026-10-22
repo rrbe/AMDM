@@ -486,6 +486,9 @@
       "disconnected": "连接已断开，连接后可重新分析。",
       "viewUnsupported": "视图暂不支持 Schema 分析",
       "sampleInfo": "采样说明",
+      "displayFieldsHint": "勾选当前查询标签页要展示的字段。",
+      "displayFieldsUnavailable": "查询此集合后，可选择展示字段。",
+      "displayField": "展示 {{field}}",
       "sampleHint": "字段和类型来自随机抽样，可能遗漏少见字段或类型。"
     },
     "target": "当前上下文",
