@@ -194,8 +194,8 @@ export interface Api {
     delete(request: DocMutateRequest): Promise<DocMutateResult>
   }
   io: {
-    /** Let the user grant an owner-scoped directory for subsequent exports. */
-    chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+    /** Grant the default directory or let the user choose an owner-scoped export directory. */
+    chooseExportDirectory(useDefault?: boolean): Promise<ExportDirectorySelection | null>
     /** Export a collection or bounded Renderer result to the granted destination. */
     export(request: ExportFileRequest): Promise<DataOpResult>
     cancelExport(taskId: string): Promise<boolean>

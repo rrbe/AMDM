@@ -24,7 +24,7 @@ import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
 /**
@@ -300,10 +300,7 @@ export function TreeView({
       label: t('result.dataMenu.copy'),
       children: treeCopyMenuItems(node, selected, fieldSort, setAdvancedCopy)
     })
-    if (!IS_WEB) items.push({
-      label: t('result.dataMenu.export'),
-      children: exportMenuItems(selected, onExport)
-    })
+    if (!IS_WEB) items.push(resultExportMenuItem(selected, onExport))
     if (docCtx && docHasId(rootDoc)) {
       items.push('separator')
       items.push({
@@ -422,13 +419,6 @@ export function TreeView({
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
-}
-
-function exportMenuItems(
-  documents: unknown[],
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
-): ContextMenuEntry[] {
-  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy submenu for a tree field / document selection. */

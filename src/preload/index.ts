@@ -83,7 +83,7 @@ const api: Api = {
     delete: (request) => ipcRenderer.invoke(IPC.docDelete, request)
   },
   io: {
-    chooseExportDirectory: () => ipcRenderer.invoke(IPC.ioChooseExportDirectory),
+    chooseExportDirectory: (useDefault) => ipcRenderer.invoke(IPC.ioChooseExportDirectory, useDefault),
     export: (request) => ipcRenderer.invoke(IPC.ioExport, request),
     cancelExport: (taskId) => ipcRenderer.invoke(IPC.ioExportCancel, taskId),
     onExportProgress: (listener) => {

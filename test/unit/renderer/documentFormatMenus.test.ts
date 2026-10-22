@@ -4,7 +4,7 @@ vi.mock('@renderer/i18n', () => ({
   default: { t: (key: string) => key }
 }))
 
-import { jsonCopyMenuItems, resultExportMenuItems } from '@renderer/components/results/documentFormatMenus'
+import { jsonCopyMenuItems, resultExportMenuItem } from '@renderer/components/results/documentFormatMenus'
 
 describe('document format menus', () => {
   it('copies JSON directly and opens advanced formats without copying', () => {
@@ -34,29 +34,13 @@ describe('document format menus', () => {
     expect(copy).not.toHaveBeenCalled()
   })
 
-  it('groups JSON export layouts under the encoding before other formats', () => {
+  it('opens export directly for the selected documents', () => {
     const exportDocuments = vi.fn()
-    const items = resultExportMenuItems([], exportDocuments)
-
-    expect(items.map((item) => (item === 'separator' ? item : item.label))).toEqual([
-      'result.export.plainJson',
-      'result.export.relaxedEjson',
-      'result.export.canonicalEjson',
-      'result.export.bson',
-      'result.export.csv',
-      'result.export.tsv',
-      'result.export.xlsx'
-    ])
-    for (const item of items.slice(0, 3)) {
-      expect(item !== 'separator' && 'children' in item ? item.children : []).toMatchObject([
-        { label: 'JSON Array', description: 'io.layoutHelp.array' },
-        { label: 'JSONL / NDJSON', description: 'io.layoutHelp.jsonl' }
-      ])
-    }
-    const relaxed = items[1]
-    const relaxedLayouts = relaxed !== 'separator' && relaxed && 'children' in relaxed ? relaxed.children : []
-    const jsonArray = relaxedLayouts[0]
-    if (jsonArray !== 'separator' && jsonArray && 'onClick' in jsonArray) jsonArray.onClick()
-    expect(exportDocuments).toHaveBeenCalledWith('json', [], 'relaxed')
+    const documents = [{ name: 'Ada' }]
+    const item = resultExportMenuItem(documents, exportDocuments)
+    expect(item).toMatchObject({ label: 'result.dataMenu.export' })
+    expect(item).not.toHaveProperty('children')
+    if (item !== 'separator' && 'onClick' in item) item.onClick()
+    expect(exportDocuments).toHaveBeenCalledWith('json', documents, 'plain')
   })
 })

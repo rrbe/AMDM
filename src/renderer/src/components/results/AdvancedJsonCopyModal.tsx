@@ -1,3 +1,4 @@
+import { jsonFormatExamples as examples } from '@renderer/lib/jsonFormatExamples'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '@renderer/components/common/Modal'
@@ -9,11 +10,6 @@ import {
   toEncodedJsonLines
 } from '@renderer/lib/resultCopy'
 
-const examples = Array.from({ length: 8 }, (_, index) => ({
-  _id: { $oid: `507f1f77bcf86cd7994390${11 + index}` },
-  createdAt: { $date: { $numberLong: String(1767225600000 + index * 86400000) } },
-  count: { $numberLong: String(42 + index) }
-}))
 const formats = ['plain', 'relaxed', 'canonical'] as const
 
 type Format = (typeof formats)[number]

@@ -39,7 +39,7 @@ import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
 /**
@@ -371,13 +371,7 @@ export function TableView({
       label: t('result.dataMenu.copy'),
       children: tableCopyMenuItems(selectedIndexes, row, copyCol, docs, fieldSort, setAdvancedCopy)
     })
-    if (!IS_WEB) items.push({
-      label: t('result.dataMenu.export'),
-      children: exportMenuItems(
-        selectedIndexes.map((index) => docs[index]),
-        onExport
-      )
-    })
+    if (!IS_WEB) items.push(resultExportMenuItem(selectedIndexes.map((index) => docs[index]), onExport))
     if (docCtx && docHasId(doc)) {
       items.push('separator')
       items.push({
@@ -608,13 +602,6 @@ function TableColumnHeader({
       <span className="tbl-col-resizer" onMouseDown={onResize} />
     </div>
   )
-}
-
-function exportMenuItems(
-  documents: unknown[],
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
-): ContextMenuEntry[] {
-  return resultExportMenuItems(documents, onExport)
 }
 
 /** Right-click copy menu for a table cell / row(s). */

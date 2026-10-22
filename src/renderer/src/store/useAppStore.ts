@@ -273,7 +273,7 @@ interface AppState {
 
   // ---- actions: import/export (Phase 3) ----
   exportProgress: Record<string, ExportProgress | undefined>
-  chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+  chooseExportDirectory(useDefault?: boolean): Promise<ExportDirectorySelection | null>
   exportCollection(req: ExportFileRequest): Promise<DataOpResult>
   cancelExport(taskId: string): Promise<boolean>
   openExportedFile(taskId: string): Promise<string | null>
@@ -1959,9 +1959,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ------------------------------------------------------------- import/export
-  async chooseExportDirectory() {
+  async chooseExportDirectory(useDefault = false) {
     try {
-      return await window.api.io.chooseExportDirectory()
+      return await window.api.io.chooseExportDirectory(useDefault)
     } catch (e) {
       get().notify(
         appNotice(
