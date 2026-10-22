@@ -62,6 +62,8 @@ interface FlatNode {
 
 interface TreeViewProps {
   docs: unknown[]
+  displayDocs?: unknown[]
+  onSelectFields: () => void
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
@@ -76,6 +78,8 @@ const MAX_KEY_WIDTH = 680
 
 export function TreeView({
   docs,
+  displayDocs = docs,
+  onSelectFields,
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
@@ -138,9 +142,9 @@ export function TreeView({
     }
     // Display badge is 1-based for humans; the path id stays 0-based (it keys
     // expand state and child paths).
-    docs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
+    displayDocs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
     return out
-  }, [docs, expanded, fieldSort])
+  }, [displayDocs, expanded, fieldSort])
 
   const rowVirtualizer = useVirtualizer({
     count: flat.length,
@@ -276,6 +280,7 @@ export function TreeView({
       ? { ...docCtx, ...(docHasId(rootDoc) ? { id: rootDoc._id } : {}) }
       : undefined
     const items: ContextMenuEntry[] = [
+      { label: t('result.selectFields'), onClick: onSelectFields },
       {
         label: t('result.dataMenu.view'),
         onClick: () => setPreviewDoc({ value: rootDoc, source })

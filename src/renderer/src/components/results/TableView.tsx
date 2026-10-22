@@ -65,6 +65,8 @@ import { useResultTimeZone } from './ResultTimeZone'
 
 interface TableViewProps {
   docs: unknown[]
+  displayDocs?: unknown[]
+  onSelectFields: () => void
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
@@ -96,6 +98,8 @@ function columnStyle(width: number, index: number): CSSProperties {
 
 export function TableView({
   docs,
+  displayDocs = docs,
+  onSelectFields,
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
@@ -162,14 +166,18 @@ export function TableView({
   }
 
   const derivedGroups = useMemo(
-    () => deriveTableColumnGroups(docs, nestedDisplay, fieldSort),
-    [docs, nestedDisplay, fieldSort]
+    () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort),
+    [displayDocs, nestedDisplay, fieldSort]
   )
   const groups = useMemo(() => {
     const byKey = new Map(derivedGroups.map((group) => [group.key, group]))
     return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
   }, [derivedGroups, columnOrder])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
+  useEffect(() => {
+    setSelectedCell((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
+    setEditing((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
+  }, [columns])
   const hasPinnedId = groups[0]?.key === '_id'
   const groupStyle = (width: number, groupIndex: number): CSSProperties =>
     hasPinnedId && groupIndex === 0
@@ -345,6 +353,7 @@ export function TableView({
       ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}) }
       : undefined
     const items: ContextMenuEntry[] = [
+      { label: t('result.selectFields'), onClick: onSelectFields },
       {
         label: t('result.dataMenu.view'),
         onClick: () => setPreview({ title: t('result.documentPreviewTitle'), value: doc, documentView: true, source })
