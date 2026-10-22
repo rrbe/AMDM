@@ -522,8 +522,29 @@
     "expandResults": "Expand results",
     "restoreEditor": "Restore editor",
     "displayOptions": "Display options",
+    "advancedCopy": {
+      "title": "Advanced JSON Format",
+      "example": "Example",
+      "layout": "Output layout",
+      "plain": {
+        "name": "Plain JSON",
+        "usage": "For APIs, everyday development and tools that read JSON or JSONL.",
+        "types": "Converts ObjectId and dates to strings and numeric types to ordinary values. Large Int64 values and Decimal128 are kept as strings to preserve precision."
+      },
+      "relaxed": {
+        "name": "Relaxed EJSON",
+        "usage": "For data exchange with mongoimport / mongoexport; the default format of modern mongoexport.",
+        "types": "Keeps ObjectId, Date and other extended type markers while simplifying numbers. Numeric types and large integer precision may be lost."
+      },
+      "canonical": {
+        "name": "Canonical EJSON",
+        "usage": "For data exchange and debugging that require BSON type information; use mongoexport --jsonFormat=canonical.",
+        "types": "Preserves BSON type markers, including Int32, Int64, Double and Decimal128. This is JSON text, not binary BSON."
+      }
+    },
     "copy": {
-      "plainJson": "Copy as Plain JSON",
+      "plainJson": "Copy as JSON",
+      "advancedJson": "Copy as Advanced JSON",
       "relaxedEjson": "Copy as Relaxed EJSON",
       "canonicalEjson": "Copy as Canonical EJSON",
       "mongoShell": "Copy as MongoDB Document",

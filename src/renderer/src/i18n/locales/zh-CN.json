@@ -522,8 +522,29 @@
     "expandResults": "展开结果区",
     "restoreEditor": "恢复编辑区",
     "displayOptions": "显示选项",
+    "advancedCopy": {
+      "title": "高级 JSON 格式",
+      "example": "示例",
+      "layout": "输出格式",
+      "plain": {
+        "name": "普通 JSON",
+        "usage": "适合 API、日常开发，以及读取 JSON 或 JSONL 的通用工具。",
+        "types": "将 ObjectId、日期转换为字符串，数字类型转换为普通值；大整数和 Decimal128 保留为字符串以避免精度丢失。"
+      },
+      "relaxed": {
+        "name": "Relaxed EJSON",
+        "usage": "适合与 mongoimport / mongoexport 交换数据，也是现代 mongoexport 的默认格式。",
+        "types": "保留 ObjectId、日期等扩展类型标记，简化数字表示；可能丢失数字类型和大整数精度。"
+      },
+      "canonical": {
+        "name": "Canonical EJSON",
+        "usage": "适合需要保留 BSON 类型的数据交换和排查；对应 mongoexport --jsonFormat=canonical。",
+        "types": "保留 BSON 类型标记，包括 Int32、Int64、Double、Decimal128。输出是 JSON 文本，不是 BSON 二进制。"
+      }
+    },
     "copy": {
-      "plainJson": "复制为 Plain JSON",
+      "plainJson": "复制为 JSON",
+      "advancedJson": "复制为高级 JSON",
       "relaxedEjson": "复制为 Relaxed EJSON",
       "canonicalEjson": "复制为 Canonical EJSON",
       "mongoShell": "复制为 MongoDB 文档",

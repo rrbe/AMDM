@@ -30,7 +30,6 @@ import {
   toCsv,
   toPlainJson,
   toPlainKeyValue,
-  toShellText,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -39,6 +38,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
@@ -142,6 +142,7 @@ export function TableView({
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: TableColumn } | null>(null)
   const selectedRows = selectedDocIndexes
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // Drag a header cell's right-edge handle to resize that column.
@@ -339,7 +340,8 @@ export function TableView({
       onSelectedDocIndexesChange(new Set([row]))
       setAnchorRow(row)
     }
-    setSelectedCell(col ? { row, col } : null)
+    const copyCol = selectedRows.has(row) && (selectedRows.size > 1 || selectedCell === null) ? null : col
+    setSelectedCell(copyCol ? { row, col: copyCol } : null)
     const doc = docs[row]
     const source: JsonPreviewSource | undefined = docCtx
       ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}) }
@@ -367,7 +369,7 @@ export function TableView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
-      children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
+      children: tableCopyMenuItems(selectedIndexes, row, copyCol, docs, fieldSort, setAdvancedCopy)
     })
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
@@ -542,6 +544,9 @@ export function TableView({
         />
       )}
 
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -618,49 +623,38 @@ function tableCopyMenuItems(
   row: number,
   col: TableColumn | null,
   docs: unknown[],
-  fieldSort: CollectionSort
+  fieldSort: CollectionSort,
+  openAdvanced: (documents: unknown[]) => void
 ): ContextMenuEntry[] {
-  const cell = col == null ? { present: false, value: undefined } : cellValue(docs[row], col.path)
-  const hasValue = col != null && cell.present
-  const single = docs[row]
-  const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
-  const many = rows.length > 1
-  const formatted = many ? sel : single
+  if (col === null) {
+    const selected = rows.map((index) => docs[index])
+    return [
+      ...jsonCopyMenuItems(selected, (text) => void copyText(text), openAdvanced),
+      {
+        label: i18n.t('result.copy.csv'),
+        onClick: () => void copyText(toCsv(selected, fieldSort))
+      },
+      {
+        label: i18n.t('result.copy.tsv'),
+        onClick: () => void copyText(toTsv(selected, fieldSort))
+      }
+    ]
+  }
+  const cell = cellValue(docs[row], col.path)
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
-      disabled: col == null,
-      onClick: () => void copyText(col?.path.join('.') ?? '')
+      onClick: () => void copyText(col.path.join('.'))
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
-      disabled: !hasValue,
+      disabled: !cell.present,
       onClick: () => void copyText(plainScalarText(cell.value))
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
-      disabled: !hasValue,
-      onClick: () => void copyText(toPlainKeyValue(col?.path.join('.') ?? '', cell.value))
-    },
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copySelectedDocuments'),
-      children: [
-        ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
-        {
-          label: i18n.t('result.dataMenu.copyMongoShell'),
-          onClick: () => void copyText(toShellText(formatted))
-        },
-        'separator',
-        {
-          label: i18n.t('result.dataMenu.copyCsv'),
-          onClick: () => void copyText(toCsv(sel, fieldSort))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyTsv'),
-          onClick: () => void copyText(toTsv(sel, fieldSort))
-        }
-      ]
+      disabled: !cell.present,
+      onClick: () => void copyText(toPlainKeyValue(col.path.join('.'), cell.value))
     }
   ]
 }

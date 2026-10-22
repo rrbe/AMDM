@@ -15,7 +15,6 @@ import {
   toCsv,
   toPlainJson,
   toPlainKeyValue,
-  toShellText,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -24,6 +23,7 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
@@ -104,6 +104,7 @@ export function TreeView({
   // the single-node `selectedId` — selecting one clears the other.
   const selectedDocs = selectedDocIndexes
   const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   const toggle = (id: string): void => {
@@ -297,7 +298,7 @@ export function TreeView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
-      children: treeCopyMenuItems(node, selected, fieldSort)
+      children: treeCopyMenuItems(node, selected, fieldSort, setAdvancedCopy)
     })
     if (!IS_WEB) items.push({
       label: t('result.dataMenu.export'),
@@ -415,6 +416,9 @@ export function TreeView({
         />
       )}
 
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
@@ -428,45 +432,33 @@ function exportMenuItems(
 }
 
 /** Right-click copy submenu for a tree field / document selection. */
-function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: CollectionSort): ContextMenuEntry[] {
-  const hasField = node.depth > 0
+function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: CollectionSort, openAdvanced: (documents: unknown[]) => void): ContextMenuEntry[] {
+  if (node.depth === 0) {
+    return [
+      ...jsonCopyMenuItems(docs, (text) => void copyText(text), openAdvanced),
+      {
+        label: i18n.t('result.copy.csv'),
+        onClick: () => void copyText(toCsv(docs, fieldSort))
+      },
+      {
+        label: i18n.t('result.copy.tsv'),
+        onClick: () => void copyText(toTsv(docs, fieldSort))
+      }
+    ]
+  }
   const valueText = node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
-  const formatted = docs.length > 1 ? docs : docs[0]
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
-      disabled: !hasField,
       onClick: () => void copyText(node.keyLabel)
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
-      disabled: !hasField,
       onClick: () => void copyText(valueText)
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
-      disabled: !hasField,
       onClick: () => void copyText(toPlainKeyValue(node.keyLabel, node.value))
-    },
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copySelectedDocuments'),
-      children: [
-        ...jsonCopyMenuItems(docs, (text) => void copyText(text)),
-        {
-          label: i18n.t('result.dataMenu.copyMongoShell'),
-          onClick: () => void copyText(toShellText(formatted))
-        },
-        'separator',
-        {
-          label: i18n.t('result.dataMenu.copyCsv'),
-          onClick: () => void copyText(toCsv(docs, fieldSort))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyTsv'),
-          onClick: () => void copyText(toTsv(docs, fieldSort))
-        }
-      ]
     }
   ]
 }

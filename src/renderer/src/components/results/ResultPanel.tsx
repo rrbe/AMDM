@@ -7,7 +7,7 @@ import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/l
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
-import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
+import { copyText, toCsv, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
@@ -31,6 +31,7 @@ import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems } from './documentFormatMenus'
 import { ResultTimeZoneContext } from './ResultTimeZone'
 
@@ -119,6 +120,7 @@ function ResultPanelContent({
         : next
     )
   }, [])
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [exportModal, setExportModal] = useState<{
     format: ResultExportFormat
     jsonEncoding?: JsonEncoding
@@ -402,14 +404,16 @@ function ResultPanelContent({
         )}
       </div>
 
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {copyMenu && (
         <ContextMenu
           x={copyMenu.x}
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            ...jsonCopyMenuItems(docs, copyWithFeedback),
-            { label: t('result.copy.mongoShell'), onClick: () => copyWithFeedback(toShellText(docs)) },
+            ...jsonCopyMenuItems(docs, copyWithFeedback, setAdvancedCopy),
             { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
             { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
