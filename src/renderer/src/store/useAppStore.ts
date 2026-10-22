@@ -274,7 +274,7 @@ interface AppState {
 
   // ---- actions: import/export (Phase 3) ----
   exportProgress: Record<string, ExportProgress | undefined>
-  chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+  chooseExportDirectory(useDefault?: boolean): Promise<ExportDirectorySelection | null>
   exportCollection(req: ExportFileRequest): Promise<DataOpResult>
   cancelExport(taskId: string): Promise<boolean>
   openExportedFile(taskId: string): Promise<string | null>
@@ -1970,9 +1970,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ------------------------------------------------------------- import/export
-  async chooseExportDirectory() {
+  async chooseExportDirectory(useDefault = false) {
     try {
-      return await window.api.io.chooseExportDirectory()
+      return await window.api.io.chooseExportDirectory(useDefault)
     } catch (e) {
       get().notify(
         appNotice(
@@ -2180,6 +2180,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 // Result ownership follows the tab/result lifecycle, including automatic eviction.
 useAppStore.subscribe((state, previous) => {
+  if (
+    state.settings.resultFieldSort !== previous.settings.resultFieldSort ||
+    state.settings.resultIdFirst !== previous.settings.resultIdFirst
+  ) {
+    useAppStore.setState({
+      tabs: state.tabs.map((tab) => ({
+        ...tab,
+        tableColumnOrder: [],
+        results: tab.results.map((result) => ({
+          ...result,
+          foldedLines: { ...result.foldedLines, json: [], console: [] }
+        }))
+      }))
+    })
+  }
   if (state.tabs === previous.tabs) return
   for (const tab of previous.tabs) {
     const next = state.tabs.find((item) => item.id === tab.id)

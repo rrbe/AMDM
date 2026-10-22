@@ -245,8 +245,13 @@ export function assertRuntimeHealthy(clients, application) {
 }
 
 export async function quitPackaged(application, main, clients) {
-  await main.evaluate(`setTimeout(() => process.getBuiltinModule('module')
-    .createRequire(${JSON.stringify(join(application.root, 'package.json'))})('electron').app.quit(), 50); true`)
+  // Exercise normal asynchronous shutdown without leaving teardown at a native prompt.
+  await main.evaluate(`setTimeout(() => {
+    const { app, dialog } = process.getBuiltinModule('module')
+      .createRequire(${JSON.stringify(join(application.root, 'package.json'))})('electron');
+    dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+    app.quit();
+  }, 50); true`)
   // An attached Node inspector keeps application shutdown waiting to disconnect.
   for (const client of clients) client.close()
   const exit = await application.waitForExit(5000)

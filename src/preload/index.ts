@@ -14,7 +14,8 @@ const api: Api = {
     release: (token) => ipcRenderer.invoke(IPC.connectionsImportRelease, token)
   },
   app: {
-    openSettings: () => ipcRenderer.invoke(IPC.appOpenSettings)
+    openSettings: () => ipcRenderer.invoke(IPC.appOpenSettings),
+    workspaceChanged: (hasContent) => ipcRenderer.send(IPC.appWorkspaceChanged, hasContent)
   },
   connections: {
     list: () => ipcRenderer.invoke(IPC.connectionsList),
@@ -82,7 +83,7 @@ const api: Api = {
     delete: (request) => ipcRenderer.invoke(IPC.docDelete, request)
   },
   io: {
-    chooseExportDirectory: () => ipcRenderer.invoke(IPC.ioChooseExportDirectory),
+    chooseExportDirectory: (useDefault) => ipcRenderer.invoke(IPC.ioChooseExportDirectory, useDefault),
     export: (request) => ipcRenderer.invoke(IPC.ioExport, request),
     cancelExport: (taskId) => ipcRenderer.invoke(IPC.ioExportCancel, taskId),
     onExportProgress: (listener) => {

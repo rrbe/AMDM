@@ -64,9 +64,11 @@ export function TableNestedDisplayPreview({ display }: { display: TableNestedDis
           </tbody>
         </table>
       </div>
-      <figcaption className="mt-2 text-xs text-[var(--text-secondary)]">
-        {t(`settings.tableNestedHint_${display}`)}
-      </figcaption>
+      {display === 'auto' && (
+        <figcaption className="mt-2 text-xs text-[var(--text-secondary)]">
+          {t('settings.tableNestedHint_auto')}
+        </figcaption>
+      )}
     </figure>
   )
 }

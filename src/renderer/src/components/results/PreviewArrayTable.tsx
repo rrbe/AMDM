@@ -25,8 +25,9 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
   const { t } = useTranslation()
   const openLabel = t('result.previewOpen')
   const openHint = t('result.previewOpenHint')
-  const sort = useAppStore((state) => state.settings.collectionSort)
-  const columns = useMemo(() => previewArrayColumns(value, sort), [value, sort])
+  const sort = useAppStore((state) => state.settings.resultFieldSort)
+  const idFirst = useAppStore((state) => state.settings.resultIdFirst)
+  const columns = useMemo(() => previewArrayColumns(value, sort, idFirst), [value, sort, idFirst])
   const scrollRef = useRef<HTMLDivElement>(null)
   const rowHeight = fontSize + 11
   const virtualizer = useVirtualizer({

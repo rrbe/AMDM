@@ -1,4 +1,4 @@
-import type { SessionManager } from '../../src/main/mongo/sessionManager'
+import { SessionManager } from '../../src/main/mongo/sessionManager'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Collection, MongoClient } from 'mongodb'
 import { EJSON } from 'bson'
@@ -27,6 +27,34 @@ afterEach(() => shellResults.closeConnection('paging'))
 afterAll(async () => { await client?.close(); await replicaSet?.stop() })
 
 describe('execution-owned result pages', () => {
+  it('shutdown closes a real MongoClient and releases its retained results before completing', async () => {
+    const uri = new URL(replicaSet.getUri())
+    const manager = new SessionManager({ getDecrypted: () => ({ config: {
+      id: 'shutdown', name: 'Shutdown', useSrv: false, host: uri.host,
+      replicaSet: uri.searchParams.get('replicaSet')!, auth: { type: 'none' },
+      ssh: { enabled: false }, tls: { enabled: false }, createdAt: 0, updatedAt: 0
+    } }) })
+    try {
+      expect((await manager.connect('shutdown')).state).toBe('connected')
+      const liveClient = manager.getClient('shutdown')
+      const close = vi.spyOn(liveClient, 'close')
+      const result = await executeShell({ connectionId: 'shutdown', database: 'paging', code: 'db.items.find()', pageSize: 2 }, owner, manager)
+      expect(result.resultId).toBeTruthy()
+      const session = shellResults.get(result.resultId!, owner)
+      const directory = (session as unknown as { directory: string }).directory
+
+      await manager.shutdown()
+      expect(close).toHaveBeenCalledOnce()
+      expect(manager.hasActiveSessions()).toBe(false)
+      expect(() => shellResults.get(result.resultId!, owner)).toThrow('closed')
+      const { access } = await import('node:fs/promises')
+      await expect(access(directory)).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(manager.connect('shutdown')).resolves.toMatchObject({ state: 'disconnected' })
+    } finally {
+      await manager.closeAll()
+    }
+  })
+
   it('respects query limit and skip independently from the display size and counts the actual result', async () => {
     const result = await run('db.items.find({n:{$gte:1}}).sort({n:1}).skip(1).limit(3)')
     expect(numbers(result)).toEqual([2, 3])

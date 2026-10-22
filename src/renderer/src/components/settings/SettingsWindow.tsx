@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Code2, Database, HardDrive, FolderOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
+import { ArrowLeft, Code2, Table2, HardDrive, FileOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -30,7 +30,7 @@ import { cn } from '@renderer/lib/utils'
 import { WebStorageSettings } from '@renderer/components/web/WebStorageSettings'
 import { IS_WEB } from '@renderer/lib/platform'
 
-type SettingsSection = 'appearance' | 'updates' | 'catalog' | 'export' | 'query' | 'editor' | 'shortcuts' | 'storage'
+type SettingsSection = 'appearance' | 'updates' | 'dataDisplay' | 'export' | 'query' | 'editor' | 'shortcuts' | 'storage'
 
 interface UpdateAvailableDotProps {
   version: string
@@ -79,9 +79,6 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
         t('settings.sectionAppearance'),
         t('settings.language'),
         t('settings.languageSystem'),
-        t('settings.timeZone'),
-        t('settings.timeZoneSystem'),
-        t('settings.timeZoneHint'),
         t('settings.theme'),
         t('settings.themeSystem'),
         t('settings.themeLight'),
@@ -99,14 +96,24 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
       ]
     },
     {
-      id: 'catalog',
-      label: t('settings.sectionCatalog'),
-      icon: Database,
+      id: 'dataDisplay',
+      label: t('settings.sectionDataDisplay'),
+      icon: Table2,
       keywords: [
-        t('settings.sectionCatalog'),
+        t('settings.sectionDataDisplay'),
         t('settings.collectionSort'),
+        t('settings.timeZone'),
+        t('settings.timeZoneSystem'),
+        t('settings.timeZoneHint'),
+        t('settings.resultFieldSort'),
+        t('settings.resultIdFirst'),
+        t('settings.tableNestedDisplay'),
+        t('settings.tableNestedInline'),
+        t('settings.tableNestedGrouped'),
+        t('settings.tableNestedAuto'),
         t('settings.sortNatural'),
-        t('settings.sortAlpha')
+        t('settings.sortAlpha'),
+        t('settings.sortAlphaDesc')
       ]
     },
     {
@@ -117,10 +124,6 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
         t('settings.sectionQuery'),
         t('settings.queryLimit'),
         t('settings.queryLimitHint'),
-        t('settings.tableNestedDisplay'),
-        t('settings.tableNestedInline'),
-        t('settings.tableNestedGrouped'),
-        t('settings.tableNestedAuto'),
         t('settings.queryTimeout'),
         t('settings.queryTimeoutHint'),
         t('settings.historyLimit'),
@@ -130,7 +133,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
     {
       id: 'export',
       label: t('settings.sectionExport'),
-      icon: FolderOutput,
+      icon: FileOutput,
       keywords: [
         t('settings.sectionExport'),
         t('settings.defaultExportDirectory'),
@@ -349,13 +352,6 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                   ]}
                 />
               </Field>
-
-              <Field label={t('settings.timeZone')} hint={t('settings.timeZoneHint')}>
-                <TimeZoneSelect
-                  value={settings.dateTimeZone}
-                  onChange={(dateTimeZone) => void updateSettings({ dateTimeZone })}
-                />
-              </Field>
             </>
           )}
 
@@ -369,7 +365,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                   label={t('settings.automaticUpdateChecks')}
                 />
               </div>
-              <Field label={t('settings.checkForUpdates')}>
+              <Field>
                 <div className="flex flex-col items-start gap-2">
                   <div className="relative flex items-center gap-2">
                     <Button
@@ -413,21 +409,61 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
             </>
           )}
 
-          {displayedSectionId === 'catalog' && (
-            <Field label={t('settings.collectionSort')}>
-              <Select<CollectionSort>
-                value={settings.collectionSort}
-                onChange={(collectionSort) => void updateSettings({ collectionSort })}
-                options={[
-                  { label: t('settings.sortNatural'), value: 'natural' },
-                  { label: t('settings.sortAlpha'), value: 'alpha' }
-                ]}
-              />
-            </Field>
+          {displayedSectionId === 'dataDisplay' && (
+            <>
+              <Field label={t('settings.collectionSort')}>
+                <Select<CollectionSort>
+                  value={settings.collectionSort}
+                  onChange={(collectionSort) => void updateSettings({ collectionSort })}
+                  options={[
+                    { label: t('settings.sortNatural'), value: 'natural' },
+                    { label: t('settings.sortAlpha'), value: 'alpha' },
+                    { label: t('settings.sortAlphaDesc'), value: 'alphaDesc' }
+                  ]}
+                />
+              </Field>
+              <Field label={t('settings.resultFieldSort')}>
+                <Select<CollectionSort>
+                  value={settings.resultFieldSort}
+                  onChange={(resultFieldSort) => void updateSettings({ resultFieldSort })}
+                  options={[
+                    { label: t('settings.sortNatural'), value: 'natural' },
+                    { label: t('settings.sortAlpha'), value: 'alpha' },
+                    { label: t('settings.sortAlphaDesc'), value: 'alphaDesc' }
+                  ]}
+                />
+              </Field>
+              <div className="mb-4">
+                <Checkbox
+                  checked={settings.resultIdFirst}
+                  onCheckedChange={(resultIdFirst) => void updateSettings({ resultIdFirst })}
+                  label={t('settings.resultIdFirst')}
+                />
+              </div>
+              <Field label={t('settings.timeZone')}>
+                <TimeZoneSelect
+                  value={settings.dateTimeZone}
+                  onChange={(dateTimeZone) => void updateSettings({ dateTimeZone })}
+                />
+              </Field>
+              <Field label={t('settings.tableNestedDisplay')}>
+                <Select<TableNestedDisplay>
+                  value={settings.tableNestedDisplay}
+                  onChange={(tableNestedDisplay) => void updateSettings({ tableNestedDisplay })}
+                  options={[
+                    { label: t('settings.tableNestedInline'), value: 'inline' },
+                    { label: t('settings.tableNestedGrouped'), value: 'grouped' },
+                    { label: t('settings.tableNestedAuto'), value: 'auto' }
+                  ]}
+                  aria-label={t('settings.tableNestedDisplay')}
+                />
+                <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
+              </Field>
+            </>
           )}
 
           {displayedSectionId === 'export' && (
-            <Field label={t('settings.defaultExportDirectory')} hint={t('settings.defaultExportDirectoryHint')}>
+            <Field label={t('settings.defaultExportDirectory')}>
               <div className="flex min-w-0 items-center gap-2">
                 <Input
                   className="min-w-0 flex-1 font-mono text-xs"
@@ -449,20 +485,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
 
           {displayedSectionId === 'query' && (
             <>
-              <Field label={t('settings.tableNestedDisplay')}>
-                <Select<TableNestedDisplay>
-                  value={settings.tableNestedDisplay}
-                  onChange={(tableNestedDisplay) => void updateSettings({ tableNestedDisplay })}
-                  options={[
-                    { label: t('settings.tableNestedInline'), value: 'inline' },
-                    { label: t('settings.tableNestedGrouped'), value: 'grouped' },
-                    { label: t('settings.tableNestedAuto'), value: 'auto' }
-                  ]}
-                  aria-label={t('settings.tableNestedDisplay')}
-                />
-                <TableNestedDisplayPreview display={settings.tableNestedDisplay} />
-              </Field>
-              <Field label={t('settings.queryLimit')} hint={t('settings.queryLimitHint')}>
+              <Field label={t('settings.queryLimit')}>
                 <Select<number>
                   value={settings.queryLimit}
                   onChange={(queryLimit) => void updateSettings({ queryLimit })}
@@ -470,7 +493,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                   aria-label={t('settings.queryLimit')}
                 />
               </Field>
-              <Field label={t('settings.queryTimeout')} hint={t('settings.queryTimeoutHint')}>
+              <Field label={t('settings.queryTimeout')}>
                 <Select<number>
                   value={settings.queryTimeoutMS}
                   onChange={(queryTimeoutMS) => void updateSettings({ queryTimeoutMS })}
@@ -484,7 +507,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                   aria-label={t('settings.queryTimeout')}
                 />
               </Field>
-              <Field label={t('settings.historyLimit')} hint={t('settings.historyLimitHint')}>
+              <Field label={t('settings.historyLimit')}>
                 <Select<number>
                   value={settings.historyLimit}
                   onChange={(historyLimit) => void updateSettings({ historyLimit })}
@@ -523,6 +546,8 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                 <Field label={t('settings.editorTabSize')}>
                   <Select<number>
                     value={settings.editorTabSize}
+                    className="relative justify-end"
+                    triggerContent={<span className="absolute inset-x-9 text-center">{settings.editorTabSize}</span>}
                     onChange={(editorTabSize) => void updateSettings({ editorTabSize })}
                     options={[
                       { label: '2', value: 2 },
@@ -661,16 +686,15 @@ function ShortcutRow({
         ) : (
           <span className="px-2 py-1 text-[12px] text-muted-foreground">{t('settings.shortcutUnassigned')}</span>
         )}
-        {onEnabledChange && (
-          <button
-            type="button"
-            className="rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
-            onClick={() => onEnabledChange(!enabled)}
-            aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
-          >
-            {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
-          </button>
-        )}
+        <button
+          type="button"
+          className="min-w-14 rounded-md border-0 bg-transparent px-2 py-1 text-[12px] text-muted-foreground outline-none enabled:hover:bg-accent enabled:hover:text-foreground focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] disabled:cursor-default disabled:opacity-40"
+          disabled={!onEnabledChange}
+          onClick={() => onEnabledChange?.(!enabled)}
+          aria-label={t(enabled ? 'settings.shortcutClearLabel' : 'settings.shortcutRestoreLabel', { label })}
+        >
+          {t(enabled ? 'settings.shortcutClear' : 'settings.shortcutRestore')}
+        </button>
       </div>
     </div>
   )

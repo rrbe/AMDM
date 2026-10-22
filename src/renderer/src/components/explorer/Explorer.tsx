@@ -1271,7 +1271,7 @@ export function flattenCatalog(
   const byName = (x: { name: string }, y: { name: string }): number => x.name.localeCompare(y.name)
   const rows: TreeRow[] = []
   const dbsRaw = cat.databases ?? []
-  const dbs = sort === 'alpha' ? [...dbsRaw].sort(byName) : dbsRaw
+  const dbs = sort === 'natural' ? dbsRaw : [...dbsRaw].sort((a, b) => sort === 'alphaDesc' ? byName(b, a) : byName(a, b))
 
   for (const db of dbs) {
     const dbNodeId = `${connId}:db:${db.name}`
@@ -1301,7 +1301,7 @@ export function flattenCatalog(
     // Otherwise it appears as the database's first child, then jumps below the
     // entire collection list when that list arrives, which looks like a re-sort.
     if (collsRaw === undefined) continue
-    const colls = sort === 'alpha' ? [...collsRaw].sort(byName) : collsRaw
+    const colls = sort === 'natural' ? collsRaw : [...collsRaw].sort((a, b) => sort === 'alphaDesc' ? byName(b, a) : byName(a, b))
 
     for (const coll of colls) {
       const collNodeId = `${connId}:coll:${db.name}/${coll.name}`

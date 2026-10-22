@@ -12,9 +12,9 @@ function isDocument(value: unknown): value is Record<string, unknown> {
   return isPlainObject(value) && !isExtended(value)
 }
 
-export function previewArrayColumns(value: unknown[], sort: CollectionSort): PreviewArrayColumn[] {
+export function previewArrayColumns(value: unknown[], sort: CollectionSort, idFirst = false): PreviewArrayColumn[] {
   const documents = value.filter(isDocument)
-  const fields = deriveColumns(documents, sort)
+  const fields = deriveColumns(documents, sort, idFirst)
   const columns: PreviewArrayColumn[] = fields.map((field) => ({ field, label: field }))
   if (documents.length < value.length) {
     const names = new Set(fields)

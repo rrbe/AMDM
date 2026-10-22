@@ -8,6 +8,7 @@
  * for very large results (we never build one giant string and hand it to the
  * DOM).
  */
+import type { CollectionSort } from '@shared/types'
 import { entriesOf, formatScalar, isExtended } from './ejson'
 
 /** A colored segment of a JSON line (key, scalar value, or punctuation). */
@@ -110,7 +111,9 @@ function pushLines(
   keyText: string | null,
   trailingComma: boolean,
   out: JsonLine[],
-  timeZone?: string
+  timeZone: string | undefined,
+  sort: CollectionSort,
+  idFirst: boolean
 ): void {
   const comma = trailingComma ? ',' : ''
   const keyPrefix = keyText === null ? '' : `${keyText}: `
@@ -138,7 +141,7 @@ function pushLines(
 
   const open = isArray ? '[' : '{'
   const close = isArray ? ']' : '}'
-  const entries = entriesOf(value)
+  const entries = entriesOf(value, sort, idFirst)
 
   if (entries.length === 0) {
     out.push({
@@ -154,16 +157,16 @@ function pushLines(
   entries.forEach(([k, v], i) => {
     const last = i === entries.length - 1
     const childKey = isArray ? null : quoteKey(k)
-    pushLines(v, depth + 1, childKey, !last, out, timeZone)
+    pushLines(v, depth + 1, childKey, !last, out, timeZone, sort, idFirst)
   })
   out.push({ depth, text: `${close}${comma}`, tokens: [punct(close), ...commaToks] })
   out[start].fold = { end: out.length - 1, closeText: `${close}${comma}` }
 }
 
 /** Flatten any EJSON value into virtualizable lines. */
-export function toJsonLines(value: unknown, timeZone?: string): JsonLine[] {
+export function toJsonLines(value: unknown, timeZone?: string, sort: CollectionSort = 'natural', idFirst = false): JsonLine[] {
   const out: JsonLine[] = []
-  pushLines(value, 0, null, false, out, timeZone)
+  pushLines(value, 0, null, false, out, timeZone, sort, idFirst)
   return out
 }
 

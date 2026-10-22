@@ -883,3 +883,19 @@ describe('result retention notice', () => {
     expect(useAppStore.getState().notifications).toHaveLength(0)
   })
 })
+
+
+it('resets field-order-dependent view state when sorting settings arrive', () => {
+  const result = {
+    id: 'sort-result', seq: 1, result: { kind: 'documents' as const, data: [{ b: 1, a: 2 }] },
+    executedAt: 1, query: null, skip: 0,
+    foldedLines: { json: [2], console: [3], explain: [4] }
+  }
+  useAppStore.setState({ settings: { ...DEFAULT_SETTINGS, resultFieldSort: 'natural' } })
+  useAppStore.setState({ tabs: [createTab('sort-tab', { tableColumnOrder: ['b', 'a'], results: [result] })] })
+  useAppStore.setState({ settings: { ...DEFAULT_SETTINGS, resultFieldSort: 'alphaDesc' } })
+  const tab = useAppStore.getState().tabs[0]
+  expect(tab.tableColumnOrder).toEqual([])
+  expect(tab.results[0].foldedLines).toEqual({ json: [], console: [], explain: [4] })
+  expect(tab.results[0].result).toBe(result.result)
+})

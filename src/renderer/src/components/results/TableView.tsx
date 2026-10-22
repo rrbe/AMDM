@@ -30,7 +30,6 @@ import {
   toCsv,
   toPlainJson,
   toPlainKeyValue,
-  toShellText,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -39,7 +38,8 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { jsonCopyMenuItems, resultExportMenuItems } from './documentFormatMenus'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
+import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
 /**
@@ -110,7 +110,8 @@ export function TableView({
   const { t, i18n: tableI18n } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   const nestedDisplay = useAppStore((s) => s.settings.tableNestedDisplay)
   const columnOrder = useAppStore((s) => getActiveTab(s).tableColumnOrder)
   const setColumnOrder = useAppStore((s) => s.setTableColumnOrder)
@@ -146,6 +147,7 @@ export function TableView({
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: TableColumn } | null>(null)
   const selectedRows = selectedDocIndexes
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // Drag a header cell's right-edge handle to resize that column.
@@ -166,19 +168,19 @@ export function TableView({
   }
 
   const derivedGroups = useMemo(
-    () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort),
-    [displayDocs, nestedDisplay, fieldSort]
+    () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort, idFirst),
+    [displayDocs, nestedDisplay, fieldSort, idFirst]
   )
   const groups = useMemo(() => {
     const byKey = new Map(derivedGroups.map((group) => [group.key, group]))
-    return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
-  }, [derivedGroups, columnOrder])
+    return orderTableColumns([...byKey.keys()], columnOrder, idFirst).map((key) => byKey.get(key)!)
+  }, [derivedGroups, columnOrder, idFirst])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
   useEffect(() => {
     setSelectedCell((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
     setEditing((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
   }, [columns])
-  const hasPinnedId = groups[0]?.key === '_id'
+  const hasPinnedId = idFirst && groups[0]?.key === '_id'
   const groupStyle = (width: number, groupIndex: number): CSSProperties =>
     hasPinnedId && groupIndex === 0
       ? { width, left: INDEX_COL_WIDTH }
@@ -347,7 +349,8 @@ export function TableView({
       onSelectedDocIndexesChange(new Set([row]))
       setAnchorRow(row)
     }
-    setSelectedCell(col ? { row, col } : null)
+    const copyCol = selectedRows.has(row) && (selectedRows.size > 1 || selectedCell === null) ? null : col
+    setSelectedCell(copyCol ? { row, col: copyCol } : null)
     const doc = docs[row]
     const source: JsonPreviewSource | undefined = docCtx
       ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}) }
@@ -376,15 +379,9 @@ export function TableView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
-      children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
+      children: tableCopyMenuItems(selectedIndexes, row, copyCol, docs, fieldSort, setAdvancedCopy)
     })
-    if (!IS_WEB) items.push({
-      label: t('result.dataMenu.export'),
-      children: exportMenuItems(
-        selectedIndexes.map((index) => docs[index]),
-        onExport
-      )
-    })
+    if (!IS_WEB) items.push(resultExportMenuItem(selectedIndexes.map((index) => docs[index]), onExport))
     if (docCtx && docHasId(doc)) {
       items.push('separator')
       items.push({
@@ -444,7 +441,7 @@ export function TableView({
           {groups.map((group, groupIndex) => (
             <div
               key={group.key}
-              className={`tbl-column-group${group.key === '_id' ? ' tbl-pinned-id' : ''}`}
+              className={`tbl-column-group${idFirst && group.key === '_id' ? ' tbl-pinned-id' : ''}`}
               data-column={group.key}
               style={groupStyle(
                 group.columns.reduce((sum, col) => sum + widthOf(col), 0),
@@ -551,6 +548,9 @@ export function TableView({
         />
       )}
 
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -614,62 +614,44 @@ function TableColumnHeader({
   )
 }
 
-function exportMenuItems(
-  documents: unknown[],
-  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
-): ContextMenuEntry[] {
-  return resultExportMenuItems(documents, onExport)
-}
-
 /** Right-click copy menu for a table cell / row(s). */
 function tableCopyMenuItems(
   rows: number[],
   row: number,
   col: TableColumn | null,
   docs: unknown[],
-  fieldSort: CollectionSort
+  fieldSort: CollectionSort,
+  openAdvanced: (documents: unknown[]) => void
 ): ContextMenuEntry[] {
-  const cell = col == null ? { present: false, value: undefined } : cellValue(docs[row], col.path)
-  const hasValue = col != null && cell.present
-  const single = docs[row]
-  const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
-  const many = rows.length > 1
-  const formatted = many ? sel : single
+  if (col === null) {
+    const selected = rows.map((index) => docs[index])
+    return [
+      ...jsonCopyMenuItems(selected, (text) => void copyText(text), openAdvanced),
+      {
+        label: i18n.t('result.copy.csv'),
+        onClick: () => void copyText(toCsv(selected, fieldSort))
+      },
+      {
+        label: i18n.t('result.copy.tsv'),
+        onClick: () => void copyText(toTsv(selected, fieldSort))
+      }
+    ]
+  }
+  const cell = cellValue(docs[row], col.path)
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
-      disabled: col == null,
-      onClick: () => void copyText(col?.path.join('.') ?? '')
+      onClick: () => void copyText(col.path.join('.'))
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
-      disabled: !hasValue,
+      disabled: !cell.present,
       onClick: () => void copyText(plainScalarText(cell.value))
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
-      disabled: !hasValue,
-      onClick: () => void copyText(toPlainKeyValue(col?.path.join('.') ?? '', cell.value))
-    },
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copySelectedDocuments'),
-      children: [
-        ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
-        {
-          label: i18n.t('result.dataMenu.copyMongoShell'),
-          onClick: () => void copyText(toShellText(formatted))
-        },
-        'separator',
-        {
-          label: i18n.t('result.dataMenu.copyCsv'),
-          onClick: () => void copyText(toCsv(sel, fieldSort))
-        },
-        {
-          label: i18n.t('result.dataMenu.copyTsv'),
-          onClick: () => void copyText(toTsv(sel, fieldSort))
-        }
-      ]
+      disabled: !cell.present,
+      onClick: () => void copyText(toPlainKeyValue(col.path.join('.'), cell.value))
     }
   ]
 }

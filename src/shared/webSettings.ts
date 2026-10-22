@@ -29,7 +29,9 @@ export function mergeWebSettings(
   if (
     !Array.isArray(next.connectionOrder) ||
     !next.connectionOrder.every((item) => typeof item === "string") ||
-    !["natural", "alpha"].includes(next.collectionSort) ||
+    !["natural", "alpha", "alphaDesc"].includes(next.collectionSort) ||
+    !["natural", "alpha", "alphaDesc"].includes(next.resultFieldSort) ||
+    typeof next.resultIdFirst !== "boolean" ||
     !["light", "dark", "system"].includes(next.theme) ||
     !["system", "en", "zh-CN", "zh-TW"].includes(next.language) ||
     !(next.dateTimeZone === "system" || isValidTimeZone(next.dateTimeZone)) ||

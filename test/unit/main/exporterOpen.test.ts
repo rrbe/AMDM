@@ -58,6 +58,20 @@ describe('open exported file', () => {
     rmSync(outputDir, { recursive: true, force: true })
   })
 
+  it('grants the default directory without opening the picker', async () => {
+    const exportingOwner = owner(1)
+    const directory = await chooseExportDirectory(null, exportingOwner, outputDir, true)
+    expect(directory?.path).toBe(outputDir)
+    expect(electron.showOpenDialog).not.toHaveBeenCalled()
+    const result = await exportData({
+      taskId: 'default-directory', source: 'result', format: 'json',
+      documents: [{ name: 'Ada' }],
+      destination: { directorySelectionId: directory!.selectionId, fileName: 'default-directory' }
+    }, null, exportingOwner)
+    expect(result.ok).toBe(true)
+    expect(JSON.parse(readFileSync(join(outputDir, 'default-directory.json'), 'utf8'))).toEqual([{ name: 'Ada' }])
+  })
+
   it('opens only the latest completed export owned by the requesting Renderer', async () => {
     const exportingOwner = owner(1)
     const directory = await chooseExportDirectory(null, exportingOwner, outputDir)

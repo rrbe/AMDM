@@ -1,11 +1,12 @@
+import { useAppStore } from '@renderer/store/useAppStore'
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import i18n from '@renderer/i18n'
 import { toJsonLines } from '@renderer/lib/format'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
-import { copyText, toPlainJson, toShellText } from '@renderer/lib/resultCopy'
+import { copyText, toPlainJson } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
 import { resultSelectionText } from '@renderer/lib/resultTextSelection'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
@@ -42,12 +43,15 @@ interface JsonViewProps {
 
 export function JsonView({ value, displayValue = value, onSelectFields, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   const { t } = useTranslation()
   const [allSelected, setAllSelected] = useState(false)
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo(() => toJsonLines(displayValue, timeZone), [displayValue, timeZone])
+  const lines = useMemo(() => toJsonLines(displayValue, timeZone, fieldSort, idFirst), [displayValue, timeZone, fieldSort, idFirst])
 
   // A fresh result clears any lingering "all selected" state.
   useEffect(() => setAllSelected(false), [displayValue])
@@ -77,8 +81,7 @@ export function JsonView({ value, displayValue = value, onSelectFields, fontSize
     const selText = resultSelectionText(e.currentTarget)
     const documents = Array.isArray(value) ? value : [value]
     const items: ContextMenuEntry[] = [
-      ...jsonCopyMenuItems(documents, (text) => void copyText(text)),
-      { label: i18n.t('result.copy.mongoShell'), onClick: () => void copyText(toShellText(value)) }
+      ...jsonCopyMenuItems(documents, (text) => void copyText(text), setAdvancedCopy)
     ]
     if (onSelectFields) items.unshift({ label: t('result.selectFields'), onClick: onSelectFields }, 'separator')
     if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
@@ -100,6 +103,9 @@ export function JsonView({ value, displayValue = value, onSelectFields, fontSize
         onMouseDown={() => setAllSelected(false)}
         onContextMenu={openMenu}
       />
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
       )}

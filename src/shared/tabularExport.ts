@@ -130,7 +130,8 @@ export function collectTabularColumns(document: unknown, seen: Set<string>, colu
 }
 
 export function sortTabularColumns(columns: string[], sort: CollectionSort): string[] {
-  return sort === 'alpha' ? [...columns].sort((a, b) => a.localeCompare(b)) : [...columns]
+  return sort === 'natural' ? [...columns] : [...columns].sort((a, b) =>
+    sort === 'alphaDesc' ? b.localeCompare(a) : a.localeCompare(b))
 }
 
 function fieldValue(document: unknown, column: string): { present: boolean; value: unknown } {
