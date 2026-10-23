@@ -26,11 +26,9 @@ import { ResultPanel } from '@renderer/components/results/ResultPanel'
 import { ResizeHandle } from '@renderer/components/common/ResizeHandle'
 import { Button } from '@renderer/components/common/Button'
 import { ShortcutHint } from '@renderer/components/common/ShortcutHint'
-import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
 import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
-import { formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ContextMenu } from '@renderer/components/ContextMenu'
 import {
@@ -328,7 +326,7 @@ function TabBar({
   contextOpen: boolean
   onContextToggle: () => void
 }): React.JSX.Element {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const tabs = useAppStore((s) => s.tabs)
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
@@ -405,7 +403,6 @@ function TabBar({
           const connectionStatus = tab.connectionId ? statuses[tab.connectionId] : undefined
           const connectionName = connections.find((connection) => connection.id === tab.connectionId)?.name
           const collection = tabCollection(tab)
-          const lastExecutedAt = tab.results.reduce((latest, result) => Math.max(latest, result.executedAt), 0)
           const unavailable =
             !!tab.connectionId &&
             (connectionStatus === undefined ||
@@ -433,16 +430,6 @@ function TabBar({
                   <dd className="m-0 min-w-0 break-words">{tab.activeDatabase || '—'}</dd>
                   <dt className="text-primary-foreground/65">{t('context.collection')}</dt>
                   <dd className="m-0 min-w-0 break-words">{collection ?? '—'}</dd>
-                  <dt className="text-primary-foreground/65">{t('context.totalResultDataSize')}</dt>
-                  <dd className="m-0"><ResultDataSize results={tab.results} /></dd>
-                  {lastExecutedAt > 0 && (
-                    <>
-                      <dt className="text-primary-foreground/65">{t('context.queryTime')}</dt>
-                      <dd className="m-0" data-query-tab-time="">
-                        {formatRelativeQueryTime(lastExecutedAt, i18n.language)}
-                      </dd>
-                    </>
-                  )}
                 </dl>
               )}
               tooltipVariant="text"

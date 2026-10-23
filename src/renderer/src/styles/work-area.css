@@ -75,7 +75,7 @@
   align-items: center;
   gap: 4px;
   height: 35px;
-  padding: 0 6px 0 8px;
+  padding: 0 6px;
   border-radius: var(--radius-tab);
   background: transparent;
   color: var(--text-muted);
