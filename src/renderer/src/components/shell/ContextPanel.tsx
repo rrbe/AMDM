@@ -240,6 +240,7 @@ function CollectionSchema({
     ...(canSelectFields && Array.isArray(activeResult?.result.data) ? deriveColumns(activeResult.result.data) : [])
   ])], [tree, canSelectFields, activeResult?.result.data])
   const selectedFields = useMemo(() => new Set(visibleFields ?? availableFields), [visibleFields, availableFields])
+  const allFieldsSelected = visibleFields === null || (selectedFields.size > 0 && availableFields.every((field) => selectedFields.has(field)))
   const rows = useMemo(
     () => visibleSchemaRows(tree, panel?.expanded ?? new Set(), panel?.search ?? ''),
     [tree, panel?.expanded, panel?.search]
@@ -313,15 +314,17 @@ function CollectionSchema({
               }}
             />
           </div>
-          <div className="flex items-center justify-between gap-2 px-3 pb-2 text-[11px] text-muted-foreground">
-            <span>{t(canSelectFields ? 'context.schema.displayFieldsHint' : 'context.schema.displayFieldsUnavailable')}</span>
-            {canSelectFields && visibleFields !== null && (
-              <button className="ghost shrink-0" onClick={() => setVisibleFields(null)}>{t('result.showAllFields')}</button>
-            )}
-          </div>
           <div className="grid h-7 shrink-0 grid-cols-[minmax(0,1fr)_92px] items-center gap-2 border-b border-[var(--separator)] pl-[10px] pr-3 text-[11px] text-muted-foreground">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="w-9 shrink-0" aria-hidden />
+              <Checkbox
+                checked={!canSelectFields || allFieldsSelected}
+                indeterminate={canSelectFields && !allFieldsSelected && selectedFields.size > 0}
+                disabled={!canSelectFields}
+                label={<span className="sr-only">{t('result.selectAllFields')}</span>}
+                className="shrink-0 gap-0!"
+                onCheckedChange={(on) => setVisibleFields(on ? null : [])}
+              />
+              <span className="size-4 shrink-0" aria-hidden />
               <span>{t('schema.field')}</span>
               <Popover
                 label={t('context.schema.sampleInfo')}
@@ -387,7 +390,7 @@ function CollectionSchema({
                       {row.depth === 0 && (
                         <Checkbox
                           checked={!canSelectFields || selectedFields.has(row.name)}
-                          disabled={!canSelectFields || (selectedFields.has(row.name) && selectedFields.size === 1)}
+                          disabled={!canSelectFields}
                           label={<span className="sr-only">{t('context.schema.displayField', { field: row.name })}</span>}
                           className="shrink-0 gap-0!"
                           onCheckedChange={(checked) => {

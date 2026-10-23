@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { Checkbox as BaseCheckbox } from '@base-ui/react/checkbox'
-import { Check } from 'lucide-react'
+import { Check, Minus } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
 
 /**
@@ -13,6 +13,7 @@ import { cn } from '@renderer/lib/utils'
  */
 interface CheckboxProps {
   checked: boolean
+  indeterminate?: boolean
   onCheckedChange: (checked: boolean) => void
   label?: ReactNode
   disabled?: boolean
@@ -24,6 +25,7 @@ interface CheckboxProps {
 
 export function Checkbox({
   checked,
+  indeterminate = false,
   onCheckedChange,
   label,
   disabled,
@@ -38,17 +40,18 @@ export function Checkbox({
         className
       )}
       checked={checked}
+      indeterminate={indeterminate}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
       id={id}
       name={name}
     >
       <span
-        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)]"
+        className="inline-flex size-[15px] shrink-0 items-center justify-center rounded-[4px] border border-[var(--separator-strong)] bg-[var(--surface-control)] transition-colors group-data-[checked]:border-[var(--primary)] group-data-[checked]:bg-[var(--primary)] group-data-[indeterminate]:border-[var(--primary)] group-data-[indeterminate]:bg-[var(--primary)]"
         aria-hidden
       >
         <BaseCheckbox.Indicator className="inline-flex text-[var(--primary-foreground)]">
-          <Check size={12} strokeWidth={3} />
+          {indeterminate ? <Minus size={12} strokeWidth={3} /> : <Check size={12} strokeWidth={3} />}
         </BaseCheckbox.Indicator>
       </span>
       {label != null && <span className="select-none">{label}</span>}

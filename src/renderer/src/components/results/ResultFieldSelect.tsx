@@ -13,6 +13,7 @@ export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.E
   const scrollRef = useRef<HTMLDivElement>(null)
   const current = useMemo(() => new Set(fields), [fields])
   const checked = useMemo(() => new Set(selected ?? fields), [selected, fields])
+  const allSelected = selected === null || (checked.size > 0 && fields.every((field) => checked.has(field)))
   const options = useMemo(() => {
     const all = [...new Set([...fields, ...(selected ?? [])])]
     const query = search.trim().toLocaleLowerCase()
@@ -38,12 +39,12 @@ export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.E
           scrollRef.current?.scrollTo({ top: 0 })
         }}
       />
-      <div className="flex items-center justify-between gap-2">
-        <span>{t('result.visibleFields')}</span>
-        <button className="ghost" disabled={selected === null} onClick={() => setSelected(null)}>
-          {t('result.showAllFields')}
-        </button>
-      </div>
+      <Checkbox
+        checked={allSelected}
+        indeterminate={!allSelected && checked.size > 0}
+        label={t('result.visibleFields')}
+        onCheckedChange={(on) => setSelected(on ? null : [])}
+      />
       <div ref={scrollRef} className="h-[192px] overflow-auto">
         <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((row) => {
@@ -52,7 +53,6 @@ export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.E
               <div key={field} className="absolute left-0 top-0 flex w-full items-center" style={{ height: row.size, transform: `translateY(${row.start}px)` }}>
                 <Checkbox
                   checked={checked.has(field)}
-                  disabled={checked.has(field) && checked.size === 1}
                   className="w-full! min-w-0 [&>span:last-child]:min-w-0 [&>span:last-child]:truncate"
                   label={<span title={field}>{field}{!current.has(field) && <span className="ml-1 text-muted-foreground">({t('result.fieldNotOnPage')})</span>}</span>}
                   onCheckedChange={(on) => {

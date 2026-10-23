@@ -356,11 +356,11 @@ export function TableView({
       ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}) }
       : undefined
     const items: ContextMenuEntry[] = [
-      { label: t('result.selectFields'), onClick: onSelectFields },
       {
         label: t('result.dataMenu.view'),
         onClick: () => setPreview({ title: t('result.documentPreviewTitle'), value: doc, documentView: true, source })
-      }
+      },
+      { label: t('result.selectFields'), onClick: onSelectFields }
     ]
     if (docCtx && docHasId(doc)) {
       items.push({

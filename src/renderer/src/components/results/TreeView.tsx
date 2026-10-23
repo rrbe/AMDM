@@ -282,11 +282,11 @@ export function TreeView({
       ? { ...docCtx, ...(docHasId(rootDoc) ? { id: rootDoc._id } : {}) }
       : undefined
     const items: ContextMenuEntry[] = [
-      { label: t('result.selectFields'), onClick: onSelectFields },
       {
         label: t('result.dataMenu.view'),
         onClick: () => setPreviewDoc({ value: rootDoc, source })
-      }
+      },
+      { label: t('result.selectFields'), onClick: onSelectFields }
     ]
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
