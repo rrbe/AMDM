@@ -486,6 +486,7 @@
       "disconnected": "Disconnected. Connect to analyze again.",
       "viewUnsupported": "Schema analysis is not available for views",
       "sampleInfo": "Sampling info",
+      "displayField": "Display {{field}}",
       "sampleHint": "Fields and types are inferred from a random sample. Rare fields or types may be missed."
     },
     "target": "Current Context",
@@ -524,6 +525,15 @@
     "copyErrorTip": "Copy error details",
     "expandResults": "Expand results",
     "restoreEditor": "Restore editor",
+    "selectFields": "Filter fields",
+    "visibleFields": "Visible fields",
+    "searchFields": "Search fields",
+    "selectAllFields": "Select all",
+    "showAllFields": "Show all",
+    "selectedFields": "Selected fields: {{count}}",
+    "fieldNotOnPage": "Not on this page",
+    "noMatchingFields": "No matching fields",
+    "fieldsUnavailable": "None of the selected fields are on this page.",
     "displayOptions": "Display options",
     "advancedCopy": {
       "title": "Advanced JSON Format",

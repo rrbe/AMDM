@@ -115,6 +115,7 @@ export interface QueryTab {
   activeResultId: string | null
   /** Last manually arranged Table columns, retained for this query tab's lifetime. */
   tableColumnOrder: string[]
+  visibleFields: string[] | null
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
@@ -137,6 +138,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     results: [],
     activeResultId: null,
     tableColumnOrder: [],
+    visibleFields: null,
     resultSeq: 0,
     running: false,
     stopping: false,

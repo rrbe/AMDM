@@ -34,12 +34,14 @@ import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 interface JsonViewProps {
   value: unknown
+  displayValue?: unknown
+  onSelectFields?: () => void
   fontSize: number
   folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
 }
 
-export function JsonView({ value, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
+export function JsonView({ value, displayValue = value, onSelectFields, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
   const timeZone = useResultTimeZone()
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
   const idFirst = useAppStore((s) => s.settings.resultIdFirst)
@@ -49,10 +51,10 @@ export function JsonView({ value, fontSize, controlsContainer, folding }: JsonVi
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo(() => toJsonLines(value, timeZone, fieldSort, idFirst), [value, timeZone, fieldSort, idFirst])
+  const lines = useMemo(() => toJsonLines(displayValue, timeZone, fieldSort, idFirst), [displayValue, timeZone, fieldSort, idFirst])
 
   // A fresh result clears any lingering "all selected" state.
-  useEffect(() => setAllSelected(false), [value])
+  useEffect(() => setAllSelected(false), [displayValue])
 
   // Cmd/Ctrl+A → mark the whole result selected (and kill the overflowing
   // native select-all). Cmd+C then copies the full plain JSON.
@@ -81,6 +83,7 @@ export function JsonView({ value, fontSize, controlsContainer, folding }: JsonVi
     const items: ContextMenuEntry[] = [
       ...jsonCopyMenuItems(documents, (text) => void copyText(text), setAdvancedCopy)
     ]
+    if (onSelectFields) items.unshift({ label: t('result.selectFields'), onClick: onSelectFields }, 'separator')
     if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
