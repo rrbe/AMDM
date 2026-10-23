@@ -42,64 +42,71 @@ export function DocumentTab({
   showShortcutHint
 }: DocumentTabProps): React.JSX.Element {
   return (
-    <div
-      data-tab-id={dataTabId}
-      className={cn('document-tab', active && 'active', contextMenuOpen && 'context-menu-open', className)}
-      onClick={onSelect}
-      onContextMenu={onContextMenu}
-      onAuxClick={(event) => {
-        if (event.button === 1) {
-          event.preventDefault()
-          onClose()
-        }
-      }}
+    <Tooltip
+      content={tooltip ?? shortcut}
+      delay={150}
+      footer={
+        tooltipFooter
+          ? () => (
+              <>
+                {typeof tooltipFooter === 'function' ? tooltipFooter() : tooltipFooter}
+                {shortcut && <span>{shortcut}</span>}
+              </>
+            )
+          : tooltip
+            ? shortcut
+            : undefined
+      }
+      variant={tooltipVariant}
     >
-      {statusAction ? (
-        <Tooltip content={statusAction.label}>
+      <div
+        data-tab-id={dataTabId}
+        className={cn('document-tab', active && 'active', contextMenuOpen && 'context-menu-open', className)}
+        onClick={onSelect}
+        onContextMenu={onContextMenu}
+        onAuxClick={(event) => {
+          if (event.button === 1) {
+            event.preventDefault()
+            onClose()
+          }
+        }}
+      >
+        {statusAction ? (
+          <Tooltip content={statusAction.label}>
+            <button
+              className="document-tab-status document-tab-status-action"
+              aria-label={statusAction.label}
+              onClick={(event) => {
+                event.stopPropagation()
+                statusAction.onClick()
+              }}
+            >
+              {status}
+            </button>
+          </Tooltip>
+        ) : status ? (
+          <span className="document-tab-status" aria-hidden>
+            {status}
+          </span>
+        ) : null}
+        <span className="document-tab-label">{label}</span>
+        {!showShortcutHint || !shortcut ? (
           <button
-            className="document-tab-status document-tab-status-action"
-            aria-label={statusAction.label}
+            className="document-tab-close"
+            aria-label={closeLabel}
             onClick={(event) => {
               event.stopPropagation()
-              statusAction.onClick()
+              onClose()
             }}
           >
-            {status}
+            <X size={12} />
           </button>
-        </Tooltip>
-      ) : (
-        <span className="document-tab-status" aria-hidden>
-          {status}
-        </span>
-      )}
-      <Tooltip
-        content={tooltip ?? shortcut}
-        footer={tooltipFooter ? () => (
-          <>
-            {typeof tooltipFooter === 'function' ? tooltipFooter() : tooltipFooter}
-            {shortcut && <span>{shortcut}</span>}
-          </>
-        ) : tooltip ? shortcut : undefined}
-        variant={tooltipVariant}
-      >
-        <span className="document-tab-label">{label}</span>
-      </Tooltip>
-      {!showShortcutHint || !shortcut ? (
-        <button
-          className="document-tab-close"
-          aria-label={closeLabel}
-          onClick={(event) => {
-            event.stopPropagation()
-            onClose()
-          }}
-        >
-          <X size={12} />
-        </button>
-      ) : (
-        <span className="document-tab-shortcut" data-shortcut={shortcut} aria-hidden="true">
-          <span>{shortcut}</span>
-        </span>
-      )}
-    </div>
+        ) : (
+          <span className="document-tab-shortcut" data-shortcut={shortcut} aria-hidden="true">
+            <span>{shortcut}</span>
+          </span>
+        )}
+      </div>
+    </Tooltip>
   )
 }

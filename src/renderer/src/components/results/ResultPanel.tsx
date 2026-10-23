@@ -11,7 +11,6 @@ import { copyText, toCsv, toTsv } from '@renderer/lib/resultCopy'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
-import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
 import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
@@ -539,7 +538,6 @@ function ResultTabStrip({
                 <span data-result-tab-time="">
                   {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
                 </span>
-                <span>{t('context.resultDataSize')} · <ResultDataSize results={[r]} /></span>
               </div>
             )}
             tooltipVariant="code"
