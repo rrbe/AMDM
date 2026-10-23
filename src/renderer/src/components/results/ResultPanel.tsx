@@ -263,8 +263,8 @@ function ResultPanelContent({
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
-          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <span className="result-bar-spacer" />
+          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <ResultDisplayOptions />
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
@@ -333,10 +333,11 @@ function ResultPanelContent({
           )}
           <span className="selection-indicator" aria-hidden="true" />
         </div>
-        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
+        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         {result.kind === 'documents' && (
           <div className="result-pagination">
+            <span className="result-meta-separator" aria-hidden="true" />
             <span className="result-total" aria-live="polite">
               {typeof result.totalCount === 'number'
                 ? t('result.totalCount', { value: result.totalCount.toLocaleString() })
@@ -587,11 +588,19 @@ function ResultMeta({
     if (result.output?.length) {
       out.push({ text: t('result.outputLines', { count: result.output.length }) })
     }
-    if (typeof result.elapsedMs === 'number') {
-      out.push({ text: t('result.elapsed', { ms: result.elapsedMs }) })
-    }
     const queryTime = formatQueryTime(executedAt, i18n.resolvedLanguage)
     if (queryTime) out.push({ text: queryTime })
+    if (typeof result.elapsedMs === 'number') {
+      out.push({
+        text: t('result.elapsed', { ms: result.elapsedMs }),
+        cls:
+          result.elapsedMs >= 5000
+            ? 'text-destructive'
+            : result.elapsedMs >= 1000
+              ? 'text-[var(--warn)]'
+              : undefined
+      })
+    }
     return out
   }, [result, docCount, executedAt, i18n.resolvedLanguage, t])
 
