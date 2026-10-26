@@ -4,6 +4,35 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.10.5](https://github.com/rrbe/AMDM/releases/tag/v26.10.5) — 2026-10-26
+
+### Features
+
+- Select which fields appear in query results
+- Highlight slow queries and improve query timing placement
+- Organize display settings and add result field sorting
+- Simplify export options and initialize export destinations
+- Simplify result copy menus and add advanced JSON copy options
+- Display BSON dates in the selected time zone \(\#33\)
+- Import and export connection configurations \(\#31\)
+- Add live query diagnostics \(\#30\)
+
+### Fixes
+
+- Improve tab tooltips and compact spacing
+- Confirm workspace closure and wait for connection cleanup \(\#35\)
+- Fix Query context\-menu commands and adjust menu order
+- Reduce the default tooltip delay to 300 ms
+
+### Other Updates
+
+- Require concise UI labels and stable layouts
+- Require English commit messages
+- Wait for overlays to become visible before sending native clicks
+- Unify native right\-click event sequences for Query menus
+- Fix cross\-platform Query menu E2E coverage in daily checks
+- Keep core E2E checks for PRs and run full cross\-platform regression daily \(\#32\)
+
 ## [v26.10.4](https://github.com/rrbe/AMDM/releases/tag/v26.10.4) — 2026-10-15
 
 ### Features
