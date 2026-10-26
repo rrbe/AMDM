@@ -8,8 +8,10 @@ import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTim
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toTsv } from '@renderer/lib/resultCopy'
-import { orderFieldNames } from '@renderer/lib/ejson'
-import { getResultFieldInfo, selectDisplayFields } from '@renderer/lib/resultFields'
+import { selectDisplayFields } from '@renderer/lib/resultFields'
+import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
+import { isPlainObject } from '@renderer/lib/tableShape'
+import { isExtended } from '@renderer/lib/ejson'
 import { ResultFieldSelect } from './ResultFieldSelect'
 import { Modal } from '@renderer/components/common/Modal'
 import { consoleText } from '@renderer/lib/consoleOutput'
@@ -104,14 +106,21 @@ function ResultPanelContent({
   const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
   const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
-  const fieldInfo = useMemo(() => getResultFieldInfo(docs), [docs])
-  const fields = useMemo(() => orderFieldNames(fieldInfo.fields, fieldSort), [fieldInfo, fieldSort])
-  const noVisibleFields = useMemo(() => {
-    if (visibleFields === null || !fieldInfo.allDocuments) return false
+  const fieldInfo = useResultFieldInfo(docs, view === 'table')
+  const displayFields = useMemo(() => {
+    if (!fieldInfo) return []
+    if (visibleFields === null) return fieldInfo.fields
     const selected = new Set(visibleFields)
-    return !fieldInfo.fields.some((field) => selected.has(field))
+    return fieldInfo.fields.filter((field) => selected.has(field))
   }, [fieldInfo, visibleFields])
-  const displayDocs = useMemo(() => noVisibleFields ? docs : selectDisplayFields(docs, visibleFields), [docs, visibleFields, noVisibleFields])
+  const noVisibleFields = useMemo(() => {
+    if (visibleFields === null || docs.length === 0) return false
+    if (fieldInfo) return fieldInfo.allDocuments && displayFields.length === 0
+    return docs.every((doc) => isPlainObject(doc) && !isExtended(doc))
+      && !docs.some((doc) => visibleFields.some((field) => Object.prototype.hasOwnProperty.call(doc, field)))
+  }, [docs, visibleFields, fieldInfo, displayFields])
+  const filterTableColumns = view === 'table' && fieldInfo?.allDocuments
+  const displayDocs = useMemo(() => noVisibleFields || view !== 'table' || !fieldInfo || filterTableColumns ? docs : selectDisplayFields(docs, visibleFields), [docs, visibleFields, noVisibleFields, filterTableColumns, view, fieldInfo])
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
@@ -367,7 +376,7 @@ function ResultPanelContent({
             <ResultPager result={result} />
           </div>
         )}
-        <ResultDisplayOptions fields={showConsole ? undefined : fields} />
+        <ResultDisplayOptions docs={showConsole ? undefined : docs} />
         <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
@@ -403,7 +412,7 @@ function ResultPanelContent({
             {view === 'tree' && (
               <TreeView
                 docs={docs}
-                displayDocs={displayDocs}
+                visibleFields={visibleFields}
                 onSelectFields={openFieldModal}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
@@ -412,12 +421,14 @@ function ResultPanelContent({
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} displayValue={displayDocs} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} visibleFields={visibleFields} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}
                 docs={docs}
                 displayDocs={displayDocs}
+                fields={fieldInfo ? (filterTableColumns ? displayFields : undefined) : displayFields}
+                loading={!fieldInfo}
                 onSelectFields={openFieldModal}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
@@ -433,7 +444,7 @@ function ResultPanelContent({
 
       {fieldModalOpen && (
         <Modal title={t('result.selectFields')} size="sm" onClose={() => setFieldModalOpen(false)}>
-          <ResultFieldSelect fields={fields} />
+          <ResultFieldSelect docs={docs} />
         </Modal>
       )}
       {advancedCopy && (
@@ -472,7 +483,7 @@ function ResultPanelContent({
   )
 }
 
-function ResultDisplayOptions({ fields }: { fields?: string[] }): React.JSX.Element {
+function ResultDisplayOptions({ docs }: { docs?: unknown[] }): React.JSX.Element {
   const { t } = useTranslation()
   const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
   const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
@@ -488,12 +499,12 @@ function ResultDisplayOptions({ fields }: { fields?: string[] }): React.JSX.Elem
           title={t('result.displayOptions')}
         >
           <SlidersHorizontal size={14} aria-hidden="true" />
-          {fields && visibleFields !== null && <span className="ml-1">{t('result.selectedFields', { count: visibleFields.length })}</span>}
+          {docs && visibleFields !== null && <span className="ml-1">{t('result.selectedFields', { count: visibleFields.length })}</span>}
         </button>
       }
     >
       <div className="min-h-8 w-[256px] max-w-full">
-        {fields && (fields.length > 0 || visibleFields !== null) && <ResultFieldSelect fields={fields} />}
+        {docs && <ResultFieldSelect docs={docs} />}
         <Suspense fallback={null}>
           <TimeZoneSelect
             variant="menu"

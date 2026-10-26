@@ -19,7 +19,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { SchemaTarget } from '@shared/types'
 import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useAppStore'
-import { getResultFieldInfo } from '@renderer/lib/resultFields'
+import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
 import { orderFieldNames } from '@renderer/lib/ejson'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { tabCollection } from '@renderer/lib/tabs'
@@ -236,10 +236,12 @@ function CollectionSchema({
   }, [loadSchemaModel, target, connected])
 
   const tree = useMemo(() => buildSchemaTree(model?.analysis.fields ?? []), [model?.analysis.fields])
+  const resultDocs = useMemo(() => canSelectFields && Array.isArray(activeResult?.result.data) ? activeResult.result.data : [], [canSelectFields, activeResult?.result.data])
+  const resultFieldInfo = useResultFieldInfo(resultDocs, canSelectFields)
   const availableFields = useMemo(() => [...new Set([
     ...tree.map((field) => field.name),
-    ...(canSelectFields && Array.isArray(activeResult?.result.data) ? orderFieldNames(getResultFieldInfo(activeResult.result.data).fields, 'alpha') : [])
-  ])], [tree, canSelectFields, activeResult?.result.data])
+    ...(resultFieldInfo ? orderFieldNames(resultFieldInfo.fields, 'alpha') : [])
+  ])], [tree, resultFieldInfo])
   const selectedFields = useMemo(() => new Set(visibleFields ?? availableFields), [visibleFields, availableFields])
   const allFieldsSelected = visibleFields === null || (selectedFields.size > 0 && availableFields.every((field) => selectedFields.has(field)))
   const rows = useMemo(
@@ -320,7 +322,7 @@ function CollectionSchema({
               <Checkbox
                 checked={!canSelectFields || allFieldsSelected}
                 indeterminate={canSelectFields && !allFieldsSelected && selectedFields.size > 0}
-                disabled={!canSelectFields}
+                disabled={!canSelectFields || !resultFieldInfo}
                 label={<span className="sr-only">{t('result.selectAllFields')}</span>}
                 className="shrink-0 gap-0!"
                 onCheckedChange={(on) => setVisibleFields(on ? null : [])}
@@ -391,7 +393,7 @@ function CollectionSchema({
                       {row.depth === 0 && (
                         <Checkbox
                           checked={!canSelectFields || selectedFields.has(row.name)}
-                          disabled={!canSelectFields}
+                          disabled={!canSelectFields || !resultFieldInfo}
                           label={<span className="sr-only">{t('context.schema.displayField', { field: row.name })}</span>}
                           className="shrink-0 gap-0!"
                           onCheckedChange={(checked) => {

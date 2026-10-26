@@ -1,10 +1,29 @@
-import { describe, expect, it } from 'vitest'
-import { selectDisplayFields } from '@renderer/lib/resultFields'
+import { describe, expect, it, vi } from 'vitest'
+import { cachedResultFieldInfo, getResultFieldInfo, prepareResultFieldInfo, selectDisplayFields } from '@renderer/lib/resultFields'
 import { deriveTableColumnGroups } from '@renderer/lib/tableShape'
 import { appendResult, createTab, patchResult, patchTab } from '@renderer/lib/tabs'
 import { toPlainJson } from '@renderer/lib/resultCopy'
 
 describe('result display fields', () => {
+  it('shares completed field metadata and cancels preparation without publishing partial fields', async () => {
+    const docs = [{ z: 1 }, { a: 2 }]
+    const info = await prepareResultFieldInfo(docs, new AbortController().signal)
+    expect(info.fields).toEqual(['z', 'a'])
+    expect(getResultFieldInfo(docs)).toBe(info)
+    const controller = new AbortController()
+    const nextDocs = Array.from({ length: 100 }, (_, index) => ({ [index]: index }))
+    let clock = 0
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock += 10)
+    try {
+      const pending = prepareResultFieldInfo(nextDocs, controller.signal)
+      queueMicrotask(() => controller.abort())
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      expect(cachedResultFieldInfo(nextDocs)).toBeUndefined()
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it('retains the original results when all fields are displayed', () => {
     const docs = [{ _id: 1, name: 'Ada' }]
     expect(selectDisplayFields(docs, null)).toBe(docs)

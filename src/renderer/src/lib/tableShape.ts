@@ -87,10 +87,11 @@ export function deriveTableColumnGroups(
   docs: unknown[],
   display: TableNestedDisplay,
   sort: CollectionSort = 'alpha',
-  idFirst = false
+  idFirst = false,
+  fields?: string[]
 ): TableColumnGroup[] {
   const column = (path: string[]): TableColumn => ({ id: JSON.stringify(path), label: path[path.length - 1], path })
-  return deriveColumns(docs, sort, idFirst).map((key) => {
+  return (fields ? orderFieldNames(fields, sort, idFirst) : deriveColumns(docs, sort, idFirst)).map((key) => {
     const single = { key, columns: [column([key])] }
     if (display === 'inline' || key === '_id') return single
     const children = new Set<string>()

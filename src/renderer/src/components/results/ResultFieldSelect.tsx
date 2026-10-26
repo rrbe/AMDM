@@ -4,21 +4,27 @@ import { useTranslation } from 'react-i18next'
 import { getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Input } from '@renderer/components/ui/Input'
+import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
+import { orderFieldNames } from '@renderer/lib/ejson'
 
-export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.Element {
+export function ResultFieldSelect({ docs }: { docs: unknown[] }): React.JSX.Element | null {
   const { t } = useTranslation()
   const selected = useAppStore((s) => getActiveTab(s).visibleFields)
   const setSelected = useAppStore((s) => s.setVisibleFields)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const info = useResultFieldInfo(docs, true)
+  const fields = useMemo(() => info ? orderFieldNames(info.fields, fieldSort) : [], [info, fieldSort])
   const [search, setSearch] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const current = useMemo(() => new Set(fields), [fields])
   const checked = useMemo(() => new Set(selected ?? fields), [selected, fields])
-  const allSelected = selected === null || (checked.size > 0 && fields.every((field) => checked.has(field)))
+  const allSelected = selected === null || (!!info && checked.size > 0 && fields.every((field) => checked.has(field)))
   const options = useMemo(() => {
+    if (!info) return []
     const all = [...new Set([...fields, ...(selected ?? [])])]
     const query = search.trim().toLocaleLowerCase()
     return all.filter((field) => field.toLocaleLowerCase().includes(query))
-  }, [fields, selected, search])
+  }, [fields, selected, search, info])
   const virtualizer = useVirtualizer({
     count: options.length,
     getScrollElement: () => scrollRef.current,
@@ -26,6 +32,8 @@ export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.E
     getItemKey: (index) => options[index],
     overscan: 5
   })
+
+  if (info && fields.length === 0 && selected === null) return null
 
   return (
     <div className="mb-2 flex flex-col gap-2 border-b border-[var(--separator)] pb-2">
@@ -40,12 +48,13 @@ export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.E
         }}
       />
       <Checkbox
+        disabled={!info}
         checked={allSelected}
         indeterminate={!allSelected && checked.size > 0}
         label={t('result.visibleFields')}
         onCheckedChange={(on) => setSelected(on ? null : [])}
       />
-      <div ref={scrollRef} className="h-[192px] overflow-auto">
+      <div ref={scrollRef} className="h-[192px] overflow-auto" aria-busy={!info}>
         <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((row) => {
             const field = options[row.index]
@@ -66,7 +75,7 @@ export function ResultFieldSelect({ fields }: { fields: string[] }): React.JSX.E
             )
           })}
         </div>
-        {options.length === 0 && <span className="text-muted-foreground">{t('result.noMatchingFields')}</span>}
+        {options.length === 0 && <span className="text-muted-foreground">{t(info ? 'result.noMatchingFields' : 'common.loading')}</span>}
       </div>
     </div>
   )

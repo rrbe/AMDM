@@ -66,6 +66,8 @@ import { useResultTimeZone } from './ResultTimeZone'
 interface TableViewProps {
   docs: unknown[]
   displayDocs?: unknown[]
+  fields?: string[]
+  loading?: boolean
   onSelectFields: () => void
   fontSize: number
   selectedDocIndexes: Set<number>
@@ -99,6 +101,8 @@ function columnStyle(width: number, index: number): CSSProperties {
 export function TableView({
   docs,
   displayDocs = docs,
+  fields,
+  loading = false,
   onSelectFields,
   fontSize,
   selectedDocIndexes,
@@ -168,8 +172,8 @@ export function TableView({
   }
 
   const derivedGroups = useMemo(
-    () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort, idFirst),
-    [displayDocs, nestedDisplay, fieldSort, idFirst]
+    () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort, idFirst, fields),
+    [displayDocs, nestedDisplay, fieldSort, idFirst, fields]
   )
   const groups = useMemo(() => {
     const byKey = new Map(derivedGroups.map((group) => [group.key, group]))
@@ -186,6 +190,16 @@ export function TableView({
       ? { width, left: INDEX_COL_WIDTH }
       : columnStyle(width, groupIndex - Number(hasPinnedId))
   const headerHeight = (fontSize + 11) * (groups.some((group) => group.columns[0].path.length > 1) ? 2 : 1)
+  const groupLayout = useMemo(() => {
+    let left = INDEX_COL_WIDTH
+    return groups.map((group) => {
+      const width = group.columns.reduce((sum, column) => sum + widthOf(column), 0)
+      const item = { id: group.key, left, width }
+      left += width
+      return item
+    })
+  }, [groups, widthOf])
+  const reorderLayout = useMemo(() => groupLayout.slice(Number(hasPinnedId)), [groupLayout, hasPinnedId])
   const moveColumn = useCallback(
     (source: string, target: string) => {
       if (source === target) return
@@ -198,12 +212,12 @@ export function TableView({
     },
     [groups, setColumnOrder]
   )
-  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn, setDraggingGroup, endColumnDrag)
+  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn, setDraggingGroup, endColumnDrag, reorderLayout)
+  const sortColumnId = columns.find((column) => column.id === tableSort?.column)?.id
   const rows = useMemo(() => {
-    const column = columns.find((column) => column.id === tableSort?.column)
-    const sort = tableSort && column ? { ...tableSort, column: column.path } : null
+    const sort = tableSort && sortColumnId ? { ...tableSort, column: JSON.parse(sortColumnId) as string[] } : null
     return sortTableRows(docs, sort, tableI18n.resolvedLanguage ?? tableI18n.language)
-  }, [docs, columns, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
+  }, [docs, sortColumnId, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
 
   useEffect(() => {
     onDocumentOrderChange(rows.map((row) => row.sourceIndex))
@@ -222,10 +236,7 @@ export function TableView({
     ),
     [groups, widthOf]
   )
-  const draggingColumnIndexes = useMemo(
-    () => columnLayout.flatMap((entry, index) => groups[entry.groupIndex].key === draggingGroup ? [index] : []),
-    [columnLayout, groups, draggingGroup]
-  )
+  const draggingColumnIndex = columnLayout.findIndex((entry) => groups[entry.groupIndex].key === draggingGroup)
   const focusedColumnIndex = columns.findIndex((column) => column.id === (editing?.col.id ?? selectedCell?.col.id))
   const columnVirtualizer = useVirtualizer({
     horizontal: true,
@@ -234,19 +245,26 @@ export function TableView({
     estimateSize: (index) => columnLayout[index].width,
     getItemKey: (index) => columns[index].id,
     paddingStart: INDEX_COL_WIDTH,
-    overscan: 2 + draggingColumnIndexes.length,
+    overscan: 2,
     rangeExtractor: useCallback(
       (range) => {
         const indexes = new Set(defaultRangeExtractor(range))
         if (hasPinnedId) indexes.add(0)
         if (focusedColumnIndex >= 0) indexes.add(focusedColumnIndex)
-        for (const index of draggingColumnIndexes) indexes.add(index)
+        if (draggingColumnIndex >= 0) indexes.add(draggingColumnIndex)
         return [...indexes].sort((a, b) => a - b)
       },
-      [hasPinnedId, focusedColumnIndex, draggingColumnIndexes]
+      [hasPinnedId, focusedColumnIndex, draggingColumnIndex]
     )
   })
   const visibleColumns = columnVirtualizer.getVirtualItems()
+  const visibleGroups = new Map<number, typeof visibleColumns>()
+  for (const item of visibleColumns) {
+    const groupIndex = columnLayout[item.index].groupIndex
+    const items = visibleGroups.get(groupIndex) ?? []
+    items.push(item)
+    visibleGroups.set(groupIndex, items)
+  }
 
   useEffect(() => columnVirtualizer.measure(), [columnLayout, columnVirtualizer])
 
@@ -401,11 +419,12 @@ export function TableView({
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
-  const renderColumnHeader = (col: TableColumn): React.JSX.Element => (
+  const renderColumnHeader = (col: TableColumn, left?: number): React.JSX.Element => (
     <TableColumnHeader
       key={col.id}
       column={col}
       width={widthOf(col)}
+      left={left}
       direction={tableSort?.column === col.id ? tableSort.direction : undefined}
       onResize={(event) => startColResize(col, event)}
       onSort={() =>
@@ -416,6 +435,8 @@ export function TableView({
       }
     />
   )
+
+  if (loading) return <div className="center-msg muted" aria-busy="true">{t('common.loading')}</div>
 
   return (
     <div
@@ -438,15 +459,17 @@ export function TableView({
           <div className="tbl-th idx" style={{ width: INDEX_COL_WIDTH }}>
             #
           </div>
-          {groups.map((group, groupIndex) => (
+          {[...visibleGroups].map(([groupIndex, items]) => {
+            const group = groups[groupIndex]
+            const layout = groupLayout[groupIndex]
+            return (
             <div
               key={group.key}
               className={`tbl-column-group${idFirst && group.key === '_id' ? ' tbl-pinned-id' : ''}`}
               data-column={group.key}
-              style={groupStyle(
-                group.columns.reduce((sum, col) => sum + widthOf(col), 0),
-                groupIndex
-              )}
+              style={hasPinnedId && groupIndex === 0
+                ? groupStyle(layout.width, groupIndex)
+                : { ...groupStyle(layout.width, groupIndex), position: 'absolute', left: layout.left }}
             >
               {group.columns[0].path.length > 1 ? (
                 <>
@@ -455,13 +478,15 @@ export function TableView({
                       <span className="tbl-col-label">{group.key}</span>
                     </Tooltip>
                   </div>
-                  <div className="tbl-group-children">{group.columns.map(renderColumnHeader)}</div>
+                  <div className="tbl-group-children" style={{ position: 'relative' }}>
+                    {items.map((item) => renderColumnHeader(columns[item.index], item.start - layout.left))}
+                  </div>
                 </>
               ) : (
                 renderColumnHeader(group.columns[0])
               )}
             </div>
-          ))}
+          )})}
         </div>
 
         {/* Virtualized rows */}
@@ -567,12 +592,14 @@ export function TableView({
 function TableColumnHeader({
   column,
   width,
+  left,
   direction,
   onSort,
   onResize
 }: {
   column: TableColumn
   width: number
+  left?: number
   direction?: TableSortDirection
   onSort: () => void
   onResize: (event: MouseEvent) => void
@@ -588,7 +615,7 @@ function TableColumnHeader({
     <div
       className="tbl-th"
       data-column-path={column.id}
-      style={{ width }}
+      style={{ width, ...(left === undefined ? {} : { position: 'absolute', left }) }}
       role="columnheader"
       aria-sort={direction === undefined ? 'none' : direction === 'asc' ? 'ascending' : 'descending'}
     >

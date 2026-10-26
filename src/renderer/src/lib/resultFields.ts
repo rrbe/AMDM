@@ -7,22 +7,54 @@ const fieldInfoCache = new WeakMap<unknown[], {
   documents: { value: unknown; keys: string[] | null }[]
 }>()
 
-export function getResultFieldInfo(docs: unknown[]) {
-  const cached = fieldInfoCache.get(docs)
-  if (cached) return cached
+function* collectResultFieldInfo(docs: unknown[]) {
   const fields = new Set<string>()
-  const documents = docs.map((value) => {
+  const documents: { value: unknown; keys: string[] | null }[] = []
+  for (const value of docs) {
     const keys = isPlainObject(value) && !isExtended(value) ? Object.keys(value) : null
     if (keys) for (const key of keys) fields.add(key)
-    return { value, keys }
-  })
-  const info = {
+    documents.push({ value, keys })
+    yield
+  }
+  return {
     fields: [...fields],
     allDocuments: docs.length > 0 && documents.every(({ keys }) => keys !== null),
     documents
   }
+}
+
+export function cachedResultFieldInfo(docs: unknown[]) {
+  return fieldInfoCache.get(docs)
+}
+
+export function getResultFieldInfo(docs: unknown[]) {
+  const cached = fieldInfoCache.get(docs)
+  if (cached) return cached
+  const iterator = collectResultFieldInfo(docs)
+  let step = iterator.next()
+  while (!step.done) step = iterator.next()
+  const info = step.value
   fieldInfoCache.set(docs, info)
   return info
+}
+
+export async function prepareResultFieldInfo(docs: unknown[], signal: AbortSignal) {
+  const cached = fieldInfoCache.get(docs)
+  if (cached) return cached
+  const iterator = collectResultFieldInfo(docs)
+  let step = iterator.next()
+  let deadline = performance.now() + 6
+  while (!step.done) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    if (performance.now() >= deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      deadline = performance.now() + 6
+    }
+    step = iterator.next()
+  }
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  fieldInfoCache.set(docs, step.value)
+  return step.value
 }
 
 export function selectDisplayFields(docs: unknown[], fields: readonly string[] | null): unknown[] {
