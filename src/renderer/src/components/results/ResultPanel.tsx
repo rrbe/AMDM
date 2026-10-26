@@ -8,9 +8,8 @@ import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTim
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toTsv } from '@renderer/lib/resultCopy'
-import { deriveColumns, isPlainObject } from '@renderer/lib/tableShape'
-import { isExtended } from '@renderer/lib/ejson'
-import { selectDisplayFields } from '@renderer/lib/resultFields'
+import { orderFieldNames } from '@renderer/lib/ejson'
+import { getResultFieldInfo, selectDisplayFields } from '@renderer/lib/resultFields'
 import { ResultFieldSelect } from './ResultFieldSelect'
 import { Modal } from '@renderer/components/common/Modal'
 import { consoleText } from '@renderer/lib/consoleOutput'
@@ -103,11 +102,16 @@ function ResultPanelContent({
   // Normalize to a documents array for the three views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
-  const displayDocs = useMemo(() => selectDisplayFields(docs, visibleFields), [docs, visibleFields])
   const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
-  const fields = useMemo(() => deriveColumns(docs.filter((doc) => isPlainObject(doc) && !isExtended(doc)), fieldSort), [docs, fieldSort])
-  const noVisibleFields = docs.length > 0 && docs.every((doc) => isPlainObject(doc) && !isExtended(doc)) && visibleFields !== null && !fields.some((field) => visibleFields.includes(field))
+  const fieldInfo = useMemo(() => getResultFieldInfo(docs), [docs])
+  const fields = useMemo(() => orderFieldNames(fieldInfo.fields, fieldSort), [fieldInfo, fieldSort])
+  const noVisibleFields = useMemo(() => {
+    if (visibleFields === null || !fieldInfo.allDocuments) return false
+    const selected = new Set(visibleFields)
+    return !fieldInfo.fields.some((field) => selected.has(field))
+  }, [fieldInfo, visibleFields])
+  const displayDocs = useMemo(() => noVisibleFields ? docs : selectDisplayFields(docs, visibleFields), [docs, visibleFields, noVisibleFields])
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)

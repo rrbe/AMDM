@@ -19,7 +19,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { SchemaTarget } from '@shared/types'
 import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useAppStore'
-import { deriveColumns } from '@renderer/lib/tableShape'
+import { getResultFieldInfo } from '@renderer/lib/resultFields'
+import { orderFieldNames } from '@renderer/lib/ejson'
 import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { tabCollection } from '@renderer/lib/tabs'
 import {
@@ -237,7 +238,7 @@ function CollectionSchema({
   const tree = useMemo(() => buildSchemaTree(model?.analysis.fields ?? []), [model?.analysis.fields])
   const availableFields = useMemo(() => [...new Set([
     ...tree.map((field) => field.name),
-    ...(canSelectFields && Array.isArray(activeResult?.result.data) ? deriveColumns(activeResult.result.data) : [])
+    ...(canSelectFields && Array.isArray(activeResult?.result.data) ? orderFieldNames(getResultFieldInfo(activeResult.result.data).fields, 'alpha') : [])
   ])], [tree, canSelectFields, activeResult?.result.data])
   const selectedFields = useMemo(() => new Set(visibleFields ?? availableFields), [visibleFields, availableFields])
   const allFieldsSelected = visibleFields === null || (selectedFields.size > 0 && availableFields.every((field) => selectedFields.has(field)))
