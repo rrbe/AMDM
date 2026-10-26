@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
-import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
+import { entriesOf, formatScalar, isExpandable, orderFieldNames, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
+import { isPlainObject } from '@renderer/lib/tableShape'
+import { isExtended } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeSelection } from '@renderer/lib/selection'
@@ -58,10 +60,13 @@ interface FlatNode {
   expanded: boolean
   /** Top-level document index (only set for depth-0 rows). */
   docIndex?: number
+  document?: boolean
 }
 
 interface TreeViewProps {
   docs: unknown[]
+  visibleFields: string[] | null
+  onSelectFields: () => void
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
@@ -74,8 +79,15 @@ const DEFAULT_KEY_WIDTH = 280
 const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
+function hasFields(value: object): boolean {
+  for (const key in value) if (Object.prototype.hasOwnProperty.call(value, key)) return true
+  return false
+}
+
 export function TreeView({
   docs,
+  visibleFields,
+  onSelectFields,
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
@@ -107,6 +119,7 @@ export function TreeView({
   const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
   const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
+  const selectedFields = useMemo(() => visibleFields === null ? null : new Set(visibleFields), [visibleFields])
 
   const toggle = (id: string): void => {
     setExpanded((prev) => {
@@ -121,7 +134,10 @@ export function TreeView({
   const flat = useMemo<FlatNode[]>(() => {
     const out: FlatNode[] = []
     const walk = (key: string, value: unknown, depth: number, path: string, docIndex?: number): void => {
-      const canExpand = isExpandable(value)
+      const document = depth === 0 && isPlainObject(value) && !isExtended(value)
+      const canExpand = document && visibleFields
+        ? visibleFields.some((key) => Object.prototype.hasOwnProperty.call(value, key))
+        : document ? hasFields(value as object) : isExpandable(value)
       const isOpen = canExpand && expanded.has(path)
       out.push({
         id: path,
@@ -130,19 +146,23 @@ export function TreeView({
         value,
         expandable: canExpand,
         expanded: isOpen,
-        docIndex
+        docIndex,
+        document
       })
       if (isOpen) {
-        for (const [childKey, childVal] of entriesOf(value, fieldSort, idFirst)) {
+        const children = document && selectedFields
+          ? orderFieldNames(Object.keys(value as object).filter((key) => selectedFields.has(key)), fieldSort, idFirst).map((key) => [key, (value as Record<string, unknown>)[key]] as [string, unknown])
+          : entriesOf(value, fieldSort, idFirst)
+        for (const [childKey, childVal] of children) {
           walk(childKey, childVal, depth + 1, `${path}.${childKey}`)
         }
       }
     }
     // Display badge is 1-based for humans; the path id stays 0-based (it keys
     // expand state and child paths).
-    docs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
+    docs.forEach((value, i) => walk(`(${i + 1})`, value, 0, String(i), i))
     return out
-  }, [docs, expanded, fieldSort, idFirst])
+  }, [docs, selectedFields, expanded, fieldSort, idFirst])
 
   const rowVirtualizer = useVirtualizer({
     count: flat.length,
@@ -281,7 +301,8 @@ export function TreeView({
       {
         label: t('result.dataMenu.view'),
         onClick: () => setPreviewDoc({ value: rootDoc, source })
-      }
+      },
+      { label: t('result.selectFields'), onClick: onSelectFields }
     ]
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
@@ -380,7 +401,7 @@ export function TreeView({
                     }}
                   />
                 ) : (
-                  <ValueCell node={node} />
+                  <ValueCell node={node} selectedFields={selectedFields} />
                 )}
               </div>
               <div className={`kv-type v-${valueType(node.value)}`}>
@@ -454,15 +475,22 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
   ]
 }
 
-function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
+function ValueCell({ node, selectedFields }: { node: FlatNode; selectedFields: ReadonlySet<string> | null }): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  let value = node.value
+  if (node.document) {
+    const keys = Object.keys(node.value as object)
+    const count = selectedFields ? keys.reduce((count, key) => count + Number(selectedFields.has(key)), 0) : keys.length
+    if (count) return <span className="tree-summary">{`{ ${count} fields }`}</span>
+    value = {}
+  }
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.
     return <span className="tree-summary">{summarize(node.value)}</span>
   }
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
-  const { text, type } = formatScalar(node.value, timeZone)
+  const { text, type } = formatScalar(value, timeZone)
   return (
     <Tooltip content={text}>
       <span className={`tree-val v-${type}`}>{text}</span>

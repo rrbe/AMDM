@@ -3,6 +3,12 @@ import type { JsonEncoding } from './types'
 
 type Dict = Record<string, unknown>
 
+const EJSON_MARKERS = [
+  '$oid', '$date', '$numberLong', '$numberInt', '$numberDouble', '$numberDecimal',
+  '$binary', '$regularExpression', '$timestamp', '$minKey', '$maxKey', '$undefined',
+  '$symbol', '$code', '$ref'
+]
+
 function isObject(value: unknown): value is Dict {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -14,6 +20,7 @@ function hasKey(value: Dict, key: string): boolean {
 /** Whether a structured-cloneable value is one canonical EJSON type wrapper. */
 export function isEjsonWrapper(value: unknown): value is Dict {
   if (!isObject(value)) return false
+  if (!EJSON_MARKERS.some((key) => hasKey(value, key))) return false
   const keys = Object.keys(value)
   if (keys.length === 0) return false
   if (keys.length === 1) {

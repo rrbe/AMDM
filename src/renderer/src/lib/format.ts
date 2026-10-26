@@ -31,6 +31,14 @@ export interface JsonLine {
   fold?: { end: number; closeText: string }
 }
 
+export interface JsonLineSource<T extends { depth: number; fold?: JsonLine['fold'] }> {
+  length: number
+  getLine(index: number): T
+  hasFoldable(includeRoot: boolean): boolean
+  foldableIndexes(includeRoot: boolean): number[]
+  visibleRows(collapsed: ReadonlySet<number>): { length: number; at(row: number): number }
+}
+
 const INDENT = '  '
 
 function quoteKey(key: string): string {

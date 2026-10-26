@@ -220,6 +220,7 @@ interface AppState {
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
   setResultFoldedLines(view: ResultFoldView, lines: number[]): void
+  setVisibleFields(fields: string[] | null): void
   setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
@@ -1327,6 +1328,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         }))
       }
     })
+  },
+
+  setVisibleFields(fields) {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, {
+      visibleFields: fields,
+      results: getActiveTab(s).results.map((result) => ({
+        ...result,
+        foldedLines: { ...result.foldedLines, json: undefined }
+      }))
+    }) }))
   },
 
   setTableColumnOrder(order) {

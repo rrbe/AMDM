@@ -1,7 +1,9 @@
 import { useAppStore } from '@renderer/store/useAppStore'
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toJsonLines } from '@renderer/lib/format'
+import { Loader2 } from 'lucide-react'
+import type { JsonLine, JsonLineSource } from '@renderer/lib/format'
+import { cachedResultJsonLines, createResultJsonLines } from '@renderer/lib/resultJsonLines'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import { copyText, toPlainJson } from '@renderer/lib/resultCopy'
 import { useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -15,9 +17,8 @@ import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
  * Pretty-printed EJSON, virtualized BY LINE.
  *
  * VIRTUALIZATION APPROACH:
- *  - We flatten the whole result into a flat `JsonLine[]` once (memoized on the
- *    docs identity) instead of building one giant string and dumping it into
- *    the DOM. Each line carries its indent depth.
+ *  - A cancellable, chunked pass indexes container spans without formatting
+ *    their contents. Only mounted lines receive text and highlighting tokens.
  *  - `useVirtualizer` then renders only the visible lines (+ overscan), so even
  *    a result that pretty-prints to hundreds of thousands of lines stays smooth.
  *
@@ -34,12 +35,14 @@ import { FoldableJsonLines, type JsonFoldingState } from './FoldableJsonLines'
 
 interface JsonViewProps {
   value: unknown
+  visibleFields?: string[] | null
+  onSelectFields?: () => void
   fontSize: number
   folding?: JsonFoldingState
   controlsContainer: HTMLElement | null
 }
 
-export function JsonView({ value, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
+export function JsonView({ value, visibleFields = null, onSelectFields, fontSize, controlsContainer, folding }: JsonViewProps): React.JSX.Element {
   const timeZone = useResultTimeZone()
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
   const idFirst = useAppStore((s) => s.settings.resultIdFirst)
@@ -48,11 +51,25 @@ export function JsonView({ value, fontSize, controlsContainer, folding }: JsonVi
   const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
-  // The top-level payload is the array of docs (or the single wrapped value).
-  const lines = useMemo(() => toJsonLines(value, timeZone, fieldSort, idFirst), [value, timeZone, fieldSort, idFirst])
+  const input = useMemo(() => ({ value, visibleFields, timeZone, sort: fieldSort, idFirst }), [value, visibleFields, timeZone, fieldSort, idFirst])
+  const [prepared, setPrepared] = useState<{ input: typeof input; lines?: JsonLineSource<JsonLine>; error?: Error }>()
+  const lines = prepared?.input === input ? prepared.lines : cachedResultJsonLines(value, visibleFields, input)
+  useEffect(() => {
+    const cached = cachedResultJsonLines(value, visibleFields, input)
+    if (cached) {
+      setPrepared({ input, lines: cached })
+      return
+    }
+    const controller = new AbortController()
+    void createResultJsonLines(value, visibleFields, input, controller.signal).then(
+      (lines) => { if (!controller.signal.aborted) setPrepared({ input, lines }) },
+      (error: Error) => { if (!controller.signal.aborted) setPrepared({ input, error }) }
+    )
+    return () => controller.abort()
+  }, [input])
 
   // A fresh result clears any lingering "all selected" state.
-  useEffect(() => setAllSelected(false), [value])
+  useEffect(() => setAllSelected(false), [value, visibleFields])
 
   // Cmd/Ctrl+A → mark the whole result selected (and kill the overflowing
   // native select-all). Cmd+C then copies the full plain JSON.
@@ -81,18 +98,24 @@ export function JsonView({ value, fontSize, controlsContainer, folding }: JsonVi
     const items: ContextMenuEntry[] = [
       ...jsonCopyMenuItems(documents, (text) => void copyText(text), setAdvancedCopy)
     ]
+    if (onSelectFields) items.unshift({ label: t('result.selectFields'), onClick: onSelectFields }, 'separator')
     if (selText) items.unshift({ label: t('json.copySelection'), onClick: () => void copyText(selText) })
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
-  if (lines.length === 0) {
+  if (prepared?.input === input && prepared.error) throw prepared.error
+  const displayedLines = lines ?? (prepared && prepared.input.value === value ? prepared.lines : undefined)
+  if (!displayedLines) return <div className="center-msg muted" aria-busy="true">{t('common.loading')}</div>
+  if (displayedLines.length === 0) {
     return <div className="center-msg muted">{t('json.noOutput')}</div>
   }
 
   return (
-    <div className="json-view-wrap">
+    <div className="json-view-wrap relative" aria-busy={!lines} inert={!lines}>
+      {!lines && <Loader2 className="pointer-events-none absolute right-3 top-3 animate-spin" size={14} aria-label={t('common.loading')} />}
       <FoldableJsonLines
-        lines={lines}
+        lines={displayedLines}
+        disabled={!lines}
         fontSize={fontSize}
         folding={folding}
         controlsContainer={controlsContainer}

@@ -82,6 +82,9 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    optimizeDeps: {
+      entries: ['src/**/*.{ts,tsx}']
+    },
     define: {
       __APP_VERSION__: JSON.stringify(version),
       __WEB__: 'false'

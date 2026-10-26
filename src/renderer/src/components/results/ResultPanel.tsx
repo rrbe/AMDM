@@ -8,6 +8,12 @@ import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTim
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
 import { copyText, toCsv, toTsv } from '@renderer/lib/resultCopy'
+import { selectDisplayFields } from '@renderer/lib/resultFields'
+import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
+import { isPlainObject } from '@renderer/lib/tableShape'
+import { isExtended } from '@renderer/lib/ejson'
+import { ResultFieldSelect } from './ResultFieldSelect'
+import { Modal } from '@renderer/components/common/Modal'
 import { consoleText } from '@renderer/lib/consoleOutput'
 import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
@@ -93,8 +99,28 @@ function ResultPanelContent({
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
+  const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
+  const setVisibleFields = useAppStore((s) => s.setVisibleFields)
+  // Normalize to a documents array for the three views. 'value' / 'ack' get
+  // wrapped in a single-element array so the same renderers apply uniformly.
+  const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
   const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const fieldInfo = useResultFieldInfo(docs, view === 'table')
+  const displayFields = useMemo(() => {
+    if (!fieldInfo) return []
+    if (visibleFields === null) return fieldInfo.fields
+    const selected = new Set(visibleFields)
+    return fieldInfo.fields.filter((field) => selected.has(field))
+  }, [fieldInfo, visibleFields])
+  const noVisibleFields = useMemo(() => {
+    if (visibleFields === null || docs.length === 0) return false
+    if (fieldInfo) return fieldInfo.allDocuments && displayFields.length === 0
+    return docs.every((doc) => isPlainObject(doc) && !isExtended(doc))
+      && !docs.some((doc) => visibleFields.some((field) => Object.prototype.hasOwnProperty.call(doc, field)))
+  }, [docs, visibleFields, fieldInfo, displayFields])
+  const filterTableColumns = view === 'table' && fieldInfo?.allDocuments
+  const displayDocs = useMemo(() => noVisibleFields || view !== 'table' || !fieldInfo || filterTableColumns ? docs : selectDisplayFields(docs, visibleFields), [docs, visibleFields, noVisibleFields, filterTableColumns, view, fieldInfo])
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
@@ -107,6 +133,10 @@ function ResultPanelContent({
     onChange: (lines: number[]) => setResultFoldedLines(view, lines)
   })
   const docCtx = docActionContext(result, active?.query ?? null)
+  const [fieldModalOpen, setFieldModalOpen] = useState(false)
+  const openFieldModal = useCallback(() => {
+    window.setTimeout(() => setFieldModalOpen(true), 0)
+  }, [])
   const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
@@ -274,9 +304,6 @@ function ResultPanelContent({
     )
   }
 
-  // Normalize to a documents array for the three views. 'value' / 'ack' get
-  // wrapped in a single-element array so the same renderers apply uniformly.
-  const docs = normalizeDocs(result)
   const documentOrder = view === 'table' && tableDocumentOrder ? tableDocumentOrder : docs.map((_, index) => index)
   const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
     .filter((index) => index >= 0 && index < docs.length)
@@ -349,7 +376,7 @@ function ResultPanelContent({
             <ResultPager result={result} />
           </div>
         )}
-        <ResultDisplayOptions />
+        <ResultDisplayOptions docs={showConsole ? undefined : docs} />
         <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
@@ -375,11 +402,18 @@ function ResultPanelContent({
       <div className="result-body">
         {showConsole ? (
           <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+        ) : noVisibleFields ? (
+          <div className="center-msg muted">
+            <span>{t('result.fieldsUnavailable')}</span>
+            <button className="ghost" onClick={() => setVisibleFields(null)}>{t('result.showAllFields')}</button>
+          </div>
         ) : (
           <>
             {view === 'tree' && (
               <TreeView
                 docs={docs}
+                visibleFields={visibleFields}
+                onSelectFields={openFieldModal}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
@@ -387,11 +421,15 @@ function ResultPanelContent({
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} visibleFields={visibleFields} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}
                 docs={docs}
+                displayDocs={displayDocs}
+                fields={fieldInfo ? (filterTableColumns ? displayFields : undefined) : displayFields}
+                loading={!fieldInfo}
+                onSelectFields={openFieldModal}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
@@ -404,6 +442,11 @@ function ResultPanelContent({
         )}
       </div>
 
+      {fieldModalOpen && (
+        <Modal title={t('result.selectFields')} size="sm" onClose={() => setFieldModalOpen(false)}>
+          <ResultFieldSelect docs={docs} />
+        </Modal>
+      )}
       {advancedCopy && (
         <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
       )}
@@ -440,8 +483,9 @@ function ResultPanelContent({
   )
 }
 
-function ResultDisplayOptions(): React.JSX.Element {
+function ResultDisplayOptions({ docs }: { docs?: unknown[] }): React.JSX.Element {
   const { t } = useTranslation()
+  const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
   const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
   const updateSettings = useAppStore((s) => s.updateSettings)
   return (
@@ -455,10 +499,12 @@ function ResultDisplayOptions(): React.JSX.Element {
           title={t('result.displayOptions')}
         >
           <SlidersHorizontal size={14} aria-hidden="true" />
+          {docs && visibleFields !== null && <span className="ml-1">{t('result.selectedFields', { count: visibleFields.length })}</span>}
         </button>
       }
     >
       <div className="min-h-8 w-[256px] max-w-full">
+        {docs && <ResultFieldSelect docs={docs} />}
         <Suspense fallback={null}>
           <TimeZoneSelect
             variant="menu"
