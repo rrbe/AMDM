@@ -38,6 +38,8 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { imagePreviewUrl } from '@renderer/lib/imagePreview'
+import { ImagePreview } from './ImagePreview'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
@@ -732,11 +734,12 @@ function Cell({
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
   const tokens = expandable ? toInlineJsonTokens(value, timeZone) : null
   const scalar = tokens ? null : formatScalar(value, timeZone)
+  const imageUrl = imagePreviewUrl(value)
   return (
     <Tooltip
-      content={expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
+      content={imageUrl ? () => <ImagePreview key={imageUrl} url={imageUrl} /> : expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
-      variant={expandable ? 'code' : 'compact'}
+      variant={imageUrl ? 'image' : expandable ? 'code' : 'compact'}
     >
       <div
         className={cellCls}

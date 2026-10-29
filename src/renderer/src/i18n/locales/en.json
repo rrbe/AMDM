@@ -514,6 +514,8 @@
   },
   "result": {
     "previewOpen": "Open",
+    "imagePreview": "Image preview",
+    "imagePreviewFailed": "Unable to load image",
     "previewOpenHint": "Click or press Enter to inspect",
     "previewPath": "Preview path",
     "previewBack": "Back to parent",

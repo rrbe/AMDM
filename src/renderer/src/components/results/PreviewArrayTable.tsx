@@ -8,6 +8,8 @@ import { previewArrayCell, previewArrayColumns } from '@renderer/lib/previewArra
 import { formatJsonPreview } from '@renderer/lib/resultCopy'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { imagePreviewUrl } from '@renderer/lib/imagePreview'
+import { ImagePreview } from './ImagePreview'
 import { useResultTimeZone } from './ResultTimeZone'
 
 const INDEX_WIDTH = 56
@@ -73,6 +75,7 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
               const nested = cell.present && (Array.isArray(cell.value) || (isPlainObject(cell.value) && !isExtended(cell.value)))
               const tokens = nested ? toInlineJsonTokens(cell.value, timeZone) : null
               const scalar = cell.present && !nested ? formatScalar(cell.value, timeZone) : null
+              const imageUrl = imagePreviewUrl(cell.value)
               const path = `[${row.index}]${column.field === null ? '' : `[${JSON.stringify(column.field)}]`}`
               const content = (
                 <div
@@ -89,7 +92,7 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
                     }
                   } : undefined}
                   style={{ position: 'absolute', left: item.start, width: item.size }}
-                  title={scalar?.text}
+                  title={imageUrl ? undefined : scalar?.text}
                 >
                   {!cell.present ? (
                     <span className="empty">—</span>
@@ -100,7 +103,11 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
                   )}
                 </div>
               )
-              return nested ? (
+              return imageUrl ? (
+                <Tooltip key={item.key} content={() => <ImagePreview key={imageUrl} url={imageUrl} />} variant="image">
+                  {content}
+                </Tooltip>
+              ) : nested ? (
                 <Tooltip
                   key={item.key}
                   content={() => formatJsonPreview(cell.value, { timeZone }).text}

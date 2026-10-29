@@ -513,6 +513,8 @@
     }
   },
   "result": {
+    "imagePreview": "圖片預覽",
+    "imagePreviewFailed": "圖片載入失敗",
     "previewOpen": "開啟",
     "previewOpenHint": "點擊或按 Enter 查看完整內容",
     "previewPath": "預覽路徑",

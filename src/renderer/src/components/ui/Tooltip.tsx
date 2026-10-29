@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { Tooltip as BaseTooltip } from '@base-ui/react/tooltip'
 import { cva } from 'class-variance-authority'
 
-export type TooltipVariant = 'compact' | 'text' | 'code'
+export type TooltipVariant = 'compact' | 'text' | 'code' | 'image'
 
 export type TooltipContent = ReactNode | (() => ReactNode)
 
@@ -38,16 +38,20 @@ const tooltipHandle = BaseTooltip.createHandle<TooltipPayload>()
 const OVERFLOW_ONLY_ATTR = 'data-tooltip-overflow-only'
 
 const popupVariants = cva(
-  'app-tooltip pointer-events-auto cursor-text select-text whitespace-pre-wrap rounded-[var(--radius-control)] border-0 bg-primary text-primary-foreground shadow-[var(--shadow-popover)] outline-none [overflow-wrap:anywhere]',
+  'app-tooltip pointer-events-auto select-text whitespace-pre-wrap rounded-[var(--radius-control)] border-0 outline-none [overflow-wrap:anywhere]',
   {
     variants: {
       variant: {
         compact:
           'max-w-[min(360px,calc(100vw-16px))] px-[10px] py-[7px] font-sans text-[12px] font-medium leading-[1.35]',
         text: 'max-h-[min(320px,45vh)] max-w-[min(520px,calc(100vw-16px))] overflow-hidden px-3 py-2.5 font-sans text-[12px] font-normal leading-[1.45]',
-        code: 'max-h-[min(320px,45vh)] max-w-[min(520px,calc(100vw-16px))] overflow-auto px-3 py-2.5 font-mono text-[12px] font-normal leading-[1.45] [tab-size:2]'
+        code: 'max-h-[min(320px,45vh)] max-w-[min(520px,calc(100vw-16px))] overflow-auto px-3 py-2.5 font-mono text-[12px] font-normal leading-[1.45] [tab-size:2]',
+        image: 'cursor-default overflow-hidden p-0'
       }
     },
+    compoundVariants: [
+      { variant: ['compact', 'text', 'code'], className: 'cursor-text bg-primary text-primary-foreground shadow-[var(--shadow-popover)]' }
+    ],
     defaultVariants: { variant: 'compact' }
   }
 )

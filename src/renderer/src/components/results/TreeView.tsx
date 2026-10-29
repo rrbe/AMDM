@@ -25,6 +25,8 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { imagePreviewUrl } from '@renderer/lib/imagePreview'
+import { ImagePreview } from './ImagePreview'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
@@ -491,8 +493,9 @@ function ValueCell({ node, selectedFields }: { node: FlatNode; selectedFields: R
   }
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
   const { text, type } = formatScalar(value, timeZone)
+  const imageUrl = imagePreviewUrl(value)
   return (
-    <Tooltip content={text}>
+    <Tooltip content={imageUrl ? () => <ImagePreview key={imageUrl} url={imageUrl} /> : text} variant={imageUrl ? 'image' : 'compact'}>
       <span className={`tree-val v-${type}`}>{text}</span>
     </Tooltip>
   )
