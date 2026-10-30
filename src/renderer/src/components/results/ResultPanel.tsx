@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, SlidersHorizontal, Table } from 'lucide-react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, SlidersHorizontal, Table, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
@@ -464,8 +464,8 @@ function ResultPanelContent({
           onClose={() => setCopyMenu(null)}
           items={[
             ...jsonCopyMenuItems(docs, copyWithFeedback, setAdvancedCopy),
-            { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
-            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
+            { label: t('result.copy.csv'), icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
+            { label: t('result.copy.tsv'), icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
         />
       )}

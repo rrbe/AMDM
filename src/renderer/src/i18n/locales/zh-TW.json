@@ -675,6 +675,7 @@
     "format": "格式",
     "fileFormat": "檔案格式",
     "bsonExample": "BSON 範例 · 十六進位",
+    "prettyPrint": "格式化輸出",
     "jsonEncoding": "型別表示",
     "encodingHelp": {
       "plain": "ObjectId、Date、Decimal128 等 BSON 類型會轉換為字串或數字；重新匯入時不會自動還原原始類型。",

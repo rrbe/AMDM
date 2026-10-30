@@ -675,6 +675,7 @@
     "format": "Format",
     "fileFormat": "File format",
     "bsonExample": "BSON example · Hexadecimal",
+    "prettyPrint": "Pretty print",
     "jsonEncoding": "Type representation",
     "encodingHelp": {
       "plain": "BSON types such as ObjectId, Date, and Decimal128 become strings or numbers and are not restored automatically when imported again.",
