@@ -38,8 +38,8 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { imagePreviewUrl } from '@renderer/lib/imagePreview'
-import { ImagePreview } from './ImagePreview'
+import { resourcePreview } from '@renderer/lib/resourcePreview'
+import { ResourcePreview, useResourcePreviewSettings } from './ResourcePreview'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
@@ -713,6 +713,7 @@ function Cell({
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const previewSettings = useResourcePreviewSettings()
   const { present, value } = cellValue(doc, column.path)
   const cellCls = `tbl-td${column.path[0] === '_id' ? ' tbl-pinned-id' : ''}${selected ? ' selected' : ''}`
 
@@ -734,12 +735,12 @@ function Cell({
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
   const tokens = expandable ? toInlineJsonTokens(value, timeZone) : null
   const scalar = tokens ? null : formatScalar(value, timeZone)
-  const imageUrl = imagePreviewUrl(value)
+  const resource = resourcePreview(value, previewSettings)
   return (
     <Tooltip
-      content={imageUrl ? () => <ImagePreview key={imageUrl} url={imageUrl} /> : expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
+      content={resource ? () => <ResourcePreview key={resource.url} resource={resource} /> : expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
-      variant={imageUrl ? 'image' : expandable ? 'code' : 'compact'}
+      variant={resource ? 'image' : expandable ? 'code' : 'compact'}
     >
       <div
         className={cellCls}

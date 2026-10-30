@@ -25,8 +25,8 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { imagePreviewUrl } from '@renderer/lib/imagePreview'
-import { ImagePreview } from './ImagePreview'
+import { resourcePreview } from '@renderer/lib/resourcePreview'
+import { ResourcePreview, useResourcePreviewSettings } from './ResourcePreview'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
@@ -479,6 +479,7 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
 
 function ValueCell({ node, selectedFields }: { node: FlatNode; selectedFields: ReadonlySet<string> | null }): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const previewSettings = useResourcePreviewSettings()
   let value = node.value
   if (node.document) {
     const keys = Object.keys(node.value as object)
@@ -493,9 +494,9 @@ function ValueCell({ node, selectedFields }: { node: FlatNode; selectedFields: R
   }
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
   const { text, type } = formatScalar(value, timeZone)
-  const imageUrl = imagePreviewUrl(value)
+  const resource = resourcePreview(value, previewSettings)
   return (
-    <Tooltip content={imageUrl ? () => <ImagePreview key={imageUrl} url={imageUrl} /> : text} variant={imageUrl ? 'image' : 'compact'}>
+    <Tooltip content={resource ? () => <ResourcePreview key={resource.url} resource={resource} /> : text} variant={resource ? 'image' : 'compact'}>
       <span className={`tree-val v-${type}`}>{text}</span>
     </Tooltip>
   )

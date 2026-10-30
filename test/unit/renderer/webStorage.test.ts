@@ -10,6 +10,8 @@ const input: ConnectionInput = {
   name: "Private",
   useSrv: false,
   host: "localhost:27017",
+  previewResources: false,
+  cdnPrefix: "https://cdn.example.com/",
   auth: { type: "scram", username: "user", authSource: "admin" },
   ssh: { enabled: false },
   tls: { enabled: false },
@@ -34,6 +36,8 @@ describe("Web storage boundaries", () => {
     expect(connection).toMatchObject({
       id: "new",
       hasPassword: false,
+      previewResources: false,
+      cdnPrefix: input.cdnPrefix,
       createdAt: 100,
       ssh: { enabled: false },
     });

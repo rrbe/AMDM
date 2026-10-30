@@ -89,6 +89,8 @@ export interface ConnectionConfig {
   defaultDatabase?: string
   /** Extra connection-string options, e.g. { readPreference: 'secondaryPreferred' }. */
   options?: Record<string, string>
+  previewResources?: boolean
+  cdnPrefix?: string
 
   auth: AuthConfig
   ssh: SshConfig
@@ -631,6 +633,7 @@ export interface AppSettings {
   acknowledgedUpdateVersion: string | null
   /** Automatic update checks on Windows/Linux; macOS persists this in Sparkle. */
   automaticUpdateChecks: boolean
+  confirmBeforeQuit: boolean
   /** App-wide navigation/new-item shortcuts; editor-local key bindings are separate. */
   keyboardShortcutsEnabled: boolean
   /** Individually cleared app shortcut ids. */
@@ -690,6 +693,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   exportIncludeRealPassword: false,
   acknowledgedUpdateVersion: null,
   automaticUpdateChecks: true,
+  confirmBeforeQuit: true,
   keyboardShortcutsEnabled: true,
   disabledKeyboardShortcuts: []
 }

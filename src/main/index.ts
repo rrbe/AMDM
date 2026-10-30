@@ -30,6 +30,8 @@ function openSettingsWindow(owner: BrowserWindow): void {
     minHeight: 500,
     show: false,
     title: 'Settings',
+    maximizable: false,
+    fullscreenable: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 13 } : undefined,
     backgroundColor: '#edece8',

@@ -33,6 +33,8 @@
     "title": "设置",
     "searchPlaceholder": "搜索设置",
     "searchNoResults": "没有匹配的设置",
+    "sectionGeneral": "通用",
+    "confirmBeforeQuit": "退出前确认",
     "sectionAppearance": "外观",
     "sectionDataDisplay": "数据展示",
     "sectionExport": "导出",
@@ -239,7 +241,7 @@
     },
     "secret": { "placeholder": "•••••••• （未更改——留空则保留原密码）" },
     "optional": "（可选）",
-    "tab": { "general": "常规", "auth": "认证" },
+    "tab": { "general": "常规", "auth": "认证", "other": "其他" },
     "general": {
       "name": "名称",
       "color": "颜色",
@@ -259,6 +261,8 @@
       "defaultDatabase": "默认数据库",
       "readPreference": "读取偏好",
       "readPreferenceDefault": "默认（primary）",
+      "previewResources": "预览图片、视频和音频",
+      "cdnPrefix": "CDN 前缀",
       "customOptions": "自定义选项",
       "optionKey": "选项",
       "optionValue": "值",
@@ -513,8 +517,8 @@
     }
   },
   "result": {
-    "imagePreview": "图片预览",
-    "imagePreviewFailed": "图片加载失败",
+    "resourcePreview": "资源预览",
+    "resourcePreviewFailed": "资源加载失败",
     "previewOpen": "打开",
     "previewOpenHint": "点击或按 Enter 查看完整内容",
     "previewPath": "预览路径",

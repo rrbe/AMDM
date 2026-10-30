@@ -39,6 +39,7 @@ import { ConsoleView } from './ConsoleView'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems } from './documentFormatMenus'
 import { ResultTimeZoneContext } from './ResultTimeZone'
+import { ResourcePreviewContext } from './ResourcePreview'
 
 const EMPTY_FOLDED_LINES: number[] = []
 const TimeZoneSelect = lazy(async () => ({
@@ -81,10 +82,16 @@ interface ResultPanelProps {
  */
 export function ResultPanel(props: ResultPanelProps): React.JSX.Element {
   const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
+  const previewSettings = useAppStore((s) => {
+    const connectionId = getActiveResult(s)?.query?.connectionId ?? getActiveTab(s).connectionId
+    return s.connections.find((connection) => connection.id === connectionId)
+  })
   const timeZone = resolveResultTimeZone(dateTimeZone)
   return (
     <ResultTimeZoneContext value={timeZone}>
-      <ResultPanelContent {...props} />
+      <ResourcePreviewContext value={previewSettings}>
+        <ResultPanelContent {...props} />
+      </ResourcePreviewContext>
     </ResultTimeZoneContext>
   )
 }

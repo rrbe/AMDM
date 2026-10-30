@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Code2, Table2, HardDrive, FileOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
+import { ArrowLeft, Settings, Code2, Table2, HardDrive, FileOutput, Keyboard, Palette, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_SETTINGS,
@@ -30,7 +30,7 @@ import { cn } from '@renderer/lib/utils'
 import { WebStorageSettings } from '@renderer/components/web/WebStorageSettings'
 import { IS_WEB } from '@renderer/lib/platform'
 
-type SettingsSection = 'appearance' | 'updates' | 'dataDisplay' | 'export' | 'query' | 'editor' | 'shortcuts' | 'storage'
+type SettingsSection = 'general' | 'appearance' | 'updates' | 'dataDisplay' | 'export' | 'query' | 'editor' | 'shortcuts' | 'storage'
 
 interface UpdateAvailableDotProps {
   version: string
@@ -70,6 +70,12 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl'
 
   const sections = [
+    ...(!IS_WEB ? [{
+      id: 'general' as const,
+      label: t('settings.sectionGeneral'),
+      icon: Settings,
+      keywords: [t('settings.sectionGeneral'), t('settings.confirmBeforeQuit')]
+    }] : []),
     ...(IS_WEB ? [{ id: 'storage' as const, label: t('webStorage.section'), icon: HardDrive, keywords: [t('webStorage.section'), t('webStorage.server'), t('webStorage.browser')] }] : []),
     {
       id: 'appearance',
@@ -325,6 +331,14 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
           </h1>
 
           {__WEB__ && displayedSectionId === 'storage' && <WebStorageSettings />}
+
+          {displayedSectionId === 'general' && (
+            <Checkbox
+              checked={settings.confirmBeforeQuit}
+              onCheckedChange={(confirmBeforeQuit) => void updateSettings({ confirmBeforeQuit })}
+              label={t('settings.confirmBeforeQuit')}
+            />
+          )}
 
           {displayedSectionId === 'appearance' && (
             <>

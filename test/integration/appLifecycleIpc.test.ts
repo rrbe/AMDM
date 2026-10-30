@@ -12,6 +12,7 @@ const fake = vi.hoisted(() => ({
   api: undefined as Api | undefined,
   sender: undefined as unknown,
   confirm: vi.fn(),
+  settings: { language: 'system', confirmBeforeQuit: true },
   shutdown: vi.fn(),
   hasActiveSessions: vi.fn(),
   dispose: vi.fn(),
@@ -65,7 +66,7 @@ vi.mock('../../src/main/mongo/desktopSession', () => ({
   sessionManager: { hasActiveSessions: fake.hasActiveSessions, shutdown: fake.shutdown }
 }))
 vi.mock('../../src/main/store/settingsStore', () => ({
-  settingsStore: { get: () => ({ language: 'system' }) }
+  settingsStore: { get: () => fake.settings }
 }))
 vi.mock('../../src/main/workers/serializerPool', () => ({
   serializerPool: { dispose: fake.dispose }
@@ -78,6 +79,7 @@ describe('desktop close and quit through the preload bridge', () => {
     vi.resetModules()
     vi.clearAllMocks()
     fake.handlers.clear()
+    fake.settings.confirmBeforeQuit = true
     fake.app = Object.assign(new EventEmitter(), { quit: vi.fn(), exit: vi.fn() })
     fake.app.quit.mockImplementation(() => {
       const event = { preventDefault: vi.fn() }
@@ -182,6 +184,22 @@ describe('desktop close and quit through the preload bridge', () => {
     await vi.waitFor(() => expect(fake.confirm).toHaveBeenCalledOnce())
     expect(main.destroyed).toBe(false)
     expect(fake.shutdown).not.toHaveBeenCalled()
+  })
+
+  it.each(['close', 'quit'])('skips confirmation for %s when disabled and still awaits cleanup', async (action) => {
+    fake.settings.confirmBeforeQuit = false
+    fake.hasActiveSessions.mockReturnValue(true)
+    fake.api!.app.workspaceChanged(true)
+    let finish!: () => void
+    fake.shutdown.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve }))
+    if (action === 'close') main.close()
+    else fake.app.quit()
+    await vi.waitFor(() => expect(fake.shutdown).toHaveBeenCalledOnce())
+    expect(fake.confirm).not.toHaveBeenCalled()
+    expect(main.destroyed).toBe(false)
+    finish()
+    await vi.waitFor(() => expect(main.destroyed).toBe(true))
+    expect(fake.dispose).toHaveBeenCalledOnce()
   })
 
   it('closes settings independently and ignores its workspace reports', async () => {

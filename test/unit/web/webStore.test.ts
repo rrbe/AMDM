@@ -11,6 +11,8 @@ function input(password = 'secret'): ConnectionInput {
     name: 'Mongo',
     useSrv: false,
     host: 'localhost:27017',
+    previewResources: false,
+    cdnPrefix: 'https://cdn.example.com/',
     auth: { type: 'scram', username: 'user' },
     password,
     ssh: { enabled: false },
@@ -37,7 +39,7 @@ describe('WebStore', () => {
     const store = new WebStore(root, Buffer.alloc(32, 1))
     const saved = store.saveConnection('alice@example.com', input())
 
-    expect(store.listConnections('alice@example.com')).toMatchObject([{ id: saved.id, hasPassword: true }])
+    expect(store.listConnections('alice@example.com')).toMatchObject([{ id: saved.id, hasPassword: true, previewResources: false, cdnPrefix: 'https://cdn.example.com/' }])
     expect(store.listConnections('bob@example.com')).toEqual([])
     expect(() => store.sessionId('bob@example.com', saved.id)).toThrow('Connection not found')
     expect(store.getDecrypted(store.sessionId('alice@example.com', saved.id))?.password).toBe('secret')

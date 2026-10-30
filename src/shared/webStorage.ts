@@ -33,6 +33,8 @@ export function browserConnection(
     replicaSet: input.replicaSet,
     defaultDatabase: input.defaultDatabase,
     options: input.options,
+    previewResources: input.previewResources,
+    cdnPrefix: input.cdnPrefix,
     auth: {
       type: input.auth.type,
       username: input.auth.username,

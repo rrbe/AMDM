@@ -37,7 +37,8 @@ const text = (): typeof messages.en =>
 
 const shutdown = new ShutdownController({
   needsConfirmation: () =>
-    sessionManager.hasActiveSessions() || [...mainWindows.values()].some(Boolean),
+    settingsStore.get().confirmBeforeQuit &&
+    (sessionManager.hasActiveSessions() || [...mainWindows.values()].some(Boolean)),
   confirm: async () => {
     const owner = [...mainWindows.keys()].find((win) => !win.isDestroyed())
     const { message, detail, buttons } = text()

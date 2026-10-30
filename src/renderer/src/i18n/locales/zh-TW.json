@@ -33,6 +33,8 @@
     "title": "設定",
     "searchPlaceholder": "搜尋設定",
     "searchNoResults": "沒有符合的設定",
+    "sectionGeneral": "一般",
+    "confirmBeforeQuit": "結束前確認",
     "sectionAppearance": "外觀",
     "sectionDataDisplay": "資料顯示",
     "sectionExport": "匯出",
@@ -239,7 +241,7 @@
     },
     "secret": { "placeholder": "•••••••• （未變更——留空則保留原密碼）" },
     "optional": "（選填）",
-    "tab": { "general": "一般", "auth": "驗證" },
+    "tab": { "general": "一般", "auth": "驗證", "other": "其他" },
     "general": {
       "name": "名稱",
       "color": "顏色",
@@ -259,6 +261,8 @@
       "defaultDatabase": "預設資料庫",
       "readPreference": "讀取偏好",
       "readPreferenceDefault": "預設（primary）",
+      "previewResources": "預覽圖片、影片和音訊",
+      "cdnPrefix": "CDN 前綴",
       "customOptions": "自訂選項",
       "optionKey": "選項",
       "optionValue": "值",
@@ -513,8 +517,8 @@
     }
   },
   "result": {
-    "imagePreview": "圖片預覽",
-    "imagePreviewFailed": "圖片載入失敗",
+    "resourcePreview": "資源預覽",
+    "resourcePreviewFailed": "資源載入失敗",
     "previewOpen": "開啟",
     "previewOpenHint": "點擊或按 Enter 查看完整內容",
     "previewPath": "預覽路徑",

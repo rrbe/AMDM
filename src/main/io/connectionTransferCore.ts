@@ -384,6 +384,8 @@ function validateInput(
       'replicaSet',
       'defaultDatabase',
       'options',
+      'previewResources',
+      'cdnPrefix',
       'auth',
       'ssh',
       'tls',
@@ -421,6 +423,8 @@ function validateInput(
     auth,
     ssh: ssh(s.ssh, warnings),
     tls: tls(s.tls, warnings),
+    previewResources: s.previewResources === undefined ? undefined : bool(s.previewResources),
+    cdnPrefix: string(s.cdnPrefix),
     options: options(s.options, warnings, preserveOptions)
   }
   if (s.color !== undefined && s.color !== '') {
