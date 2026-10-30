@@ -8,6 +8,8 @@ import { previewArrayCell, previewArrayColumns } from '@renderer/lib/previewArra
 import { formatJsonPreview } from '@renderer/lib/resultCopy'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
+import { resourcePreview } from '@renderer/lib/resourcePreview'
+import { ResourcePreview, useResourcePreviewSettings } from './ResourcePreview'
 import { useResultTimeZone } from './ResultTimeZone'
 
 const INDEX_WIDTH = 56
@@ -22,11 +24,13 @@ interface PreviewArrayTableProps {
 
 export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTableProps): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const previewSettings = useResourcePreviewSettings()
   const { t } = useTranslation()
   const openLabel = t('result.previewOpen')
   const openHint = t('result.previewOpenHint')
-  const sort = useAppStore((state) => state.settings.collectionSort)
-  const columns = useMemo(() => previewArrayColumns(value, sort), [value, sort])
+  const sort = useAppStore((state) => state.settings.resultFieldSort)
+  const idFirst = useAppStore((state) => state.settings.resultIdFirst)
+  const columns = useMemo(() => previewArrayColumns(value, sort, idFirst), [value, sort, idFirst])
   const scrollRef = useRef<HTMLDivElement>(null)
   const rowHeight = fontSize + 11
   const virtualizer = useVirtualizer({
@@ -72,6 +76,7 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
               const nested = cell.present && (Array.isArray(cell.value) || (isPlainObject(cell.value) && !isExtended(cell.value)))
               const tokens = nested ? toInlineJsonTokens(cell.value, timeZone) : null
               const scalar = cell.present && !nested ? formatScalar(cell.value, timeZone) : null
+              const resource = resourcePreview(cell.value, previewSettings)
               const path = `[${row.index}]${column.field === null ? '' : `[${JSON.stringify(column.field)}]`}`
               const content = (
                 <div
@@ -88,7 +93,7 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
                     }
                   } : undefined}
                   style={{ position: 'absolute', left: item.start, width: item.size }}
-                  title={scalar?.text}
+                  title={resource ? undefined : scalar?.text}
                 >
                   {!cell.present ? (
                     <span className="empty">—</span>
@@ -99,7 +104,11 @@ export function PreviewArrayTable({ value, fontSize, onOpen }: PreviewArrayTable
                   )}
                 </div>
               )
-              return nested ? (
+              return resource ? (
+                <Tooltip key={item.key} content={() => <ResourcePreview key={resource.url} resource={resource} />} variant="image">
+                  {content}
+                </Tooltip>
+              ) : nested ? (
                 <Tooltip
                   key={item.key}
                   content={() => formatJsonPreview(cell.value, { timeZone }).text}

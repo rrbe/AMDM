@@ -5,7 +5,7 @@ This file contains only repository-level non-negotiable rules. Read the relevant
 ## Git workflow
 
 1. Commit only when the user explicitly asks; otherwise leave changes in the working tree.
-2. Use Conventional Commits: `<type>: <summary>`.
+2. Write all commit messages in English and use Conventional Commits: `<type>: <summary>`.
 3. Work directly on `master`; do not create feature branches or pull requests, and never force-push.
 
 ## Releases
@@ -18,7 +18,7 @@ This file contains only repository-level non-negotiable rules. Read the relevant
 
 AMDM is a performance-first MongoDB desktop GUI built with Electron, React, TypeScript, and Vite.
 
-The current Electron capability baseline is Electron 44 (`electron@^44.7.0`). Keep this line synchronized with Electron upgrades.
+The current Electron capability baseline is Electron 44 (`electron@^44.9.1`). Keep this line synchronized with Electron upgrades.
 
 Read the documentation relevant to the task:
 
@@ -86,3 +86,8 @@ Use pnpm exclusively. The project has no linter. Choose type-checking and target
 - When benchmarks are warranted, reuse or extend the existing benchmarks and `test/helpers/packagedElectron.mjs`. Collect repeated before/after samples on the same machine with equivalent data, settings, build mode, and cache state; retain raw reports outside `dist/` when rebuilding. State the measurement boundary: Shell IPC timings do not measure result rendering or scrolling.
 - When runtime UI verification is warranted, use the current Electron Renderer with Electron DevTools/CDP to inspect relevant DOM, computed styles, events, focus, and scrolling. A regular Chrome page is not a substitute. This does not make automated E2E a requirement for every UI change.
 - For complex changes to data views, shared per-cell components, or virtualization that warrant performance validation, profile view switching and scrolling in Electron with representative wide and nested results. Compare before/after timings and mounted cell/DOM counts using the same data, viewport, and build mode. Passing type checks and tests is not evidence of acceptable interaction latency; investigate measured bottlenecks before choosing an optimization.
+
+## Strict Rules
+
+- Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining
+- Avoid designs that cause the page to flicker—for example, changes in modal height when switching tabs, or shifts in the position of a drop-down menu as the user scrolls through its options.

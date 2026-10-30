@@ -39,7 +39,7 @@ import {
   type ConnectionOption
 } from '@renderer/lib/connectionUri'
 
-type Tab = 'general' | 'auth' | 'ssh' | 'tls'
+type Tab = 'general' | 'auth' | 'ssh' | 'tls' | 'other'
 type MemberRow = ConnectionMember & { id: string }
 type OptionRow = ConnectionOption & { id: string }
 
@@ -205,6 +205,8 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
     )
   )
   const [replicaSet, setReplicaSet] = useState(editing?.replicaSet ?? '')
+  const [previewResources, setPreviewResources] = useState(editing?.previewResources ?? true)
+  const [cdnPrefix, setCdnPrefix] = useState(editing?.cdnPrefix ?? '')
   const [defaultDatabase, setDefaultDatabase] = useState(editing?.defaultDatabase ?? '')
   const [readPreference, setReadPreference] = useState(() => splitConnectionOptions(editing?.options).readPreference)
   const [customOptions, setCustomOptions] = useState<OptionRow[]>(() =>
@@ -386,6 +388,8 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
         replicaSet: replicaSet.trim() || undefined,
         defaultDatabase: defaultDatabase.trim() || undefined,
         options: Object.keys(options).length ? options : undefined,
+        previewResources,
+        cdnPrefix: cdnPrefix.trim() || undefined,
         auth: {
           type: authType,
           username: authType === 'scram' ? username.trim() || undefined : undefined,
@@ -436,6 +440,8 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
       host,
       replicaSet,
       defaultDatabase,
+      previewResources,
+      cdnPrefix,
       options,
       authType,
       username,
@@ -548,10 +554,10 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
   return (
     <Modal
       title={tFn(copyFromId ? 'connection.menu.duplicate' : editing ? 'connection.title.edit' : 'connection.title.new')}
-      description={tFn('connection.description')}
       onClose={handleModalClose}
       size="lg"
-      lockTop
+      className="h-[840px] max-h-[calc(100vh-48px)]"
+      bodyClassName="flex-1"
       headerActions={
         <>
           <Button
@@ -589,7 +595,8 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
             { value: 'general', label: tFn('connection.tab.general') },
             { value: 'auth', label: tFn('connection.tab.auth') },
             ...(!IS_WEB ? [{ value: 'ssh' as const, label: 'SSH' }] : []),
-            { value: 'tls', label: 'TLS' }
+            { value: 'tls', label: 'TLS' },
+            { value: 'other', label: tFn('connection.tab.other') }
           ]}
         />
       }
@@ -916,6 +923,26 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
         </>
       )}
 
+      {tab === 'other' && (
+        <section className="connection-form-section">
+          <div className="form-row">
+            <Checkbox
+              checked={previewResources}
+              onCheckedChange={setPreviewResources}
+              label={tFn('connection.general.previewResources')}
+            />
+          </div>
+          <Field label={tFn('connection.general.cdnPrefix')}>
+            <Input
+              value={cdnPrefix}
+              onChange={(event) => setCdnPrefix(event.target.value)}
+              disabled={!previewResources}
+              placeholder="https://cdn.example.com/"
+            />
+          </Field>
+        </section>
+      )}
+
       {tab === 'auth' && (
         <>
           <div className="mb-3 text-[11px] text-[var(--fg-3)]">
@@ -1153,7 +1180,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
             <DialogTitle id={fromUrlTitleId} render={<span className="text-[13px] font-semibold" />}>
               {tFn('connection.uri.fromUrlTitle')}
             </DialogTitle>
-            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.fromUrlHint')}</span>
           </div>
         </div>
         <textarea
@@ -1199,7 +1225,6 @@ export function ConnectionForm({ editing, copyFromId, onClose }: ConnectionFormP
             <DialogTitle id={toUrlTitleId} render={<span className="text-[13px] font-semibold" />}>
               {tFn('connection.uri.toUrlTitle')}
             </DialogTitle>
-            <span className="text-[11px] text-muted-foreground">{tFn('connection.uri.toUrlHint')}</span>
           </div>
         </div>
         {/* Editable: regenerated on open / password-toggle, but the user can tweak

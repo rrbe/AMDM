@@ -85,6 +85,7 @@ describe('settingsStore', () => {
       contextPanelOpen: false,
       editorHeight: 142,
       acknowledgedUpdateVersion: null,
+      confirmBeforeQuit: true,
       automaticUpdateChecks: true
     })
   })
@@ -120,6 +121,15 @@ describe('settingsStore', () => {
     settingsStore.update({ acknowledgedUpdateVersion: '26.8.11' })
     settingsStore.init()
     expect(settingsStore.get().acknowledgedUpdateVersion).toBe('26.8.11')
+  })
+
+  it('defaults existing installations to confirmation and persists the quit preference', () => {
+    electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
+    settingsStore.init()
+    expect(settingsStore.get().confirmBeforeQuit).toBe(true)
+    settingsStore.update({ confirmBeforeQuit: false })
+    settingsStore.init()
+    expect(settingsStore.get().confirmBeforeQuit).toBe(false)
   })
 
   it('persists the automatic update-check preference', () => {

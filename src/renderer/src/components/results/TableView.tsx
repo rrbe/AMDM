@@ -2,23 +2,8 @@ import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
-  Braces,
-  Copy,
-  Download,
-  Eye,
-  FilePenLine,
-  KeyRound,
-  Pencil,
-  Table2,
-  Terminal,
-  TextCursorInput,
-  Trash2
-} from 'lucide-react'
-import type { CollectionSort } from '@shared/types'
+import { ArrowDown, ArrowUp, Braces, ChevronsUpDown, Copy, Eye, FilePenLine, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
+import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
 import {
@@ -45,7 +30,6 @@ import {
   toCsv,
   toPlainJson,
   toPlainKeyValue,
-  toShellText,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -54,7 +38,10 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { jsonCopyMenuItems } from './documentFormatMenus'
+import { resourcePreview } from '@renderer/lib/resourcePreview'
+import { ResourcePreview, useResourcePreviewSettings } from './ResourcePreview'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
+import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
 /**
@@ -80,10 +67,15 @@ import { useResultTimeZone } from './ResultTimeZone'
 
 interface TableViewProps {
   docs: unknown[]
+  displayDocs?: unknown[]
+  fields?: string[]
+  loading?: boolean
+  onSelectFields: () => void
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onExport: (documents: unknown[]) => void
+  onDocumentOrderChange: (sourceIndexes: number[]) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, rows whose doc has an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -110,16 +102,22 @@ function columnStyle(width: number, index: number): CSSProperties {
 
 export function TableView({
   docs,
+  displayDocs = docs,
+  fields,
+  loading = false,
+  onSelectFields,
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
+  onDocumentOrderChange,
   onExport,
   docCtx
 }: TableViewProps): React.JSX.Element {
   const { t, i18n: tableI18n } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   const nestedDisplay = useAppStore((s) => s.settings.tableNestedDisplay)
   const columnOrder = useAppStore((s) => getActiveTab(s).tableColumnOrder)
   const setColumnOrder = useAppStore((s) => s.setTableColumnOrder)
@@ -155,6 +153,7 @@ export function TableView({
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: TableColumn } | null>(null)
   const selectedRows = selectedDocIndexes
   const [anchorRow, setAnchorRow] = useState<number | null>(null)
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
   // Drag a header cell's right-edge handle to resize that column.
@@ -175,20 +174,34 @@ export function TableView({
   }
 
   const derivedGroups = useMemo(
-    () => deriveTableColumnGroups(docs, nestedDisplay, fieldSort),
-    [docs, nestedDisplay, fieldSort]
+    () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort, idFirst, fields),
+    [displayDocs, nestedDisplay, fieldSort, idFirst, fields]
   )
   const groups = useMemo(() => {
     const byKey = new Map(derivedGroups.map((group) => [group.key, group]))
-    return orderTableColumns([...byKey.keys()], columnOrder).map((key) => byKey.get(key)!)
-  }, [derivedGroups, columnOrder])
+    return orderTableColumns([...byKey.keys()], columnOrder, idFirst).map((key) => byKey.get(key)!)
+  }, [derivedGroups, columnOrder, idFirst])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
-  const hasPinnedId = groups[0]?.key === '_id'
+  useEffect(() => {
+    setSelectedCell((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
+    setEditing((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
+  }, [columns])
+  const hasPinnedId = idFirst && groups[0]?.key === '_id'
   const groupStyle = (width: number, groupIndex: number): CSSProperties =>
     hasPinnedId && groupIndex === 0
       ? { width, left: INDEX_COL_WIDTH }
       : columnStyle(width, groupIndex - Number(hasPinnedId))
   const headerHeight = (fontSize + 11) * (groups.some((group) => group.columns[0].path.length > 1) ? 2 : 1)
+  const groupLayout = useMemo(() => {
+    let left = INDEX_COL_WIDTH
+    return groups.map((group) => {
+      const width = group.columns.reduce((sum, column) => sum + widthOf(column), 0)
+      const item = { id: group.key, left, width }
+      left += width
+      return item
+    })
+  }, [groups, widthOf])
+  const reorderLayout = useMemo(() => groupLayout.slice(Number(hasPinnedId)), [groupLayout, hasPinnedId])
   const moveColumn = useCallback(
     (source: string, target: string) => {
       if (source === target) return
@@ -201,12 +214,16 @@ export function TableView({
     },
     [groups, setColumnOrder]
   )
-  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn, setDraggingGroup, endColumnDrag)
+  useHorizontalReorder(parentRef, JSON.stringify(groups), COLUMN_REORDER, moveColumn, setDraggingGroup, endColumnDrag, reorderLayout)
+  const sortColumnId = columns.find((column) => column.id === tableSort?.column)?.id
   const rows = useMemo(() => {
-    const column = columns.find((column) => column.id === tableSort?.column)
-    const sort = tableSort && column ? { ...tableSort, column: column.path } : null
+    const sort = tableSort && sortColumnId ? { ...tableSort, column: JSON.parse(sortColumnId) as string[] } : null
     return sortTableRows(docs, sort, tableI18n.resolvedLanguage ?? tableI18n.language)
-  }, [docs, columns, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
+  }, [docs, sortColumnId, tableSort, tableI18n.resolvedLanguage, tableI18n.language])
+
+  useEffect(() => {
+    onDocumentOrderChange(rows.map((row) => row.sourceIndex))
+  }, [onDocumentOrderChange, rows])
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -221,10 +238,7 @@ export function TableView({
     ),
     [groups, widthOf]
   )
-  const draggingColumnIndexes = useMemo(
-    () => columnLayout.flatMap((entry, index) => groups[entry.groupIndex].key === draggingGroup ? [index] : []),
-    [columnLayout, groups, draggingGroup]
-  )
+  const draggingColumnIndex = columnLayout.findIndex((entry) => groups[entry.groupIndex].key === draggingGroup)
   const focusedColumnIndex = columns.findIndex((column) => column.id === (editing?.col.id ?? selectedCell?.col.id))
   const columnVirtualizer = useVirtualizer({
     horizontal: true,
@@ -233,19 +247,26 @@ export function TableView({
     estimateSize: (index) => columnLayout[index].width,
     getItemKey: (index) => columns[index].id,
     paddingStart: INDEX_COL_WIDTH,
-    overscan: 2 + draggingColumnIndexes.length,
+    overscan: 2,
     rangeExtractor: useCallback(
       (range) => {
         const indexes = new Set(defaultRangeExtractor(range))
         if (hasPinnedId) indexes.add(0)
         if (focusedColumnIndex >= 0) indexes.add(focusedColumnIndex)
-        for (const index of draggingColumnIndexes) indexes.add(index)
+        if (draggingColumnIndex >= 0) indexes.add(draggingColumnIndex)
         return [...indexes].sort((a, b) => a - b)
       },
-      [hasPinnedId, focusedColumnIndex, draggingColumnIndexes]
+      [hasPinnedId, focusedColumnIndex, draggingColumnIndex]
     )
   })
   const visibleColumns = columnVirtualizer.getVirtualItems()
+  const visibleGroups = new Map<number, typeof visibleColumns>()
+  for (const item of visibleColumns) {
+    const groupIndex = columnLayout[item.index].groupIndex
+    const items = visibleGroups.get(groupIndex) ?? []
+    items.push(item)
+    visibleGroups.set(groupIndex, items)
+  }
 
   useEffect(() => columnVirtualizer.measure(), [columnLayout, columnVirtualizer])
 
@@ -348,7 +369,8 @@ export function TableView({
       onSelectedDocIndexesChange(new Set([row]))
       setAnchorRow(row)
     }
-    setSelectedCell(col ? { row, col } : null)
+    const copyCol = selectedRows.has(row) && (selectedRows.size > 1 || selectedCell === null) ? null : col
+    setSelectedCell(copyCol ? { row, col: copyCol } : null)
     const doc = docs[row]
     const source: JsonPreviewSource | undefined = docCtx
       ? { ...docCtx, ...(docHasId(doc) ? { id: doc._id } : {}) }
@@ -358,21 +380,18 @@ export function TableView({
         label: t('result.dataMenu.view'),
         icon: <Eye size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => setPreview({ title: t('result.documentPreviewTitle'), value: doc, documentView: true, source })
-      }
+      },
+      { label: t('result.selectFields'), icon: <ListFilter size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: onSelectFields }
     ]
     if (docCtx && docHasId(doc)) {
       items.push({
         label: t('result.dataMenu.edit'),
         icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          {
-            label: t('table.editDoc'),
-            icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />,
-            onClick: () => setEditIndex(row)
-          },
+          { label: t('table.editDoc'), icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(row) },
           {
             label: t('table.editCell'),
-            icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
+            icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: col == null || !canEditCell(row, col),
             onClick: () => {
               if (col != null) startEditCell(row, col)
@@ -384,13 +403,9 @@ export function TableView({
     items.push({
       label: t('result.dataMenu.copy'),
       icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
-      children: tableCopyMenuItems(selectedIndexes, row, col, docs, fieldSort)
+      children: tableCopyMenuItems(selectedIndexes, row, copyCol, docs, fieldSort, setAdvancedCopy)
     })
-    if (!IS_WEB) items.push({
-      label: t('result.dataMenu.export'),
-      icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => onExport(selectedIndexes.map((index) => docs[index]))
-    })
+    if (!IS_WEB) items.push(resultExportMenuItem(selectedIndexes.map((index) => docs[index]), onExport))
     if (docCtx && docHasId(doc)) {
       items.push('separator')
       items.push({
@@ -411,11 +426,12 @@ export function TableView({
 
   const editDoc = editIndex !== null ? docs[editIndex] : undefined
 
-  const renderColumnHeader = (col: TableColumn): React.JSX.Element => (
+  const renderColumnHeader = (col: TableColumn, left?: number): React.JSX.Element => (
     <TableColumnHeader
       key={col.id}
       column={col}
       width={widthOf(col)}
+      left={left}
       direction={tableSort?.column === col.id ? tableSort.direction : undefined}
       onResize={(event) => startColResize(col, event)}
       onSort={() =>
@@ -426,6 +442,8 @@ export function TableView({
       }
     />
   )
+
+  if (loading) return <div className="center-msg muted" aria-busy="true">{t('common.loading')}</div>
 
   return (
     <div
@@ -448,15 +466,17 @@ export function TableView({
           <div className="tbl-th idx" style={{ width: INDEX_COL_WIDTH }}>
             #
           </div>
-          {groups.map((group, groupIndex) => (
+          {[...visibleGroups].map(([groupIndex, items]) => {
+            const group = groups[groupIndex]
+            const layout = groupLayout[groupIndex]
+            return (
             <div
               key={group.key}
-              className={`tbl-column-group${group.key === '_id' ? ' tbl-pinned-id' : ''}`}
+              className={`tbl-column-group${idFirst && group.key === '_id' ? ' tbl-pinned-id' : ''}`}
               data-column={group.key}
-              style={groupStyle(
-                group.columns.reduce((sum, col) => sum + widthOf(col), 0),
-                groupIndex
-              )}
+              style={hasPinnedId && groupIndex === 0
+                ? groupStyle(layout.width, groupIndex)
+                : { ...groupStyle(layout.width, groupIndex), position: 'absolute', left: layout.left }}
             >
               {group.columns[0].path.length > 1 ? (
                 <>
@@ -465,13 +485,15 @@ export function TableView({
                       <span className="tbl-col-label">{group.key}</span>
                     </Tooltip>
                   </div>
-                  <div className="tbl-group-children">{group.columns.map(renderColumnHeader)}</div>
+                  <div className="tbl-group-children" style={{ position: 'relative' }}>
+                    {items.map((item) => renderColumnHeader(columns[item.index], item.start - layout.left))}
+                  </div>
                 </>
               ) : (
                 renderColumnHeader(group.columns[0])
               )}
             </div>
-          ))}
+          )})}
         </div>
 
         {/* Virtualized rows */}
@@ -558,6 +580,9 @@ export function TableView({
         />
       )}
 
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -574,12 +599,14 @@ export function TableView({
 function TableColumnHeader({
   column,
   width,
+  left,
   direction,
   onSort,
   onResize
 }: {
   column: TableColumn
   width: number
+  left?: number
   direction?: TableSortDirection
   onSort: () => void
   onResize: (event: MouseEvent) => void
@@ -595,7 +622,7 @@ function TableColumnHeader({
     <div
       className="tbl-th"
       data-column-path={column.id}
-      style={{ width }}
+      style={{ width, ...(left === undefined ? {} : { position: 'absolute', left }) }}
       role="columnheader"
       aria-sort={direction === undefined ? 'none' : direction === 'asc' ? 'ascending' : 'descending'}
     >
@@ -627,50 +654,43 @@ function tableCopyMenuItems(
   row: number,
   col: TableColumn | null,
   docs: unknown[],
-  fieldSort: CollectionSort
+  fieldSort: CollectionSort,
+  openAdvanced: (documents: unknown[]) => void
 ): ContextMenuEntry[] {
-  const cell = col == null ? { present: false, value: undefined } : cellValue(docs[row], col.path)
-  const hasValue = col != null && cell.present
-  const single = docs[row]
-  const sel = rows.map((i) => docs[i]) // effective rows: the multi-selection, or just this row
-  const many = rows.length > 1
-  const formatted = many ? sel : single
+  if (col === null) {
+    const selected = rows.map((index) => docs[index])
+    return [
+      ...jsonCopyMenuItems(selected, (text) => void copyText(text), openAdvanced),
+      {
+        label: i18n.t('result.copy.csv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+        onClick: () => void copyText(toCsv(selected, fieldSort))
+      },
+      {
+        label: i18n.t('result.copy.tsv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+        onClick: () => void copyText(toTsv(selected, fieldSort))
+      }
+    ]
+  }
+  const cell = cellValue(docs[row], col.path)
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
-      icon: <KeyRound size={16} strokeWidth={1.8} aria-hidden="true" />,
-      disabled: col == null,
-      onClick: () => void copyText(col?.path.join('.') ?? '')
+      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
+      onClick: () => void copyText(col.path.join('.'))
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
-      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
-      disabled: !hasValue,
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
+      disabled: !cell.present,
       onClick: () => void copyText(plainScalarText(cell.value))
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
       icon: <Braces size={16} strokeWidth={1.8} aria-hidden="true" />,
-      disabled: !hasValue,
-      onClick: () => void copyText(toPlainKeyValue(col?.path.join('.') ?? '', cell.value))
-    },
-    'separator',
-    ...jsonCopyMenuItems(sel, (text) => void copyText(text)),
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copyMongoShell'),
-      icon: <Terminal size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => void copyText(toShellText(formatted))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyCsv'),
-      icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => void copyText(toCsv(sel, fieldSort))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyTsv'),
-      icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => void copyText(toTsv(sel, fieldSort))
+      disabled: !cell.present,
+      onClick: () => void copyText(toPlainKeyValue(col.path.join('.'), cell.value))
     }
   ]
 }
@@ -703,6 +723,7 @@ function Cell({
   onContextMenu: (e: MouseEvent) => void
 }): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const previewSettings = useResourcePreviewSettings()
   const { present, value } = cellValue(doc, column.path)
   const cellCls = `tbl-td${column.path[0] === '_id' ? ' tbl-pinned-id' : ''}${selected ? ' selected' : ''}`
 
@@ -724,11 +745,12 @@ function Cell({
   const expandable = Array.isArray(value) || (isPlainObject(value) && !isExtended(value))
   const tokens = expandable ? toInlineJsonTokens(value, timeZone) : null
   const scalar = tokens ? null : formatScalar(value, timeZone)
+  const resource = resourcePreview(value, previewSettings)
   return (
     <Tooltip
-      content={expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
+      content={resource ? () => <ResourcePreview key={resource.url} resource={resource} /> : expandable ? () => formatJsonPreview(value, { timeZone }).text : scalar!.text}
       footer={expandable ? openPreviewHint : undefined}
-      variant={expandable ? 'code' : 'compact'}
+      variant={resource ? 'image' : expandable ? 'code' : 'compact'}
     >
       <div
         className={cellCls}

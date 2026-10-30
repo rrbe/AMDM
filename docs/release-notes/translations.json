@@ -1,4 +1,76 @@
 {
+  "add result display field filtering": {
+    "en": "Select which fields appear in query results",
+    "zh": "支持选择查询结果中显示的字段"
+  },
+  "improve tab tooltip coverage and compact spacing": {
+    "en": "Improve tab tooltips and compact spacing",
+    "zh": "完善标签页提示并紧凑布局间距"
+  },
+  "highlight slow queries and reposition query timing": {
+    "en": "Highlight slow queries and improve query timing placement",
+    "zh": "突出显示慢查询并优化查询耗时的位置"
+  },
+  "organize display settings and add result field sorting": {
+    "en": "Organize display settings and add result field sorting",
+    "zh": "整理显示设置并支持结果字段排序"
+  },
+  "require concise UI labels and stable layouts": {
+    "en": "Require concise UI labels and stable layouts",
+    "zh": "规范简洁的界面文案和稳定的布局"
+  },
+  "streamline export options and initialize export destinations": {
+    "en": "Simplify export options and initialize export destinations",
+    "zh": "精简导出选项并初始化导出位置"
+  },
+  "simplify result copy menus and add advanced JSON options": {
+    "en": "Simplify result copy menus and add advanced JSON copy options",
+    "zh": "精简结果复制菜单并新增高级 JSON 复制选项"
+  },
+  "confirm workspace close and await connection cleanup (#35)": {
+    "en": "Confirm workspace closure and wait for connection cleanup (#35)",
+    "zh": "关闭工作区时请求确认并等待连接清理完成 (#35)"
+  },
+  "require English commit messages": {
+    "en": "Require English commit messages",
+    "zh": "规范使用英文提交信息"
+  },
+  "等待浮层可见后再发送原生点击": {
+    "en": "Wait for overlays to become visible before sending native clicks",
+    "zh": "等待浮层可见后再发送原生点击"
+  },
+  "统一 Query 菜单原生右键事件序列": {
+    "en": "Unify native right-click event sequences for Query menus",
+    "zh": "统一 Query 菜单原生右键事件序列"
+  },
+  "修复 daily Query 菜单跨平台 E2E": {
+    "en": "Fix cross-platform Query menu E2E coverage in daily checks",
+    "zh": "修复每日检查中 Query 菜单的跨平台 E2E 测试"
+  },
+  "display BSON dates in selected time zone (#33)": {
+    "en": "Display BSON dates in the selected time zone (#33)",
+    "zh": "按所选时区显示 BSON 日期 (#33)"
+  },
+  "修复 Query 右键命令并调整菜单顺序": {
+    "en": "Fix Query context-menu commands and adjust menu order",
+    "zh": "修复 Query 右键命令并调整菜单顺序"
+  },
+  "为 PR 保留核心 E2E，完整跨平台回归每日运行 (#32)": {
+    "en": "Keep core E2E checks for PRs and run full cross-platform regression daily (#32)",
+    "zh": "为 PR 保留核心 E2E，每日执行完整跨平台回归 (#32)"
+  },
+  "支持连接配置导入导出 (#31)": {
+    "en": "Import and export connection configurations (#31)",
+    "zh": "支持连接配置导入导出 (#31)"
+  },
+  "reduce default tooltip delay to 300ms": {
+    "en": "Reduce the default tooltip delay to 300 ms",
+    "zh": "将默认提示延迟缩短为 300 毫秒"
+  },
+  "add live query diagnostics (#30)": {
+    "en": "Add live query diagnostics (#30)",
+    "zh": "新增实时查询诊断 (#30)"
+  },
   "add web edition with current desktop interface and features (#29)": {
     "en": "Add an internal Web edition with the current desktop interface and feature set",
     "zh": "新增内部 Web 版，采用桌面版现有界面和功能"

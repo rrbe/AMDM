@@ -116,6 +116,8 @@ class ConnectionStore {
       replicaSet: input.replicaSet,
       defaultDatabase: input.defaultDatabase,
       options: input.options,
+      previewResources: input.previewResources,
+      cdnPrefix: input.cdnPrefix,
       auth: input.auth,
       ssh: input.ssh,
       tls: input.tls,

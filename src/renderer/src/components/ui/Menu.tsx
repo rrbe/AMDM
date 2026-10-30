@@ -67,7 +67,20 @@ function MenuEntries({ items, finalFocus }: { items: MenuEntry[]; finalFocus?: M
           )
           return (
             <BaseMenu.SubmenuRoot key={index}>
-              {submenuTrigger}
+              {item.description != null ? (
+                <Tooltip
+                  content={item.description}
+                  disabled={item.disabled}
+                  variant="text"
+                  side="right"
+                  delay={500}
+                  align="start"
+                >
+                  {submenuTrigger}
+                </Tooltip>
+              ) : (
+                submenuTrigger
+              )}
               <BaseMenu.Portal>
                 <BaseMenu.Positioner
                   className="ui-menu-positioner"

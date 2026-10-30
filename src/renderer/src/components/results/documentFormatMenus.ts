@@ -1,48 +1,41 @@
-import type { JsonEncoding } from '@shared/types'
-import { Braces } from 'lucide-react'
+import type { JsonEncoding, ResultExportFormat } from '@shared/types'
+import { Braces, Download, SlidersHorizontal, Terminal } from 'lucide-react'
 import { createElement } from 'react'
 import i18n from '@renderer/i18n'
 import type { ContextMenuEntry } from '@renderer/components/ContextMenu'
-import { toEncodedJsonArray, toEncodedJsonLines } from '@renderer/lib/resultCopy'
+import { toEncodedJsonArray, toShellText } from '@renderer/lib/resultCopy'
 
 type CopyDocuments = (text: string) => void
-const iconProps = { size: 16, strokeWidth: 1.8, 'aria-hidden': true } as const
+export type ExportDocuments = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
 
-const JSON_ENCODINGS = [
-  {
-    value: 'plain',
-    labelKey: 'result.copy.plainJson',
-    helpKey: 'io.encodingHelp.plain'
-  },
-  {
-    value: 'relaxed',
-    labelKey: 'result.copy.relaxedEjson',
-    helpKey: 'io.encodingHelp.relaxed'
-  },
-  {
-    value: 'canonical',
-    labelKey: 'result.copy.canonicalEjson',
-    helpKey: 'io.encodingHelp.canonical'
-  }
-] as const satisfies ReadonlyArray<{
-  value: JsonEncoding
-  labelKey: string
-  helpKey: string
-}>
-
-export function jsonCopyMenuItems(documents: unknown[], copy: CopyDocuments): ContextMenuEntry[] {
+export function jsonCopyMenuItems(
+  documents: unknown[],
+  copy: CopyDocuments,
+  openAdvanced: (documents: unknown[]) => void
+): ContextMenuEntry[] {
   return [
-    ...JSON_ENCODINGS.map(({ value, labelKey, helpKey }) => ({
-      label: i18n.t(labelKey),
-      icon: createElement(Braces, iconProps),
-      description: i18n.t(helpKey),
-      onClick: () => copy(toEncodedJsonArray(documents, value))
-    })),
     {
-      label: i18n.t('result.copy.jsonl'),
-      icon: createElement(Braces, iconProps),
-      description: i18n.t('io.layoutHelp.jsonl'),
-      onClick: () => copy(toEncodedJsonLines(documents, 'plain'))
+      label: i18n.t('result.copy.plainJson'),
+      icon: createElement(Braces, { size: 16, strokeWidth: 1.8, 'aria-hidden': true }),
+      onClick: () => copy(toEncodedJsonArray(documents, 'plain'))
+    },
+    {
+      label: i18n.t('result.copy.advancedJson'),
+      icon: createElement(SlidersHorizontal, { size: 16, strokeWidth: 1.8, 'aria-hidden': true }),
+      onClick: () => openAdvanced(documents)
+    },
+    {
+      label: i18n.t('result.copy.mongoShell'),
+      icon: createElement(Terminal, { size: 16, strokeWidth: 1.8, 'aria-hidden': true }),
+      onClick: () => copy(toShellText(documents.length === 1 ? documents[0] : documents))
     }
   ]
+}
+
+export function resultExportMenuItem(documents: unknown[], exportDocuments: ExportDocuments): ContextMenuEntry {
+  return {
+    label: i18n.t('result.dataMenu.export'),
+    icon: createElement(Download, { size: 16, strokeWidth: 1.8, 'aria-hidden': true }),
+    onClick: () => exportDocuments('json', documents, 'plain')
+  }
 }

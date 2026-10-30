@@ -1,3 +1,4 @@
+import { useAppStore } from '@renderer/store/useAppStore'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ShellOutputLine } from '@shared/types'
@@ -25,8 +26,10 @@ interface ConsoleViewProps {
 
 export function ConsoleView({ output, fontSize, truncated, controlsContainer, folding }: ConsoleViewProps): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   const { t } = useTranslation()
-  const lines = useMemo(() => toConsoleLines(output, timeZone), [output, timeZone])
+  const lines = useMemo(() => toConsoleLines(output, timeZone, fieldSort, idFirst), [output, timeZone, fieldSort, idFirst])
 
   useCopyHotkey(() => consoleText(output))
 

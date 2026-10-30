@@ -147,12 +147,18 @@ async function confirmOverwrite(filePath: string, win: BrowserWindow | null): Pr
   return result.response === 0
 }
 
-/** Grant this Renderer an owner-scoped directory chosen through the native picker. */
+/** Grant this Renderer an owner-scoped default or native-selected directory. */
 export async function chooseExportDirectory(
   win: BrowserWindow | null,
   owner: WebContents,
-  defaultPath: string
+  defaultPath: string,
+  useDefault = false
 ): Promise<ExportDirectorySelection | null> {
+  if (useDefault) {
+    const selection = { selectionId: randomUUID(), path: defaultPath }
+    exportDirectories.set(owner, selection)
+    return selection
+  }
   const options: Electron.OpenDialogOptions = {
     title: directoryDialogTitle(),
     defaultPath,

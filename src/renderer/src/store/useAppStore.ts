@@ -220,6 +220,7 @@ interface AppState {
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
   setResultFoldedLines(view: ResultFoldView, lines: number[]): void
+  setVisibleFields(fields: string[] | null): void
   setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
@@ -273,7 +274,7 @@ interface AppState {
 
   // ---- actions: import/export (Phase 3) ----
   exportProgress: Record<string, ExportProgress | undefined>
-  chooseExportDirectory(): Promise<ExportDirectorySelection | null>
+  chooseExportDirectory(useDefault?: boolean): Promise<ExportDirectorySelection | null>
   exportCollection(req: ExportFileRequest): Promise<DataOpResult>
   cancelExport(taskId: string): Promise<boolean>
   openExportedFile(taskId: string): Promise<string | null>
@@ -1329,6 +1330,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  setVisibleFields(fields) {
+    set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, {
+      visibleFields: fields,
+      results: getActiveTab(s).results.map((result) => ({
+        ...result,
+        foldedLines: { ...result.foldedLines, json: undefined }
+      }))
+    }) }))
+  },
+
   setTableColumnOrder(order) {
     set((s) => ({ tabs: patchTab(s.tabs, s.activeTabId, { tableColumnOrder: order }) }))
   },
@@ -1959,9 +1970,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ------------------------------------------------------------- import/export
-  async chooseExportDirectory() {
+  async chooseExportDirectory(useDefault = false) {
     try {
-      return await window.api.io.chooseExportDirectory()
+      return await window.api.io.chooseExportDirectory(useDefault)
     } catch (e) {
       get().notify(
         appNotice(
@@ -2169,6 +2180,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 // Result ownership follows the tab/result lifecycle, including automatic eviction.
 useAppStore.subscribe((state, previous) => {
+  if (
+    state.settings.resultFieldSort !== previous.settings.resultFieldSort ||
+    state.settings.resultIdFirst !== previous.settings.resultIdFirst
+  ) {
+    useAppStore.setState({
+      tabs: state.tabs.map((tab) => ({
+        ...tab,
+        tableColumnOrder: [],
+        results: tab.results.map((result) => ({
+          ...result,
+          foldedLines: { ...result.foldedLines, json: [], console: [] }
+        }))
+      }))
+    })
+  }
   if (state.tabs === previous.tabs) return
   for (const tab of previous.tabs) {
     const next = state.tabs.find((item) => item.id === tab.id)

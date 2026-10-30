@@ -8,6 +8,7 @@ import {
   releaseSchemaPanels,
   schemaPanelKey,
   schemaPanelTarget,
+  schemaResultMatchesTarget,
   schemaNodeLabel,
   visibleSchemaRows,
   type SchemaPanelState
@@ -121,5 +122,24 @@ describe('Schema sidebar namespace and lifecycle', () => {
       owner
     })
     expect(Object.keys(releaseSchemaPanels(panels, 'c1'))).toEqual([schemaPanelKey({ ...target, connectionId: 'c2' })])
+  })
+})
+
+describe('schema display field selection target', () => {
+  const target = { connectionId: 'c1', database: 'db1', collection: 'users' }
+  const result = {
+    id: 'r1', seq: 1, executedAt: 0, skip: 0,
+    query: { connectionId: 'c1', database: 'db1', code: 'db.users.find()' },
+    result: { kind: 'documents' as const, collection: 'users', data: [] }
+  }
+
+  it('allows only document results from the same namespace', () => {
+    expect(schemaResultMatchesTarget(result, target)).toBe(true)
+    for (const changed of [
+      { connectionId: 'c2' }, { database: 'db2' }, { collection: 'orders' }
+    ]) expect(schemaResultMatchesTarget(result, { ...target, ...changed })).toBe(false)
+    expect(schemaResultMatchesTarget(null, target)).toBe(false)
+    expect(schemaResultMatchesTarget({ ...result, query: null }, target)).toBe(false)
+    expect(schemaResultMatchesTarget({ ...result, result: { kind: 'value', collection: 'users', data: 1 } }, target)).toBe(false)
   })
 })

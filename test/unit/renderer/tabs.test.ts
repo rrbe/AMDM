@@ -9,6 +9,7 @@ import {
   appendResult,
   closeResult,
   createTab,
+  hasWorkspaceContent,
   dbCollRef,
   indexDetailsQuery,
   isRunFailure,
@@ -24,6 +25,20 @@ import {
   type ResultTab
 } from '../../../src/renderer/src/lib/tabs'
 import type { ShellResult } from '../../../src/shared/types'
+
+describe('workspace close warning', () => {
+  it('does not warn for a single empty tab', () => {
+    expect(hasWorkspaceContent([createTab('empty')])).toBe(false)
+    expect(hasWorkspaceContent([createTab('whitespace', { code: '  \n' })])).toBe(false)
+  })
+
+  it('warns for query text, results, running queries, or multiple tabs', () => {
+    expect(hasWorkspaceContent([createTab('code', { code: 'db.items.find()' })])).toBe(true)
+    expect(hasWorkspaceContent([createTab('running', { running: true })])).toBe(true)
+    expect(hasWorkspaceContent([createTab('results', { results: [{ result: { kind: 'value', data: 1 } } as ResultTab] })])).toBe(true)
+    expect(hasWorkspaceContent([createTab('one'), createTab('two')])).toBe(true)
+  })
+})
 
 describe('dbCollRef', () => {
   it('quotes unsafe or reserved collection names', () => {

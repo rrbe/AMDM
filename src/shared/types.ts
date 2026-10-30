@@ -89,6 +89,8 @@ export interface ConnectionConfig {
   defaultDatabase?: string
   /** Extra connection-string options, e.g. { readPreference: 'secondaryPreferred' }. */
   options?: Record<string, string>
+  previewResources?: boolean
+  cdnPrefix?: string
 
   auth: AuthConfig
   ssh: SshConfig
@@ -546,7 +548,7 @@ export interface DataOpResult {
 // ---------------------------------------------------------------------------
 
 /** How databases/collections are ordered in the catalog tree. */
-export type CollectionSort = 'natural' | 'alpha'
+export type CollectionSort = 'natural' | 'alpha' | 'alphaDesc'
 
 /**
  * UI color theme. 'system' (default) follows the OS appearance and reacts to
@@ -588,8 +590,10 @@ export interface AppSettings {
   connectionOrder: string[]
   /** Absolute directory opened first by the native export-directory picker. */
   defaultExportDirectory: string
-  /** 'natural' = server order; 'alpha' = A→Z by name. */
+  /** 'natural' = server order; 'alpha' = A→Z; 'alphaDesc' = Z→A. */
   collectionSort: CollectionSort
+  resultFieldSort: CollectionSort
+  resultIdFirst: boolean
   /** 'system' = follow OS (default); 'light' = Stone; 'dark' = Stone Night. */
   theme: ThemeMode
   /** UI language. 'system' (default) follows the OS/app locale. */
@@ -631,6 +635,7 @@ export interface AppSettings {
   acknowledgedUpdateVersion: string | null
   /** Automatic update checks on Windows/Linux; macOS persists this in Sparkle. */
   automaticUpdateChecks: boolean
+  confirmBeforeQuit: boolean
   /** App-wide navigation/new-item shortcuts; editor-local key bindings are separate. */
   keyboardShortcutsEnabled: boolean
   /** Individually cleared app shortcut ids. */
@@ -668,6 +673,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   connectionOrder: [],
   defaultExportDirectory: '',
   collectionSort: 'alpha',
+  resultFieldSort: 'alpha',
+  resultIdFirst: true,
   theme: 'system',
   language: 'system',
   dateTimeZone: 'system',
@@ -688,6 +695,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   exportIncludeRealPassword: false,
   acknowledgedUpdateVersion: null,
   automaticUpdateChecks: true,
+  confirmBeforeQuit: true,
   keyboardShortcutsEnabled: true,
   disabledKeyboardShortcuts: []
 }

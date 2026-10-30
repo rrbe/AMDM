@@ -207,7 +207,9 @@ export async function clickElement(client, expression, clickCount = 1, settleFra
     // Scrolling can update virtualized rows before native input arrives.
     if (${settleFrames}) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const target = ${expression};
-    if (!target) return null;
+    // Floating menus exist at temporary coordinates with an opacity-zero ancestor
+    // until positioning finishes. Hit testing alone still accepts those elements.
+    if (!target?.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return null;
     const r = target.getBoundingClientRect();
     const point = {x:r.x+r.width/2, y:r.y+r.height/2};
     return r.width && r.height && target.contains(document.elementFromPoint(point.x, point.y)) ? point : null;
@@ -243,8 +245,13 @@ export function assertRuntimeHealthy(clients, application) {
 }
 
 export async function quitPackaged(application, main, clients) {
-  await main.evaluate(`setTimeout(() => process.getBuiltinModule('module')
-    .createRequire(${JSON.stringify(join(application.root, 'package.json'))})('electron').app.quit(), 50); true`)
+  // Exercise normal asynchronous shutdown without leaving teardown at a native prompt.
+  await main.evaluate(`setTimeout(() => {
+    const { app, dialog } = process.getBuiltinModule('module')
+      .createRequire(${JSON.stringify(join(application.root, 'package.json'))})('electron');
+    dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+    app.quit();
+  }, 50); true`)
   // An attached Node inspector keeps application shutdown waiting to disconnect.
   for (const client of clients) client.close()
   const exit = await application.waitForExit(5000)

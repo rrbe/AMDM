@@ -221,6 +221,8 @@ export class WebStore implements ConnectionSource {
       replicaSet: input.replicaSet,
       defaultDatabase: input.defaultDatabase,
       options: input.options,
+      previewResources: input.previewResources,
+      cdnPrefix: input.cdnPrefix,
       auth: input.auth,
       ssh: { enabled: false },
       tls: input.tls,

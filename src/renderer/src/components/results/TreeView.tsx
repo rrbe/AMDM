@@ -1,22 +1,12 @@
+import { Braces, Copy, Eye, FilePenLine, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
 import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { CollectionSort } from '@shared/types'
-import {
-  Braces,
-  Copy,
-  Download,
-  Eye,
-  FilePenLine,
-  KeyRound,
-  Pencil,
-  Table2,
-  Terminal,
-  TextCursorInput,
-  Trash2
-} from 'lucide-react'
-import { entriesOf, formatScalar, isExpandable, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
+import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
+import { entriesOf, formatScalar, isExpandable, orderFieldNames, summarize, typeLabel, valueType } from '@renderer/lib/ejson'
+import { isPlainObject } from '@renderer/lib/tableShape'
+import { isExtended } from '@renderer/lib/ejson'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeSelection } from '@renderer/lib/selection'
@@ -28,7 +18,6 @@ import {
   toCsv,
   toPlainJson,
   toPlainKeyValue,
-  toShellText,
   toTsv
 } from '@renderer/lib/resultCopy'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -37,7 +26,10 @@ import { CellInput } from './CellInput'
 import { DocEditor } from './DocEditor'
 import { JsonPreviewModal, type JsonPreviewSource } from './JsonPreviewModal'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { jsonCopyMenuItems } from './documentFormatMenus'
+import { resourcePreview } from '@renderer/lib/resourcePreview'
+import { ResourcePreview, useResourcePreviewSettings } from './ResourcePreview'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
+import { jsonCopyMenuItems, resultExportMenuItem } from './documentFormatMenus'
 import { useResultTimeZone } from './ResultTimeZone'
 
 /**
@@ -71,14 +63,17 @@ interface FlatNode {
   expanded: boolean
   /** Top-level document index (only set for depth-0 rows). */
   docIndex?: number
+  document?: boolean
 }
 
 interface TreeViewProps {
   docs: unknown[]
+  visibleFields: string[] | null
+  onSelectFields: () => void
   fontSize: number
   selectedDocIndexes: Set<number>
   onSelectedDocIndexesChange: (selection: Set<number>) => void
-  onExport: (documents: unknown[]) => void
+  onExport: (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding) => void
   /** When set, top-level docs with an _id get Edit/Delete actions. */
   docCtx?: DocActionContext | null
 }
@@ -87,8 +82,15 @@ const DEFAULT_KEY_WIDTH = 280
 const MIN_KEY_WIDTH = 120
 const MAX_KEY_WIDTH = 680
 
+function hasFields(value: object): boolean {
+  for (const key in value) if (Object.prototype.hasOwnProperty.call(value, key)) return true
+  return false
+}
+
 export function TreeView({
   docs,
+  visibleFields,
+  onSelectFields,
   fontSize,
   selectedDocIndexes,
   onSelectedDocIndexesChange,
@@ -98,7 +100,8 @@ export function TreeView({
   const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const setDocumentField = useAppStore((s) => s.setDocumentField)
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const idFirst = useAppStore((s) => s.settings.resultIdFirst)
   // Index of the document open in the full-document modal editor (null = none).
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [previewDoc, setPreviewDoc] = useState<{ value: unknown; source?: JsonPreviewSource } | null>(null)
@@ -117,7 +120,9 @@ export function TreeView({
   // the single-node `selectedId` — selecting one clears the other.
   const selectedDocs = selectedDocIndexes
   const [anchorDoc, setAnchorDoc] = useState<number | null>(null)
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
+  const selectedFields = useMemo(() => visibleFields === null ? null : new Set(visibleFields), [visibleFields])
 
   const toggle = (id: string): void => {
     setExpanded((prev) => {
@@ -132,7 +137,10 @@ export function TreeView({
   const flat = useMemo<FlatNode[]>(() => {
     const out: FlatNode[] = []
     const walk = (key: string, value: unknown, depth: number, path: string, docIndex?: number): void => {
-      const canExpand = isExpandable(value)
+      const document = depth === 0 && isPlainObject(value) && !isExtended(value)
+      const canExpand = document && visibleFields
+        ? visibleFields.some((key) => Object.prototype.hasOwnProperty.call(value, key))
+        : document ? hasFields(value as object) : isExpandable(value)
       const isOpen = canExpand && expanded.has(path)
       out.push({
         id: path,
@@ -141,19 +149,23 @@ export function TreeView({
         value,
         expandable: canExpand,
         expanded: isOpen,
-        docIndex
+        docIndex,
+        document
       })
       if (isOpen) {
-        for (const [childKey, childVal] of entriesOf(value, fieldSort)) {
+        const children = document && selectedFields
+          ? orderFieldNames(Object.keys(value as object).filter((key) => selectedFields.has(key)), fieldSort, idFirst).map((key) => [key, (value as Record<string, unknown>)[key]] as [string, unknown])
+          : entriesOf(value, fieldSort, idFirst)
+        for (const [childKey, childVal] of children) {
           walk(childKey, childVal, depth + 1, `${path}.${childKey}`)
         }
       }
     }
     // Display badge is 1-based for humans; the path id stays 0-based (it keys
     // expand state and child paths).
-    docs.forEach((doc, i) => walk(`(${i + 1})`, doc, 0, String(i), i))
+    docs.forEach((value, i) => walk(`(${i + 1})`, value, 0, String(i), i))
     return out
-  }, [docs, expanded, fieldSort])
+  }, [docs, selectedFields, expanded, fieldSort, idFirst])
 
   const rowVirtualizer = useVirtualizer({
     count: flat.length,
@@ -293,7 +305,8 @@ export function TreeView({
         label: t('result.dataMenu.view'),
         icon: <Eye size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => setPreviewDoc({ value: rootDoc, source })
-      }
+      },
+      { label: t('result.selectFields'), icon: <ListFilter size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: onSelectFields }
     ]
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
@@ -301,14 +314,10 @@ export function TreeView({
         label: t('result.dataMenu.edit'),
         icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          {
-            label: t('tree.editDoc'),
-            icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />,
-            onClick: () => setEditIndex(rootIndex)
-          },
+          { label: t('tree.editDoc'), icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(rootIndex) },
           {
             label: t('tree.editCell'),
-            icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
+            icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: !canEditNode(node),
             onClick: () => startEdit(node)
           }
@@ -318,13 +327,9 @@ export function TreeView({
     items.push({
       label: t('result.dataMenu.copy'),
       icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
-      children: treeCopyMenuItems(node, selected, fieldSort)
+      children: treeCopyMenuItems(node, selected, fieldSort, setAdvancedCopy)
     })
-    if (!IS_WEB) items.push({
-      label: t('result.dataMenu.export'),
-      icon: <Download size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => onExport(selected)
-    })
+    if (!IS_WEB) items.push(resultExportMenuItem(selected, onExport))
     if (docCtx && docHasId(rootDoc)) {
       items.push('separator')
       items.push({
@@ -404,7 +409,7 @@ export function TreeView({
                     }}
                   />
                 ) : (
-                  <ValueCell node={node} />
+                  <ValueCell node={node} selectedFields={selectedFields} />
                 )}
               </div>
               <div className={`kv-type v-${valueType(node.value)}`}>
@@ -438,67 +443,71 @@ export function TreeView({
         />
       )}
 
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }
 
 /** Right-click copy submenu for a tree field / document selection. */
-function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: CollectionSort): ContextMenuEntry[] {
-  const hasField = node.depth > 0
+function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: CollectionSort, openAdvanced: (documents: unknown[]) => void): ContextMenuEntry[] {
+  if (node.depth === 0) {
+    return [
+      ...jsonCopyMenuItems(docs, (text) => void copyText(text), openAdvanced),
+      {
+        label: i18n.t('result.copy.csv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+        onClick: () => void copyText(toCsv(docs, fieldSort))
+      },
+      {
+        label: i18n.t('result.copy.tsv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
+        onClick: () => void copyText(toTsv(docs, fieldSort))
+      }
+    ]
+  }
   const valueText = node.expandable ? toPlainJson(node.value) : plainScalarText(node.value)
-  const formatted = docs.length > 1 ? docs : docs[0]
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
-      icon: <KeyRound size={16} strokeWidth={1.8} aria-hidden="true" />,
-      disabled: !hasField,
+      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
       onClick: () => void copyText(node.keyLabel)
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
-      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
-      disabled: !hasField,
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       onClick: () => void copyText(valueText)
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
       icon: <Braces size={16} strokeWidth={1.8} aria-hidden="true" />,
-      disabled: !hasField,
       onClick: () => void copyText(toPlainKeyValue(node.keyLabel, node.value))
-    },
-    'separator',
-    ...jsonCopyMenuItems(docs, (text) => void copyText(text)),
-    'separator',
-    {
-      label: i18n.t('result.dataMenu.copyMongoShell'),
-      icon: <Terminal size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => void copyText(toShellText(formatted))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyCsv'),
-      icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => void copyText(toCsv(docs, fieldSort))
-    },
-    {
-      label: i18n.t('result.dataMenu.copyTsv'),
-      icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
-      onClick: () => void copyText(toTsv(docs, fieldSort))
     }
   ]
 }
 
-function ValueCell({ node }: { node: FlatNode }): React.JSX.Element {
+function ValueCell({ node, selectedFields }: { node: FlatNode; selectedFields: ReadonlySet<string> | null }): React.JSX.Element {
   const timeZone = useResultTimeZone()
+  const previewSettings = useResourcePreviewSettings()
+  let value = node.value
+  if (node.document) {
+    const keys = Object.keys(node.value as object)
+    const count = selectedFields ? keys.reduce((count, key) => count + Number(selectedFields.has(key)), 0) : keys.length
+    if (count) return <span className="tree-summary">{`{ ${count} fields }`}</span>
+    value = {}
+  }
   if (node.expandable) {
     // Containers show a compact summary (`{ 11 fields }` / `[ 3 ]`) whether open
     // or closed; their children render as indented rows below.
     return <span className="tree-summary">{summarize(node.value)}</span>
   }
   // Leaf: scalar / EJSON extended type; `type` drives the color class.
-  const { text, type } = formatScalar(node.value, timeZone)
+  const { text, type } = formatScalar(value, timeZone)
+  const resource = resourcePreview(value, previewSettings)
   return (
-    <Tooltip content={text}>
+    <Tooltip content={resource ? () => <ResourcePreview key={resource.url} resource={resource} /> : text} variant={resource ? 'image' : 'compact'}>
       <span className={`tree-val v-${type}`}>{text}</span>
     </Tooltip>
   )

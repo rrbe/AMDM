@@ -1,29 +1,22 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import {
-  Braces,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Maximize2,
-  Minimize2,
-  Network,
-  SlidersHorizontal,
-  Table,
-  Table2,
-  Terminal
-} from 'lucide-react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, SlidersHorizontal, Table, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type ShellResult } from '@shared/types'
+import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
-import { copyText, toCsv, toShellText, toTsv } from '@renderer/lib/resultCopy'
+import { copyText, toCsv, toTsv } from '@renderer/lib/resultCopy'
+import { selectDisplayFields } from '@renderer/lib/resultFields'
+import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
+import { isPlainObject } from '@renderer/lib/tableShape'
+import { isExtended } from '@renderer/lib/ejson'
+import { ResultFieldSelect } from './ResultFieldSelect'
+import { Modal } from '@renderer/components/common/Modal'
 import { consoleText } from '@renderer/lib/consoleOutput'
+import { selectedIndexesInOrder } from '@renderer/lib/selection'
 import { ContextMenu } from '@renderer/components/ContextMenu'
-import { ResultDataSize } from '@renderer/components/common/ResultDataSize'
 import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
@@ -43,8 +36,10 @@ import { JsonView } from './JsonView'
 import { TableView } from './TableView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
+import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
 import { jsonCopyMenuItems } from './documentFormatMenus'
 import { ResultTimeZoneContext } from './ResultTimeZone'
+import { ResourcePreviewContext } from './ResourcePreview'
 
 const EMPTY_FOLDED_LINES: number[] = []
 const TimeZoneSelect = lazy(async () => ({
@@ -87,10 +82,16 @@ interface ResultPanelProps {
  */
 export function ResultPanel(props: ResultPanelProps): React.JSX.Element {
   const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
+  const previewSettings = useAppStore((s) => {
+    const connectionId = getActiveResult(s)?.query?.connectionId ?? getActiveTab(s).connectionId
+    return s.connections.find((connection) => connection.id === connectionId)
+  })
   const timeZone = resolveResultTimeZone(dateTimeZone)
   return (
     <ResultTimeZoneContext value={timeZone}>
-      <ResultPanelContent {...props} />
+      <ResourcePreviewContext value={previewSettings}>
+        <ResultPanelContent {...props} />
+      </ResourcePreviewContext>
     </ResultTimeZoneContext>
   )
 }
@@ -105,8 +106,28 @@ function ResultPanelContent({
   const results = useAppStore((s) => getActiveTab(s).results)
   const active = useAppStore((s) => getActiveResult(s))
   const result = active?.result ?? null
+  const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
+  const setVisibleFields = useAppStore((s) => s.setVisibleFields)
+  // Normalize to a documents array for the three views. 'value' / 'ack' get
+  // wrapped in a single-element array so the same renderers apply uniformly.
+  const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
   const view = active?.resultView ?? 'tree'
-  const fieldSort = useAppStore((s) => s.settings.collectionSort)
+  const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
+  const fieldInfo = useResultFieldInfo(docs, view === 'table')
+  const displayFields = useMemo(() => {
+    if (!fieldInfo) return []
+    if (visibleFields === null) return fieldInfo.fields
+    const selected = new Set(visibleFields)
+    return fieldInfo.fields.filter((field) => selected.has(field))
+  }, [fieldInfo, visibleFields])
+  const noVisibleFields = useMemo(() => {
+    if (visibleFields === null || docs.length === 0) return false
+    if (fieldInfo) return fieldInfo.allDocuments && displayFields.length === 0
+    return docs.every((doc) => isPlainObject(doc) && !isExtended(doc))
+      && !docs.some((doc) => visibleFields.some((field) => Object.prototype.hasOwnProperty.call(doc, field)))
+  }, [docs, visibleFields, fieldInfo, displayFields])
+  const filterTableColumns = view === 'table' && fieldInfo?.allDocuments
+  const displayDocs = useMemo(() => noVisibleFields || view !== 'table' || !fieldInfo || filterTableColumns ? docs : selectDisplayFields(docs, visibleFields), [docs, visibleFields, noVisibleFields, filterTableColumns, view, fieldInfo])
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
@@ -119,11 +140,28 @@ function ResultPanelContent({
     onChange: (lines: number[]) => setResultFoldedLines(view, lines)
   })
   const docCtx = docActionContext(result, active?.query ?? null)
+  const [fieldModalOpen, setFieldModalOpen] = useState(false)
+  const openFieldModal = useCallback(() => {
+    window.setTimeout(() => setFieldModalOpen(true), 0)
+  }, [])
   const [foldControls, setFoldControls] = useState<HTMLSpanElement | null>(null)
   // Anchor for the "copy all" format dropdown (null = closed).
   const [copyMenu, setCopyMenu] = useState<{ x: number; y: number } | null>(null)
   const [selectedDocIndexes, setSelectedDocIndexes] = useState<Set<number>>(() => new Set())
-  const [exportDocuments, setExportDocuments] = useState<unknown[] | null>(null)
+  const [tableDocumentOrder, setTableDocumentOrder] = useState<number[] | null>(null)
+  const updateTableDocumentOrder = useCallback((next: number[]) => {
+    setTableDocumentOrder((current) =>
+      current?.length === next.length && current.every((sourceIndex, index) => sourceIndex === next[index])
+        ? current
+        : next
+    )
+  }, [])
+  const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
+  const [exportModal, setExportModal] = useState<{
+    format: ResultExportFormat
+    jsonEncoding?: JsonEncoding
+    fixedDocuments?: unknown[]
+  } | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const copiedTimer = useRef<number | null>(null)
   const copyAttempt = useRef(0)
@@ -204,6 +242,10 @@ function ResultPanelContent({
     setSelectedDocIndexes(new Set())
   }, [active?.id, result?.data])
 
+  useEffect(() => {
+    if (view !== 'table') setTableDocumentOrder(null)
+  }, [view])
+
   // One tab per run; the strip only appears once there is something to switch
   // between (a single result reads exactly as before).
   const strip =
@@ -257,8 +299,8 @@ function ResultPanelContent({
         {strip}
         <div className="result-bar">
           <span className="explain-tag">{t('result.explainTag')}</span>
-          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <span className="result-bar-spacer" />
+          <ResultMeta result={result} docCount={0} executedAt={active!.executedAt} />
           <ResultDisplayOptions />
           <ResultExpandButton expanded={expanded} onExpandedChange={onExpandedChange} />
         </div>
@@ -269,11 +311,15 @@ function ResultPanelContent({
     )
   }
 
-  // Normalize to a documents array for the three views. 'value' / 'ack' get
-  // wrapped in a single-element array so the same renderers apply uniformly.
-  const docs = normalizeDocs(result)
+  const documentOrder = view === 'table' && tableDocumentOrder ? tableDocumentOrder : docs.map((_, index) => index)
+  const selectedDocuments = selectedIndexesInOrder(selectedDocIndexes, documentOrder)
+    .filter((index) => index >= 0 && index < docs.length)
+    .map((index) => docs[index])
+  const openSelectionExport = (format: ResultExportFormat, documents: unknown[], jsonEncoding?: JsonEncoding): void => {
+    setExportModal({ format, jsonEncoding, fixedDocuments: documents })
+  }
   const closeExport = (): void => {
-    setExportDocuments(null)
+    setExportModal(null)
     window.requestAnimationFrame(() => copyButtonRef.current?.focus())
   }
 
@@ -320,10 +366,11 @@ function ResultPanelContent({
           )}
           <span className="selection-indicator" aria-hidden="true" />
         </div>
-        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         <span className="result-bar-spacer" />
+        <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         {result.kind === 'documents' && (
           <div className="result-pagination">
+            <span className="result-meta-separator" aria-hidden="true" />
             <span className="result-total" aria-live="polite">
               {typeof result.totalCount === 'number'
                 ? t('result.totalCount', { value: result.totalCount.toLocaleString() })
@@ -336,7 +383,7 @@ function ResultPanelContent({
             <ResultPager result={result} />
           </div>
         )}
-        <ResultDisplayOptions />
+        <ResultDisplayOptions docs={showConsole ? undefined : docs} />
         <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
@@ -362,27 +409,39 @@ function ResultPanelContent({
       <div className="result-body">
         {showConsole ? (
           <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+        ) : noVisibleFields ? (
+          <div className="center-msg muted">
+            <span>{t('result.fieldsUnavailable')}</span>
+            <button className="ghost" onClick={() => setVisibleFields(null)}>{t('result.showAllFields')}</button>
+          </div>
         ) : (
           <>
             {view === 'tree' && (
               <TreeView
                 docs={docs}
+                visibleFields={visibleFields}
+                onSelectFields={openFieldModal}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
-                onExport={setExportDocuments}
+                onExport={openSelectionExport}
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} visibleFields={visibleFields} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'table' && (
               <TableView
                 key={active?.id}
                 docs={docs}
+                displayDocs={displayDocs}
+                fields={fieldInfo ? (filterTableColumns ? displayFields : undefined) : displayFields}
+                loading={!fieldInfo}
+                onSelectFields={openFieldModal}
                 fontSize={dataFontSize}
                 selectedDocIndexes={selectedDocIndexes}
                 onSelectedDocIndexesChange={setSelectedDocIndexes}
-                onExport={setExportDocuments}
+                onDocumentOrderChange={updateTableDocumentOrder}
+                onExport={openSelectionExport}
                 docCtx={docCtx}
               />
             )}
@@ -390,43 +449,40 @@ function ResultPanelContent({
         )}
       </div>
 
+      {fieldModalOpen && (
+        <Modal title={t('result.selectFields')} size="sm" onClose={() => setFieldModalOpen(false)}>
+          <ResultFieldSelect docs={docs} />
+        </Modal>
+      )}
+      {advancedCopy && (
+        <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />
+      )}
       {copyMenu && (
         <ContextMenu
           x={copyMenu.x}
           y={copyMenu.y}
           onClose={() => setCopyMenu(null)}
           items={[
-            ...jsonCopyMenuItems(docs, copyWithFeedback),
-            {
-              label: t('result.copy.mongoShell'),
-              icon: <Terminal size={16} strokeWidth={1.8} aria-hidden="true" />,
-              onClick: () => copyWithFeedback(toShellText(docs))
-            },
-            {
-              label: t('result.copy.csv'),
-              icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
-              onClick: () => copyWithFeedback(toCsv(docs, fieldSort))
-            },
-            {
-              label: t('result.copy.tsv'),
-              icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
-              onClick: () => copyWithFeedback(toTsv(docs, fieldSort))
-            }
+            ...jsonCopyMenuItems(docs, copyWithFeedback, setAdvancedCopy),
+            { label: t('result.copy.csv'), icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
+            { label: t('result.copy.tsv'), icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
         />
       )}
-      {exportDocuments && (
+      {exportModal && (
         <ExportModal
           source={{
             kind: 'result',
-            documents: exportDocuments,
-            selectedDocuments: exportDocuments,
-            fixedSelection: true,
+            documents: exportModal.fixedDocuments ?? docs,
+            selectedDocuments: exportModal.fixedDocuments ?? selectedDocuments,
+            fixedSelection: exportModal.fixedDocuments != null,
             connectionId: docCtx?.connectionId ?? active?.query?.connectionId,
             database: docCtx?.database ?? active?.query?.database,
             collection: docCtx?.collection,
             suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
           }}
+          initialFormat={exportModal.format}
+          initialJsonEncoding={exportModal.jsonEncoding}
           onClose={closeExport}
         />
       )}
@@ -434,8 +490,9 @@ function ResultPanelContent({
   )
 }
 
-function ResultDisplayOptions(): React.JSX.Element {
+function ResultDisplayOptions({ docs }: { docs?: unknown[] }): React.JSX.Element {
   const { t } = useTranslation()
+  const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
   const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
   const updateSettings = useAppStore((s) => s.updateSettings)
   return (
@@ -449,10 +506,12 @@ function ResultDisplayOptions(): React.JSX.Element {
           title={t('result.displayOptions')}
         >
           <SlidersHorizontal size={14} aria-hidden="true" />
+          {docs && visibleFields !== null && <span className="ml-1">{t('result.selectedFields', { count: visibleFields.length })}</span>}
         </button>
       }
     >
       <div className="min-h-8 w-[256px] max-w-full">
+        {docs && <ResultFieldSelect docs={docs} />}
         <Suspense fallback={null}>
           <TimeZoneSelect
             variant="menu"
@@ -532,7 +591,6 @@ function ResultTabStrip({
                 <span data-result-tab-time="">
                   {t('context.queryTime')} · {formatRelativeQueryTime(r.executedAt, i18n.language)}
                 </span>
-                <span>{t('context.resultDataSize')} · <ResultDataSize results={[r]} /></span>
               </div>
             )}
             tooltipVariant="code"
@@ -581,11 +639,19 @@ function ResultMeta({
     if (result.output?.length) {
       out.push({ text: t('result.outputLines', { count: result.output.length }) })
     }
-    if (typeof result.elapsedMs === 'number') {
-      out.push({ text: t('result.elapsed', { ms: result.elapsedMs }) })
-    }
     const queryTime = formatQueryTime(executedAt, i18n.resolvedLanguage)
     if (queryTime) out.push({ text: queryTime })
+    if (typeof result.elapsedMs === 'number') {
+      out.push({
+        text: t('result.elapsed', { ms: result.elapsedMs }),
+        cls:
+          result.elapsedMs >= 5000
+            ? 'text-destructive'
+            : result.elapsedMs >= 1000
+              ? 'text-[var(--warn)]'
+              : undefined
+      })
+    }
     return out
   }, [result, docCount, executedAt, i18n.resolvedLanguage, t])
 

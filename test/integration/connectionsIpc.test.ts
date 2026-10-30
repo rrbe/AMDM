@@ -53,6 +53,8 @@ const input: ConnectionInput = {
   replicaSet: 'rs0',
   defaultDatabase: 'shop',
   options: { readPreference: 'secondaryPreferred' },
+  previewResources: false,
+  cdnPrefix: 'https://cdn.example.com/assets/',
   auth: { type: 'scram', username: 'reader', authSource: 'admin' },
   ssh: {
     enabled: true,
@@ -78,6 +80,20 @@ describe('connection duplication through IPC', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('saves preview preferences independently for each connection and reloads them over IPC', async () => {
+    const api = bridge.api!
+    const first = await api.connections.save(input)
+    const second = await api.connections.save({ ...input, id: '', name: 'Second', previewResources: true, cdnPrefix: '' })
+    connectionStore.init()
+    const saved = await api.connections.list()
+    expect(saved.find((connection) => connection.id === first.id)).toMatchObject({
+      previewResources: false, cdnPrefix: input.cdnPrefix
+    })
+    expect(saved.find((connection) => connection.id === second.id)).toMatchObject({
+      previewResources: true, cdnPrefix: ''
+    })
   })
 
   it('persists an independent copy with all secrets, without exposing secret material over IPC', async () => {

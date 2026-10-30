@@ -1,5 +1,5 @@
 import type { SchemaFieldStat, SchemaModel, SchemaTarget, SchemaTypeStat } from '@shared/types'
-import { tabCollection, type QueryTab } from './tabs'
+import { tabCollection, type QueryTab, type ResultTab } from './tabs'
 import { DATABASE_RESERVED } from './tsAutocomplete/mongoBaseDts'
 
 export const MAX_SCHEMA_PANELS = 24
@@ -73,6 +73,13 @@ export function schemaPanelTarget(tab: QueryTab): SchemaTarget | null {
     database: tab.activeDatabase,
     collection
   }
+}
+
+export function schemaResultMatchesTarget(result: ResultTab | null, target: SchemaTarget): boolean {
+  return result?.result.kind === 'documents'
+    && result.result.collection === target.collection
+    && result.query?.connectionId === target.connectionId
+    && result.query.database === target.database
 }
 
 export interface SchemaTreeNode {

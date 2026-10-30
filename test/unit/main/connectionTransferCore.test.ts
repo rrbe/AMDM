@@ -101,6 +101,13 @@ function expectSafeRows(rows: Awaited<ReturnType<typeof decodeConnections>>): vo
 }
 
 describe('AMDM connection backup', () => {
+  it('round-trips resource preview preferences and the CDN prefix', async () => {
+    const text = await encodeConnections([input({ previewResources: false, cdnPrefix: 'https://cdn.example.com/assets' })], 'amdm', false)
+    const [row] = await decodeConnections(text)
+    expect(row.input).toMatchObject({ previewResources: false, cdnPrefix: 'https://cdn.example.com/assets' })
+    expect(row.warnings).toEqual([])
+  })
+
   it('round-trips complete settings and strips identity and store metadata', async () => {
     const original = input({
       ssh: {

@@ -19,9 +19,13 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { SchemaTarget } from '@shared/types'
 import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useAppStore'
+import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
+import { orderFieldNames } from '@renderer/lib/ejson'
+import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { tabCollection } from '@renderer/lib/tabs'
 import {
   schemaPanelTarget,
+  schemaResultMatchesTarget,
   buildSchemaTree,
   schemaPanelKey,
   visibleSchemaRows,
@@ -198,6 +202,10 @@ function CollectionSchema({
   isView: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const activeResult = useAppStore(getActiveResult)
+  const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
+  const setVisibleFields = useAppStore((s) => s.setVisibleFields)
+  const canSelectFields = schemaResultMatchesTarget(activeResult, target)
   const key = schemaPanelKey(target)
   const panel = useAppStore((s) => s.schemaPanels[key])
   const loadSchemaModel = useAppStore((s) => s.loadSchemaModel)
@@ -228,6 +236,14 @@ function CollectionSchema({
   }, [loadSchemaModel, target, connected])
 
   const tree = useMemo(() => buildSchemaTree(model?.analysis.fields ?? []), [model?.analysis.fields])
+  const resultDocs = useMemo(() => canSelectFields && Array.isArray(activeResult?.result.data) ? activeResult.result.data : [], [canSelectFields, activeResult?.result.data])
+  const resultFieldInfo = useResultFieldInfo(resultDocs, canSelectFields)
+  const availableFields = useMemo(() => [...new Set([
+    ...tree.map((field) => field.name),
+    ...(resultFieldInfo ? orderFieldNames(resultFieldInfo.fields, 'alpha') : [])
+  ])], [tree, resultFieldInfo])
+  const selectedFields = useMemo(() => new Set(visibleFields ?? availableFields), [visibleFields, availableFields])
+  const allFieldsSelected = visibleFields === null || (selectedFields.size > 0 && availableFields.every((field) => selectedFields.has(field)))
   const rows = useMemo(
     () => visibleSchemaRows(tree, panel?.expanded ?? new Set(), panel?.search ?? ''),
     [tree, panel?.expanded, panel?.search]
@@ -303,6 +319,14 @@ function CollectionSchema({
           </div>
           <div className="grid h-7 shrink-0 grid-cols-[minmax(0,1fr)_92px] items-center gap-2 border-b border-[var(--separator)] pl-[10px] pr-3 text-[11px] text-muted-foreground">
             <span className="flex min-w-0 items-center gap-1.5">
+              <Checkbox
+                checked={!canSelectFields || allFieldsSelected}
+                indeterminate={canSelectFields && !allFieldsSelected && selectedFields.size > 0}
+                disabled={!canSelectFields || !resultFieldInfo}
+                label={<span className="sr-only">{t('result.selectAllFields')}</span>}
+                className="shrink-0 gap-0!"
+                onCheckedChange={(on) => setVisibleFields(on ? null : [])}
+              />
               <span className="size-4 shrink-0" aria-hidden />
               <span>{t('schema.field')}</span>
               <Popover
@@ -362,10 +386,24 @@ function CollectionSchema({
                     style={{
                       height: item.size,
                       transform: `translateY(${item.start}px)`,
-                      paddingLeft: 10 + Math.min(row.depth, 6) * 12
+                      paddingLeft: 10 + (row.depth > 0 ? 21 : 0) + Math.min(row.depth, 6) * 12
                     }}
                   >
                     <div className="flex min-w-0 items-center gap-1.5">
+                      {row.depth === 0 && (
+                        <Checkbox
+                          checked={!canSelectFields || selectedFields.has(row.name)}
+                          disabled={!canSelectFields || !resultFieldInfo}
+                          label={<span className="sr-only">{t('context.schema.displayField', { field: row.name })}</span>}
+                          className="shrink-0 gap-0!"
+                          onCheckedChange={(checked) => {
+                            const next = new Set(selectedFields)
+                            if (checked) next.add(row.name)
+                            else next.delete(row.name)
+                            setVisibleFields([...next])
+                          }}
+                        />
+                      )}
                       <button
                         type="button"
                         className="flex size-4 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 text-muted-foreground disabled:pointer-events-none"

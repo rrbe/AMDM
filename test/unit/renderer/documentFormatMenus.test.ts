@@ -4,36 +4,43 @@ vi.mock('@renderer/i18n', () => ({
   default: { t: (key: string) => key }
 }))
 
-import { jsonCopyMenuItems } from '@renderer/components/results/documentFormatMenus'
+import { jsonCopyMenuItems, resultExportMenuItem } from '@renderer/components/results/documentFormatMenus'
 
 describe('document format menus', () => {
-  it('copies JSON encodings and JSONL directly from one submenu level', () => {
+  it('copies JSON directly and opens advanced formats without copying', () => {
     const copy = vi.fn()
-    const items = jsonCopyMenuItems([{ name: 'Ada' }, { name: 'Grace' }], copy)
+    const documents = [{ name: 'Ada' }]
+    const openAdvanced = vi.fn()
+    const items = jsonCopyMenuItems(documents, copy, openAdvanced)
 
     expect(items.map((item) => (item === 'separator' ? item : item.label))).toEqual([
       'result.copy.plainJson',
-      'result.copy.relaxedEjson',
-      'result.copy.canonicalEjson',
-      'result.copy.jsonl'
+      'result.copy.advancedJson',
+      'result.copy.mongoShell'
     ])
-    const jsonLines = items[3]
-    if (jsonLines !== 'separator' && jsonLines && 'onClick' in jsonLines) jsonLines.onClick()
-    expect(copy).toHaveBeenCalledWith('{"name":"Ada"}\n{"name":"Grace"}')
+    const plain = items[0]
+    expect(plain).not.toHaveProperty('children')
+    if (plain !== 'separator' && plain && 'onClick' in plain) plain.onClick()
+    expect(copy).toHaveBeenCalledWith(JSON.stringify(documents, null, 2))
+    const shell = items[2]
+    expect(shell).not.toHaveProperty('children')
+    if (shell !== 'separator' && shell && 'onClick' in shell) shell.onClick()
+    expect(copy).toHaveBeenLastCalledWith('{\n  "name": "Ada"\n}')
+    copy.mockClear()
+    const advanced = items[1]
+    expect(advanced).not.toHaveProperty('children')
+    if (advanced !== 'separator' && advanced && 'onClick' in advanced) advanced.onClick()
+    expect(openAdvanced).toHaveBeenCalledWith(documents)
+    expect(copy).not.toHaveBeenCalled()
   })
 
-  it.each([
-    [0, [{ _id: '64b7f0f0f0f0f0f0f0f0f0f0', count: 42 }]],
-    [1, [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: 42 }]],
-    [2, [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '42' } }]]
-  ])('copies the BSON representation chosen by action %i', (index, expected) => {
-    const copy = vi.fn()
-    const documents = [{ _id: { $oid: '64b7f0f0f0f0f0f0f0f0f0f0' }, count: { $numberLong: '42' } }]
-    const item = jsonCopyMenuItems(documents, copy)[index as number]
-
-    expect(item).toHaveProperty('onClick')
-    if (item === 'separator' || !item || !('onClick' in item)) throw new Error('Expected copy action')
-    item.onClick()
-    expect(JSON.parse(copy.mock.calls[0][0])).toEqual(expected)
+  it('opens export directly for the selected documents', () => {
+    const exportDocuments = vi.fn()
+    const documents = [{ name: 'Ada' }]
+    const item = resultExportMenuItem(documents, exportDocuments)
+    expect(item).toMatchObject({ label: 'result.dataMenu.export' })
+    expect(item).not.toHaveProperty('children')
+    if (item !== 'separator' && 'onClick' in item) item.onClick()
+    expect(exportDocuments).toHaveBeenCalledWith('json', documents, 'plain')
   })
 })

@@ -5,7 +5,7 @@
  * printjson payloads reuse the JSON view's shell-style line formatter, so
  * `ObjectId("..")` / `ISODate("..")` render identically in both views.
  */
-import type { ShellOutputLine } from '@shared/types'
+import type { CollectionSort, ShellOutputLine } from '@shared/types'
 import { toJsonLines, type JsonLine, type JsonToken } from './format'
 
 export interface ConsoleLine {
@@ -21,13 +21,13 @@ export interface ConsoleLine {
 }
 
 /** Flatten output entries into individual display lines, in call order. */
-export function toConsoleLines(output: ShellOutputLine[], timeZone?: string): ConsoleLine[] {
+export function toConsoleLines(output: ShellOutputLine[], timeZone?: string, sort: CollectionSort = 'natural', idFirst = false): ConsoleLine[] {
   const lines: ConsoleLine[] = []
   for (const entry of output) {
     const level = entry.level ?? 'log'
     if (entry.kind === 'json') {
       const offset = lines.length
-      for (const jl of toJsonLines(entry.data, timeZone)) {
+      for (const jl of toJsonLines(entry.data, timeZone, sort, idFirst)) {
         lines.push({
           depth: jl.depth,
           text: jl.text,

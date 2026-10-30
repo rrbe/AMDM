@@ -134,3 +134,14 @@ describe('toInlineJsonTokens', () => {
     expect(preview({ nested: deep })).toBe('{ nested: { … } }')
   })
 })
+
+it('applies field ordering recursively without reordering array values or mutating source', () => {
+  const value = { a: [{ a: 1, z: 2, _id: 3 }, 7], _id: { $numberInt: '4' }, z: 5 }
+  const before = JSON.stringify(value)
+  const lines = toJsonLines(value, undefined, 'alphaDesc', true).map((line) => line.text)
+  expect(lines.filter((line) => /^"/.test(line)).map((line) => line.split(':')[0])).toEqual([
+    '"_id"', '"z"', '"a"', '"_id"', '"z"', '"a"'
+  ])
+  expect(lines.indexOf('7')).toBeGreaterThan(lines.indexOf('"a": 1'))
+  expect(JSON.stringify(value)).toBe(before)
+})

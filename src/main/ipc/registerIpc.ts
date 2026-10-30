@@ -278,11 +278,12 @@ export function registerIpc(openSettingsWindow: (owner: BrowserWindow) => void):
   ipcMain.handle(IPC.docDelete, (_e, req: DocMutateRequest) => deleteDocument(req))
 
   // import / export
-  ipcMain.handle(IPC.ioChooseExportDirectory, (event) =>
+  ipcMain.handle(IPC.ioChooseExportDirectory, (event, useDefault?: boolean) =>
     chooseExportDirectory(
       BrowserWindow.fromWebContents(event.sender),
       event.sender,
-      settingsStore.get().defaultExportDirectory
+      settingsStore.get().defaultExportDirectory,
+      useDefault === true
     )
   )
   ipcMain.handle(IPC.ioExport, (event, req: ExportFileRequest) =>

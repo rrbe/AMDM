@@ -39,6 +39,13 @@ export interface ResultTab {
     lands because each result can hold a full page of EJSON docs. */
 export const MAX_RESULT_TABS = 8
 
+/** State that a destroyed desktop workspace cannot restore. */
+export function hasWorkspaceContent(tabs: readonly QueryTab[]): boolean {
+  return tabs.length > 1 || tabs.some((tab) =>
+    !!tab.code.trim() || tab.results.length > 0 || tab.running
+  )
+}
+
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 const DB_MEMBERS = new Set([
   'getCollection',
@@ -108,6 +115,7 @@ export interface QueryTab {
   activeResultId: string | null
   /** Last manually arranged Table columns, retained for this query tab's lifetime. */
   tableColumnOrder: string[]
+  visibleFields: string[] | null
   /** Monotonic run counter feeding ResultTab.seq. */
   resultSeq: number
   running: boolean
@@ -130,6 +138,7 @@ export function createTab(id: string, init: Partial<QueryTab> = {}): QueryTab {
     results: [],
     activeResultId: null,
     tableColumnOrder: [],
+    visibleFields: null,
     resultSeq: 0,
     running: false,
     stopping: false,

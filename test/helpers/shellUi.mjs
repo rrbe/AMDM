@@ -82,6 +82,28 @@ export async function runShellScenario(name, exercise) {
       (await waitForTarget(application.mainPort, () => true)).webSocketDebuggerUrl,
     )
     clients.push(main)
+    // Hosted desktops can show the window without giving it native input focus.
+    await main.evaluate(`setTimeout(() => {
+      const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron');
+      const window = BrowserWindow.getAllWindows()[0];
+      window.show();
+      window.focus();
+      window.webContents.focus();
+    }, 0); true`)
+    await renderer.call('Emulation.setFocusEmulationEnabled', { enabled: true })
+    await waitForExpression(renderer, 'document.hasFocus() && document.visibilityState === "visible"')
+    await renderer.evaluate(`(() => {
+      window.shellInputTrace = [];
+      for (const type of ['pointerdown', 'pointerup', 'click', 'contextmenu']) {
+        document.addEventListener(type, event => {
+          const item = event.target.closest('[role=menuitem]');
+          window.shellInputTrace.push({ type, x: event.clientX, y: event.clientY,
+            button: event.button, buttons: event.buttons, focused: document.hasFocus(),
+            target: item?.textContent ?? event.target.className });
+          if (window.shellInputTrace.length > 60) window.shellInputTrace.shift();
+        }, true);
+      }
+    })()`)
     await clickElement(renderer, 'document.querySelector(".conn-item")', 2)
     await waitForExpression(
       renderer,
@@ -145,6 +167,7 @@ export async function runShellScenario(name, exercise) {
       if (screenshot)
         await writeFile(join(diagnostics, 'failure.png'), Buffer.from(screenshot.data, 'base64'))
       report.dom = await renderer.evaluate('document.body.innerText').catch(() => undefined)
+      report.input = await renderer.evaluate('window.shellInputTrace').catch(() => undefined)
     }
     throw error
   } finally {

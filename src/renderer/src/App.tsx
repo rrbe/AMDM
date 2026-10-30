@@ -32,6 +32,7 @@ import {
 import type { CatalogDestination } from '@renderer/lib/quickSearch/documents'
 import { searchId, type SearchHit, type SearchScope } from '@renderer/lib/quickSearch/types'
 import { flushSearchVisits, loadSearchVisits, recordSearchVisit } from '@renderer/lib/quickSearch/visits'
+import { hasWorkspaceContent } from '@renderer/lib/tabs'
 
 type QueryPrompt =
   | {
@@ -102,6 +103,18 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     void bootstrap()
   }, [bootstrap])
+
+  useEffect(() => {
+    if (__WEB__) return
+    let hasContent = hasWorkspaceContent(useAppStore.getState().tabs)
+    window.api.app.workspaceChanged(hasContent)
+    return useAppStore.subscribe((state) => {
+      const next = hasWorkspaceContent(state.tabs)
+      if (next === hasContent) return
+      hasContent = next
+      window.api.app.workspaceChanged(next)
+    })
+  }, [])
 
   useEffect(() => {
     loadSearchVisits()
