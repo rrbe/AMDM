@@ -13,7 +13,7 @@ describe('resource preview URLs', () => {
   })
 
   it.each([
-    ['mp4', 'video'], ['webm', 'video'], ['mov', 'video'], ['ogv', 'video'],
+    ['mp4', 'video'], ['webm', 'video'], ['mov', 'video'], ['ogv', 'video'], ['m3u8', 'video'],
     ['mp3', 'audio'], ['wav', 'audio'], ['ogg', 'audio'], ['m4a', 'audio']
   ])('recognizes .%s resources', (extension, type) => {
     const url = `https://cdn.example.com/resource.${extension}`
@@ -30,6 +30,18 @@ describe('resource preview URLs', () => {
     expect(resourcePreview(path, { cdnPrefix: 'https://cdn.example.com/assets/' })).toEqual({
       url: 'https://cdn.example.com/assets/images/photo.jpg', type: 'image'
     })
+  })
+
+  it.each([
+    ['images/photo.png', 'image'], ['/videos/clip.mp4', 'video'],
+    ['videos/stream.m3u8?token=a%2Fb', 'video'], ['/audio/clip.mp3', 'audio']
+  ])('uses the connection preview settings for %s', (path, type) => {
+    expect(resourcePreview(path, { previewResources: true, cdnPrefix: 'https://cdn.example.com/assets/' })).toEqual({
+      url: `https://cdn.example.com/assets/${path.replace(/^\//, '')}`, type
+    })
+    expect(resourcePreview(path)).toBeNull()
+    expect(resourcePreview(path, { cdnPrefix: '' })).toBeNull()
+    expect(resourcePreview(path, { previewResources: false, cdnPrefix: 'https://cdn.example.com' })).toBeNull()
   })
 
   it('preserves full URLs and signed query strings with a CDN prefix', () => {

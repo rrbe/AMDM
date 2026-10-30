@@ -40,7 +40,7 @@ export function ResourcePreview({ resource }: { resource: PreviewResource }): Re
     window.clearTimeout(timerRef.current)
     setStatus('error')
   }
-  const className = `block h-auto w-auto max-h-[min(320px,45vh)] max-w-[min(360px,calc(100vw-16px))] object-contain${status === 'ready' ? '' : ' invisible absolute'}`
+  const className = `block ${type === 'audio' ? 'h-[54px] w-[300px]' : 'h-auto w-auto'} max-h-[min(320px,45vh)] max-w-[min(360px,calc(100vw-16px))] object-contain${status === 'ready' ? '' : ' invisible absolute'}`
 
   return (
     <div className={`relative flex items-center justify-center overflow-hidden rounded-sm text-foreground${status === 'ready' ? '' : ' h-[120px] w-[200px] bg-[var(--surface-elevated)]'}`} aria-busy={status === 'loading'}>

@@ -17,7 +17,7 @@ export function resourcePreview(value: unknown, settings?: ResourcePreviewSettin
     const url = new URL(source)
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null
     const type = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|ico)$/i.test(url.pathname) ? 'image'
-      : /\.(?:mp4|webm|mov|m4v|ogv)$/i.test(url.pathname) ? 'video'
+      : /\.(?:mp4|webm|mov|m4v|ogv|m3u8)$/i.test(url.pathname) ? 'video'
       : /\.(?:mp3|wav|ogg|m4a|aac|flac)$/i.test(url.pathname) ? 'audio' : null
     return type ? { url: url.href, type } : null
   } catch {
