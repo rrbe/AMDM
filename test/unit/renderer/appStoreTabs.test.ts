@@ -103,7 +103,7 @@ describe('connection-bound tabs', () => {
     useAppStore.getState().setResultView('json')
     useAppStore.getState().setActiveResultTab('r2')
     expect(useAppStore.getState().tabs[0].results[1].resultView).toBe('tree')
-    useAppStore.getState().setResultView('table')
+    useAppStore.getState().setResultView('grid')
     useAppStore.getState().setActiveResultTab('r1')
     expect(useAppStore.getState().tabs[0].results[0].resultView).toBe('json')
     useAppStore.getState().setActiveTab('c2-tab')
@@ -113,7 +113,7 @@ describe('connection-bound tabs', () => {
     useAppStore.getState().setResultView('table')
     useAppStore.getState().setActiveTab('c1-tab')
 
-    expect(useAppStore.getState().tabs[0].results.map((r) => r.resultView)).toEqual(['json', 'table'])
+    expect(useAppStore.getState().tabs[0].results.map((r) => r.resultView)).toEqual(['json', 'grid'])
     expect(useAppStore.getState().tabs[1].results[0].resultView).toBe('table')
   })
 

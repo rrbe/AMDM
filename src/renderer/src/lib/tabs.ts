@@ -7,7 +7,7 @@
  */
 import type { ShellResult } from '@shared/types'
 
-export type ResultView = 'tree' | 'json' | 'table'
+export type ResultView = 'tree' | 'json' | 'table' | 'grid'
 export type ResultFoldView = 'json' | 'console' | 'explain'
 
 /** The query that produced a result (refresh / doc-edit target). */
@@ -20,7 +20,7 @@ export interface ResultQuery {
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
 export interface ResultTab {
   id: string
-  /** Selected Tree/JSON/Table view for this result tab. */
+  /** Selected data view for this result tab. */
   resultView?: ResultView
   foldedLines?: Partial<Record<ResultFoldView, number[]>>
   /** 1-based run sequence within its query tab (drives the "结果 N" label).

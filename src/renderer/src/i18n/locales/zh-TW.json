@@ -94,7 +94,7 @@
     "shortcutTabs": "切換 Tab（9：末尾）",
     "shortcutQueryTabs": "查詢",
     "shortcutDataTabs": "結果",
-    "shortcutResultView": "切換樹狀 / JSON / 表格 / Console",
+    "shortcutResultView": "切換樹狀 / JSON / 表格 / Grid / Console",
     "shortcutOpenSettings": "開啟設定",
     "shortcutClear": "清除",
     "shortcutRestore": "恢復",
@@ -593,6 +593,8 @@
       "copyTsv": "TSV"
     },
     "documentPreviewTitle": "文件",
+    "gridMoreFields_one": "還有 {{count}} 個欄位",
+    "gridMoreFields_other": "還有 {{count}} 個欄位",
     "documentRefreshed": "文件已重新整理",
     "documentMissing": "該文件已不存在",
     "documentRefreshFailed": "重新整理文件失敗：{{error}}",

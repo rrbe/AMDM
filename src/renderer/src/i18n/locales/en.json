@@ -94,7 +94,7 @@
     "shortcutTabs": "Switch Tabs (9: last)",
     "shortcutQueryTabs": "Query",
     "shortcutDataTabs": "Result",
-    "shortcutResultView": "Switch Tree / JSON / Table / Console",
+    "shortcutResultView": "Switch Tree / JSON / Table / Grid / Console",
     "shortcutOpenSettings": "Open Settings",
     "shortcutClear": "Clear",
     "shortcutRestore": "Restore",
@@ -593,6 +593,8 @@
       "copyTsv": "TSV"
     },
     "documentPreviewTitle": "Document",
+    "gridMoreFields_one": "{{count}} more field",
+    "gridMoreFields_other": "{{count}} more fields",
     "documentRefreshed": "Document refreshed",
     "documentMissing": "This document no longer exists",
     "documentRefreshFailed": "Failed to refresh document: {{error}}",
