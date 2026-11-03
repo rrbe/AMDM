@@ -41,8 +41,8 @@
 ## 5. 布局与数据视图
 
 - 左栏浏览 Connection,中间承载 Shell 与结果,右栏只显示已加载上下文,不得为展示额外查询。
-- Tree、Table、JSON、Console 保持虚拟化或有界渲染;结构化结果使用应用自己的选择和复制模型。
-- Tree/Table 禁用原生文本选择;内联编辑器、JSON、Shell 和输入框保留原生选择。
+- Tree、Table、Grid、JSON、Console 保持虚拟化或有界渲染;结构化结果使用应用自己的选择和复制模型。
+- Tree/Table/Grid 禁用原生文本选择;内联编辑器、JSON、Shell 和输入框保留原生选择。
 - 结果类型色来自 `--t-*`;主题由 `data-theme` 驱动。
 
 ## 6. 动效
