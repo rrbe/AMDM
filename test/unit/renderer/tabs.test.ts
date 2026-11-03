@@ -289,6 +289,33 @@ describe('appendResult', () => {
     expect(next.activeResultId).toBe('r4')
     expect(next.resultSeq).toBe(4)
   })
+
+  it('retains pinned results while evicting the oldest unpinned result after reordering', () => {
+    const tab = tabWithResults(3)
+    const [first, second, third] = tab.results
+    first.pinned = true
+    const next = appendResult({ ...tab, results: [third, first, second] }, 'r4', docsResult(), QUERY, 2)
+    expect(next.results?.map((result) => result.id)).toEqual(['r3', 'r1', 'r4'])
+    expect(next.results?.[1]).toBe(first)
+    expect(next.activeResultId).toBe('r4')
+  })
+
+  it('keeps new results available when all existing results are pinned', () => {
+    const tab = tabWithResults(3)
+    tab.results.forEach((result) => { result.pinned = true })
+    const next = appendResult(tab, 'r4', docsResult(), QUERY, 2)
+    expect(next.results?.map((result) => result.id)).toEqual(['r1', 'r2', 'r3', 'r4'])
+    expect(next.activeResultId).toBe('r4')
+  })
+
+  it('makes unpinned results eligible for eviction on the next run', () => {
+    let tab = tabWithResults(3)
+    tab = { ...tab, ...patchResult(tab, 'r1', { pinned: true }) }
+    tab = { ...tab, ...appendResult(tab, 'r4', docsResult(), QUERY, 3) }
+    tab = { ...tab, ...patchResult(tab, 'r1', { pinned: false }) }
+    const next = appendResult(tab, 'r5', docsResult(), QUERY, 3)
+    expect(next.results?.map((result) => result.id)).toEqual(['r3', 'r4', 'r5'])
+  })
 })
 
 describe('patchResult', () => {
@@ -317,6 +344,16 @@ describe('patchResult', () => {
 })
 
 describe('closeResult', () => {
+  it('keeps pinned results and focus until they are unpinned', () => {
+    const tab = tabWithResults(2)
+    tab.results[1].pinned = true
+    expect(closeResult(tab, 'r2')).toEqual({})
+    const unpinned = { ...tab, ...patchResult(tab, 'r2', { pinned: false }) }
+    expect(closeResult(unpinned, 'r2')).toMatchObject({
+      results: [tab.results[0]],
+      activeResultId: 'r1'
+    })
+  })
   it('moves focus to the left neighbor when the active result closes', () => {
     const tab = tabWithResults(3)
     const patch = closeResult(tab, 'r3')

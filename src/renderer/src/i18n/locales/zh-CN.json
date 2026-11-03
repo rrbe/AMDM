@@ -140,7 +140,7 @@
     "restartToUpdate": "重启并更新"
   },
   "notify": {
-    "resultRetentionLimit": "为控制内存占用，每个查询仅保留最近 {{count}} 个结果，已移除最早的结果。",
+    "resultRetentionLimit": "每个查询保留固定的结果和最近 {{count}} 个未固定的结果，已移除更早的未固定结果。",
     "loadConnectionsFailed": "加载连接失败：{{error}}",
     "saveConnectionFailed": "保存连接失败：{{error}}",
     "deleteConnectionFailed": "删除连接失败：{{error}}",
@@ -525,6 +525,8 @@
     "previewBack": "返回上一级",
     "noResults": "运行查询以查看结果。",
     "closeTab": "关闭结果",
+    "pinTab": "固定结果",
+    "unpinTab": "取消固定",
     "explainTag": "Explain",
     "view": { "tree": "树形", "table": "表格", "console": "Console" },
     "copyAllTip": "复制全部结果",

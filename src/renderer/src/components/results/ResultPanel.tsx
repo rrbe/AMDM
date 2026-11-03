@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, SlidersHorizontal, Table } from 'lucide-react'
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
@@ -246,10 +246,8 @@ function ResultPanelContent({
     if (view !== 'table') setTableDocumentOrder(null)
   }, [view])
 
-  // One tab per run; the strip only appears once there is something to switch
-  // between (a single result reads exactly as before).
   const strip =
-    results.length > 1 ? (
+    results.length > 0 ? (
       <ResultTabStrip results={results} activeId={active?.id ?? null} showShortcutHints={showTabShortcutHints} />
     ) : null
 
@@ -548,7 +546,7 @@ function ResultExpandButton({
 /**
  * The result-tab strip: one chip per kept run (newest last), click to focus,
  * ✕ / middle-click to close. New runs always land in a fresh tab (the store
- * caps how many are kept — see lib/tabs MAX_RESULT_TABS).
+ * caps unpinned results — see lib/tabs MAX_RESULT_TABS).
  */
 function ResultTabStrip({
   results,
@@ -562,6 +560,7 @@ function ResultTabStrip({
   const { t, i18n } = useTranslation()
   const setActiveResultTab = useAppStore((s) => s.setActiveResultTab)
   const closeResultTab = useAppStore((s) => s.closeResultTab)
+  const setResultTabPinned = useAppStore((s) => s.setResultTabPinned)
   const tabShortcutsEnabled = useAppStore((s) =>
     isAppShortcutEnabled(s.settings.keyboardShortcutsEnabled, s.settings.disabledKeyboardShortcuts, 'contextualTabs')
   )
@@ -599,7 +598,12 @@ function ResultTabStrip({
             tooltipVariant="code"
             closeLabel={t('result.closeTab')}
             onSelect={() => setActiveResultTab(r.id)}
-            onClose={() => closeResultTab(r.id)}
+            onClose={r.pinned ? undefined : () => closeResultTab(r.id)}
+            status={r.pinned ? <Pin size={12} /> : undefined}
+            statusAction={r.pinned ? {
+              label: t('result.unpinTab'),
+              onClick: () => setResultTabPinned(r.id, false)
+            } : undefined}
             onContextMenu={(event) => {
               event.preventDefault()
               setMenu({ x: event.clientX, y: event.clientY, tabId: r.id })
@@ -615,14 +619,25 @@ function ResultTabStrip({
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            { label: t('result.closeTab'), onClick: () => closeResultTab(menu.tabId) },
+            {
+              label: t(results[menuIndex].pinned ? 'result.unpinTab' : 'result.pinTab'),
+              icon: results[menuIndex].pinned ? <PinOff size={14} /> : <Pin size={14} />,
+              onClick: () => setResultTabPinned(menu.tabId, !results[menuIndex].pinned)
+            },
+            'separator',
+            {
+              label: t('result.closeTab'),
+              disabled: results[menuIndex].pinned,
+              onClick: () => closeResultTab(menu.tabId)
+            },
             {
               label: t('shell.closeTabsToRight'),
-              disabled: menuIndex === results.length - 1,
+              disabled: !results.slice(menuIndex + 1).some((result) => !result.pinned),
               onClick: () => results.slice(menuIndex + 1).forEach((result) => closeResultTab(result.id))
             },
             {
               label: t('shell.closeAllTabs'),
+              disabled: results.every((result) => result.pinned),
               onClick: () => results.forEach((result) => closeResultTab(result.id))
             }
           ]}
