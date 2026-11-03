@@ -566,6 +566,8 @@ function ResultTabStrip({
     isAppShortcutEnabled(s.settings.keyboardShortcutsEnabled, s.settings.disabledKeyboardShortcuts, 'contextualTabs')
   )
   const stripRef = useRef<HTMLDivElement>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
+  const menuIndex = menu ? results.findIndex((result) => result.id === menu.tabId) : -1
   const moveResultTab = useAppStore((s) => s.moveResultTab)
   useTabReorder(stripRef, results, setActiveResultTab, moveResultTab)
 
@@ -577,6 +579,7 @@ function ResultTabStrip({
           <DocumentTab
             key={r.id}
             active={r.id === activeId}
+            contextMenuOpen={menu?.tabId === r.id}
             className="rtab"
             dataTabId={r.id}
             label={
@@ -597,11 +600,34 @@ function ResultTabStrip({
             closeLabel={t('result.closeTab')}
             onSelect={() => setActiveResultTab(r.id)}
             onClose={() => closeResultTab(r.id)}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              setMenu({ x: event.clientX, y: event.clientY, tabId: r.id })
+            }}
             shortcut={tabShortcutsEnabled ? tabShortcutLabel(index, results.length, true, isMacPlatform()) : undefined}
             showShortcutHint={showShortcutHints}
           />
         )
       })}
+      {menu && menuIndex >= 0 && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: t('result.closeTab'), onClick: () => closeResultTab(menu.tabId) },
+            {
+              label: t('shell.closeTabsToRight'),
+              disabled: menuIndex === results.length - 1,
+              onClick: () => results.slice(menuIndex + 1).forEach((result) => closeResultTab(result.id))
+            },
+            {
+              label: t('shell.closeAllTabs'),
+              onClick: () => results.forEach((result) => closeResultTab(result.id))
+            }
+          ]}
+        />
+      )}
     </DocumentTabStrip>
   )
 }
