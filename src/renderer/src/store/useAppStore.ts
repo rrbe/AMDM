@@ -90,6 +90,7 @@ export type { QueryTab, ResultTab, ResultView }
 
 /** Loaded children for a catalog node, keyed by a synthetic node id. */
 export interface CatalogState {
+  owner: symbol
   /** db name -> collections (undefined = not loaded yet). */
   collections: Record<string, CollectionInfo[] | undefined>
   /** `${db}` -> databases loaded flag handled separately. */
@@ -106,6 +107,7 @@ export interface CatalogState {
 
 function emptyCatalog(): CatalogState {
   return {
+    owner: Symbol(),
     collections: {},
     databases: undefined,
     indexes: {},
@@ -980,13 +982,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   async loadDatabases(connId) {
     const nodeId = `${connId}:databases`
     set((s) => withLoading(s, connId, nodeId, true))
+    const owner = get().catalogs[connId].owner
+    const ownsRequest = (): boolean => !!get().catalogs[connId] && get().catalogs[connId].owner === owner
     try {
       const databases = await window.api.catalog.databases(connId)
+      if (!ownsRequest()) return
       set((s) => {
         const c = s.catalogs[connId] ?? emptyCatalog()
         return { catalogs: { ...s.catalogs, [connId]: { ...c, databases } } }
       })
     } catch (e) {
+      if (!ownsRequest()) return
       get().notify(
         appNotice(
           'error',
@@ -996,15 +1002,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         )
       )
     } finally {
-      set((s) => withLoading(s, connId, nodeId, false))
+      if (ownsRequest()) set((s) => withLoading(s, connId, nodeId, false))
     }
   },
 
   async loadCollections(connId, db) {
     const nodeId = `${connId}:db:${db}`
     set((s) => withLoading(s, connId, nodeId, true))
+    const owner = get().catalogs[connId].owner
+    const ownsRequest = (): boolean => !!get().catalogs[connId] && get().catalogs[connId].owner === owner
     try {
       const collections = await window.api.catalog.collections(connId, db)
+      if (!ownsRequest()) return
       set((s) => {
         const c = s.catalogs[connId] ?? emptyCatalog()
         return {
@@ -1015,6 +1024,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
+      if (!ownsRequest()) return
       get().notify(
         appNotice(
           'error',
@@ -1024,7 +1034,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         )
       )
     } finally {
-      set((s) => withLoading(s, connId, nodeId, false))
+      if (ownsRequest()) set((s) => withLoading(s, connId, nodeId, false))
     }
   },
 
@@ -1125,8 +1135,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const key = `${db}/${coll}`
     const nodeId = `${connId}:idx:${key}`
     set((s) => withLoading(s, connId, nodeId, true))
+    const owner = get().catalogs[connId].owner
+    const ownsRequest = (): boolean => !!get().catalogs[connId] && get().catalogs[connId].owner === owner
     try {
       const indexes = await window.api.catalog.indexes(connId, db, coll)
+      if (!ownsRequest()) return
       set((s) => {
         const c = s.catalogs[connId] ?? emptyCatalog()
         return {
@@ -1137,6 +1150,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
+      if (!ownsRequest()) return
       get().notify(
         appNotice(
           'error',
@@ -1146,15 +1160,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         )
       )
     } finally {
-      set((s) => withLoading(s, connId, nodeId, false))
+      if (ownsRequest()) set((s) => withLoading(s, connId, nodeId, false))
     }
   },
 
   async loadUsers(connId, db) {
     const nodeId = `${connId}:users:${db}`
     set((s) => withLoading(s, connId, nodeId, true))
+    const owner = get().catalogs[connId].owner
+    const ownsRequest = (): boolean => !!get().catalogs[connId] && get().catalogs[connId].owner === owner
     try {
       const users = await window.api.catalog.users(connId, db)
+      if (!ownsRequest()) return
       set((s) => {
         const c = s.catalogs[connId] ?? emptyCatalog()
         return {
@@ -1162,6 +1179,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
     } catch (e) {
+      if (!ownsRequest()) return
       get().notify(
         appNotice(
           'error',
@@ -1171,7 +1189,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         )
       )
     } finally {
-      set((s) => withLoading(s, connId, nodeId, false))
+      if (ownsRequest()) set((s) => withLoading(s, connId, nodeId, false))
     }
   },
 

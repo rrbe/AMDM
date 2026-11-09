@@ -3,6 +3,7 @@ import { useAppStore, type CatalogState } from '../../../src/renderer/src/store/
 
 describe('offline catalog search lifecycle', () => {
   const catalog: CatalogState = {
+    owner: Symbol(),
     databases: [{ name: 'shop' }],
     collections: { shop: [{ name: 'orders', type: 'collection', estimatedCount: 42 }] },
     indexes: {},
@@ -64,4 +65,37 @@ describe('offline catalog search lifecycle', () => {
     await useAppStore.getState().deleteConnection('c1')
     expect(useAppStore.getState().catalogSearchSnapshots.c1).toBeUndefined()
   })
+  it.each(['databases', 'collections', 'indexes', 'users'] as const)(
+    'discards stale %s responses and errors after disconnect or reconnect', async (kind) => {
+      for (const reconnect of [false, true]) {
+        for (const fail of [false, true]) {
+          useAppStore.setState({ catalogs: { c1: { ...catalog } }, notifications: [] })
+          let resolve!: (value: never[]) => void
+          let reject!: (error: Error) => void
+          const pending = new Promise<never[]>((res, rej) => { resolve = res; reject = rej })
+          vi.stubGlobal('window', { api: {
+            session: { disconnect: vi.fn().mockResolvedValue(undefined), connect: vi.fn().mockResolvedValue({ id: 'c1', state: 'connected' }) },
+            catalog: { [kind]: vi.fn().mockReturnValueOnce(pending) }
+          } })
+          const actions = useAppStore.getState()
+          const request = kind === 'databases' ? actions.loadDatabases('c1')
+            : kind === 'collections' ? actions.loadCollections('c1', 'shop')
+            : kind === 'indexes' ? actions.loadIndexes('c1', 'shop', 'orders')
+            : actions.loadUsers('c1', 'shop')
+          await actions.disconnect('c1')
+          if (reconnect) {
+            window.api.catalog.databases = vi.fn().mockResolvedValue([{ name: 'fresh' }])
+            await actions.connect('c1')
+          }
+          const before = useAppStore.getState().catalogs.c1
+          if (fail) reject(new Error('stale failure'))
+          else resolve([])
+          await request
+          expect(useAppStore.getState().catalogs.c1).toBe(before)
+          expect(useAppStore.getState().notifications).toEqual([])
+        }
+      }
+    }
+  )
+
 })

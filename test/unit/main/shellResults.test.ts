@@ -60,4 +60,19 @@ describe('result cursor and cache lifecycle', () => {
     expect(cursor.close).toHaveBeenCalledOnce()
     expect((await value.page(0,1)).data).toEqual([{n:0}])
   })
+  it.each(['cursor', 'cleanup'])('removes cached files when %s cleanup fails', async (failure) => {
+    const value = session()
+    const error = new Error('cleanup failed')
+    await value.capture({ hasNext: async () => true, next: async () => ({}), close: async () => {
+      if (failure === 'cursor') throw error
+    } })
+    await value.page(0, 1)
+    const directory = (value as unknown as { directory: string }).directory
+    const cleanup = vi.fn(async () => { if (failure === 'cleanup') throw error })
+    value.retainCleanup(cleanup)
+    await expect(value.close()).rejects.toThrow(error)
+    expect(cleanup).toHaveBeenCalledOnce()
+    await expect(access(directory)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
 })

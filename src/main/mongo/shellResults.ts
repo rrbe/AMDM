@@ -181,10 +181,13 @@ export class ShellResultSession {
     this.closed = true
     this.controller.abort(new Error('Result is closed'))
     await this.reading
-    await this.finishCursor()
-    await this.counting
-    if (this.directory) await rm(this.directory, { recursive: true, force: true })
-    this.chunks = []
+    try {
+      await this.finishCursor()
+    } finally {
+      await this.counting
+      if (this.directory) await rm(this.directory, { recursive: true, force: true })
+      this.chunks = []
+    }
   }
 }
 
