@@ -213,6 +213,7 @@ interface AppState {
   /** Focus one of the active tab's result tabs. */
   setActiveResultTab(id: string, queryTabId?: string): void
   moveResultTab(sourceId: string, targetId: string): void
+  setResultTabPinned(id: string, pinned: boolean): void
   /** Close one of the active tab's result tabs. */
   closeResultTab(id: string): void
 
@@ -1287,6 +1288,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeResultTab(id) {
     set((s) => patchTabResults(s, s.activeTabId, (t) => closeResult(t, id)))
+  },
+
+  setResultTabPinned(id, pinned) {
+    set((s) => patchTabResults(s, s.activeTabId, (t) => patchResult(t, id, { pinned })))
   },
 
   // --------------------------------------------------------------------- shell

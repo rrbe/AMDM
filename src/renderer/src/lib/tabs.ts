@@ -20,6 +20,7 @@ export interface ResultQuery {
 /** One entry in a tab's result strip: a run outcome plus its paging state. */
 export interface ResultTab {
   id: string
+  pinned?: boolean
   /** Selected Tree/JSON/Table view for this result tab. */
   resultView?: ResultView
   foldedLines?: Partial<Record<ResultFoldView, number[]>>
@@ -35,7 +36,7 @@ export interface ResultTab {
   skip: number
 }
 
-/** Upper bound on kept results per tab; the oldest is evicted when a new run
+/** Upper bound on unpinned results per tab; the oldest is evicted when a new run
     lands because each result can hold a full page of EJSON docs. */
 export const MAX_RESULT_TABS = 8
 
@@ -109,7 +110,7 @@ export interface QueryTab {
       editor's onChange (user keystrokes only — external value syncs don't
       fire it), never set back. */
   pristine: boolean
-  /** Result strip in display order, capped at MAX_RESULT_TABS. New runs append. */
+  /** Result strip in display order; unpinned results are capped at MAX_RESULT_TABS. */
   results: ResultTab[]
   /** Focused result tab id (null = nothing has run yet). */
   activeResultId: string | null
@@ -233,7 +234,7 @@ export function moveTab<T extends { id: string }>(tabs: T[], sourceId: string, t
 }
 
 /** Append a new run's result as a fresh, focused result tab (evicting the
-    oldest beyond `max`). */
+    oldest unpinned results beyond `max`). */
 export function appendResult(
   tab: QueryTab,
   id: string,
@@ -242,10 +243,11 @@ export function appendResult(
   max = MAX_RESULT_TABS
 ): Partial<QueryTab> {
   const seq = tab.resultSeq + 1
-  const results = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0, resultView: 'tree' as const }]
+  const results: ResultTab[] = [...tab.results, { id, seq, result, executedAt: Date.now(), query, skip: 0, resultView: 'tree' }]
+  const unpinned = results.filter((entry) => !entry.pinned)
   // Display order can change; eviction still follows the run sequence.
   const evicted = new Set(
-    [...results].sort((a, b) => a.seq - b.seq).slice(0, Math.max(0, results.length - max))
+    unpinned.sort((a, b) => a.seq - b.seq).slice(0, Math.max(0, unpinned.length - max))
   )
   return {
     results: evicted.size ? results.filter((entry) => !evicted.has(entry)) : results,
@@ -266,6 +268,7 @@ export function patchResult(tab: QueryTab, resultId: string, patch: Partial<Resu
 
 /** Close one result tab, moving focus to a neighbor when it was active. */
 export function closeResult(tab: QueryTab, resultId: string): Partial<QueryTab> {
+  if (tab.results.some((result) => result.id === resultId && result.pinned)) return {}
   const results = tab.results.filter((r) => r.id !== resultId)
   if (results.length === tab.results.length) return {}
   const next = tab.activeResultId ? pickActiveAfterClose(tab.results, tab.activeResultId, resultId) : undefined

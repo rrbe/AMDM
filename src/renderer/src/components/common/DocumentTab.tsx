@@ -8,7 +8,7 @@ interface DocumentTabProps {
   label: ReactNode
   closeLabel: string
   onSelect: () => void
-  onClose: () => void
+  onClose?: () => void
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
   contextMenuOpen?: boolean
   className?: string
@@ -67,7 +67,7 @@ export function DocumentTab({
         onAuxClick={(event) => {
           if (event.button === 1) {
             event.preventDefault()
-            onClose()
+            onClose?.()
           }
         }}
       >
@@ -91,16 +91,18 @@ export function DocumentTab({
         ) : null}
         <span className="document-tab-label">{label}</span>
         {!showShortcutHint || !shortcut ? (
-          <button
-            className="document-tab-close"
-            aria-label={closeLabel}
-            onClick={(event) => {
-              event.stopPropagation()
-              onClose()
-            }}
-          >
-            <X size={12} />
-          </button>
+          onClose && (
+            <button
+              className="document-tab-close"
+              aria-label={closeLabel}
+              onClick={(event) => {
+                event.stopPropagation()
+                onClose()
+              }}
+            >
+              <X size={12} />
+            </button>
+          )
         ) : (
           <span className="document-tab-shortcut" data-shortcut={shortcut} aria-hidden="true">
             <span>{shortcut}</span>
