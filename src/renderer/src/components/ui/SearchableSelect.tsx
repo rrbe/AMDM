@@ -16,6 +16,7 @@ export interface SearchableSelectOption<T extends string> {
   value: T
   label: ReactNode
   filterText: string
+  disabled?: boolean
   /** Keep the option visible when the list scrolls. */
   pinned?: boolean
 }
@@ -132,8 +133,9 @@ function SearchableSelectInner<T extends string, Multiple extends boolean = fals
                   <Combobox.Item
                     key={option.value}
                     value={option.value}
+                    disabled={option.disabled}
                     className={cn(
-                      'flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[linear-gradient(var(--interaction-hover),var(--interaction-hover))] data-[highlighted]:text-foreground',
+                      'flex cursor-pointer select-none items-center gap-2 rounded-[4px] py-1.5 pl-2 pr-2.5 text-[13px] text-foreground/85 outline-none data-[highlighted]:bg-[linear-gradient(var(--interaction-hover),var(--interaction-hover))] data-[highlighted]:text-foreground data-[disabled]:cursor-default data-[disabled]:opacity-50',
                       option.pinned && 'sticky top-0 z-10 bg-[var(--surface-elevated)]'
                     )}
                   >

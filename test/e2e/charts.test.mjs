@@ -34,14 +34,16 @@ test('Query charts render BSON results and preserve configuration and page scope
     }
     async function field(label, value) {
       const multiple = label === 'Metric' && await renderer.evaluate('document.querySelector("[data-chart-type]").dataset.chartType !== "pie"')
-      if (multiple) label = 'Metrics'
-      await clickElement(renderer, button(label))
-      await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-combobox-popup input") && !!document.activeElement?.closest(".amdm-combobox-popup")')
+      const trigger = label === 'Dimension'
+        ? `${button('Add dimension')} || ${button('Change dimension')}`
+        : `${button('Add metric')} || ${button('Change metric')}`
+      await clickElement(renderer, trigger)
+      await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-field-select-popup input") && !!document.activeElement?.closest(".amdm-field-select-popup")')
       await renderer.call('Input.insertText', { text: value })
-      await waitForExpression(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].some(el => el.textContent.trim() === ${JSON.stringify(value)})`)
-      await clickElement(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+      await waitForExpression(renderer, `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].some(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+      await clickElement(renderer, `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
       if (multiple) await key('Escape', 'Escape', 27)
-      await waitForExpression(renderer, '!document.querySelector(".amdm-combobox-popup")')
+      await waitForExpression(renderer, '!document.querySelector(".amdm-field-select-popup")')
     }
     async function type(label, type) {
       await renderer.evaluate('window.chartLabels.clear()')
@@ -69,12 +71,18 @@ test('Query charts render BSON results and preserve configuration and page scope
     await labels('status', 'count')
     await field('Metric', 'amount')
     await waitForExpression(renderer, 'window.chartLabels.has("count") && window.chartLabels.has("amount") && window.chartLabels.has("Metrics")')
+    assert.deepEqual(await renderer.evaluate('[...document.querySelectorAll("[data-chart-view] [role=list][aria-label=Metrics] [role=listitem]")].map(el => el.textContent.trim())'), ['count', 'amount'])
+    await clickElement(renderer, button('Remove metric count'))
+    await waitForExpression(renderer, `!${button('Remove metric count')}`)
+    await field('Metric', 'count')
     await screenshot('bar')
     await type('Line', 'line')
     await plotted(3)
     await waitForExpression(renderer, 'window.chartLabels.has("count") && window.chartLabels.has("amount") && window.chartLabels.has("Metrics")')
     await type('Pie', 'pie')
     await plotted(3)
+    await labels('status', 'amount')
+    await field('Metric', 'count')
     await labels('status', 'count')
     await field('Metric', 'amount')
     await labels('status', 'amount')
@@ -88,7 +96,7 @@ test('Query charts render BSON results and preserve configuration and page scope
     await clickElement(renderer, button('Chart'))
     await waitForExpression(renderer, '!!document.querySelector("[data-chart-type=pie]")')
     await plotted(3)
-    assert.equal(await renderer.evaluate('document.querySelector("button[aria-label=Metric]").textContent.trim()'), 'amount')
+    assert.equal(await renderer.evaluate('document.querySelector("[data-chart-view] [role=list][aria-label=Metrics] [role=listitem]").textContent.trim()'), 'amount')
     assert.equal(await mongo.db('amdm_e2e').collection('chartRuns').countDocuments(), 1)
     report.steps.push('bar and line render multiple metrics; pie retains a single metric, and view switches retain both selections without rerunning the script')
 
@@ -133,14 +141,15 @@ test('Query charts render BSON results and preserve configuration and page scope
     report.steps.push('Decimal results retain a precision notice and duplicate dimension values are rejected in pie charts')
 
     await run('db.pages.find({ n: 0 }).map(d => Object.fromEntries(Array.from({ length: 500 }, (_, i) => ["field" + i, i])))')
-    await clickElement(renderer, button('Dimension'))
-    await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-combobox-popup input") && !!document.activeElement?.closest(".amdm-combobox-popup")')
-    assert.equal(await renderer.evaluate('document.querySelectorAll(".amdm-combobox-popup [role=option]").length'), 100)
+    await clickElement(renderer, button('Add dimension'))
+    await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-field-select-popup input") && !!document.activeElement?.closest(".amdm-field-select-popup")')
+    await waitForExpression(renderer, 'document.querySelectorAll(".amdm-field-select-popup [role=option]").length > 0')
+    assert.ok(await renderer.evaluate('document.querySelectorAll(".amdm-field-select-popup [role=option]").length > 0 && document.querySelectorAll(".amdm-field-select-popup [role=option]").length < 30'))
     await key('Escape', 'Escape', 27)
     await field('Dimension', 'field499')
     await field('Metric', 'field498')
     await plotted(1)
-    report.steps.push('500-field results keep at most 100 choices mounted while search can reach the last field')
+    report.steps.push('500-field results virtualize choices while search can reach the last field')
 
     await run('Array.from({ length: 2000 }, (_, n) => ({ n, value: Math.sin(n / 50) }))')
     await clickElement(renderer, button('Show'))

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChartColumn, ChartLine, ChartPie, Download } from 'lucide-react'
+import { ArrowLeftRight, ChartNoAxesColumn, ChartPie, Download, Plus, TrendingUp, X } from 'lucide-react'
 import { init, use, type EChartsType } from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ShellResult } from '@shared/types'
 import { Button } from '@renderer/components/common/Button'
-import { SearchableSelect, type SearchableSelectOption } from '@renderer/components/ui/SearchableSelect'
+import { FieldSelect } from '@renderer/components/ui/FieldSelect'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { chartHasCompleteResult, prepareChart, type ResultChartConfig } from '@renderer/lib/resultChart'
 import { formatEjsonDate } from '@renderer/lib/ejson'
@@ -25,29 +25,15 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   const { t } = useTranslation()
   const timeZone = useResultTimeZone()
   const host = useRef<HTMLDivElement>(null)
+  const dimensionField = useRef<HTMLDivElement>(null)
+  const metricFields = useRef<HTMLDivElement>(null)
   const chart = useRef<EChartsType | null>(null)
   const [themeVersion, setThemeVersion] = useState(0)
   const data = useMemo(() => prepareChart(docs, config, timeZone), [docs, config, timeZone])
   const ready = fields !== undefined && fields.includes(config.dimension) && data.metrics.length > 0 && data.metrics.every((field) => fields.includes(field))
   const error = ready ? data.error : null
-  const options = useMemo(() => (fields ?? []).map((field) => ({ value: field, label: field, filterText: field })), [fields])
-
-  const matchesField = useMemo(() => {
-    let previousQuery: string | undefined
-    let matching = new Set<string>()
-    return (option: SearchableSelectOption<string>, query: string): boolean => {
-      if (query !== previousQuery) {
-        previousQuery = query
-        matching = new Set()
-        const search = query.toLowerCase()
-        for (const candidate of options) {
-          if (candidate.filterText.toLowerCase().includes(search)) matching.add(candidate.value)
-          if (matching.size === 100) break
-        }
-      }
-      return matching.has(option.value)
-    }
-  }, [options])
+  const dimensionAction = t(config.dimension ? 'chart.changeDimension' : 'chart.addDimension')
+  const metricAction = t(config.type === 'pie' && data.metrics[0] ? 'chart.changeMetric' : 'chart.addMetric')
 
   useEffect(() => {
     const element = host.current!
@@ -139,10 +125,10 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   const message = !fields ? t('chart.loading') : !ready ? t('chart.chooseFields') : error ? t(`chart.${error}`) : null
   return (
     <div className="@container/chart flex h-full min-h-0 [font-family:var(--font-ui)]" data-chart-view="">
-      <div className="flex w-36 shrink-0 flex-col gap-4 overflow-y-auto border-r border-[var(--separator)] px-2 py-3 @min-[720px]/chart:w-40">
+      <div className="flex w-36 shrink-0 flex-col gap-5 overflow-y-auto border-r border-[var(--separator)] px-2 py-4 @min-[720px]/chart:w-40">
         <div className="flex shrink-0 items-center gap-1" role="group" aria-label={t('chart.type')}>
           {(['bar', 'line', 'pie'] as const).map((type) => {
-            const Icon = type === 'bar' ? ChartColumn : type === 'line' ? ChartLine : ChartPie
+            const Icon = type === 'bar' ? ChartNoAxesColumn : type === 'line' ? TrendingUp : ChartPie
             return (
               <Tooltip key={type} content={t(`chart.${type}`)}>
                 <button
@@ -150,7 +136,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
                   aria-label={t(`chart.${type}`)} aria-pressed={config.type === type}
                   onClick={() => onChange({ ...config, type })}
                 >
-                  <Icon size={16} className="shrink-0" aria-hidden="true" />
+                  <Icon size={16} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
                   <span className="explorer-nav-label hidden @min-[720px]/chart:block" aria-hidden="true">
                     <span>{t(`chart.${type}`)}</span>
                   </span>
@@ -159,33 +145,36 @@ export function ChartView({ docs, fields, result, config, onChange }: {
             )
           })}
         </div>
-        <div className="flex shrink-0 flex-col gap-1.5">
+        <div ref={dimensionField} className="flex shrink-0 flex-col gap-2">
           <span className="text-xs text-muted-foreground">{t('chart.dimension')}</span>
-          <SearchableSelect value={config.dimension} options={options}
-            matches={matchesField}
+          <FieldSelect value={config.dimension} fields={fields}
             onChange={(dimension) => onChange({ ...config, dimension })}
-            triggerContent={<span className="truncate px-2">{config.dimension || t('chart.selectField')}</span>}
-            placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
-            aria-label={t('chart.dimension')}
-            className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
+            label={t('chart.dimension')} side="right"
+            trigger={<Button size="sm" className="h-8 w-full" aria-label={dimensionAction}>{config.dimension ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{dimensionAction}</Button>} />
+          <ChartFieldTags fields={config.dimension ? [config.dimension] : []} kind="dimension"
+            onRemove={() => {
+              onChange({ ...config, dimension: '' })
+              dimensionField.current?.querySelector('button')?.focus()
+            }} />
         </div>
-        <div className="flex shrink-0 flex-col gap-1.5">
+        <div ref={metricFields} className="flex shrink-0 flex-col gap-2">
           <span className="text-xs text-muted-foreground">{t(config.type === 'pie' ? 'chart.metric' : 'chart.metrics')}</span>
           {config.type === 'pie' ? (
-            <SearchableSelect key="pie" value={data.metrics[0] ?? ''} options={options}
-              matches={matchesField} onChange={(pieMetric) => onChange({ ...config, pieMetric })}
-              triggerContent={<span className="truncate px-2">{data.metrics[0] || t('chart.selectField')}</span>}
-              placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
-              aria-label={t('chart.metric')}
-              className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
+            <FieldSelect key="pie" value={data.metrics[0] ?? ''} fields={fields}
+              onChange={(pieMetric) => onChange({ ...config, pieMetric })}
+              label={t('chart.metric')} side="right"
+              trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}>{data.metrics[0] ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{metricAction}</Button>} />
           ) : (
-            <SearchableSelect key="metrics" multiple value={config.metrics} options={options}
-              matches={matchesField} onChange={(metrics) => onChange({ ...config, metrics })}
-              triggerContent={<span className="truncate px-2">{config.metrics.join(', ') || t('chart.selectField')}</span>}
-              placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
-              aria-label={t('chart.metrics')}
-              className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
+            <FieldSelect key="metrics" multiple value={config.metrics} fields={fields}
+              onChange={(metrics) => onChange({ ...config, metrics: metrics ?? fields ?? [] })}
+              label={t('chart.metrics')} side="right"
+              trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}><Plus size={14} aria-hidden="true" />{metricAction}</Button>} />
           )}
+          <ChartFieldTags fields={data.metrics.filter(Boolean)} kind="metric"
+            onRemove={(field) => {
+              onChange(config.type === 'pie' ? { ...config, pieMetric: '' } : { ...config, metrics: config.metrics.filter((metric) => metric !== field) })
+              metricFields.current?.querySelector('button')?.focus()
+            }} />
         </div>
         <Button variant="ghost" size="sm" className="mt-auto shrink-0" disabled={!ready || !!error} onClick={exportPng}>
           <Download size={14} aria-hidden="true" />
@@ -195,7 +184,6 @@ export function ChartView({ docs, fields, result, config, onChange }: {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-xs text-muted-foreground" aria-live="polite">
           <span data-chart-scope="">{t(chartHasCompleteResult(result) ? 'chart.complete' : 'chart.page', { count: docs.length })}</span>
-          {options.length > 100 && <span>{t('chart.fieldLimit')}</span>}
           {ready && data.invalid > 0 && <span>{t('chart.invalid', { count: data.invalid })}</span>}
           {ready && data.approximate > 0 && <span>{t('chart.approximate')}</span>}
         </div>
@@ -204,6 +192,29 @@ export function ChartView({ docs, fields, result, config, onChange }: {
           {message && <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground" role="status">{message}</div>}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ChartFieldTags({ fields, kind, onRemove }: {
+  fields: string[]
+  kind: 'dimension' | 'metric'
+  onRemove: (field: string) => void
+}): React.JSX.Element | null {
+  const { t } = useTranslation()
+  if (fields.length === 0) return null
+  return (
+    <div className="mt-1 flex flex-wrap gap-2" role="list" aria-label={t(kind === 'dimension' ? 'chart.dimension' : 'chart.metrics')}>
+      {fields.map((field) => (
+        <span key={field} role="listitem" className="inline-flex max-w-full items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--t-number)_14%,transparent)] py-1 pl-2 pr-1 text-xs font-medium text-[var(--t-number)]">
+          <span className="min-w-0 truncate" title={field}>{field}</span>
+          <button type="button" aria-label={t(kind === 'dimension' ? 'chart.removeDimension' : 'chart.removeMetric', { field })}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 text-inherit outline-none hover:bg-[color-mix(in_srgb,var(--t-number)_18%,transparent)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+            onClick={() => onRemove(field)}>
+            <X size={12} aria-hidden="true" />
+          </button>
+        </span>
+      ))}
     </div>
   )
 }
