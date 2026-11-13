@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChartColumn, ChartLine, ChartPie } from 'lucide-react'
 import { init, use, type EChartsType } from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ShellResult } from '@shared/types'
-import { Select } from '@renderer/components/ui/Select'
 import { SearchableSelect, type SearchableSelectOption } from '@renderer/components/ui/SearchableSelect'
+import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { chartHasCompleteResult, prepareChart, type ResultChartConfig } from '@renderer/lib/resultChart'
 import { formatEjsonDate } from '@renderer/lib/ejson'
 import { useResultTimeZone } from './ResultTimeZone'
@@ -117,11 +118,29 @@ export function ChartView({ docs, fields, result, config, onChange }: {
 
   const message = !fields ? t('chart.loading') : !ready ? t('chart.chooseFields') : error ? t(`chart.${error}`) : null
   return (
-    <div className="flex h-full min-h-0 flex-col [font-family:var(--font-ui)]" data-chart-view="">
-      <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[var(--separator)] px-4 py-3">
-        <Select value={config.type} options={(['bar', 'line', 'pie'] as const).map((value) => ({ value, label: t(`chart.${value}`) }))} onChange={(type) => onChange({ ...config, type })} aria-label={t('chart.type')} className="h-8 w-32 shrink-0 text-xs" />
+    <div className="@container/chart flex h-full min-h-0 [font-family:var(--font-ui)]" data-chart-view="">
+      <div className="flex w-36 shrink-0 flex-col gap-4 overflow-y-auto border-r border-[var(--separator)] px-2 py-3 @min-[720px]/chart:w-40">
+        <div className="flex shrink-0 items-center gap-1" role="group" aria-label={t('chart.type')}>
+          {(['bar', 'line', 'pie'] as const).map((type) => {
+            const Icon = type === 'bar' ? ChartColumn : type === 'line' ? ChartLine : ChartPie
+            return (
+              <Tooltip key={type} content={t(`chart.${type}`)}>
+                <button
+                  className={`explorer-nav-item text-xs outline-none focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] ${config.type === type ? 'is-active' : ''}`}
+                  aria-label={t(`chart.${type}`)} aria-pressed={config.type === type}
+                  onClick={() => onChange({ ...config, type })}
+                >
+                  <Icon size={16} className="shrink-0" aria-hidden="true" />
+                  <span className="explorer-nav-label hidden @min-[720px]/chart:block" aria-hidden="true">
+                    <span>{t(`chart.${type}`)}</span>
+                  </span>
+                </button>
+              </Tooltip>
+            )
+          })}
+        </div>
         {(['x', 'y'] as const).map((axis) => (
-          <div key={axis} className="flex shrink-0 items-center gap-2">
+          <div key={axis} className="flex shrink-0 flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">{t(axis === 'x' ? 'chart.dimension' : 'chart.metric')}</span>
             <SearchableSelect value={config[axis]} options={options}
               matches={matchesField}
@@ -129,19 +148,21 @@ export function ChartView({ docs, fields, result, config, onChange }: {
               triggerContent={<span className="truncate px-2">{config[axis] || t('chart.selectField')}</span>}
               placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
               aria-label={t(axis === 'x' ? 'chart.dimension' : 'chart.metric')}
-              className="h-8 w-40 text-xs" popupClassName="w-64 max-h-72" />
+              className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
           </div>
         ))}
       </div>
-      <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-xs text-muted-foreground" aria-live="polite">
-        <span data-chart-scope="">{t(chartHasCompleteResult(result) ? 'chart.complete' : 'chart.page', { count: docs.length })}</span>
-        {options.length > 100 && <span>{t('chart.fieldLimit')}</span>}
-        {ready && data.invalid > 0 && <span>{t('chart.invalid', { count: data.invalid })}</span>}
-        {ready && data.approximate > 0 && <span>{t('chart.approximate')}</span>}
-      </div>
-      <div className="relative min-h-0 flex-1">
-        <div ref={host} className="h-full w-full" role="img" aria-label={t('chart.description', { type: t(`chart.${config.type}`), x: config.x, y: config.y })} data-chart-type={config.type} data-chart-points={ready && !error ? data.points.length : 0} />
-        {message && <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground" role="status">{message}</div>}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-xs text-muted-foreground" aria-live="polite">
+          <span data-chart-scope="">{t(chartHasCompleteResult(result) ? 'chart.complete' : 'chart.page', { count: docs.length })}</span>
+          {options.length > 100 && <span>{t('chart.fieldLimit')}</span>}
+          {ready && data.invalid > 0 && <span>{t('chart.invalid', { count: data.invalid })}</span>}
+          {ready && data.approximate > 0 && <span>{t('chart.approximate')}</span>}
+        </div>
+        <div className="relative min-h-0 flex-1">
+          <div ref={host} className="h-full w-full" role="img" aria-label={t('chart.description', { type: t(`chart.${config.type}`), x: config.x, y: config.y })} data-chart-type={config.type} data-chart-points={ready && !error ? data.points.length : 0} />
+          {message && <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground" role="status">{message}</div>}
+        </div>
       </div>
     </div>
   )

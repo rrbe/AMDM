@@ -517,10 +517,10 @@
     }
   },
   "chart": {
-    "title": "图表",
+    "title": "Chart",
     "type": "图表类型",
-    "bar": "柱状图",
-    "line": "折线图",
+    "bar": "柱图",
+    "line": "线图",
     "pie": "饼图",
     "dimension": "维度",
     "metric": "指标",

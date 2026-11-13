@@ -41,9 +41,7 @@ test('Query charts render BSON results and preserve configuration and page scope
     }
     async function type(label, type) {
       await renderer.evaluate('window.chartLabels.clear()')
-      await clickElement(renderer, button('Chart type'))
-      await waitForExpression(renderer, '!!document.querySelector(".amdm-select-popup")')
-      await clickElement(renderer, `[...document.querySelectorAll('.amdm-select-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(label)})`)
+      await clickElement(renderer, button(label))
       await waitForExpression(renderer, `!!document.querySelector('[data-chart-type=${type}]')`)
     }
     async function plotted(count) {

@@ -517,11 +517,11 @@
     }
   },
   "chart": {
-    "title": "圖表",
+    "title": "Chart",
     "type": "圖表類型",
-    "bar": "長條圖",
-    "line": "折線圖",
-    "pie": "圓餅圖",
+    "bar": "柱圖",
+    "line": "線圖",
+    "pie": "餅圖",
     "dimension": "維度",
     "metric": "指標",
     "dimensionName": "維度：{{field}}",
