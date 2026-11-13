@@ -221,4 +221,16 @@ describe('desktop close and quit through the preload bridge', () => {
     await vi.waitFor(() => expect(main.destroyed).toBe(true))
     expect(fake.confirm).not.toHaveBeenCalled()
   })
+  it('finishes confirmed shutdown when session cleanup fails instead of reopening the workspace', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    fake.hasActiveSessions.mockReturnValue(true)
+    fake.confirm.mockResolvedValue({ response: 1 })
+    fake.shutdown.mockRejectedValueOnce(new Error('cache cleanup failed'))
+    main.close()
+    await vi.waitFor(() => expect(main.destroyed).toBe(true))
+    expect(fake.dispose).toHaveBeenCalledOnce()
+    expect(log).toHaveBeenCalled()
+    expect(fake.showError).not.toHaveBeenCalled()
+  })
+
 })
