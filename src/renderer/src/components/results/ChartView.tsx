@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChartColumn, ChartLine, ChartPie } from 'lucide-react'
+import { ChartColumn, ChartLine, ChartPie, Download } from 'lucide-react'
 import { init, use, type EChartsType } from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ShellResult } from '@shared/types'
+import { Button } from '@renderer/components/common/Button'
 import { SearchableSelect, type SearchableSelectOption } from '@renderer/components/ui/SearchableSelect'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { chartHasCompleteResult, prepareChart, type ResultChartConfig } from '@renderer/lib/resultChart'
@@ -116,6 +117,18 @@ export function ChartView({ docs, fields, result, config, onChange }: {
     }, { notMerge: true })
   }, [config, data, ready, error, timeZone, themeVersion, t])
 
+  const exportPng = (): void => {
+    const link = document.createElement('a')
+    link.download = `chart-${config.type}.png`
+    link.href = chart.current!.getDataURL({
+      type: 'png',
+      pixelRatio: 2,
+      backgroundColor: getComputedStyle(host.current!).getPropertyValue('--surface-content').trim(),
+      excludeComponents: ['tooltip']
+    })
+    link.click()
+  }
+
   const message = !fields ? t('chart.loading') : !ready ? t('chart.chooseFields') : error ? t(`chart.${error}`) : null
   return (
     <div className="@container/chart flex h-full min-h-0 [font-family:var(--font-ui)]" data-chart-view="">
@@ -151,6 +164,10 @@ export function ChartView({ docs, fields, result, config, onChange }: {
               className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
           </div>
         ))}
+        <Button variant="ghost" size="sm" className="mt-auto shrink-0" disabled={!ready || !!error} onClick={exportPng}>
+          <Download size={14} aria-hidden="true" />
+          {t('chart.exportPng')}
+        </Button>
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-xs text-muted-foreground" aria-live="polite">

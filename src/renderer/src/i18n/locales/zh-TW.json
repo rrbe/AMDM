@@ -518,6 +518,7 @@
   },
   "chart": {
     "title": "Chart",
+    "exportPng": "匯出 PNG",
     "type": "圖表類型",
     "bar": "柱圖",
     "line": "線圖",

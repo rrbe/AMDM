@@ -518,6 +518,7 @@
   },
   "chart": {
     "title": "Chart",
+    "exportPng": "Export PNG",
     "type": "Chart type",
     "bar": "Bar",
     "line": "Line",
