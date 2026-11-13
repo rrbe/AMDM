@@ -77,6 +77,7 @@ describe('settingsStore', () => {
       historyLimit: 200,
       dataFontSize: 13,
       tableNestedDisplay: 'inline',
+      gridHeightMode: 'fixed',
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],
@@ -114,6 +115,19 @@ describe('settingsStore', () => {
     settingsStore.update({ tableNestedDisplay: 'auto' })
     settingsStore.init()
     expect(settingsStore.get().tableNestedDisplay).toBe('auto')
+    expect(settingsStore.get().theme).toBe('dark')
+  })
+
+  it('defaults existing installations to fixed Grid height and persists the selected mode', () => {
+    electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
+    settingsStore.init()
+    expect(settingsStore.get().gridHeightMode).toBe('fixed')
+    settingsStore.update({ gridHeightMode: 'expanded' })
+    settingsStore.init()
+    expect(settingsStore.get().gridHeightMode).toBe('expanded')
+    settingsStore.update({ gridHeightMode: 'fixed' })
+    settingsStore.init()
+    expect(settingsStore.get().gridHeightMode).toBe('fixed')
     expect(settingsStore.get().theme).toBe('dark')
   })
 
