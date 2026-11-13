@@ -33,7 +33,7 @@ DbGate 的图表属于 Premium / Team Premium；具体操作文档以 SQL 结果
 
 ### 入口和操作
 
-在现有 Fields / JSON / Table 旁增加 Chart，模式名称统一使用英文。在结果区域内展示图表，配置面板保持固定布局。
+在现有 Tree / JSON / Table 旁增加 Chart，模式名称统一使用英文。在结果区域内展示图表，配置面板保持固定布局。
 
 基本操作：执行查询 → 切换 Chart → 选择图表类型 → 选择维度字段和指标字段。
 

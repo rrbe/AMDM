@@ -331,7 +331,7 @@ function ResultPanelContent({
       <div className="result-bar flex-wrap">
         <div className="view-switch sliding-selection shrink-0">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : 'Table'
+            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : 'Table'
             const Icon = v === 'tree' ? Network : v === 'json' ? Braces : Table
             return (
               <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
