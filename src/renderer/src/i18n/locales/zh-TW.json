@@ -593,8 +593,11 @@
       "copyTsv": "TSV"
     },
     "documentPreviewTitle": "文件",
-    "gridMoreFields_one": "還有 {{count}} 個欄位",
-    "gridMoreFields_other": "還有 {{count}} 個欄位",
+    "gridHeightMode": "卡片高度",
+    "gridFixedHeight": "固定高度",
+    "gridExpandedHeight": "撐開高度",
+    "gridMoreFields_one": "剩餘 {{count}} 個欄位",
+    "gridMoreFields_other": "剩餘 {{count}} 個欄位",
     "documentRefreshed": "文件已重新整理",
     "documentMissing": "該文件已不存在",
     "documentRefreshFailed": "重新整理文件失敗：{{error}}",

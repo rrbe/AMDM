@@ -60,6 +60,7 @@ export function mergeWebSettings(
     next.contextPanelWidth < 200 ||
     next.contextPanelWidth > 10_000 ||
     !["inline", "grouped", "auto"].includes(next.tableNestedDisplay) ||
+    !["fixed", "expanded"].includes(next.gridHeightMode) ||
     typeof next.keyboardShortcutsEnabled !== "boolean" ||
     !Array.isArray(next.disabledKeyboardShortcuts) ||
     next.disabledKeyboardShortcuts.some(

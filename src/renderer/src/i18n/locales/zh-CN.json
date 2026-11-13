@@ -593,8 +593,11 @@
       "copyTsv": "TSV"
     },
     "documentPreviewTitle": "文档",
-    "gridMoreFields_one": "还有 {{count}} 个字段",
-    "gridMoreFields_other": "还有 {{count}} 个字段",
+    "gridHeightMode": "卡片高度",
+    "gridFixedHeight": "固定高度",
+    "gridExpandedHeight": "撑开高度",
+    "gridMoreFields_one": "剩余 {{count}} 个字段",
+    "gridMoreFields_other": "剩余 {{count}} 个字段",
     "documentRefreshed": "文档已刷新",
     "documentMissing": "该文档已不存在",
     "documentRefreshFailed": "刷新文档失败：{{error}}",

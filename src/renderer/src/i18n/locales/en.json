@@ -593,8 +593,11 @@
       "copyTsv": "TSV"
     },
     "documentPreviewTitle": "Document",
-    "gridMoreFields_one": "{{count}} more field",
-    "gridMoreFields_other": "{{count}} more fields",
+    "gridHeightMode": "Card height",
+    "gridFixedHeight": "Fixed height",
+    "gridExpandedHeight": "Expanded height",
+    "gridMoreFields_one": "{{count}} remaining field",
+    "gridMoreFields_other": "{{count}} remaining fields",
     "documentRefreshed": "Document refreshed",
     "documentMissing": "This document no longer exists",
     "documentRefreshFailed": "Failed to refresh document: {{error}}",

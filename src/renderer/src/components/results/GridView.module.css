@@ -70,22 +70,17 @@
   color: var(--text-secondary);
 }
 
-.preview {
-  display: flex;
-  width: 26px;
-  height: 26px;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-}
-
 .fields {
+  position: relative;
   min-height: 0;
   flex: 1;
   padding: 4px 6px;
 }
 
 .field {
+  position: absolute;
+  left: 6px;
+  right: 6px;
   display: flex;
   height: calc(1em + 11px);
   align-items: center;
@@ -137,6 +132,9 @@
 }
 
 .footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 30px;
   flex-shrink: 0;
   padding: 2px 8px 6px;
@@ -145,6 +143,20 @@
 }
 
 .footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 3px 4px;
   color: var(--text-secondary);
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
