@@ -15,7 +15,7 @@ test('Query charts render BSON results and preserve configuration and page scope
       window.chartLabels = new Set();
       const fillText = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function(text, ...args) {
-        if (this.canvas.closest('[data-chart-view]') && /^(Dimension|Metric):/.test(text)) window.chartLabels.add(text);
+        if (this.canvas.closest('[data-chart-view]')) window.chartLabels.add(text);
         return fillText.call(this, text, ...args);
       };
     })()`)
@@ -33,11 +33,15 @@ test('Query charts render BSON results and preserve configuration and page scope
       await waitForExpression(renderer, '!!document.querySelector("[data-chart-view]")')
     }
     async function field(label, value) {
+      const multiple = label === 'Metric' && await renderer.evaluate('document.querySelector("[data-chart-type]").dataset.chartType !== "pie"')
+      if (multiple) label = 'Metrics'
       await clickElement(renderer, button(label))
       await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-combobox-popup input") && !!document.activeElement?.closest(".amdm-combobox-popup")')
       await renderer.call('Input.insertText', { text: value })
       await waitForExpression(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].some(el => el.textContent.trim() === ${JSON.stringify(value)})`)
       await clickElement(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+      if (multiple) await key('Escape', 'Escape', 27)
+      await waitForExpression(renderer, '!document.querySelector(".amdm-combobox-popup")')
     }
     async function type(label, type) {
       await renderer.evaluate('window.chartLabels.clear()')
@@ -57,24 +61,36 @@ test('Query charts render BSON results and preserve configuration and page scope
       await writeFile(new URL(`../../dist/e2e-validation/query-charts/${name}.png`, import.meta.url), Buffer.from(shot.data, 'base64'))
     }
 
-    await run('db.chartRuns.insertOne({ marker: "once" }); db.chartSales.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $project: { _id: 0, status: "$_id", count: 1 } }, { $sort: { count: -1 } }])')
+    await run('db.chartRuns.insertOne({ marker: "once" }); db.chartSales.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $project: { _id: 0, status: "$_id", count: 1, amount: { $multiply: ["$count", 10] } } }, { $sort: { count: -1 } }])')
     await field('Dimension', 'status')
     await field('Metric', 'count')
     await plotted(3)
     assert.match(await renderer.evaluate('document.querySelector("[data-chart-scope]").textContent'), /Complete query result · 3 rows/)
     await labels('status', 'count')
+    await field('Metric', 'amount')
+    await waitForExpression(renderer, 'window.chartLabels.has("count") && window.chartLabels.has("amount") && window.chartLabels.has("Metrics")')
     await screenshot('bar')
+    await type('Line', 'line')
+    await plotted(3)
+    await waitForExpression(renderer, 'window.chartLabels.has("count") && window.chartLabels.has("amount") && window.chartLabels.has("Metrics")')
     await type('Pie', 'pie')
     await plotted(3)
     await labels('status', 'count')
+    await field('Metric', 'amount')
+    await labels('status', 'amount')
+    await type('Bar', 'bar')
+    await waitForExpression(renderer, 'window.chartLabels.has("count") && window.chartLabels.has("amount") && window.chartLabels.has("Metrics")')
+    await type('Pie', 'pie')
+    await labels('status', 'amount')
     await screenshot('pie')
     await clickElement(renderer, button('Table'))
     await waitForExpression(renderer, '!document.querySelector("[data-chart-view]")')
     await clickElement(renderer, button('Chart'))
     await waitForExpression(renderer, '!!document.querySelector("[data-chart-type=pie]")')
     await plotted(3)
+    assert.equal(await renderer.evaluate('document.querySelector("button[aria-label=Metric]").textContent.trim()'), 'amount')
     assert.equal(await mongo.db('amdm_e2e').collection('chartRuns').countDocuments(), 1)
-    report.steps.push('MongoDB aggregation plots as bar and pie; view switches retain fields/type and do not rerun the script')
+    report.steps.push('bar and line render multiple metrics; pie retains a single metric, and view switches retain both selections without rerunning the script')
 
     await renderer.evaluate('document.documentElement.setAttribute("data-theme", "dark")')
     await main.evaluate(`(() => { const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron'); BrowserWindow.getAllWindows()[0].setSize(1080, 760); })()`)

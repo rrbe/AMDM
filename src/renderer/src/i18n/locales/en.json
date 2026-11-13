@@ -525,6 +525,7 @@
     "pie": "Pie",
     "dimension": "Dimension",
     "metric": "Metric",
+    "metrics": "Metrics",
     "dimensionName": "Dimension: {{field}}",
     "metricName": "Metric: {{field}}",
     "selectField": "Select field",

@@ -28,7 +28,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   const chart = useRef<EChartsType | null>(null)
   const [themeVersion, setThemeVersion] = useState(0)
   const data = useMemo(() => prepareChart(docs, config, timeZone), [docs, config, timeZone])
-  const ready = fields !== undefined && fields.includes(config.x) && fields.includes(config.y)
+  const ready = fields !== undefined && fields.includes(config.dimension) && data.metrics.length > 0 && data.metrics.every((field) => fields.includes(field))
   const error = ready ? data.error : null
   const options = useMemo(() => (fields ?? []).map((field) => ({ value: field, label: field, filterText: field })), [fields])
 
@@ -77,13 +77,20 @@ export function ChartView({ docs, fields, result, config, onChange }: {
     const token = (name: string) => style.getPropertyValue(name).trim()
     const colors = ['--t-number', '--t-string', '--t-boolean', '--t-objectId', '--t-null'].map(token)
     const axis = config.type === 'line' ? data.axis : 'category'
-    const points = data.points.map((point) => ({
-      name: point.label,
-      value: config.type === 'pie' || axis === 'category' ? point.y : [point.x, point.y],
-      rawY: point.rawY
+    const series = data.metrics.map((field, index) => ({
+      name: field,
+      type: config.type,
+      data: data.points.map((point) => ({
+        name: point.label,
+        value: config.type === 'pie' || axis === 'category' ? point.values[index].value : [point.x, point.values[index].value],
+        rawValue: point.values[index].raw
+      })),
+      ...(config.type === 'pie'
+        ? { radius: '60%', center: ['50%', '53%'], label: { show: false } }
+        : { connectNulls: false, showSymbol: data.points.length <= 100, barMaxWidth: 60 })
     }))
-    const dimensionName = t('chart.dimensionName', { field: config.x })
-    const metricName = t('chart.metricName', { field: config.y })
+    const dimensionName = t('chart.dimensionName', { field: config.dimension })
+    const metricName = data.metrics.length === 1 ? t('chart.metricName', { field: data.metrics[0] }) : t('chart.metrics')
     const nameTextStyle = { color: token('--text-primary'), fontSize: 12 }
     const axisStyle = { axisLabel: { color: token('--text-secondary') }, axisLine: { lineStyle: { color: token('--separator-strong') } }, splitLine: { lineStyle: { color: token('--separator') } } }
     instance.setOption({
@@ -94,25 +101,25 @@ export function ChartView({ docs, fields, result, config, onChange }: {
         trigger: 'item', renderMode: 'richText', confine: true,
         backgroundColor: token('--surface-elevated'), borderColor: token('--separator-strong'),
         textStyle: { color: token('--text-primary') },
-        formatter: (params: { name: string; data: unknown; percent?: number }) => {
-          const point = params.data as { rawY: string }
-          return `${params.name}\n${config.y}: ${point.rawY}${config.type === 'pie' ? ` (${params.percent}%)` : ''}`
+        formatter: (params: { name: string; seriesName: string; data: unknown; percent?: number }) => {
+          const point = params.data as { rawValue: string }
+          return `${params.name}\n${params.seriesName}: ${point.rawValue}${config.type === 'pie' ? ` (${params.percent}%)` : ''}`
         }
       },
+      series,
       ...(config.type === 'pie' ? {
         title: { text: metricName, subtext: dimensionName, left: 16, top: 12, textStyle: { ...nameTextStyle, fontSize: 14, fontWeight: 500 }, subtextStyle: { color: token('--text-secondary'), fontSize: 12 } },
-        legend: { type: 'scroll', selectedMode: false, bottom: 4, textStyle: { color: token('--text-secondary') } },
-        series: [{ type: 'pie', radius: '60%', center: ['50%', '53%'], label: { show: false }, data: points }]
+        legend: { type: 'scroll', selectedMode: false, bottom: 4, textStyle: { color: token('--text-secondary') } }
       } : {
-        grid: { top: 48, left: 24, right: 32, bottom: 64, containLabel: true },
+        legend: { show: data.metrics.length > 1, type: 'scroll', selectedMode: false, bottom: 4, textStyle: { color: token('--text-secondary') } },
+        grid: { top: 48, left: 24, right: 32, bottom: data.metrics.length > 1 ? 92 : 64, containLabel: true },
         xAxis: {
           ...axisStyle, type: axis, scale: axis !== 'category',
           name: dimensionName, nameLocation: 'middle', nameGap: axis === 'time' ? 52 : 34, nameTextStyle,
           ...(axis === 'category' ? { data: data.points.map((point) => point.label), axisLabel: { ...axisStyle.axisLabel, hideOverlap: true, width: 100, overflow: 'truncate' } } : {}),
           ...(axis === 'time' ? { axisLabel: { ...axisStyle.axisLabel, hideOverlap: true, formatter: (value: number) => formatEjsonDate({ $numberLong: String(value) }, timeZone).slice(0, 19).replace('T', '\n') } } : {})
         },
-        yAxis: { ...axisStyle, type: 'value', scale: config.type === 'line', name: metricName, nameLocation: 'end', nameGap: 20, nameTextStyle: { ...nameTextStyle, align: 'left' } },
-        series: [{ name: config.y, type: config.type, data: points, connectNulls: false, showSymbol: data.points.length <= 100, barMaxWidth: 60 }]
+        yAxis: { ...axisStyle, type: 'value', scale: config.type === 'line', name: metricName, nameLocation: 'end', nameGap: 20, nameTextStyle: { ...nameTextStyle, align: 'left' } }
       })
     }, { notMerge: true })
   }, [config, data, ready, error, timeZone, themeVersion, t])
@@ -152,18 +159,34 @@ export function ChartView({ docs, fields, result, config, onChange }: {
             )
           })}
         </div>
-        {(['x', 'y'] as const).map((axis) => (
-          <div key={axis} className="flex shrink-0 flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">{t(axis === 'x' ? 'chart.dimension' : 'chart.metric')}</span>
-            <SearchableSelect value={config[axis]} options={options}
-              matches={matchesField}
-              onChange={(field) => onChange({ ...config, [axis]: field })}
-              triggerContent={<span className="truncate px-2">{config[axis] || t('chart.selectField')}</span>}
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">{t('chart.dimension')}</span>
+          <SearchableSelect value={config.dimension} options={options}
+            matches={matchesField}
+            onChange={(dimension) => onChange({ ...config, dimension })}
+            triggerContent={<span className="truncate px-2">{config.dimension || t('chart.selectField')}</span>}
+            placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
+            aria-label={t('chart.dimension')}
+            className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
+        </div>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">{t(config.type === 'pie' ? 'chart.metric' : 'chart.metrics')}</span>
+          {config.type === 'pie' ? (
+            <SearchableSelect key="pie" value={data.metrics[0] ?? ''} options={options}
+              matches={matchesField} onChange={(pieMetric) => onChange({ ...config, pieMetric })}
+              triggerContent={<span className="truncate px-2">{data.metrics[0] || t('chart.selectField')}</span>}
               placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
-              aria-label={t(axis === 'x' ? 'chart.dimension' : 'chart.metric')}
+              aria-label={t('chart.metric')}
               className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
-          </div>
-        ))}
+          ) : (
+            <SearchableSelect key="metrics" multiple value={config.metrics} options={options}
+              matches={matchesField} onChange={(metrics) => onChange({ ...config, metrics })}
+              triggerContent={<span className="truncate px-2">{config.metrics.join(', ') || t('chart.selectField')}</span>}
+              placeholder={t('result.searchFields')} emptyMessage={t('result.noMatchingFields')}
+              aria-label={t('chart.metrics')}
+              className="h-8 w-full text-xs" popupClassName="w-64 max-h-72" />
+          )}
+        </div>
         <Button variant="ghost" size="sm" className="mt-auto shrink-0" disabled={!ready || !!error} onClick={exportPng}>
           <Download size={14} aria-hidden="true" />
           {t('chart.exportPng')}
@@ -177,7 +200,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
           {ready && data.approximate > 0 && <span>{t('chart.approximate')}</span>}
         </div>
         <div className="relative min-h-0 flex-1">
-          <div ref={host} className="h-full w-full" role="img" aria-label={t('chart.description', { type: t(`chart.${config.type}`), x: config.x, y: config.y })} data-chart-type={config.type} data-chart-points={ready && !error ? data.points.length : 0} />
+          <div ref={host} className="h-full w-full" role="img" aria-label={t('chart.description', { type: t(`chart.${config.type}`), x: config.dimension, y: data.metrics.join(', ') })} data-chart-type={config.type} data-chart-points={ready && !error ? data.points.length : 0} />
           {message && <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground" role="status">{message}</div>}
         </div>
       </div>

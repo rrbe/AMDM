@@ -24,9 +24,10 @@ export interface SearchableSelectHandle {
   open: () => void
 }
 
-interface SearchableSelectProps<T extends string> {
-  value: T
-  onChange: (value: T) => void
+interface SearchableSelectProps<T extends string, Multiple extends boolean = false> {
+  multiple?: Multiple
+  value: Multiple extends true ? T[] : T
+  onChange: (value: Multiple extends true ? T[] : T) => void
   options: ReadonlyArray<SearchableSelectOption<T>>
   matches: (option: SearchableSelectOption<T>, query: string) => boolean
   triggerContent: ReactNode
@@ -38,8 +39,9 @@ interface SearchableSelectProps<T extends string> {
   'aria-label': string
 }
 
-function SearchableSelectInner<T extends string>(
+function SearchableSelectInner<T extends string, Multiple extends boolean = false>(
   {
+    multiple,
     value,
     onChange,
     options,
@@ -51,7 +53,7 @@ function SearchableSelectInner<T extends string>(
     popupClassName,
     side = 'bottom',
     'aria-label': ariaLabel
-  }: SearchableSelectProps<T>,
+  }: SearchableSelectProps<T, Multiple>,
   ref: ForwardedRef<SearchableSelectHandle>
 ): React.JSX.Element {
   const [open, setOpen] = useState(false)
@@ -71,14 +73,15 @@ function SearchableSelectInner<T extends string>(
   }
 
   return (
-    <Combobox.Root
+    <Combobox.Root<T, Multiple>
+      multiple={multiple}
       items={options.map((option) => option.value)}
       filteredItems={filteredValues}
       value={value}
       onValueChange={(nextValue) => {
         if (nextValue === null) return
         onChange(nextValue)
-        updateOpen(false)
+        if (!multiple) updateOpen(false)
       }}
       open={open}
       onOpenChange={updateOpen}
@@ -154,6 +157,6 @@ function SearchableSelectInner<T extends string>(
   )
 }
 
-export const SearchableSelect = forwardRef(SearchableSelectInner) as <T extends string>(
-  props: SearchableSelectProps<T> & { ref?: Ref<SearchableSelectHandle> }
+export const SearchableSelect = forwardRef(SearchableSelectInner) as <T extends string, Multiple extends boolean = false>(
+  props: SearchableSelectProps<T, Multiple> & { ref?: Ref<SearchableSelectHandle> }
 ) => React.JSX.Element

@@ -100,7 +100,7 @@ describe('connection-bound tabs', () => {
       activeConnectionId: 'c1'
     })
 
-    const chartConfig = { type: 'pie' as const, x: 'status', y: 'count' }
+    const chartConfig = { type: 'pie' as const, dimension: 'status', metrics: ['count', 'amount'], pieMetric: 'amount' }
     useAppStore.getState().setResultChartConfig(chartConfig)
     useAppStore.getState().setResultView('json')
     useAppStore.getState().setActiveResultTab('r2')

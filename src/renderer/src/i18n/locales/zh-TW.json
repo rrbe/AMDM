@@ -525,6 +525,7 @@
     "pie": "餅圖",
     "dimension": "維度",
     "metric": "指標",
+    "metrics": "指標",
     "dimensionName": "維度：{{field}}",
     "metricName": "指標：{{field}}",
     "selectField": "選擇欄位",

@@ -5,11 +5,12 @@ import { formatEjsonDate } from './ejson'
 
 export interface ResultChartConfig {
   type: 'bar' | 'line' | 'pie'
-  x: string
-  y: string
+  dimension: string
+  metrics: string[]
+  pieMetric?: string
 }
 
-export const DEFAULT_CHART_CONFIG: ResultChartConfig = { type: 'bar', x: '', y: '' }
+export const DEFAULT_CHART_CONFIG: ResultChartConfig = { type: 'bar', dimension: '', metrics: [] }
 
 type ChartScalar = { kind: 'category' | 'number' | 'date'; value: string | number; label: string; approximate?: boolean }
 
@@ -42,35 +43,44 @@ function scalar(value: unknown, timeZone?: string): ChartScalar | null {
 export interface ChartPoint {
   x: string | number
   label: string
-  y: number | null
-  rawY: string
+  values: { value: number | null; raw: string }[]
 }
 
 export function prepareChart(docs: unknown[], config: ResultChartConfig, timeZone?: string) {
+  const metrics = config.type === 'pie'
+    ? [config.pieMetric ?? config.metrics[0]].filter((field) => field !== undefined)
+    : config.metrics
   const points: ChartPoint[] = []
   let invalid = 0
   let approximate = 0
   const kinds = new Set<ChartScalar['kind']>()
   for (const doc of docs) {
-    const x = isPlainObject(doc) && Object.hasOwn(doc, config.x) ? scalar(doc[config.x], timeZone) : null
-    const y = isPlainObject(doc) && Object.hasOwn(doc, config.y) ? scalar(doc[config.y]) : null
+    const x = isPlainObject(doc) && Object.hasOwn(doc, config.dimension) ? scalar(doc[config.dimension], timeZone) : null
     if (!x) { invalid++; continue }
     kinds.add(x.kind)
-    if (y?.kind !== 'number') invalid++
-    if (x.approximate || y?.approximate) approximate++
-    points.push({ x: x.value, label: x.label, y: y?.kind === 'number' ? y.value as number : null, rawY: y?.kind === 'number' ? y.label : '' })
+    let invalidRow = false
+    let approximateRow = !!x.approximate
+    const values = metrics.map((field) => {
+      const metric = isPlainObject(doc) && Object.hasOwn(doc, field) ? scalar(doc[field]) : null
+      if (metric?.kind !== 'number') invalidRow = true
+      if (metric?.approximate) approximateRow = true
+      return { value: metric?.kind === 'number' ? metric.value as number : null, raw: metric?.kind === 'number' ? metric.label : '' }
+    })
+    if (invalidRow) invalid++
+    if (approximateRow) approximate++
+    points.push({ x: x.value, label: x.label, values })
   }
   const axis = kinds.size === 1 && kinds.has('date') ? 'time' : kinds.size === 1 && kinds.has('number') ? 'value' : 'category'
   if (config.type === 'line' && axis !== 'category') points.sort((a, b) => Number(a.x) - Number(b.x))
   let error: 'noValues' | 'pieValues' | 'pieDuplicates' | null = null
-  if (!points.some((point) => point.y !== null)) error = 'noValues'
+  if (!points.some((point) => point.values.some((metric) => metric.value !== null))) error = 'noValues'
   if (config.type === 'pie' && !error) {
-    const values = points.filter((point) => point.y !== null)
-    const sum = values.reduce((total, point) => total + point.y!, 0)
-    if (invalid || values.some((point) => point.y! < 0) || !Number.isFinite(sum) || sum <= 0) error = 'pieValues'
+    const values = points.filter((point) => point.values[0].value !== null)
+    const sum = values.reduce((total, point) => total + point.values[0].value!, 0)
+    if (invalid || values.some((point) => point.values[0].value! < 0) || !Number.isFinite(sum) || sum <= 0) error = 'pieValues'
     else if (new Set(values.map((point) => point.label)).size !== values.length) error = 'pieDuplicates'
   }
-  return { points, axis, invalid, approximate, error }
+  return { points, metrics, axis, invalid, approximate, error }
 }
 
 export function chartHasCompleteResult(result: ShellResult): boolean {

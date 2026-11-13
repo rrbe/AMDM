@@ -525,6 +525,7 @@
     "pie": "饼图",
     "dimension": "维度",
     "metric": "指标",
+    "metrics": "指标",
     "dimensionName": "维度：{{field}}",
     "metricName": "指标：{{field}}",
     "selectField": "选择字段",
