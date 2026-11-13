@@ -1,8 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table } from 'lucide-react'
+import { ChartColumn, Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
+import { DEFAULT_CHART_CONFIG } from '@renderer/lib/resultChart'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
@@ -41,6 +42,8 @@ import { jsonCopyMenuItems } from './documentFormatMenus'
 import { ResultTimeZoneContext } from './ResultTimeZone'
 import { ResourcePreviewContext } from './ResourcePreview'
 
+const ChartView = lazy(async () => ({ default: (await import('./ChartView')).ChartView }))
+
 const EMPTY_FOLDED_LINES: number[] = []
 const TimeZoneSelect = lazy(async () => ({
   default: (await import('@renderer/components/ui/TimeZoneSelect')).TimeZoneSelect
@@ -73,7 +76,7 @@ interface ResultPanelProps {
 }
 
 /**
- * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table, plus
+ * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table | Chart, plus
  * Console when the run printed output) + metadata bar for the focused result.
  * Handles every ShellResult.kind: 'documents', 'value', 'ack', 'explain',
  * 'error'. A run whose only product is its output (final value null/undefined)
@@ -108,12 +111,12 @@ function ResultPanelContent({
   const result = active?.result ?? null
   const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
   const setVisibleFields = useAppStore((s) => s.setVisibleFields)
-  // Normalize to a documents array for the three views. 'value' / 'ack' get
+  // Normalize to a documents array for the result views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
   const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
-  const fieldInfo = useResultFieldInfo(docs, view === 'table')
+  const fieldInfo = useResultFieldInfo(docs, view === 'table' || view === 'chart')
   const displayFields = useMemo(() => {
     if (!fieldInfo) return []
     if (visibleFields === null) return fieldInfo.fields
@@ -133,6 +136,7 @@ function ResultPanelContent({
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
   const viewShortcutEnabled = isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
+  const setChartConfig = useAppStore((s) => s.setResultChartConfig)
   const setView = useAppStore((s) => s.setResultView)
   const setResultFoldedLines = useAppStore((s) => s.setResultFoldedLines)
   const foldingFor = (view: ResultFoldView) => ({
@@ -324,10 +328,10 @@ function ResultPanelContent({
   return (
     <div className="result-panel">
       {strip}
-      <div className="result-bar">
-        <div className="view-switch sliding-selection">
+      <div className="result-bar flex-wrap">
+        <div className="view-switch sliding-selection shrink-0">
           {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : 'Table'
+            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : 'Table'
             const Icon = v === 'tree' ? Network : v === 'json' ? Braces : Table
             return (
               <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
@@ -349,6 +353,16 @@ function ResultPanelContent({
               </Tooltip>
             )
           })}
+          {result.kind === 'documents' && (
+            <button
+              className={`group/result-view flex items-center justify-center ${!showConsole && view === 'chart' ? 'active is-selected' : ''}`}
+              aria-label={t('chart.title')}
+              aria-pressed={!showConsole && view === 'chart'}
+              onClick={() => { chooseConsole(false); setView('chart') }}
+            >
+              <span className="inline-flex items-center gap-1"><ChartColumn size={12} aria-hidden="true" />{t('chart.title')}</span>
+            </button>
+          )}
           {hasOutput && (
             <Tooltip content={`Console (${primaryKey}4)`} disabled={!viewShortcutEnabled}>
               <button
@@ -407,6 +421,11 @@ function ResultPanelContent({
       <div className="result-body">
         {showConsole ? (
           <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+        ) : view === 'chart' && result.kind === 'documents' ? (
+          <Suspense fallback={<div className="center-msg muted">{t('chart.loading')}</div>}>
+            <ChartView key={active!.id} docs={docs} fields={fieldInfo?.fields} result={result}
+              config={active?.chartConfig ?? DEFAULT_CHART_CONFIG} onChange={setChartConfig} />
+          </Suspense>
         ) : noVisibleFields ? (
           <div className="center-msg muted">
             <span>{t('result.fieldsUnavailable')}</span>
