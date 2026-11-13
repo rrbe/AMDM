@@ -113,8 +113,8 @@ test('Query charts render BSON results and preserve configuration and page scope
     await plotted(2)
     assert.match(await renderer.evaluate('document.querySelector("[data-chart-view]").textContent'), /Decimal values are plotted approximately/)
     await type('Pie', 'pie')
-    await waitForExpression(renderer, 'document.querySelector("[data-chart-view] [role=status]")?.textContent.includes("Categories repeat")')
-    report.steps.push('Decimal results retain a precision notice and duplicate pie categories are rejected')
+    await waitForExpression(renderer, 'document.querySelector("[data-chart-view] [role=status]")?.textContent.includes("Dimension values repeat")')
+    report.steps.push('Decimal results retain a precision notice and duplicate dimension values are rejected in pie charts')
 
     await run('db.pages.find({ n: 0 }).map(d => Object.fromEntries(Array.from({ length: 500 }, (_, i) => ["field" + i, i])))')
     await clickElement(renderer, button('Dimension'))
