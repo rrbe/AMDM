@@ -852,6 +852,52 @@ db.unselectedAfter.find({})`
 describe('result retention notice', () => {
   afterEach(() => vi.unstubAllGlobals())
 
+  it('retains pinned result resources through new runs and closes, then releases them with their query', async () => {
+    let sequence = 0
+    const release = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', {
+      api: {
+        shell: {
+          execute: vi.fn().mockImplementation(async () => ({
+            kind: 'documents', data: [], resultId: `execution-${++sequence}`
+          })),
+          release
+        },
+        history: { list: vi.fn().mockResolvedValue([]) }
+      }
+    })
+    const other = createTab('other')
+    useAppStore.setState({
+      tabs: [createTab('pinned', { connectionId: 'c1', code: 'db.items.find({})' }), other],
+      activeTabId: 'pinned',
+      notifications: [],
+      settings: DEFAULT_SETTINGS
+    })
+    await useAppStore.getState().runShell()
+    const pinnedId = useAppStore.getState().tabs[0].activeResultId!
+    useAppStore.getState().setResultTabPinned(pinnedId, true)
+    for (let i = 0; i < 9; i++) await useAppStore.getState().runShell()
+    expect(useAppStore.getState().tabs[0].results.map((result) => result.seq)).toEqual([1, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(release.mock.calls).toEqual([['execution-2']])
+
+    const results = useAppStore.getState().tabs[0].results
+    results.forEach((result) => useAppStore.getState().closeResultTab(result.id))
+    expect(useAppStore.getState().tabs[0].results).toEqual([results[0]])
+    expect(useAppStore.getState().tabs[0].activeResultId).toBe(pinnedId)
+    expect(release).not.toHaveBeenCalledWith('execution-1')
+    expect(useAppStore.getState().tabs[1]).toBe(other)
+
+    useAppStore.getState().setResultTabPinned(pinnedId, false)
+    useAppStore.getState().closeResultTab(pinnedId)
+    expect(release).toHaveBeenCalledWith('execution-1')
+
+    await useAppStore.getState().runShell()
+    useAppStore.getState().setResultTabPinned(useAppStore.getState().tabs[0].activeResultId!, true)
+    useAppStore.getState().closeTab('pinned')
+    expect(release).toHaveBeenCalledWith('execution-11')
+    expect(useAppStore.getState().tabs).toEqual([other])
+  })
+
   it.each(['runShell', 'runExplain'] as const)('notifies only on eviction during %s and merges repeated notices', async (action) => {
     vi.stubGlobal('window', {
       api: {

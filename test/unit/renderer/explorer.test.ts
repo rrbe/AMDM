@@ -98,6 +98,7 @@ describe('explorer search grouping', () => {
 
   it('keeps expanded collection tools visible and permits collapsing the revealed path', () => {
     const catalog: CatalogState = {
+      owner: Symbol(),
       databases: [{ name: 'shop' }],
       collections: {
         shop: [
@@ -193,6 +194,7 @@ describe('explorer search grouping', () => {
 describe('explorer catalog rows', () => {
   it('sorts databases and collections descending without changing the catalog', () => {
     const catalog: CatalogState = {
+      owner: Symbol(),
       databases: [{ name: 'a' }, { name: 'z' }],
       collections: { a: [{ name: 'a', type: 'collection' }, { name: 'z', type: 'collection' }] },
       indexes: {}, users: {}, expanded: new Set(), loading: new Set()
@@ -204,6 +206,7 @@ describe('explorer catalog rows', () => {
 
   it('searches loaded descendants of collapsed databases without fetching or changing expansion', () => {
     const catalog: CatalogState = {
+      owner: Symbol(),
       databases: [{ name: 'shop' }, { name: 'unloaded' }],
       collections: { shop: [{ name: 'orders', type: 'collection' }] },
       indexes: { 'shop/orders': [{ name: 'orderId_1', key: { orderId: 1 } }] },
@@ -243,6 +246,7 @@ describe('explorer catalog rows', () => {
     vi.stubGlobal('__APP_VERSION__', 'test')
     const databaseNodeId = 'c1:db:ezze'
     const catalog: CatalogState = {
+      owner: Symbol(),
       databases: [{ name: 'ezze' }],
       collections: {},
       indexes: {},

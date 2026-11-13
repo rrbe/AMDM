@@ -69,7 +69,9 @@ const shutdown = new ShutdownController({
       app.exit(1)
     }, CLEANUP_TIMEOUT_MS)
     try {
-      await sessionManager.shutdown()
+      await sessionManager.shutdown().catch((error: unknown) => {
+        console.error('[app shutdown] Resource cleanup failed', error)
+      })
       serializerPool.dispose()
     } finally {
       clearTimeout(deadline)

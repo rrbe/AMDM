@@ -140,7 +140,7 @@
     "restartToUpdate": "Restart and update"
   },
   "notify": {
-    "resultRetentionLimit": "To limit memory use, each query keeps only the latest {{count}} results. The oldest result has been removed.",
+    "resultRetentionLimit": "Each query keeps pinned results and the latest {{count}} unpinned results. Older unpinned results have been removed.",
     "loadConnectionsFailed": "Failed to load connections: {{error}}",
     "saveConnectionFailed": "Failed to save connection: {{error}}",
     "deleteConnectionFailed": "Failed to delete connection: {{error}}",
@@ -524,7 +524,9 @@
     "previewPath": "Preview path",
     "previewBack": "Back to parent",
     "noResults": "Run a query to see results.",
-    "closeTab": "Close result",
+    "closeTab": "Close tab",
+    "pinTab": "Pin tab",
+    "unpinTab": "Unpin tab",
     "explainTag": "Explain",
     "view": { "tree": "Tree", "table": "Table", "console": "Console" },
     "copyAllTip": "Copy all results",
