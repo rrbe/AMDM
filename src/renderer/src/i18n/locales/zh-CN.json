@@ -516,6 +516,27 @@
       "timeseries": "时序集合"
     }
   },
+  "chart": {
+    "title": "图表",
+    "type": "图表类型",
+    "bar": "柱状图",
+    "line": "折线图",
+    "pie": "饼图",
+    "dimension": "维度",
+    "metric": "指标",
+    "selectField": "选择字段",
+    "loading": "正在加载图表…",
+    "fieldLimit": "字段列表最多显示 100 个匹配项，可搜索其他字段。",
+    "chooseFields": "选择维度和指标字段。",
+    "noValues": "所选字段中没有可绘制的数值。",
+    "pieValues": "饼图需要有效的非负数值，且总和大于零。",
+    "pieDuplicates": "分类重复，请先在查询中按分类汇总再绘制饼图。",
+    "page": "当前页 · {{count}} 条",
+    "complete": "完整查询结果 · {{count}} 条",
+    "invalid": "{{count}} 条数据存在缺失或不支持的值，已跳过或保留为空缺。",
+    "approximate": "Decimal 数值按近似值绘制，悬停可查看原始值。",
+    "description": "{{type}}：{{x}} / {{y}}"
+  },
   "result": {
     "resourcePreview": "资源预览",
     "resourcePreviewFailed": "资源加载失败",

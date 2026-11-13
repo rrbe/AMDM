@@ -516,6 +516,27 @@
       "timeseries": "時間序列集合"
     }
   },
+  "chart": {
+    "title": "圖表",
+    "type": "圖表類型",
+    "bar": "長條圖",
+    "line": "折線圖",
+    "pie": "圓餅圖",
+    "dimension": "維度",
+    "metric": "指標",
+    "selectField": "選擇欄位",
+    "loading": "正在載入圖表…",
+    "fieldLimit": "欄位清單最多顯示 100 個符合項目，可搜尋其他欄位。",
+    "chooseFields": "選擇維度和指標欄位。",
+    "noValues": "所選欄位中沒有可繪製的數值。",
+    "pieValues": "圓餅圖需要有效的非負數值，且總和大於零。",
+    "pieDuplicates": "分類重複，請先在查詢中按分類彙總再繪製圓餅圖。",
+    "page": "目前頁面 · {{count}} 筆",
+    "complete": "完整查詢結果 · {{count}} 筆",
+    "invalid": "{{count}} 筆資料存在缺失或不支援的值，已略過或保留為空缺。",
+    "approximate": "Decimal 數值按近似值繪製，懸停可查看原始值。",
+    "description": "{{type}}：{{x}} / {{y}}"
+  },
   "result": {
     "resourcePreview": "資源預覽",
     "resourcePreviewFailed": "資源載入失敗",

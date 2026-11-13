@@ -100,12 +100,16 @@ describe('connection-bound tabs', () => {
       activeConnectionId: 'c1'
     })
 
+    const chartConfig = { type: 'pie' as const, x: 'status', y: 'count' }
+    useAppStore.getState().setResultChartConfig(chartConfig)
     useAppStore.getState().setResultView('json')
     useAppStore.getState().setActiveResultTab('r2')
     expect(useAppStore.getState().tabs[0].results[1].resultView).toBe('tree')
     useAppStore.getState().setResultView('table')
     useAppStore.getState().setActiveResultTab('r1')
     expect(useAppStore.getState().tabs[0].results[0].resultView).toBe('json')
+    expect(useAppStore.getState().tabs[0].results[0].chartConfig).toEqual(chartConfig)
+    expect(useAppStore.getState().tabs[0].results[1].chartConfig).toBeUndefined()
     useAppStore.getState().setActiveTab('c2-tab')
 
     expect(useAppStore.getState().tabs[1].results[0].resultView).toBe('tree')

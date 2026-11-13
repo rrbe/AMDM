@@ -516,6 +516,27 @@
       "timeseries": "Time Series"
     }
   },
+  "chart": {
+    "title": "Chart",
+    "type": "Chart type",
+    "bar": "Bar",
+    "line": "Line",
+    "pie": "Pie",
+    "dimension": "Dimension",
+    "metric": "Metric",
+    "selectField": "Select field",
+    "loading": "Loading chart…",
+    "fieldLimit": "Field lists show up to 100 matches. Search to find other fields.",
+    "chooseFields": "Select a dimension and a numeric metric.",
+    "noValues": "No plottable numeric values in the selected fields.",
+    "pieValues": "Pie charts need valid, non-negative values with a positive total.",
+    "pieDuplicates": "Categories repeat. Group them in your query before plotting a pie chart.",
+    "page": "Current page · {{count}} rows",
+    "complete": "Complete query result · {{count}} rows",
+    "invalid": "{{count}} rows have missing or unsupported values; they are omitted or shown as gaps.",
+    "approximate": "Decimal values are plotted approximately; hover to see the original values.",
+    "description": "{{type}} chart: {{x}} / {{y}}"
+  },
   "result": {
     "previewOpen": "Open",
     "resourcePreview": "Resource preview",

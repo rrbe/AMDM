@@ -1,0 +1,129 @@
+import assert from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
+import test from 'node:test'
+import { clickElement, waitForExpression } from '../helpers/packagedElectron.mjs'
+import { runShellScenario } from '../helpers/shellUi.mjs'
+
+test('Query charts render BSON results and preserve configuration and page scope', { timeout: 120_000 }, () =>
+  runShellScenario('query-charts', async ({ renderer, main, mongo, enterQuery, key, modifier, report }) => {
+    await mongo.db('amdm_e2e').collection('chartSales').insertMany([
+      ...Array.from({ length: 12 }, () => ({ status: 'paid' })),
+      ...Array.from({ length: 3 }, () => ({ status: 'pending' })),
+      { status: 'cancelled' }
+    ])
+    const button = label => `document.querySelector('button[aria-label=${JSON.stringify(label)}]')`
+    async function run(code) {
+      const count = await renderer.evaluate('document.querySelectorAll(".rtab").length')
+      await enterQuery(code)
+      await key('Enter', 'Enter', 13, modifier)
+      await waitForExpression(renderer, `document.querySelectorAll('.rtab').length === ${Math.max(count, 1) + 1}`)
+      await waitForExpression(renderer, '!!document.querySelector("button[aria-label=Chart]")')
+      await clickElement(renderer, button('Chart'))
+      await waitForExpression(renderer, '!!document.querySelector("[data-chart-view]")')
+    }
+    async function field(label, value) {
+      await clickElement(renderer, button(label))
+      await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-combobox-popup input") && !!document.activeElement?.closest(".amdm-combobox-popup")')
+      await renderer.call('Input.insertText', { text: value })
+      await waitForExpression(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].some(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+      await clickElement(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+    }
+    async function type(label, type) {
+      await clickElement(renderer, button('Chart type'))
+      await waitForExpression(renderer, '!!document.querySelector(".amdm-select-popup")')
+      await clickElement(renderer, `[...document.querySelectorAll('.amdm-select-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(label)})`)
+      await waitForExpression(renderer, `!!document.querySelector('[data-chart-type=${type}]')`)
+    }
+    async function plotted(count) {
+      await waitForExpression(renderer, `document.querySelector('[data-chart-points]')?.dataset.chartPoints === '${count}'`)
+      assert.equal(await renderer.evaluate(`(() => {
+        const canvas = document.querySelector('[data-chart-view] canvas');
+        if (!canvas || !canvas.width || !canvas.height) return false;
+        return canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, index) => index % 4 === 3 && value > 0);
+      })()`), true)
+    }
+    async function screenshot(name) {
+      const shot = await renderer.call('Page.captureScreenshot')
+      await writeFile(new URL(`../../dist/e2e-validation/query-charts/${name}.png`, import.meta.url), Buffer.from(shot.data, 'base64'))
+    }
+
+    await run('db.chartRuns.insertOne({ marker: "once" }); db.chartSales.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $project: { _id: 0, status: "$_id", count: 1 } }, { $sort: { count: -1 } }])')
+    await field('Dimension', 'status')
+    await field('Metric', 'count')
+    await plotted(3)
+    assert.match(await renderer.evaluate('document.querySelector("[data-chart-scope]").textContent'), /Complete query result · 3 rows/)
+    await screenshot('bar')
+    await type('Pie', 'pie')
+    await plotted(3)
+    await screenshot('pie')
+    await clickElement(renderer, button('Table'))
+    await waitForExpression(renderer, '!document.querySelector("[data-chart-view]")')
+    await clickElement(renderer, button('Chart'))
+    await waitForExpression(renderer, '!!document.querySelector("[data-chart-type=pie]")')
+    await plotted(3)
+    assert.equal(await mongo.db('amdm_e2e').collection('chartRuns').countDocuments(), 1)
+    report.steps.push('MongoDB aggregation plots as bar and pie; view switches retain fields/type and do not rerun the script')
+
+    await renderer.evaluate('document.documentElement.setAttribute("data-theme", "dark")')
+    await main.evaluate(`(() => { const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron'); BrowserWindow.getAllWindows()[0].setSize(1080, 760); })()`)
+    await waitForExpression(renderer, 'innerWidth === 1080')
+    await plotted(3)
+    await screenshot('pie-dark')
+    assert.equal(await renderer.evaluate(`(() => { const host = document.querySelector('[data-chart-type]'); return host.clientWidth > 200 && host.clientHeight > 100 && host.querySelector('canvas').clientWidth === host.clientWidth; })()`), true)
+    assert.equal(await renderer.evaluate(`(() => {
+      const group = document.querySelector('.view-switch').getBoundingClientRect();
+      return [...document.querySelectorAll('.view-switch button')].every(button => {
+        const rect = button.getBoundingClientRect();
+        return rect.left >= group.left && rect.right <= group.right + 1 && rect.right <= innerWidth;
+      });
+    })()`), true)
+    report.steps.push('dark theme and native window resizing keep the canvas fitted and every view button visible')
+    await renderer.evaluate('document.documentElement.setAttribute("data-theme", "light")')
+
+    await run('db.pages.find({}, { _id: 0, n: 1, marker: 1 }).sort({ n: 1 })')
+    await field('Dimension', 'n')
+    await field('Metric', 'n')
+    await type('Line', 'line')
+    await plotted(50)
+    assert.match(await renderer.evaluate('document.querySelector("[data-chart-scope]").textContent'), /Current page · 50 rows/)
+    for (const range of ['51–100', '101–105']) {
+      await clickElement(renderer, button('Next page'))
+      await waitForExpression(renderer, `document.querySelector('.result-range')?.textContent === '${range}'`)
+    }
+    await plotted(5)
+    assert.match(await renderer.evaluate('document.querySelector("[data-chart-scope]").textContent'), /Current page · 5 rows/)
+    await screenshot('line-last-page')
+    report.steps.push('line chart paginates using the existing result; the final partial page is not labeled as complete')
+
+    await run('db.chartSales.find({}, { _id: 0, status: 1 }).limit(2).map(d => ({ status: d.status, amount: NumberDecimal("1.234567890123456789") }))')
+    await field('Dimension', 'status')
+    await field('Metric', 'amount')
+    await plotted(2)
+    assert.match(await renderer.evaluate('document.querySelector("[data-chart-view]").textContent'), /Decimal values are plotted approximately/)
+    await type('Pie', 'pie')
+    await waitForExpression(renderer, 'document.querySelector("[data-chart-view] [role=status]")?.textContent.includes("Categories repeat")')
+    report.steps.push('Decimal results retain a precision notice and duplicate pie categories are rejected')
+
+    await run('db.pages.find({ n: 0 }).map(d => Object.fromEntries(Array.from({ length: 500 }, (_, i) => ["field" + i, i])))')
+    await clickElement(renderer, button('Dimension'))
+    await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-combobox-popup input") && !!document.activeElement?.closest(".amdm-combobox-popup")')
+    assert.equal(await renderer.evaluate('document.querySelectorAll(".amdm-combobox-popup [role=option]").length'), 100)
+    await key('Escape', 'Escape', 27)
+    await field('Dimension', 'field499')
+    await field('Metric', 'field498')
+    await plotted(1)
+    report.steps.push('500-field results keep at most 100 choices mounted while search can reach the last field')
+
+    await run('Array.from({ length: 2000 }, (_, n) => ({ n, value: Math.sin(n / 50) }))')
+    await clickElement(renderer, button('Show'))
+    await waitForExpression(renderer, '!!document.querySelector(".amdm-select-popup")')
+    await clickElement(renderer, '[...document.querySelectorAll(".amdm-select-popup [role=option]")].find(el => el.textContent.trim() === "2000")')
+    await waitForExpression(renderer, 'document.querySelector(".result-range")?.textContent === "1–2000"')
+    await field('Dimension', 'n')
+    await field('Metric', 'value')
+    await type('Line', 'line')
+    await plotted(2000)
+    await screenshot('line-2000')
+    report.steps.push('the maximum display page of 2000 documents renders as a line chart')
+  })
+)
