@@ -14,6 +14,7 @@ import { exportFileExtension, sanitizeExportBaseName } from '@shared/exportDesti
 import { Modal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
 import { Input } from '@renderer/components/ui/Input'
+import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Select } from '@renderer/components/ui/Select'
 import { Radio, RadioGroup } from '@renderer/components/ui/RadioGroup'
 import { jsonFormatExamples } from '@renderer/lib/jsonFormatExamples'
@@ -81,6 +82,7 @@ export function ExportModal({
   const initialExportFormat = initialFormat ?? 'json'
   const [format, setFormat] = useState<ExportFormat>(initialExportFormat)
   const [jsonEncoding, setJsonEncoding] = useState<JsonEncoding>(initialJsonEncoding ?? 'plain')
+  const [prettyPrint, setPrettyPrint] = useState(false)
   const [scope, setScope] = useState<'collection' | 'current' | 'selection'>(
     source.kind === 'collection' ? 'collection' : source.fixedSelection ? 'selection' : 'current'
   )
@@ -252,6 +254,7 @@ export function ExportModal({
       delimiter: format === 'csv' || format === 'tsv' ? delimiter : undefined,
       worksheetName: format === 'xlsx' ? worksheetName : undefined,
       jsonEncoding: isJson ? jsonEncoding : undefined,
+      prettyPrint: format === 'json' ? prettyPrint : undefined,
       fieldSort,
       destination: {
         directorySelectionId: directory.selectionId,
@@ -456,11 +459,24 @@ export function ExportModal({
               ))}
             </RadioGroup>
           </div>
+          {format === 'json' && (
+            <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
+              <span />
+              <Checkbox
+                checked={prettyPrint}
+                onCheckedChange={setPrettyPrint}
+                label={t('io.prettyPrint')}
+                disabled={running}
+              />
+            </div>
+          )}
           <div className="mt-1">
             <div className="mb-1 text-xs text-muted-foreground">{t('result.advancedCopy.example')}</div>
             <pre className="m-0 box-border h-[200px] overflow-auto rounded-md bg-[var(--surface-inset)] p-3 font-mono text-[11px] leading-relaxed">
               {format === 'json'
-                ? toEncodedJsonArray(jsonFormatExamples.slice(0, 1), jsonEncoding)
+                ? prettyPrint
+                  ? toEncodedJsonArray(jsonFormatExamples.slice(0, 1), jsonEncoding)
+                  : `[\n${toEncodedJsonLines(jsonFormatExamples.slice(0, 1), jsonEncoding)}\n]`
                 : toEncodedJsonLines(jsonFormatExamples, jsonEncoding)}
             </pre>
           </div>

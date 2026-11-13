@@ -2,7 +2,7 @@ import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { ArrowDown, ArrowUp, Braces, ChevronsUpDown, Copy, Eye, FilePenLine, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
@@ -378,17 +378,20 @@ export function TableView({
     const items: ContextMenuEntry[] = [
       {
         label: t('result.dataMenu.view'),
+        icon: <Eye size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => setPreview({ title: t('result.documentPreviewTitle'), value: doc, documentView: true, source })
       },
-      { label: t('result.selectFields'), onClick: onSelectFields }
+      { label: t('result.selectFields'), icon: <ListFilter size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: onSelectFields }
     ]
     if (docCtx && docHasId(doc)) {
       items.push({
         label: t('result.dataMenu.edit'),
+        icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          { label: t('table.editDoc'), onClick: () => setEditIndex(row) },
+          { label: t('table.editDoc'), icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(row) },
           {
             label: t('table.editCell'),
+            icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: col == null || !canEditCell(row, col),
             onClick: () => {
               if (col != null) startEditCell(row, col)
@@ -399,6 +402,7 @@ export function TableView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: tableCopyMenuItems(selectedIndexes, row, copyCol, docs, fieldSort, setAdvancedCopy)
     })
     if (!IS_WEB) items.push(resultExportMenuItem(selectedIndexes.map((index) => docs[index]), onExport))
@@ -406,6 +410,7 @@ export function TableView({
       items.push('separator')
       items.push({
         label: t('table.deleteDoc'),
+        icon: <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, doc._id)
       })
@@ -658,10 +663,12 @@ function tableCopyMenuItems(
       ...jsonCopyMenuItems(selected, (text) => void copyText(text), openAdvanced),
       {
         label: i18n.t('result.copy.csv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => void copyText(toCsv(selected, fieldSort))
       },
       {
         label: i18n.t('result.copy.tsv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => void copyText(toTsv(selected, fieldSort))
       }
     ]
@@ -670,15 +677,18 @@ function tableCopyMenuItems(
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
+      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
       onClick: () => void copyText(col.path.join('.'))
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       disabled: !cell.present,
       onClick: () => void copyText(plainScalarText(cell.value))
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
+      icon: <Braces size={16} strokeWidth={1.8} aria-hidden="true" />,
       disabled: !cell.present,
       onClick: () => void copyText(toPlainKeyValue(col.path.join('.'), cell.value))
     }

@@ -1,3 +1,4 @@
+import { Braces, Copy, Eye, FilePenLine, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
 import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -302,18 +303,21 @@ export function TreeView({
     const items: ContextMenuEntry[] = [
       {
         label: t('result.dataMenu.view'),
+        icon: <Eye size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => setPreviewDoc({ value: rootDoc, source })
       },
-      { label: t('result.selectFields'), onClick: onSelectFields }
+      { label: t('result.selectFields'), icon: <ListFilter size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: onSelectFields }
     ]
     if (docCtx && docHasId(rootDoc)) {
       const rootIndex = Number(node.id.split('.')[0])
       items.push({
         label: t('result.dataMenu.edit'),
+        icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          { label: t('tree.editDoc'), onClick: () => setEditIndex(rootIndex) },
+          { label: t('tree.editDoc'), icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(rootIndex) },
           {
             label: t('tree.editCell'),
+            icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: !canEditNode(node),
             onClick: () => startEdit(node)
           }
@@ -322,6 +326,7 @@ export function TreeView({
     }
     items.push({
       label: t('result.dataMenu.copy'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       children: treeCopyMenuItems(node, selected, fieldSort, setAdvancedCopy)
     })
     if (!IS_WEB) items.push(resultExportMenuItem(selected, onExport))
@@ -329,6 +334,7 @@ export function TreeView({
       items.push('separator')
       items.push({
         label: t('tree.deleteDoc'),
+        icon: <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         danger: true,
         onClick: () => void confirmDeleteDoc(docCtx, rootDoc._id)
       })
@@ -452,10 +458,12 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
       ...jsonCopyMenuItems(docs, (text) => void copyText(text), openAdvanced),
       {
         label: i18n.t('result.copy.csv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => void copyText(toCsv(docs, fieldSort))
       },
       {
         label: i18n.t('result.copy.tsv'),
+        icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />,
         onClick: () => void copyText(toTsv(docs, fieldSort))
       }
     ]
@@ -464,14 +472,17 @@ function treeCopyMenuItems(node: FlatNode, docs: unknown[], fieldSort: Collectio
   return [
     {
       label: i18n.t('result.dataMenu.copyKey'),
+      icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
       onClick: () => void copyText(node.keyLabel)
     },
     {
       label: i18n.t('result.dataMenu.copyValue'),
+      icon: <Copy size={16} strokeWidth={1.8} aria-hidden="true" />,
       onClick: () => void copyText(valueText)
     },
     {
       label: i18n.t('result.dataMenu.copyKeyValue'),
+      icon: <Braces size={16} strokeWidth={1.8} aria-hidden="true" />,
       onClick: () => void copyText(toPlainKeyValue(node.keyLabel, node.value))
     }
   ]
