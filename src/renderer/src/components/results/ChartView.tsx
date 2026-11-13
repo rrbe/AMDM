@@ -8,8 +8,9 @@ import { CanvasRenderer } from 'echarts/renderers'
 import type { ShellResult } from '@shared/types'
 import { Button } from '@renderer/components/common/Button'
 import { FieldSelect } from '@renderer/components/ui/FieldSelect'
+import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
-import { chartHasCompleteResult, prepareChart, type ResultChartConfig } from '@renderer/lib/resultChart'
+import { chartFieldAggregation, chartHasCompleteResult, prepareChart, type ChartAggregation, type ChartMetric, type ResultChartConfig } from '@renderer/lib/resultChart'
 import { formatEjsonDate } from '@renderer/lib/ejson'
 import { useResultTimeZone } from './ResultTimeZone'
 
@@ -30,10 +31,15 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   const chart = useRef<EChartsType | null>(null)
   const [themeVersion, setThemeVersion] = useState(0)
   const data = useMemo(() => prepareChart(docs, config, timeZone), [docs, config, timeZone])
-  const ready = fields !== undefined && fields.includes(config.dimension) && data.metrics.length > 0 && data.metrics.every((field) => fields.includes(field))
+  const ready = fields !== undefined && fields.includes(config.dimension) && data.metrics.length > 0 && data.metrics.every((field) => field === null || fields.includes(field))
   const error = ready ? data.error : null
   const dimensionAction = t(config.dimension ? 'chart.changeDimension' : 'chart.addDimension')
-  const metricAction = t(config.type === 'pie' && data.metrics[0] ? 'chart.changeMetric' : 'chart.addMetric')
+  const metricAction = t(config.type === 'pie' && data.metrics.length > 0 ? 'chart.changeMetric' : 'chart.addMetric')
+  const metricLabels = useMemo(() => data.metrics.map((field) => {
+    if (field === null) return t('chart.recordCount')
+    const aggregation = chartFieldAggregation(config, field)
+    return aggregation === 'raw' ? field : `${field} · ${t(`chart.aggregation.${aggregation}`)}`
+  }), [config, data.metrics, t])
 
   useEffect(() => {
     const element = host.current!
@@ -63,8 +69,8 @@ export function ChartView({ docs, fields, result, config, onChange }: {
     const token = (name: string) => style.getPropertyValue(name).trim()
     const colors = ['--t-number', '--t-string', '--t-boolean', '--t-objectId', '--t-null'].map(token)
     const axis = config.type === 'line' ? data.axis : 'category'
-    const series = data.metrics.map((field, index) => ({
-      name: field,
+    const series = metricLabels.map((label, index) => ({
+      name: label,
       type: config.type,
       data: data.points.map((point) => ({
         name: point.label,
@@ -76,7 +82,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
         : { connectNulls: false, showSymbol: data.points.length <= 100, barMaxWidth: 60 })
     }))
     const dimensionName = t('chart.dimensionName', { field: config.dimension })
-    const metricName = data.metrics.length === 1 ? t('chart.metricName', { field: data.metrics[0] }) : t('chart.metrics')
+    const metricName = metricLabels.length === 1 ? t('chart.metricName', { field: metricLabels[0] }) : t('chart.metrics')
     const nameTextStyle = { color: token('--text-primary'), fontSize: 12 }
     const axisStyle = { axisLabel: { color: token('--text-secondary') }, axisLine: { lineStyle: { color: token('--separator-strong') } }, splitLine: { lineStyle: { color: token('--separator') } } }
     instance.setOption({
@@ -108,7 +114,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
         yAxis: { ...axisStyle, type: 'value', scale: config.type === 'line', name: metricName, nameLocation: 'end', nameGap: 20, nameTextStyle: { ...nameTextStyle, align: 'left' } }
       })
     }, { notMerge: true })
-  }, [config, data, ready, error, timeZone, themeVersion, t])
+  }, [config, data, metricLabels, ready, error, timeZone, themeVersion, t])
 
   const exportPng = (): void => {
     const link = document.createElement('a')
@@ -151,7 +157,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
             onChange={(dimension) => onChange({ ...config, dimension })}
             label={t('chart.dimension')} side="right"
             trigger={<Button size="sm" className="h-8 w-full" aria-label={dimensionAction}>{config.dimension ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{dimensionAction}</Button>} />
-          <ChartFieldTags fields={config.dimension ? [config.dimension] : []} kind="dimension"
+          <ChartFieldTags fields={config.dimension ? [config.dimension] : []} kind="dimension" config={config}
             onRemove={() => {
               onChange({ ...config, dimension: '' })
               dimensionField.current?.querySelector('button')?.focus()
@@ -162,15 +168,23 @@ export function ChartView({ docs, fields, result, config, onChange }: {
           {config.type === 'pie' ? (
             <FieldSelect key="pie" value={data.metrics[0] ?? ''} fields={fields}
               onChange={(pieMetric) => onChange({ ...config, pieMetric })}
+              action={{ label: t('chart.recordCount'), selected: data.metrics.includes(null), onSelect: () => onChange({ ...config, pieMetric: null }) }}
               label={t('chart.metric')} side="right"
-              trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}>{data.metrics[0] ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{metricAction}</Button>} />
+              trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}>{data.metrics.length > 0 ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{metricAction}</Button>} />
           ) : (
-            <FieldSelect key="metrics" multiple value={config.metrics} fields={fields}
-              onChange={(metrics) => onChange({ ...config, metrics: metrics ?? fields ?? [] })}
+            <FieldSelect key="metrics" multiple value={config.metrics.filter((field) => field !== null)} fields={fields}
+              onChange={(selected) => {
+                const next = new Set(selected ?? fields ?? [])
+                const metrics = config.metrics.filter((field) => field === null || next.has(field))
+                for (const field of metrics) if (field !== null) next.delete(field)
+                onChange({ ...config, metrics: [...metrics, ...next] })
+              }}
+              action={{ label: t('chart.recordCount'), selected: config.metrics.includes(null), onSelect: () => onChange({ ...config, metrics: config.metrics.includes(null) ? config.metrics.filter((field) => field !== null) : [...config.metrics, null] }) }}
               label={t('chart.metrics')} side="right"
               trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}><Plus size={14} aria-hidden="true" />{metricAction}</Button>} />
           )}
-          <ChartFieldTags fields={data.metrics.filter(Boolean)} kind="metric"
+          <ChartFieldTags fields={data.metrics.filter((field) => field !== '')} kind="metric" config={config}
+            onAggregationChange={(field, aggregation) => onChange({ ...config, aggregations: { ...config.aggregations, [field]: aggregation } })}
             onRemove={(field) => {
               onChange(config.type === 'pie' ? { ...config, pieMetric: '' } : { ...config, metrics: config.metrics.filter((metric) => metric !== field) })
               metricFields.current?.querySelector('button')?.focus()
@@ -188,7 +202,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
           {ready && data.approximate > 0 && <span>{t('chart.approximate')}</span>}
         </div>
         <div className="relative min-h-0 flex-1">
-          <div ref={host} className="h-full w-full" role="img" aria-label={t('chart.description', { type: t(`chart.${config.type}`), x: config.dimension, y: data.metrics.join(', ') })} data-chart-type={config.type} data-chart-points={ready && !error ? data.points.length : 0} />
+          <div ref={host} className="h-full w-full" role="img" aria-label={t('chart.description', { type: t(`chart.${config.type}`), x: config.dimension, y: metricLabels.join(', ') })} data-chart-type={config.type} data-chart-points={ready && !error ? data.points.length : 0} />
           {message && <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground" role="status">{message}</div>}
         </div>
       </div>
@@ -196,19 +210,30 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   )
 }
 
-function ChartFieldTags({ fields, kind, onRemove }: {
-  fields: string[]
+function ChartFieldTags({ fields, kind, config, onRemove, onAggregationChange }: {
+  fields: ChartMetric[]
   kind: 'dimension' | 'metric'
-  onRemove: (field: string) => void
+  config: ResultChartConfig
+  onRemove: (field: ChartMetric) => void
+  onAggregationChange?: (field: string, aggregation: ChartAggregation) => void
 }): React.JSX.Element | null {
   const { t } = useTranslation()
   if (fields.length === 0) return null
   return (
     <div className="mt-1 flex flex-wrap gap-2" role="list" aria-label={t(kind === 'dimension' ? 'chart.dimension' : 'chart.metrics')}>
       {fields.map((field) => (
-        <span key={field} role="listitem" className="inline-flex max-w-full items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--t-number)_14%,transparent)] py-1 pl-2 pr-1 text-xs font-medium text-[var(--t-number)]">
-          <span className="min-w-0 truncate" title={field}>{field}</span>
-          <button type="button" aria-label={t(kind === 'dimension' ? 'chart.removeDimension' : 'chart.removeMetric', { field })}
+        <span key={field === null ? 'count' : `field:${field}`} role="listitem" className="inline-flex max-w-full items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--t-number)_14%,transparent)] py-1 pl-2 pr-1 text-xs font-medium text-[var(--t-number)]">
+          <span className="min-w-0 truncate" title={field ?? t('chart.recordCount')}>{field ?? t('chart.recordCount')}</span>
+          {kind === 'metric' && field !== null && onAggregationChange && (
+            <Select<ChartAggregation>
+              value={chartFieldAggregation(config, field)}
+              onChange={(aggregation) => onAggregationChange(field, aggregation)}
+              options={(['raw', 'sum', 'average'] as const).map((value) => ({ value, label: t(`chart.aggregation.${value}`) }))}
+              aria-label={t('chart.aggregateField', { field })}
+              className="h-5 w-auto shrink-0 gap-0.5 rounded-sm border-0 bg-transparent px-0.5 text-xs text-inherit hover:bg-[color-mix(in_srgb,var(--t-number)_18%,transparent)] data-[popup-open]:bg-transparent data-[popup-open]:shadow-none [&_svg]:size-3 [&>span:last-child]:text-inherit [&>span:last-child]:opacity-60"
+              popupClassName="min-w-24 rounded-md p-0.5 shadow-none [&_[role=option]]:h-7 [&_[role=option]]:py-0 [&_[role=option]]:text-xs" />
+          )}
+          <button type="button" aria-label={t(kind === 'dimension' ? 'chart.removeDimension' : 'chart.removeMetric', { field: field ?? t('chart.recordCount') })}
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 text-inherit outline-none hover:bg-[color-mix(in_srgb,var(--t-number)_18%,transparent)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
             onClick={() => onRemove(field)}>
             <X size={12} aria-hidden="true" />

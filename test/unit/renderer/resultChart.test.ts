@@ -96,4 +96,86 @@ describe('result chart data', () => {
     expect(chartHasCompleteResult({ ...result, totalCount: undefined })).toBe(true)
     expect(chartHasCompleteResult({ ...result, truncated: undefined })).toBe(false)
   })
+
+  it('groups repeated dimensions with independent sums, averages and record counts', () => {
+    const docs = [
+      { label: 'App', amount: 100, cost: 10 },
+      { label: 'App', amount: 200, cost: 30 },
+      { label: 'Web', amount: 50, cost: 8 }
+    ]
+    const result = prepareChart(docs, { ...bar, metrics: ['amount', 'cost', null], aggregations: { amount: 'sum', cost: 'average' } })
+    expect(result.points.map((point) => [point.label, ...point.values.map((metric) => metric.value)]))
+      .toEqual([['App', 300, 20, 2], ['Web', 50, 8, 1]])
+    expect(result.points[0].values[0].raw).toBe('300')
+    expect(result.error).toBeNull()
+    expect(docs[0].amount).toBe(100)
+    const pie = prepareChart(docs, { ...bar, type: 'pie', aggregations: { amount: 'sum' } })
+    expect(pie.points.map((point) => point.values[0].value)).toEqual([300, 50])
+    expect(pie.error).toBeNull()
+  })
+
+  it('counts records independently of field values and supports count as the pie metric', () => {
+    const docs = [{ label: 'a' }, { label: 'a', amount: null }, { label: 'b', amount: 'not numeric' }]
+    const result = prepareChart(docs, { ...bar, type: 'pie', pieMetric: null })
+    expect(result.metrics).toEqual([null])
+    expect(result.points.map((point) => point.values[0].value)).toEqual([2, 1])
+    expect(result.invalid).toBe(0)
+    expect(result.error).toBeNull()
+    expect(prepareChart(docs, { ...bar, type: 'pie', pieMetric: '' }).metrics).toEqual([])
+    const namedField = prepareChart([{ label: 'a', 'Record count': 5 }, { label: 'a', 'Record count': 8 }], {
+      ...bar, metrics: ['Record count', null], aggregations: { 'Record count': 'sum' }
+    })
+    expect(namedField.points[0].values.map((metric) => metric.value)).toEqual([13, 2])
+  })
+
+  it('uses numeric samples for averages and keeps empty groups as gaps', () => {
+    const result = prepareChart([
+      { label: 'a', amount: 10 }, { label: 'a', amount: 20 }, { label: 'a', amount: null },
+      { label: 'b', amount: '30' }, { label: 'c', amount: 0 }
+    ], { ...bar, aggregations: { amount: 'average' } })
+    expect(result.points.map((point) => point.values[0].value)).toEqual([15, null, 0])
+    expect(result.invalid).toBe(2)
+    expect(result.error).toBeNull()
+  })
+
+  it('keeps dimension types distinct while grouping canonical numeric and date values', () => {
+    const result = prepareChart([
+      { label: 1, amount: 2 }, { label: { $numberInt: '1' }, amount: 3 },
+      { label: '1', amount: 4 }, { label: true, amount: 5 }, { label: 'true', amount: 6 },
+      { label: { $date: { $numberLong: '0' } }, amount: 7 },
+      { label: { $date: { $numberLong: '0' } }, amount: 8 }
+    ], { ...bar, aggregations: { amount: 'sum' } })
+    expect(result.points.map((point) => point.values[0].value)).toEqual([5, 4, 5, 6, 15])
+  })
+
+  it('does not merge distinct Decimal dimensions after chart-number rounding', () => {
+    const result = prepareChart([
+      { label: { $numberDecimal: '1.0000000000000000001' } },
+      { label: { $numberDecimal: '1.0000000000000000002' } },
+      { label: { $numberDecimal: '1.0000000000000000001' } }
+    ], { ...bar, metrics: [null] })
+    expect(result.points.map((point) => [point.label, point.values[0].value]))
+      .toEqual([['1.0000000000000000001', 2], ['1.0000000000000000002', 1]])
+  })
+
+  it('preserves BSON precision notices and rejects non-finite aggregate results', () => {
+    const config = { ...bar, aggregations: { amount: 'sum' as const } }
+    const result = prepareChart([
+      { label: 'a', amount: { $numberDecimal: '1.234567890123456789' } },
+      { label: 'a', amount: { $numberInt: '2' } }
+    ], config)
+    expect(result.points[0].values[0].value).toBeCloseTo(3.2345678901234567)
+    expect(result.approximate).toBe(1)
+    expect(prepareChart([{ label: 'a', amount: Number.MAX_VALUE }, { label: 'a', amount: Number.MAX_VALUE }], config).error)
+      .toBe('aggregationOverflow')
+  })
+
+  it('requires compatible raw or aggregate series and handles special field names', () => {
+    const docs = [{ label: 'a', amount: 2, cost: 3 }]
+    expect(prepareChart(docs, { ...bar, metrics: ['amount', 'cost'], aggregations: { amount: 'sum' } }).error).toBe('mixedAggregation')
+    expect(prepareChart(docs, { ...bar, metrics: ['amount', null] }).error).toBe('mixedAggregation')
+    const special = [{ label: 'a', constructor: 2 }, { label: 'a', constructor: 3 }]
+    expect(prepareChart(special, { ...bar, metrics: ['constructor'], aggregations: {} }).points).toHaveLength(2)
+    expect(prepareChart(special, { ...bar, metrics: ['constructor'], aggregations: { constructor: 'sum' } }).points[0].values[0].value).toBe(5)
+  })
 })

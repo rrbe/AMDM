@@ -14,6 +14,7 @@ type FieldSelectProps = {
   trigger?: ReactElement
   side?: 'bottom' | 'right'
   className?: string
+  action?: { label: string; selected: boolean; onSelect: () => void }
 } & ({
   multiple: true
   value: string[] | null
@@ -25,7 +26,7 @@ type FieldSelectProps = {
 })
 
 export function FieldSelect(props: FieldSelectProps): React.JSX.Element {
-  const { fields, label, renderField, trigger, side = 'bottom', className } = props
+  const { fields, label, renderField, trigger, side = 'bottom', className, action } = props
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -97,6 +98,17 @@ export function FieldSelect(props: FieldSelectProps): React.JSX.Element {
         </div>
         {options.length === 0 && <span className="text-muted-foreground">{t(fields ? 'result.noMatchingFields' : 'common.loading')}</span>}
       </Combobox.List>
+      {action && (
+        <button type="button" aria-pressed={action.selected}
+          className="flex h-8 shrink-0 items-center gap-2 rounded border-0 bg-transparent px-1 text-left text-[13px] text-foreground/90 outline-none hover:bg-[var(--interaction-hover)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)]"
+          onClick={() => {
+            action.onSelect()
+            if (!props.multiple) updateOpen(false)
+          }}>
+          <span className="inline-flex size-[15px] items-center justify-center" aria-hidden="true">{action.selected && <Check size={12} strokeWidth={3} />}</span>
+          {action.label}
+        </button>
+      )}
     </div>
   )
 
