@@ -524,6 +524,8 @@
     "pie": "圓餅圖",
     "dimension": "維度",
     "metric": "指標",
+    "dimensionName": "維度：{{field}}",
+    "metricName": "指標：{{field}}",
     "selectField": "選擇欄位",
     "loading": "正在載入圖表…",
     "fieldLimit": "欄位清單最多顯示 100 個符合項目，可搜尋其他欄位。",

@@ -11,6 +11,17 @@ test('Query charts render BSON results and preserve configuration and page scope
       ...Array.from({ length: 3 }, () => ({ status: 'pending' })),
       { status: 'cancelled' }
     ])
+    await renderer.evaluate(`(() => {
+      window.chartLabels = new Set();
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function(text, ...args) {
+        if (this.canvas.closest('[data-chart-view]') && /^(Dimension|Metric):/.test(text)) window.chartLabels.add(text);
+        return fillText.call(this, text, ...args);
+      };
+    })()`)
+    async function labels(dimension, metric) {
+      await waitForExpression(renderer, `window.chartLabels.has(${JSON.stringify('Dimension: ' + dimension)}) && window.chartLabels.has(${JSON.stringify('Metric: ' + metric)})`)
+    }
     const button = label => `document.querySelector('button[aria-label=${JSON.stringify(label)}]')`
     async function run(code) {
       const count = await renderer.evaluate('document.querySelectorAll(".rtab").length')
@@ -29,6 +40,7 @@ test('Query charts render BSON results and preserve configuration and page scope
       await clickElement(renderer, `[...document.querySelectorAll('.amdm-combobox-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
     }
     async function type(label, type) {
+      await renderer.evaluate('window.chartLabels.clear()')
       await clickElement(renderer, button('Chart type'))
       await waitForExpression(renderer, '!!document.querySelector(".amdm-select-popup")')
       await clickElement(renderer, `[...document.querySelectorAll('.amdm-select-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(label)})`)
@@ -52,9 +64,11 @@ test('Query charts render BSON results and preserve configuration and page scope
     await field('Metric', 'count')
     await plotted(3)
     assert.match(await renderer.evaluate('document.querySelector("[data-chart-scope]").textContent'), /Complete query result · 3 rows/)
+    await labels('status', 'count')
     await screenshot('bar')
     await type('Pie', 'pie')
     await plotted(3)
+    await labels('status', 'count')
     await screenshot('pie')
     await clickElement(renderer, button('Table'))
     await waitForExpression(renderer, '!document.querySelector("[data-chart-view]")')
@@ -123,7 +137,9 @@ test('Query charts render BSON results and preserve configuration and page scope
     await field('Metric', 'value')
     await type('Line', 'line')
     await plotted(2000)
+    await labels('n', 'value')
     await screenshot('line-2000')
     report.steps.push('the maximum display page of 2000 documents renders as a line chart')
+    report.steps.push('bar, line and pie charts draw the selected dimension and metric names inside their canvas')
   })
 )

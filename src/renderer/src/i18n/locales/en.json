@@ -524,6 +524,8 @@
     "pie": "Pie",
     "dimension": "Dimension",
     "metric": "Metric",
+    "dimensionName": "Dimension: {{field}}",
+    "metricName": "Metric: {{field}}",
     "selectField": "Select field",
     "loading": "Loading chart…",
     "fieldLimit": "Field lists show up to 100 matches. Search to find other fields.",

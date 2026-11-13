@@ -524,6 +524,8 @@
     "pie": "饼图",
     "dimension": "维度",
     "metric": "指标",
+    "dimensionName": "维度：{{field}}",
+    "metricName": "指标：{{field}}",
     "selectField": "选择字段",
     "loading": "正在加载图表…",
     "fieldLimit": "字段列表最多显示 100 个匹配项，可搜索其他字段。",

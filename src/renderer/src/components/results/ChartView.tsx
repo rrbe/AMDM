@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { init, use, type EChartsType } from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ShellResult } from '@shared/types'
 import { Select } from '@renderer/components/ui/Select'
@@ -11,7 +11,7 @@ import { chartHasCompleteResult, prepareChart, type ResultChartConfig } from '@r
 import { formatEjsonDate } from '@renderer/lib/ejson'
 import { useResultTimeZone } from './ResultTimeZone'
 
-use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
+use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer])
 
 export function ChartView({ docs, fields, result, config, onChange }: {
   docs: unknown[]
@@ -80,6 +80,9 @@ export function ChartView({ docs, fields, result, config, onChange }: {
       value: config.type === 'pie' || axis === 'category' ? point.y : [point.x, point.y],
       rawY: point.rawY
     }))
+    const dimensionName = t('chart.dimensionName', { field: config.x })
+    const metricName = t('chart.metricName', { field: config.y })
+    const nameTextStyle = { color: token('--text-primary'), fontSize: 12 }
     const axisStyle = { axisLabel: { color: token('--text-secondary') }, axisLine: { lineStyle: { color: token('--separator-strong') } }, splitLine: { lineStyle: { color: token('--separator') } } }
     instance.setOption({
       animation: false,
@@ -95,20 +98,22 @@ export function ChartView({ docs, fields, result, config, onChange }: {
         }
       },
       ...(config.type === 'pie' ? {
+        title: { text: metricName, subtext: dimensionName, left: 16, top: 12, textStyle: { ...nameTextStyle, fontSize: 14, fontWeight: 500 }, subtextStyle: { color: token('--text-secondary'), fontSize: 12 } },
         legend: { type: 'scroll', selectedMode: false, bottom: 4, textStyle: { color: token('--text-secondary') } },
-        series: [{ type: 'pie', radius: '65%', center: ['50%', '45%'], label: { show: false }, data: points }]
+        series: [{ type: 'pie', radius: '60%', center: ['50%', '53%'], label: { show: false }, data: points }]
       } : {
-        grid: { top: 28, left: 20, right: 24, bottom: 24, containLabel: true },
+        grid: { top: 48, left: 24, right: 32, bottom: 64, containLabel: true },
         xAxis: {
           ...axisStyle, type: axis, scale: axis !== 'category',
+          name: dimensionName, nameLocation: 'middle', nameGap: axis === 'time' ? 52 : 34, nameTextStyle,
           ...(axis === 'category' ? { data: data.points.map((point) => point.label), axisLabel: { ...axisStyle.axisLabel, hideOverlap: true, width: 100, overflow: 'truncate' } } : {}),
           ...(axis === 'time' ? { axisLabel: { ...axisStyle.axisLabel, hideOverlap: true, formatter: (value: number) => formatEjsonDate({ $numberLong: String(value) }, timeZone).slice(0, 19).replace('T', '\n') } } : {})
         },
-        yAxis: { ...axisStyle, type: 'value', scale: config.type === 'line' },
+        yAxis: { ...axisStyle, type: 'value', scale: config.type === 'line', name: metricName, nameLocation: 'end', nameGap: 20, nameTextStyle: { ...nameTextStyle, align: 'left' } },
         series: [{ name: config.y, type: config.type, data: points, connectNulls: false, showSymbol: data.points.length <= 100, barMaxWidth: 60 }]
       })
     }, { notMerge: true })
-  }, [config, data, ready, error, timeZone, themeVersion])
+  }, [config, data, ready, error, timeZone, themeVersion, t])
 
   const message = !fields ? t('chart.loading') : !ready ? t('chart.chooseFields') : error ? t(`chart.${error}`) : null
   return (
