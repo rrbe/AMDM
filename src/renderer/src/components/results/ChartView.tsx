@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeftRight, ChartNoAxesColumn, ChartPie, Download, Plus, TrendingUp, X } from 'lucide-react'
 import { init, use, type EChartsType } from 'echarts/core'
@@ -16,6 +16,8 @@ import { useResultTimeZone } from './ResultTimeZone'
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer])
 
+type ChartLink = 'xAxis' | 'yAxis' | { field: ChartMetric }
+
 export function ChartView({ docs, fields, result, config, onChange }: {
   docs: unknown[]
   fields: string[] | undefined
@@ -30,9 +32,16 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   const metricFields = useRef<HTMLDivElement>(null)
   const chart = useRef<EChartsType | null>(null)
   const [themeVersion, setThemeVersion] = useState(0)
+  const [hoveredLink, setHoveredLink] = useState<ChartLink | null>(null)
+  const [focusedLink, setFocusedLink] = useState<ChartLink | null>(null)
   const data = useMemo(() => prepareChart(docs, config, timeZone), [docs, config, timeZone])
-  const ready = fields !== undefined && fields.includes(config.dimension) && data.metrics.length > 0 && data.metrics.every((field) => field === null || fields.includes(field))
+  const hasDimension = fields !== undefined && fields.includes(config.dimension)
+  const ready = hasDimension && data.metrics.length > 0 && data.metrics.every((field) => field === null || fields.includes(field))
+  const dimensionPreview = config.type === 'bar' && hasDimension && data.metrics.length === 0 && data.points.length > 0
   const error = ready ? data.error : null
+  const linkedControl = config.type === 'bar' ? hoveredLink ?? focusedLink : null
+  const linkedAxis = typeof linkedControl === 'string' ? linkedControl : null
+  const linkedSeries = linkedControl && typeof linkedControl === 'object' ? data.metrics.indexOf(linkedControl.field) : -1
   const dimensionAction = t(config.dimension ? 'chart.changeDimension' : 'chart.addDimension')
   const metricAction = t(config.type === 'pie' && data.metrics.length > 0 ? 'chart.changeMetric' : 'chart.addMetric')
   const metricLabels = useMemo(() => data.metrics.map((field) => {
@@ -64,7 +73,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
 
   useEffect(() => {
     const instance = chart.current!
-    if (!ready || error) { instance.clear(); return }
+    if ((!ready && !dimensionPreview) || error) { instance.clear(); return }
     const style = getComputedStyle(host.current!)
     const token = (name: string) => style.getPropertyValue(name).trim()
     const colors = ['--t-number', '--t-string', '--t-boolean', '--t-objectId', '--t-null'].map(token)
@@ -111,10 +120,44 @@ export function ChartView({ docs, fields, result, config, onChange }: {
           ...(axis === 'category' ? { data: data.points.map((point) => point.label), axisLabel: { ...axisStyle.axisLabel, hideOverlap: true, width: 100, overflow: 'truncate' } } : {}),
           ...(axis === 'time' ? { axisLabel: { ...axisStyle.axisLabel, hideOverlap: true, formatter: (value: number) => formatEjsonDate({ $numberLong: String(value) }, timeZone).slice(0, 19).replace('T', '\n') } } : {})
         },
-        yAxis: { ...axisStyle, type: 'value', scale: config.type === 'line', name: metricName, nameLocation: 'end', nameGap: 20, nameTextStyle: { ...nameTextStyle, align: 'left' } }
+        yAxis: { ...axisStyle, show: !dimensionPreview, type: 'value', scale: config.type === 'line', name: metricName, nameLocation: 'end', nameGap: 20, nameTextStyle: { ...nameTextStyle, align: 'left' } }
       })
     }, { notMerge: true })
-  }, [config, data, metricLabels, ready, error, timeZone, themeVersion, t])
+  }, [config, data, metricLabels, ready, dimensionPreview, error, timeZone, themeVersion, t])
+
+  useEffect(() => {
+    const instance = chart.current!
+    if ((!ready && !dimensionPreview) || error) return
+    if (linkedAxis === 'xAxis' || (linkedAxis === 'yAxis' && ready)) {
+      const style = getComputedStyle(host.current!)
+      const accent = style.getPropertyValue('--t-number').trim()
+      instance.setOption({ [linkedAxis]: { axisLabel: { color: accent }, nameTextStyle: { color: accent }, axisLine: { lineStyle: { color: accent, width: 2 } } } })
+      return () => {
+        if (instance.isDisposed()) return
+        instance.setOption({ [linkedAxis]: {
+          axisLabel: { color: style.getPropertyValue('--text-secondary').trim() },
+          nameTextStyle: { color: style.getPropertyValue('--text-primary').trim() },
+          axisLine: { lineStyle: { color: style.getPropertyValue('--separator-strong').trim(), width: 1 } }
+        } })
+      }
+    }
+    if (linkedSeries < 0 || !ready) return
+    instance.dispatchAction({ type: 'highlight', seriesIndex: linkedSeries })
+    return () => {
+      if (!instance.isDisposed()) instance.dispatchAction({ type: 'downplay', seriesIndex: linkedSeries })
+    }
+  }, [config, data, metricLabels, ready, dimensionPreview, error, timeZone, themeVersion, t, linkedAxis, linkedSeries])
+
+  const linkControl = (link: ChartLink) => config.type === 'bar' ? {
+    onPointerEnter: () => setHoveredLink(link),
+    onPointerLeave: () => setHoveredLink(null),
+    onFocus: (event: FocusEvent<HTMLElement>) => {
+      if (event.target.matches(':focus-visible')) setFocusedLink(link)
+    },
+    onBlur: (event: FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setFocusedLink(null)
+    }
+  } : undefined
 
   const exportPng = (): void => {
     const link = document.createElement('a')
@@ -128,7 +171,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
     link.click()
   }
 
-  const message = !fields ? t('chart.loading') : !ready ? t('chart.chooseFields') : error ? t(`chart.${error}`) : null
+  const message = !fields ? t('chart.loading') : error ? t(`chart.${error}`) : !ready && !dimensionPreview ? t('chart.chooseFields') : null
   return (
     <div className="@container/chart flex h-full min-h-0 [font-family:var(--font-ui)]" data-chart-view="">
       <div className="flex w-36 shrink-0 flex-col gap-5 overflow-y-auto border-r border-[var(--separator)] px-2 py-4 @min-[720px]/chart:w-40">
@@ -151,7 +194,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
             )
           })}
         </div>
-        <div ref={dimensionField} className="flex shrink-0 flex-col gap-2">
+        <div ref={dimensionField} className="flex shrink-0 flex-col gap-2" {...linkControl('xAxis')}>
           <span className="text-xs text-muted-foreground">{t('chart.dimension')}</span>
           <FieldSelect value={config.dimension} fields={fields}
             onChange={(dimension) => onChange({ ...config, dimension })}
@@ -164,26 +207,29 @@ export function ChartView({ docs, fields, result, config, onChange }: {
             }} />
         </div>
         <div ref={metricFields} className="flex shrink-0 flex-col gap-2">
-          <span className="text-xs text-muted-foreground">{t(config.type === 'pie' ? 'chart.metric' : 'chart.metrics')}</span>
-          {config.type === 'pie' ? (
-            <FieldSelect key="pie" value={data.metrics[0] ?? ''} fields={fields}
-              onChange={(pieMetric) => onChange({ ...config, pieMetric })}
-              action={{ label: t('chart.recordCount'), selected: data.metrics.includes(null), onSelect: () => onChange({ ...config, pieMetric: null }) }}
-              label={t('chart.metric')} side="right"
-              trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}>{data.metrics.length > 0 ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{metricAction}</Button>} />
-          ) : (
-            <FieldSelect key="metrics" multiple value={config.metrics.filter((field) => field !== null)} fields={fields}
-              onChange={(selected) => {
-                const next = new Set(selected ?? fields ?? [])
-                const metrics = config.metrics.filter((field) => field === null || next.has(field))
-                for (const field of metrics) if (field !== null) next.delete(field)
-                onChange({ ...config, metrics: [...metrics, ...next] })
-              }}
-              action={{ label: t('chart.recordCount'), selected: config.metrics.includes(null), onSelect: () => onChange({ ...config, metrics: config.metrics.includes(null) ? config.metrics.filter((field) => field !== null) : [...config.metrics, null] }) }}
-              label={t('chart.metrics')} side="right"
-              trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}><Plus size={14} aria-hidden="true" />{metricAction}</Button>} />
-          )}
+          <div className="flex flex-col gap-2" {...linkControl('yAxis')}>
+            <span className="text-xs text-muted-foreground">{t(config.type === 'pie' ? 'chart.metric' : 'chart.metrics')}</span>
+            {config.type === 'pie' ? (
+              <FieldSelect key="pie" value={data.metrics[0] ?? ''} fields={fields}
+                onChange={(pieMetric) => onChange({ ...config, pieMetric })}
+                action={{ label: t('chart.recordCount'), selected: data.metrics.includes(null), onSelect: () => onChange({ ...config, pieMetric: null }) }}
+                label={t('chart.metric')} side="right"
+                trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}>{data.metrics.length > 0 ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{metricAction}</Button>} />
+            ) : (
+              <FieldSelect key="metrics" multiple value={config.metrics.filter((field) => field !== null)} fields={fields}
+                onChange={(selected) => {
+                  const next = new Set(selected ?? fields ?? [])
+                  const metrics = config.metrics.filter((field) => field === null || next.has(field))
+                  for (const field of metrics) if (field !== null) next.delete(field)
+                  onChange({ ...config, metrics: [...metrics, ...next] })
+                }}
+                action={{ label: t('chart.recordCount'), selected: config.metrics.includes(null), onSelect: () => onChange({ ...config, metrics: config.metrics.includes(null) ? config.metrics.filter((field) => field !== null) : [...config.metrics, null] }) }}
+                label={t('chart.metrics')} side="right"
+                trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}><Plus size={14} aria-hidden="true" />{metricAction}</Button>} />
+            )}
+          </div>
           <ChartFieldTags fields={data.metrics.filter((field) => field !== '')} kind="metric" config={config}
+            linkControl={(field) => linkControl({ field })}
             onAggregationChange={(field, aggregation) => onChange({ ...config, aggregations: { ...config.aggregations, [field]: aggregation } })}
             onRemove={(field) => {
               onChange(config.type === 'pie' ? { ...config, pieMetric: '' } : { ...config, metrics: config.metrics.filter((metric) => metric !== field) })
@@ -210,10 +256,11 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   )
 }
 
-function ChartFieldTags({ fields, kind, config, onRemove, onAggregationChange }: {
+function ChartFieldTags({ fields, kind, config, linkControl, onRemove, onAggregationChange }: {
   fields: ChartMetric[]
   kind: 'dimension' | 'metric'
   config: ResultChartConfig
+  linkControl?: (field: ChartMetric) => React.HTMLAttributes<HTMLSpanElement> | undefined
   onRemove: (field: ChartMetric) => void
   onAggregationChange?: (field: string, aggregation: ChartAggregation) => void
 }): React.JSX.Element | null {
@@ -222,7 +269,7 @@ function ChartFieldTags({ fields, kind, config, onRemove, onAggregationChange }:
   return (
     <div className="mt-1 flex flex-wrap gap-2" role="list" aria-label={t(kind === 'dimension' ? 'chart.dimension' : 'chart.metrics')}>
       {fields.map((field) => (
-        <span key={field === null ? 'count' : `field:${field}`} role="listitem" className="inline-flex max-w-full items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--t-number)_14%,transparent)] py-1 pl-2 pr-1 text-xs font-medium text-[var(--t-number)]">
+        <span key={field === null ? 'count' : `field:${field}`} role="listitem" className="inline-flex max-w-full items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--t-number)_14%,transparent)] py-1 pl-2 pr-1 text-xs font-medium text-[var(--t-number)]" {...linkControl?.(field)}>
           <span className="min-w-0 truncate" title={field ?? t('chart.recordCount')}>{field ?? t('chart.recordCount')}</span>
           {kind === 'metric' && field !== null && onAggregationChange && (
             <Select<ChartAggregation>
