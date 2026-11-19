@@ -4,6 +4,64 @@ import test from 'node:test'
 import { clickElement, waitForExpression } from '../helpers/packagedElectron.mjs'
 import { runShellScenario } from '../helpers/shellUi.mjs'
 
+test('Chart examples teach a configuration and map it to compatible result fields', { timeout: 120_000 }, () =>
+  runShellScenario('chart-examples', async ({ renderer, enterQuery, key, modifier, report }) => {
+    const dialog = 'document.querySelector("[role=dialog]")'
+    const button = (label, root = 'document') => `[...${root}.querySelectorAll('button')].find(button => (button.getAttribute('aria-label') || button.textContent.trim()) === ${JSON.stringify(label)})`
+    const option = (name) => `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].find(option => option.textContent.trim() === ${JSON.stringify(name)})`
+    await enterQuery('[{region:"north",price:100},{region:"north",price:50},{region:"south",price:80},{region:null,orphan:200}]')
+    await key('Enter', 'Enter', 13, modifier)
+    await clickElement(renderer, button('Chart'))
+    await clickElement(renderer, button('Examples'))
+    await waitForExpression(renderer, `${dialog}?.textContent.includes('Sample data · 3 rows')`)
+    assert.equal(await renderer.evaluate(`${dialog}.querySelectorAll('tbody tr').length`), 3)
+    const dialogBounds = `${dialog}.getBoundingClientRect().toJSON()`
+    const { y, height } = await renderer.evaluate(dialogBounds)
+    await clickElement(renderer, button('Total order amount', dialog))
+    await waitForExpression(renderer, `${dialog}.querySelector('[data-chart-type]')?.getAttribute('aria-label').includes('amount · Sum')`)
+    await clickElement(renderer, button('Average order amount', dialog))
+    await waitForExpression(renderer, `${dialog}.querySelector('[data-chart-type]')?.getAttribute('aria-label').includes('amount · Average')`)
+    const previewHeight = await renderer.evaluate(`${dialog}.querySelector('[data-chart-type]').clientHeight`)
+    assert.ok(previewHeight > 180, `Chart preview height: ${previewHeight}`)
+    await clickElement(renderer, button('Change dimension', dialog))
+    await clickElement(renderer, option('paymentMethod'))
+    await waitForExpression(renderer, `${dialog}.querySelector('[data-chart-type]')?.getAttribute('aria-label').includes('paymentMethod')`)
+    report.steps.push('the three example presets use the editable chart preview and the sample data is labeled')
+
+    await clickElement(renderer, button('Use with current result', dialog))
+    await waitForExpression(renderer, `${dialog}.textContent.includes('Complete query result · 4 rows')`)
+    const mappedBounds = await renderer.evaluate(dialogBounds)
+    assert.deepEqual([mappedBounds.y, mappedBounds.height], [y, height])
+    assert.ok(await renderer.evaluate(`${button('Apply chart', dialog)}.disabled`))
+    await clickElement(renderer, button('Add dimension', dialog))
+    await clickElement(renderer, option('region'))
+    await clickElement(renderer, button('Add metric', dialog))
+    await waitForExpression(renderer, `!!(${option('price')})`)
+    assert.equal(await renderer.evaluate(`!!(${option('orphan')})`), false)
+    await clickElement(renderer, option('price'))
+    await clickElement(renderer, button('Apply chart', dialog))
+    await waitForExpression(renderer, `!${dialog} && document.querySelector('[data-chart-points]')?.dataset.chartPoints === '2'`)
+    assert.match(await renderer.evaluate(`document.querySelector('[data-chart-type]').getAttribute('aria-label')`), /region \/ price · Average/)
+    report.steps.push('the example maps to real result fields with compatible values and applies the selected aggregation')
+
+    await clickElement(renderer, button('Examples'))
+    await clickElement(renderer, button('Use with current result', dialog))
+    await clickElement(renderer, button('Add dimension', dialog))
+    await clickElement(renderer, option('region'))
+    await clickElement(renderer, button('Back to examples', dialog))
+    await key('Escape', 'Escape', 27)
+    await waitForExpression(renderer, `!${dialog}`)
+    assert.match(await renderer.evaluate(`document.querySelector('[data-chart-type]').getAttribute('aria-label')`), /region \/ price · Average/)
+    await clickElement(renderer, button('Examples'))
+    await clickElement(renderer, button('Use with current result', dialog))
+    await clickElement(renderer, button('Add dimension', dialog))
+    await clickElement(renderer, option('region'))
+    await clickElement(renderer, button('Apply chart', dialog))
+    await waitForExpression(renderer, `!${dialog} && document.querySelector('[data-chart-type]')?.getAttribute('aria-label').includes('region / Record count')`)
+    report.steps.push('leaving the example preserves the chart and applying record count needs just a dimension')
+  })
+)
+
 test('Query charts render BSON results and preserve configuration and page scope', { timeout: 120_000 }, () =>
   runShellScenario('query-charts', async ({ renderer, main, mongo, enterQuery, key, modifier, report }) => {
     await mongo.db('amdm_e2e').collection('chartSales').insertMany([

@@ -552,7 +552,27 @@
     "complete": "Complete query result · {{count}} rows",
     "invalid": "{{count}} rows have missing or unsupported values; they are omitted or shown as gaps.",
     "approximate": "Decimal values are plotted approximately; hover to see the original values.",
-    "description": "{{type}} chart: {{x}} / {{y}}"
+    "description": "{{type}} chart: {{x}} / {{y}}",
+    "examples": {
+      "open": "Examples",
+      "title": "Chart examples",
+      "count": "Orders by status",
+      "sum": "Total order amount",
+      "average": "Average order amount",
+      "sampleData": "Sample orders",
+      "sampleScope": "Sample data · {{count}} rows",
+      "useResult": "Use with current result",
+      "mapFields": "Choose result fields",
+      "back": "Back to examples",
+      "apply": "Apply chart",
+      "noDimension": "There are no chartable dimension fields in these rows.",
+      "noMetric": "This dimension has no matching numeric fields. Choose another dimension or try record count.",
+      "explanation": {
+        "count": "The status dimension groups the two paid orders together. The Record count metric shows 2 for that group.",
+        "sum": "With status as the dimension, the amount metric adds the two paid orders together to give 150.",
+        "average": "With status as the dimension, the amount metric averages 100 and 50 to give 75 for the paid group."
+      }
+    }
   },
   "result": {
     "previewOpen": "Open",

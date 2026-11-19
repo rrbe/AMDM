@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { chartHasCompleteResult, prepareChart } from '../../../src/renderer/src/lib/resultChart'
+import { chartHasCompleteResult, prepareChart, prepareChartExampleFields } from '../../../src/renderer/src/lib/resultChart'
 
 const bar = { type: 'bar' as const, dimension: 'label', metrics: ['amount'] }
 
 describe('result chart data', () => {
+  it('suggests compatible example fields only where the selected dimension can be plotted', async () => {
+    const docs = [
+      { status: 'paid', amount: { $numberDecimal: '15.5' }, unsafe: { $numberLong: '9007199254740993' }, details: { total: 3 } },
+      { status: 'pending', amount: 'unavailable', 'other.total': 20 },
+      { status: null, orphan: 30, amount: 35 },
+      { status: ['paid'], orphan: 40 }
+    ]
+    const fields = ['status', 'amount', 'unsafe', 'details', 'other.total', 'orphan']
+    const { signal } = new AbortController()
+    expect(await prepareChartExampleFields(docs, fields, '', signal)).toEqual(['status', 'amount', 'other.total', 'orphan'])
+    expect(await prepareChartExampleFields(docs, fields, 'status', signal)).toEqual(['amount', 'other.total'])
+    expect(await prepareChartExampleFields(docs, fields, 'orphan', signal)).toEqual(['amount', 'orphan'])
+  })
+
   it('reads canonical BSON values and keeps exact Decimal tooltip text', () => {
     const result = prepareChart([
       { label: 'a', amount: { $numberInt: '7' } },

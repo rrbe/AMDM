@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeftRight, ChartNoAxesColumn, ChartPie, Download, Plus, TrendingUp, X } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, ChartNoAxesColumn, ChartPie, Download, Plus, TrendingUp, X } from 'lucide-react'
 import { init, use, type EChartsType } from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
@@ -12,19 +12,23 @@ import { Select } from '@renderer/components/ui/Select'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { chartFieldAggregation, chartHasCompleteResult, prepareChart, type ChartAggregation, type ChartMetric, type ResultChartConfig } from '@renderer/lib/resultChart'
 import { formatEjsonDate } from '@renderer/lib/ejson'
+import { ChartExamplesDialog } from './ChartExamplesDialog'
 import { useResultTimeZone } from './ResultTimeZone'
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer])
 
 type ChartLink = 'xAxis' | 'yAxis' | { field: ChartMetric }
 
-export function ChartView({ docs, fields, result, config, onChange }: {
+export interface ChartViewProps {
   docs: unknown[]
   fields: string[] | undefined
   result: ShellResult
   config: ResultChartConfig
   onChange: (config: ResultChartConfig) => void
-}): React.JSX.Element {
+  sample?: boolean
+}
+
+export function ChartView({ docs, fields, result, config, onChange, sample = false }: ChartViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const timeZone = useResultTimeZone()
   const host = useRef<HTMLDivElement>(null)
@@ -32,6 +36,7 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   const metricFields = useRef<HTMLDivElement>(null)
   const chart = useRef<EChartsType | null>(null)
   const [themeVersion, setThemeVersion] = useState(0)
+  const [showExamples, setShowExamples] = useState(false)
   const [hoveredLink, setHoveredLink] = useState<ChartLink | null>(null)
   const [focusedLink, setFocusedLink] = useState<ChartLink | null>(null)
   const data = useMemo(() => prepareChart(docs, config, timeZone), [docs, config, timeZone])
@@ -172,10 +177,10 @@ export function ChartView({ docs, fields, result, config, onChange }: {
   }
 
   const message = !fields ? t('chart.loading') : error ? t(`chart.${error}`) : !ready && !dimensionPreview ? t('chart.chooseFields') : null
-  return (
+  return <>
     <div className="@container/chart flex h-full min-h-0 [font-family:var(--font-ui)]" data-chart-view="">
-      <div className="flex w-36 shrink-0 flex-col gap-5 overflow-y-auto border-r border-[var(--separator)] px-2 py-4 @min-[720px]/chart:w-40">
-        <div className="flex shrink-0 items-center gap-1" role="group" aria-label={t('chart.type')}>
+      <div className={`flex w-36 shrink-0 flex-col overflow-y-auto border-r border-[var(--separator)] px-2 @min-[720px]/chart:w-40 ${sample ? 'gap-3 py-3' : 'gap-5 py-4'}`}>
+        {!sample && <div className="flex shrink-0 items-center gap-1" role="group" aria-label={t('chart.type')}>
           {(['bar', 'line', 'pie'] as const).map((type) => {
             const Icon = type === 'bar' ? ChartNoAxesColumn : type === 'line' ? TrendingUp : ChartPie
             return (
@@ -193,7 +198,11 @@ export function ChartView({ docs, fields, result, config, onChange }: {
               </Tooltip>
             )
           })}
-        </div>
+        </div>}
+        {!sample && <Button type="button" size="sm" className="h-8 w-full shrink-0" aria-haspopup="dialog" onClick={() => setShowExamples(true)}>
+          <BookOpen size={14} aria-hidden="true" />
+          {t('chart.examples.open')}
+        </Button>}
         <div ref={dimensionField} className="flex shrink-0 flex-col gap-2" {...linkControl('xAxis')}>
           <span className="text-xs text-muted-foreground">{t('chart.dimension')}</span>
           <FieldSelect value={config.dimension} fields={fields}
@@ -236,14 +245,14 @@ export function ChartView({ docs, fields, result, config, onChange }: {
               metricFields.current?.querySelector('button')?.focus()
             }} />
         </div>
-        <Button variant="ghost" size="sm" className="mt-auto shrink-0" disabled={!ready || !!error} onClick={exportPng}>
+        {!sample && <Button variant="ghost" size="sm" className="mt-auto shrink-0" disabled={!ready || !!error} onClick={exportPng}>
           <Download size={14} aria-hidden="true" />
           {t('chart.exportPng')}
-        </Button>
+        </Button>}
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-xs text-muted-foreground" aria-live="polite">
-          <span data-chart-scope="">{t(chartHasCompleteResult(result) ? 'chart.complete' : 'chart.page', { count: docs.length })}</span>
+          <span data-chart-scope="">{t(sample ? 'chart.examples.sampleScope' : chartHasCompleteResult(result) ? 'chart.complete' : 'chart.page', { count: docs.length })}</span>
           {ready && data.invalid > 0 && <span>{t('chart.invalid', { count: data.invalid })}</span>}
           {ready && data.approximate > 0 && <span>{t('chart.approximate')}</span>}
         </div>
@@ -253,7 +262,9 @@ export function ChartView({ docs, fields, result, config, onChange }: {
         </div>
       </div>
     </div>
-  )
+    {!sample && showExamples && <ChartExamplesDialog docs={docs} fields={fields} result={result} Preview={ChartView}
+      onClose={() => setShowExamples(false)} onApply={(nextConfig) => { onChange(nextConfig); setShowExamples(false) }} />}
+  </>
 }
 
 function ChartFieldTags({ fields, kind, config, linkControl, onRemove, onAggregationChange }: {

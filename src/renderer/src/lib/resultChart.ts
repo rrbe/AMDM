@@ -48,6 +48,30 @@ function scalar(value: unknown, timeZone?: string): ChartScalar | null {
   return null
 }
 
+export async function prepareChartExampleFields(docs: unknown[], fields: string[], dimension: string, signal: AbortSignal): Promise<string[]> {
+  const pending = new Set(fields.filter(Boolean))
+  if (pending.size === 0) return []
+  let deadline = performance.now() + 6
+  for (const doc of docs) {
+    if (signal.aborted) return []
+    if (isPlainObject(doc) && (!dimension || (Object.hasOwn(doc, dimension) && scalar(doc[dimension])))) {
+      for (const field of Object.keys(doc)) {
+        if (!pending.has(field)) continue
+        const value = doc[field]
+        if (dimension && typeof value !== 'number' && (value === null || typeof value !== 'object')) continue
+        const normalized = scalar(value)
+        if (dimension ? normalized?.kind === 'number' : normalized) pending.delete(field)
+      }
+      if (pending.size === 0) break
+    }
+    if (performance.now() >= deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      deadline = performance.now() + 6
+    }
+  }
+  return fields.filter((field) => field && !pending.has(field))
+}
+
 export interface ChartPoint {
   x: string | number
   label: string
