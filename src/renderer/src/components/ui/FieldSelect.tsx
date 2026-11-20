@@ -17,6 +17,7 @@ type FieldSelectProps = {
   action?: { label: string; selected: boolean; onSelect: () => void }
 } & ({
   multiple: true
+  selectAll?: boolean
   value: string[] | null
   onChange: (value: string[] | null) => void
 } | {
@@ -35,7 +36,7 @@ export function FieldSelect(props: FieldSelectProps): React.JSX.Element {
   const items = useMemo(() => fields ?? [], [fields])
   const value = props.value ?? items
   const checked = useMemo(() => new Set(Array.isArray(value) ? value : [value]), [value])
-  const allSelected = props.multiple === true && (props.value === null || (checked.size > 0 && items.every((field) => checked.has(field))))
+  const allSelected = props.multiple === true && props.selectAll === true && (props.value === null || (checked.size > 0 && items.every((field) => checked.has(field))))
   const options = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     return items.filter((field) => field.toLocaleLowerCase().includes(query))
@@ -62,7 +63,7 @@ export function FieldSelect(props: FieldSelectProps): React.JSX.Element {
         aria-label={t('result.searchFields')}
         placeholder={t('result.searchFields')}
       />
-      {props.multiple && (
+      {props.multiple && props.selectAll && (
         <Checkbox
           disabled={!fields}
           checked={allSelected}

@@ -551,7 +551,7 @@
     "page": "当前页 · {{count}} 条",
     "complete": "完整查询结果 · {{count}} 条",
     "invalid": "{{count}} 条数据存在缺失或不支持的值，已跳过或保留为空缺。",
-    "approximate": "Decimal 数值按近似值绘制，悬停可查看原始值。",
+    "approximate": "部分数值按近似值绘制，悬停可查看数值。",
     "description": "{{type}}：{{x}} / {{y}}",
     "examples": {
       "open": "示例",
@@ -568,9 +568,10 @@
       "noDimension": "这些记录没有可用于绘图的维度字段。",
       "noMetric": "这个维度没有对应的数值字段。可以换一个维度，或试试记录数。",
       "explanation": {
-        "count": "以 status 为维度时，两笔已支付订单分在一组。记录数指标显示这一组共有 2 笔。",
-        "sum": "以 status 为维度时，对 amount 求和，两笔已支付订单的金额合计为 150。",
-        "average": "以 status 为维度时，对 amount 求平均，已支付组的 100 和 50 平均为 75。"
+        "count": "按 {{dimension}} 分组，{{group}} 组共有 {{value}} 笔订单。",
+        "sum": "按 {{dimension}} 分组，{{group}} 组的 {{metric}} 合计为 {{value}}。",
+        "average": "按 {{dimension}} 分组，{{group}} 组的 {{metric}} 平均为 {{value}}。",
+        "raw": "每笔订单单独显示 {{metric}}。这笔订单的 {{dimension}} 为 {{group}}，对应的值为 {{value}}。"
       }
     }
   },

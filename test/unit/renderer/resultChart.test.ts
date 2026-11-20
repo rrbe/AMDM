@@ -184,6 +184,33 @@ describe('result chart data', () => {
       .toBe('aggregationOverflow')
   })
 
+  it('computes BSON sums before rounding plot coordinates', () => {
+    const sum = { ...bar, aggregations: { amount: 'sum' as const } }
+    const longs = ['9007199254740991', '2'].map((value) => ({ label: 'a', amount: { $numberLong: value } }))
+    const result = prepareChart(longs, sum)
+    expect(result.points[0].values[0]).toEqual({ value: 9007199254740992, raw: '9007199254740993' })
+    expect(result.approximate).toBe(1)
+    const decimals = ['9007199254740993', '-9007199254740992'].map((value) => ({ label: 'a', amount: { $numberDecimal: value } }))
+    expect(prepareChart(decimals, sum).points[0].values[0]).toEqual({ value: 1, raw: '1' })
+    expect(prepareChart(decimals, { ...bar, aggregations: { amount: 'average' } }).points[0].values[0].raw).toBe('0.5')
+  })
+
+  it('retains terminating averages and marks recurring averages at 34 significant digits', () => {
+    const avg = { ...bar, aggregations: { amount: 'average' as const } }
+    const average = (values: string[]) => prepareChart(values.map((value) => ({ label: 'a', amount: { $numberDecimal: value } })), avg)
+    expect(average(['1e34', '1']).points[0].values[0].raw).toBe('5.' + '0'.repeat(33) + '5e+33')
+    expect(average(['1e-100', '0']).points[0].values[0].raw).toBe('5e-101')
+    expect(average(['1', '0', '0']).points[0].values[0].raw).toBe('≈0.' + '3'.repeat(34))
+    expect(average(['1e-600']).error).toBe('aggregationOverflow')
+    expect(average(['1e309', '-1e309']).points[0].values[0].raw).toBe('0')
+  })
+
+  it('orders numeric bars and counts equal Decimal dimensions together', () => {
+    const docs = ['10', '1.00', '1', '1.0'].map((value) => ({ label: { $numberDecimal: value } }))
+    expect(prepareChart(docs, { ...bar, metrics: [null] }).points.map((point) => [point.x, point.values[0].value]))
+      .toEqual([[1, 3], [10, 1]])
+  })
+
   it('requires compatible raw or aggregate series and handles special field names', () => {
     const docs = [{ label: 'a', amount: 2, cost: 3 }]
     expect(prepareChart(docs, { ...bar, metrics: ['amount', 'cost'], aggregations: { amount: 'sum' } }).error).toBe('mixedAggregation')

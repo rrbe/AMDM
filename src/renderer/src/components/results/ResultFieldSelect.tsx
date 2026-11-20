@@ -19,7 +19,7 @@ export function ResultFieldSelect({ docs }: { docs: unknown[] }): React.JSX.Elem
 
   return (
     <FieldSelect
-      multiple fields={options} value={selected} onChange={setSelected}
+      multiple selectAll fields={options} value={selected} onChange={setSelected}
       label={t('result.visibleFields')}
       className="mb-2 border-b border-[var(--separator)] pb-2"
       renderField={(field) => <>{field}{!current.has(field) && <span className="ml-1 text-muted-foreground">({t('result.fieldNotOnPage')})</span>}</>}

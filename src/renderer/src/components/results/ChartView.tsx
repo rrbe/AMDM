@@ -17,6 +17,8 @@ import { useResultTimeZone } from './ResultTimeZone'
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer])
 
+type TooltipItem = { name: string; seriesName: string; data: { rawValue: string }; percent?: number }
+
 type ChartLink = 'xAxis' | 'yAxis' | { field: ChartMetric }
 
 export interface ChartViewProps {
@@ -41,14 +43,18 @@ export function ChartView({ docs, fields, result, config, onChange, sample = fal
   const [focusedLink, setFocusedLink] = useState<ChartLink | null>(null)
   const data = useMemo(() => prepareChart(docs, config, timeZone), [docs, config, timeZone])
   const hasDimension = fields !== undefined && fields.includes(config.dimension)
-  const ready = hasDimension && data.metrics.length > 0 && data.metrics.every((field) => field === null || fields.includes(field))
+  const ready = hasDimension && data.metrics.length > 0
   const dimensionPreview = config.type === 'bar' && hasDimension && data.metrics.length === 0 && data.points.length > 0
   const error = ready ? data.error : null
   const linkedControl = config.type === 'bar' ? hoveredLink ?? focusedLink : null
   const linkedAxis = typeof linkedControl === 'string' ? linkedControl : null
   const linkedSeries = linkedControl && typeof linkedControl === 'object' ? data.metrics.indexOf(linkedControl.field) : -1
+  const selectSingleMetric = (metric: ChartMetric): void => {
+    onChange(config.type === 'pie' ? { ...config, pieMetric: metric } : { ...config, metrics: [metric] })
+  }
   const dimensionAction = t(config.dimension ? 'chart.changeDimension' : 'chart.addDimension')
-  const metricAction = t(config.type === 'pie' && data.metrics.length > 0 ? 'chart.changeMetric' : 'chart.addMetric')
+  const singleMetric = sample || config.type === 'pie'
+  const metricAction = t(singleMetric && data.metrics.length > 0 ? 'chart.changeMetric' : 'chart.addMetric')
   const metricLabels = useMemo(() => data.metrics.map((field) => {
     if (field === null) return t('chart.recordCount')
     const aggregation = chartFieldAggregation(config, field)
@@ -104,12 +110,16 @@ export function ChartView({ docs, fields, result, config, onChange, sample = fal
       color: colors,
       textStyle: { color: token('--text-primary'), fontFamily: style.fontFamily },
       tooltip: {
-        trigger: 'item', renderMode: 'richText', confine: true,
+        trigger: config.type === 'line' ? 'axis' : 'item', renderMode: 'richText', confine: true,
         backgroundColor: token('--surface-elevated'), borderColor: token('--separator-strong'),
         textStyle: { color: token('--text-primary') },
-        formatter: (params: { name: string; seriesName: string; data: unknown; percent?: number }) => {
-          const point = params.data as { rawValue: string }
-          return `${params.name}\n${params.seriesName}: ${point.rawValue}${config.type === 'pie' ? ` (${params.percent}%)` : ''}`
+        formatter: (params: TooltipItem | TooltipItem[]) => {
+          const items = Array.isArray(params) ? params : [params]
+          if (!items.length) return ''
+          return [items[0].name, ...items.map((item) => {
+            const percent = item.percent === undefined ? '' : ` (${item.percent}%)`
+            return `${item.seriesName}: ${item.data.rawValue || '–'}${percent}`
+          })].join('\n')
         }
       },
       series,
@@ -217,17 +227,17 @@ export function ChartView({ docs, fields, result, config, onChange, sample = fal
         </div>
         <div ref={metricFields} className="flex shrink-0 flex-col gap-2">
           <div className="flex flex-col gap-2" {...linkControl('yAxis')}>
-            <span className="text-xs text-muted-foreground">{t(config.type === 'pie' ? 'chart.metric' : 'chart.metrics')}</span>
-            {config.type === 'pie' ? (
+            <span className="text-xs text-muted-foreground">{t(singleMetric ? 'chart.metric' : 'chart.metrics')}</span>
+            {singleMetric ? (
               <FieldSelect key="pie" value={data.metrics[0] ?? ''} fields={fields}
-                onChange={(pieMetric) => onChange({ ...config, pieMetric })}
-                action={{ label: t('chart.recordCount'), selected: data.metrics.includes(null), onSelect: () => onChange({ ...config, pieMetric: null }) }}
+                onChange={selectSingleMetric}
+                action={{ label: t('chart.recordCount'), selected: data.metrics.includes(null), onSelect: () => selectSingleMetric(null) }}
                 label={t('chart.metric')} side="right"
                 trigger={<Button size="sm" className="h-8 w-full" aria-label={metricAction}>{data.metrics.length > 0 ? <ArrowLeftRight size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}{metricAction}</Button>} />
             ) : (
               <FieldSelect key="metrics" multiple value={config.metrics.filter((field) => field !== null)} fields={fields}
                 onChange={(selected) => {
-                  const next = new Set(selected ?? fields ?? [])
+                  const next = new Set(selected)
                   const metrics = config.metrics.filter((field) => field === null || next.has(field))
                   for (const field of metrics) if (field !== null) next.delete(field)
                   onChange({ ...config, metrics: [...metrics, ...next] })

@@ -3,7 +3,7 @@ import { ChartColumn, Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2,
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
-import { DEFAULT_CHART_CONFIG } from '@renderer/lib/resultChart'
+import type { ResultChartConfig } from '@renderer/lib/resultChart'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
@@ -42,6 +42,7 @@ import { jsonCopyMenuItems } from './documentFormatMenus'
 import { ResultTimeZoneContext } from './ResultTimeZone'
 import { ResourcePreviewContext } from './ResourcePreview'
 
+const DEFAULT_CHART_CONFIG: ResultChartConfig = { type: 'bar', dimension: '', metrics: [] }
 const ChartView = lazy(async () => ({ default: (await import('./ChartView')).ChartView }))
 
 const EMPTY_FOLDED_LINES: number[] = []

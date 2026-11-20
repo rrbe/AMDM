@@ -121,6 +121,9 @@ importers:
       '@vvo/tzdb':
         specifier: ^6.201.1
         version: 6.201.1
+      bignumber.js:
+        specifier: 9.3.1
+        version: 9.3.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

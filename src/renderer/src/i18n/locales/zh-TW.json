@@ -551,7 +551,7 @@
     "page": "目前頁面 · {{count}} 筆",
     "complete": "完整查詢結果 · {{count}} 筆",
     "invalid": "{{count}} 筆資料存在缺失或不支援的值，已略過或保留為空缺。",
-    "approximate": "Decimal 數值按近似值繪製，懸停可查看原始值。",
+    "approximate": "部分數值以近似值繪製，懸停可查看數值。",
     "description": "{{type}}：{{x}} / {{y}}",
     "examples": {
       "open": "範例",
@@ -568,9 +568,10 @@
       "noDimension": "這些記錄沒有可用於繪圖的維度欄位。",
       "noMetric": "這個維度沒有對應的數值欄位。可以換一個維度，或試試記錄數。",
       "explanation": {
-        "count": "以 status 為維度時，兩筆已付款訂單分在一組。記錄數指標顯示這一組共有 2 筆。",
-        "sum": "以 status 為維度時，將 amount 加總，兩筆已付款訂單的金額合計為 150。",
-        "average": "以 status 為維度時，對 amount 求平均，已付款組的 100 和 50 平均為 75。"
+        "count": "依 {{dimension}} 分組，{{group}} 組共有 {{value}} 筆訂單。",
+        "sum": "依 {{dimension}} 分組，{{group}} 組的 {{metric}} 合計為 {{value}}。",
+        "average": "依 {{dimension}} 分組，{{group}} 組的 {{metric}} 平均為 {{value}}。",
+        "raw": "每筆訂單單獨顯示 {{metric}}。這筆訂單的 {{dimension}} 為 {{group}}，對應的值為 {{value}}。"
       }
     }
   },
