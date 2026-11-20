@@ -9,6 +9,7 @@
  * and read state. Every async action catches rejections and surfaces relevant
  * failures through the bounded notification queue or contextual result state.
  */
+import type { ResultChartConfig } from '@renderer/lib/resultChart'
 import { create } from 'zustand'
 import { DEFAULT_SETTINGS } from '@shared/types'
 import type {
@@ -222,6 +223,7 @@ interface AppState {
   formatCode(): Promise<void>
   setActiveDatabase(db: string): void
   setResultView(view: ResultView): void
+  setResultChartConfig(config: ResultChartConfig): void
   setResultFoldedLines(view: ResultFoldView, lines: number[]): void
   setVisibleFields(fields: string[] | null): void
   setTableColumnOrder(order: string[]): void
@@ -1337,6 +1339,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tab = getActiveTab(s)
       if (!tab.activeResultId) return s
       return { tabs: patchTab(s.tabs, tab.id, patchResult(tab, tab.activeResultId, { resultView: view })) }
+    })
+  },
+
+  setResultChartConfig(config) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (!tab.activeResultId) return s
+      return { tabs: patchTab(s.tabs, tab.id, patchResult(tab, tab.activeResultId, { chartConfig: config })) }
     })
   },
 
