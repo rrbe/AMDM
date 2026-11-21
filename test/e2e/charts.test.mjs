@@ -114,8 +114,8 @@ test('Query charts render BSON results and preserve configuration and page scope
       await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-field-select-popup input") && !!document.activeElement?.closest(".amdm-field-select-popup")')
       if (multiple) assert.equal(await renderer.evaluate('!!document.querySelector(".amdm-field-select-popup [role=checkbox]")'), false)
       await renderer.call('Input.insertText', { text: value })
-      await waitForExpression(renderer, `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].some(el => el.textContent.trim() === ${JSON.stringify(value)})`)
-      await clickElement(renderer, `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+      await waitForExpression(renderer, `document.querySelector('.amdm-field-select-popup [role=option][data-highlighted]')?.textContent.trim() === ${JSON.stringify(value)}`)
+      await key('Enter', 'Enter', 13)
       if (multiple) await key('Escape', 'Escape', 27)
       await waitForExpression(renderer, '!document.querySelector(".amdm-field-select-popup")')
     }
