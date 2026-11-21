@@ -653,7 +653,7 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                 />
                 <ShortcutRow
                   label={t('settings.shortcutResultView')}
-                  keys={`${primaryKey} 1–4`}
+                  keys={`${primaryKey} 1–5`}
                   enabled={!settings.disabledKeyboardShortcuts.includes('resultView')}
                   onEnabledChange={(enabled) => setShortcutEnabled('resultView', enabled)}
                 />

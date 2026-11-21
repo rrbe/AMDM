@@ -584,6 +584,7 @@ export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 export type KeyboardShortcutId =
   'newConnection' | 'newQuery' | 'tabSearch' | 'quickSearch' | 'contextualTabs' | 'resultView' | 'openSettings'
 export type TableNestedDisplay = 'inline' | 'grouped' | 'auto'
+export type GridHeightMode = 'fixed' | 'expanded'
 
 export interface AppSettings {
   /** User-defined ordering of connection ids; missing/new ids append naturally. */
@@ -620,6 +621,7 @@ export interface AppSettings {
   dataFontSize: number
   /** Nested objects in Table: inline preview or one-level grouped columns. */
   tableNestedDisplay: TableNestedDisplay
+  gridHeightMode: GridHeightMode
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
   editorWordWrap: boolean
   /** Indent width (spaces) for Tab / auto-indent in the shell editor. */
@@ -688,6 +690,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorFontSize: 13,
   dataFontSize: 13,
   tableNestedDisplay: 'inline',
+  gridHeightMode: 'fixed',
   editorWordWrap: false,
   editorTabSize: 2,
   activeEditorColorSchemeId: PINE_COLOR_SCHEME_ID,
