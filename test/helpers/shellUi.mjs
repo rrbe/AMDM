@@ -131,7 +131,7 @@ export async function runShellScenario(name, exercise) {
     const modifier = primaryModifier
     const key = (...args) => pressKey(renderer, ...args)
     async function enterQuery(code) {
-      await clickElement(renderer, 'document.querySelector(".cm-content[contenteditable=true]")')
+      await clickElement(renderer, 'document.querySelector(".cm-scroller:has(.cm-content[contenteditable=true])")')
       await key('a', 'KeyA', 65, modifier)
       await renderer.call('Input.insertText', { text: code })
       await waitForExpression(
