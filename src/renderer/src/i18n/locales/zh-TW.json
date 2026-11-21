@@ -516,6 +516,65 @@
       "timeseries": "時間序列集合"
     }
   },
+  "chart": {
+    "title": "Chart",
+    "exportPng": "匯出 PNG",
+    "type": "圖表類型",
+    "bar": "柱圖",
+    "line": "線圖",
+    "pie": "餅圖",
+    "dimension": "維度",
+    "addDimension": "新增維度",
+    "changeDimension": "更換維度",
+    "removeDimension": "移除維度 {{field}}",
+    "metric": "指標",
+    "metrics": "指標",
+    "addMetric": "新增指標",
+    "changeMetric": "更換指標",
+    "removeMetric": "移除指標 {{field}}",
+    "recordCount": "記錄數",
+    "aggregateField": "{{field}} 的統計方式",
+    "aggregation": {
+      "raw": "原值",
+      "sum": "加總",
+      "average": "平均"
+    },
+    "mixedAggregation": "彙總指標需要將所有數值指標設為加總或平均，原始值請單獨繪製。",
+    "aggregationOverflow": "彙總結果超出了圖表支援的數值範圍。",
+    "dimensionName": "維度：{{field}}",
+    "metricName": "指標：{{field}}",
+    "loading": "正在載入圖表…",
+    "chooseFields": "選擇維度，再新增數值指標或記錄數。",
+    "noValues": "所選欄位中沒有可繪製的數值。",
+    "pieValues": "餅圖需要有效的非負數值，且總和大於零。",
+    "pieDuplicates": "維度標籤重複，請選擇彙總方式，或在查詢中整理為標籤唯一的分類。",
+    "page": "目前頁面 · {{count}} 筆",
+    "complete": "完整查詢結果 · {{count}} 筆",
+    "invalid": "{{count}} 筆資料存在缺失或不支援的值，已略過或保留為空缺。",
+    "approximate": "部分數值以近似值繪製，懸停可查看數值。",
+    "description": "{{type}}：{{x}} / {{y}}",
+    "examples": {
+      "open": "範例",
+      "title": "圖表範例",
+      "count": "各狀態的訂單數",
+      "sum": "訂單金額合計",
+      "average": "平均訂單金額",
+      "sampleData": "範例訂單",
+      "sampleScope": "範例資料 · {{count}} 筆",
+      "useResult": "用於目前結果",
+      "mapFields": "選擇結果欄位",
+      "back": "返回範例",
+      "apply": "套用圖表",
+      "noDimension": "這些記錄沒有可用於繪圖的維度欄位。",
+      "noMetric": "這個維度沒有對應的數值欄位。可以換一個維度，或試試記錄數。",
+      "explanation": {
+        "count": "依 {{dimension}} 分組，{{group}} 組共有 {{value}} 筆訂單。",
+        "sum": "依 {{dimension}} 分組，{{group}} 組的 {{metric}} 合計為 {{value}}。",
+        "average": "依 {{dimension}} 分組，{{group}} 組的 {{metric}} 平均為 {{value}}。",
+        "raw": "每筆訂單單獨顯示 {{metric}}。這筆訂單的 {{dimension}} 為 {{group}}，對應的值為 {{value}}。"
+      }
+    }
+  },
   "result": {
     "resourcePreview": "資源預覽",
     "resourcePreviewFailed": "資源載入失敗",
@@ -544,7 +603,7 @@
     "fieldsUnavailable": "目前頁面沒有已選欄位。",
     "displayOptions": "顯示選項",
     "advancedCopy": {
-      "title": "進階 JSON 格式",
+      "title": "MongoDB JSON 格式",
       "example": "範例",
       "layout": "輸出格式",
       "plain": {
@@ -565,7 +624,7 @@
     },
     "copy": {
       "plainJson": "複製為 JSON",
-      "advancedJson": "複製為進階 JSON",
+      "advancedJson": "複製為 MongoDB JSON",
       "relaxedEjson": "複製為 Relaxed EJSON",
       "canonicalEjson": "複製為 Canonical EJSON",
       "mongoShell": "複製為 MongoDB 文件",
@@ -682,6 +741,7 @@
     "format": "格式",
     "fileFormat": "檔案格式",
     "bsonExample": "BSON 範例 · 十六進位",
+    "prettyPrint": "格式化輸出",
     "jsonEncoding": "型別表示",
     "encodingHelp": {
       "plain": "ObjectId、Date、Decimal128 等 BSON 類型會轉換為字串或數字；重新匯入時不會自動還原原始類型。",

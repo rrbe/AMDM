@@ -6,8 +6,9 @@
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
 import type { ShellResult } from '@shared/types'
+import type { ResultChartConfig } from './resultChart'
 
-export type ResultView = 'tree' | 'json' | 'table' | 'grid'
+export type ResultView = 'tree' | 'json' | 'table' | 'grid' | 'chart'
 export type ResultFoldView = 'json' | 'console' | 'explain'
 
 /** The query that produced a result (refresh / doc-edit target). */
@@ -23,6 +24,7 @@ export interface ResultTab {
   pinned?: boolean
   /** Selected data view for this result tab. */
   resultView?: ResultView
+  chartConfig?: ResultChartConfig
   foldedLines?: Partial<Record<ResultFoldView, number[]>>
   /** 1-based run sequence within its query tab (drives the "结果 N" label).
       Monotonic — eviction of old results never renumbers survivors. */

@@ -1,8 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table } from 'lucide-react'
+import { Braces, ChartColumn, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
+import type { ResultChartConfig } from '@renderer/lib/resultChart'
 import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
@@ -43,6 +44,9 @@ import { jsonCopyMenuItems } from './documentFormatMenus'
 import { ResultTimeZoneContext } from './ResultTimeZone'
 import { ResourcePreviewContext } from './ResourcePreview'
 
+const DEFAULT_CHART_CONFIG: ResultChartConfig = { type: 'bar', dimension: '', metrics: [] }
+const ChartView = lazy(async () => ({ default: (await import('./ChartView')).ChartView }))
+
 const EMPTY_FOLDED_LINES: number[] = []
 const TimeZoneSelect = lazy(async () => ({
   default: (await import('@renderer/components/ui/TimeZoneSelect')).TimeZoneSelect
@@ -75,7 +79,7 @@ interface ResultPanelProps {
 }
 
 /**
- * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table | Grid, plus
+ * Result-tab strip (one tab per run) + view switcher (Fields | JSON | Table | Grid | Chart, plus
  * Console when the run printed output) + metadata bar for the focused result.
  * Handles every ShellResult.kind: 'documents', 'value', 'ack', 'explain',
  * 'error'. A run whose only product is its output (final value null/undefined)
@@ -110,7 +114,7 @@ function ResultPanelContent({
   const result = active?.result ?? null
   const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
   const setVisibleFields = useAppStore((s) => s.setVisibleFields)
-  // Normalize to a documents array for the data views. 'value' / 'ack' get
+  // Normalize to a documents array for the result views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
   const gridStates = useRef(new Map<string, { docs: unknown[]; state: GridViewState }>())
@@ -131,7 +135,7 @@ function ResultPanelContent({
   }), [])
   const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
-  const fieldInfo = useResultFieldInfo(docs, view === 'table')
+  const fieldInfo = useResultFieldInfo(docs, view === 'table' || view === 'chart')
   const displayFields = useMemo(() => {
     if (!fieldInfo) return []
     if (visibleFields === null) return fieldInfo.fields
@@ -153,6 +157,7 @@ function ResultPanelContent({
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
   const viewShortcutEnabled = isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')
+  const setChartConfig = useAppStore((s) => s.setResultChartConfig)
   const setView = useAppStore((s) => s.setResultView)
   const setResultFoldedLines = useAppStore((s) => s.setResultFoldedLines)
   const foldingFor = (view: ResultFoldView) => ({
@@ -344,8 +349,8 @@ function ResultPanelContent({
   return (
     <div className="result-panel">
       {strip}
-      <div className={`result-bar${!showConsole && view === 'grid' ? ' flex-wrap [&>.view-switch]:shrink-0' : ''}`}>
-        <div className="view-switch sliding-selection">
+      <div className="result-bar flex-wrap">
+        <div className="view-switch sliding-selection shrink-0">
           {(['tree', 'json', 'table', 'grid'] as ResultView[]).map((v, i) => {
             const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : v === 'table' ? 'Table' : 'Grid'
             const Icon = v === 'tree' ? Network : v === 'json' ? Braces : v === 'table' ? Table : LayoutGrid
@@ -369,6 +374,16 @@ function ResultPanelContent({
               </Tooltip>
             )
           })}
+          {result.kind === 'documents' && (
+            <button
+              className={`group/result-view flex items-center justify-center ${!showConsole && view === 'chart' ? 'active is-selected' : ''}`}
+              aria-label={t('chart.title')}
+              aria-pressed={!showConsole && view === 'chart'}
+              onClick={() => { chooseConsole(false); setView('chart') }}
+            >
+              <span className="inline-flex items-center gap-1"><ChartColumn size={12} aria-hidden="true" />{t('chart.title')}</span>
+            </button>
+          )}
           {hasOutput && (
             <Tooltip content={`Console (${primaryKey}5)`} disabled={!viewShortcutEnabled}>
               <button
@@ -448,6 +463,11 @@ function ResultPanelContent({
       <div className="result-body">
         {showConsole ? (
           <ConsoleView folding={foldingFor('console')} output={result.output!} fontSize={dataFontSize} truncated={result.outputTruncated} controlsContainer={foldControls} />
+        ) : view === 'chart' && result.kind === 'documents' ? (
+          <Suspense fallback={<div className="center-msg muted">{t('chart.loading')}</div>}>
+            <ChartView key={active!.id} docs={docs} fields={fieldInfo?.fields} result={result}
+              config={active?.chartConfig ?? DEFAULT_CHART_CONFIG} onChange={setChartConfig} />
+          </Suspense>
         ) : noVisibleFields ? (
           <div className="center-msg muted">
             <span>{t('result.fieldsUnavailable')}</span>
@@ -518,8 +538,8 @@ function ResultPanelContent({
           onClose={() => setCopyMenu(null)}
           items={[
             ...jsonCopyMenuItems(docs, copyWithFeedback, setAdvancedCopy),
-            { label: t('result.copy.csv'), onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
-            { label: t('result.copy.tsv'), onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
+            { label: t('result.copy.csv'), icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => copyWithFeedback(toCsv(docs, fieldSort)) },
+            { label: t('result.copy.tsv'), icon: <Table2 size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => copyWithFeedback(toTsv(docs, fieldSort)) }
           ]}
         />
       )}
