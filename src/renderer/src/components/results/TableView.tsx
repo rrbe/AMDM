@@ -2,7 +2,7 @@ import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, ArrowUp, Braces, ChevronsUpDown, Copy, Eye, FilePenLine, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Braces, ChevronsUpDown, Copy, Eye, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
 import type { CollectionSort, JsonEncoding, ResultExportFormat } from '@shared/types'
 import { formatScalar, isExtended } from '@renderer/lib/ejson'
 import { toInlineJsonTokens } from '@renderer/lib/format'
@@ -388,10 +388,10 @@ export function TableView({
         label: t('result.dataMenu.edit'),
         icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          { label: t('table.editDoc'), icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(row) },
+          { label: t('table.editDoc'), icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(row) },
           {
             label: t('table.editCell'),
-            icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
+            icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: col == null || !canEditCell(row, col),
             onClick: () => {
               if (col != null) startEditCell(row, col)

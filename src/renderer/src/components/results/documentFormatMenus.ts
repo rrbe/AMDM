@@ -1,5 +1,5 @@
 import type { JsonEncoding, ResultExportFormat } from '@shared/types'
-import { Braces, Download, SlidersHorizontal, Terminal } from 'lucide-react'
+import { Braces, Download, Terminal } from 'lucide-react'
 import { createElement } from 'react'
 import i18n from '@renderer/i18n'
 import type { ContextMenuEntry } from '@renderer/components/ContextMenu'
@@ -21,7 +21,7 @@ export function jsonCopyMenuItems(
     },
     {
       label: i18n.t('result.copy.advancedJson'),
-      icon: createElement(SlidersHorizontal, { size: 16, strokeWidth: 1.8, 'aria-hidden': true }),
+      icon: createElement(Braces, { size: 16, strokeWidth: 1.8, 'aria-hidden': true }),
       onClick: () => openAdvanced(documents)
     },
     {

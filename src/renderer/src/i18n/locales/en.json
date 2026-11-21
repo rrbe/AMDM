@@ -603,7 +603,7 @@
     "fieldsUnavailable": "None of the selected fields are on this page.",
     "displayOptions": "Display options",
     "advancedCopy": {
-      "title": "Advanced JSON Format",
+      "title": "MongoDB JSON Format",
       "example": "Example",
       "layout": "Output layout",
       "plain": {
@@ -624,7 +624,7 @@
     },
     "copy": {
       "plainJson": "Copy as JSON",
-      "advancedJson": "Copy as Advanced JSON",
+      "advancedJson": "Copy as MongoDB JSON",
       "relaxedEjson": "Copy as Relaxed EJSON",
       "canonicalEjson": "Copy as Canonical EJSON",
       "mongoShell": "Copy as MongoDB Document",

@@ -1,4 +1,4 @@
-import { Braces, Copy, Eye, FilePenLine, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
+import { Braces, Copy, Eye, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
 import { IS_WEB } from '@renderer/lib/platform'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -314,10 +314,10 @@ export function TreeView({
         label: t('result.dataMenu.edit'),
         icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
         children: [
-          { label: t('tree.editDoc'), icon: <FilePenLine size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(rootIndex) },
+          { label: t('tree.editDoc'), icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />, onClick: () => setEditIndex(rootIndex) },
           {
             label: t('tree.editCell'),
-            icon: <TextCursorInput size={16} strokeWidth={1.8} aria-hidden="true" />,
+            icon: <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />,
             disabled: !canEditNode(node),
             onClick: () => startEdit(node)
           }
