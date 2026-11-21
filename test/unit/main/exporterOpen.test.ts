@@ -134,6 +134,30 @@ describe('open exported file', () => {
     )
   })
 
+  it('exports result documents as a pretty JSON array when requested', async () => {
+    const exportingOwner = owner(1)
+    const directory = await chooseExportDirectory(null, exportingOwner, outputDir)
+    const result = await exportData(
+      {
+        taskId: 'pretty-json-export',
+        source: 'result',
+        format: 'json',
+        prettyPrint: true,
+        documents: [{ name: 'Ada' }],
+        destination: {
+          directorySelectionId: directory!.selectionId,
+          fileName: 'pretty-result'
+        }
+      },
+      null,
+      exportingOwner
+    )
+
+    const filePath = join(outputDir, 'pretty-result.json')
+    expect(result).toMatchObject({ ok: true, filePath, count: 1 })
+    expect(readFileSync(filePath, 'utf8')).toBe('[\n  {\n    "name": "Ada"\n  }\n]\n')
+  })
+
   it('exports result documents as plain JSONL', async () => {
     const exportingOwner = owner(1)
     const directory = await chooseExportDirectory(null, exportingOwner, outputDir)

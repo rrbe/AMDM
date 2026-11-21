@@ -603,7 +603,7 @@
     "fieldsUnavailable": "None of the selected fields are on this page.",
     "displayOptions": "Display options",
     "advancedCopy": {
-      "title": "Advanced JSON Format",
+      "title": "MongoDB JSON Format",
       "example": "Example",
       "layout": "Output layout",
       "plain": {
@@ -624,7 +624,7 @@
     },
     "copy": {
       "plainJson": "Copy as JSON",
-      "advancedJson": "Copy as Advanced JSON",
+      "advancedJson": "Copy as MongoDB JSON",
       "relaxedEjson": "Copy as Relaxed EJSON",
       "canonicalEjson": "Copy as Canonical EJSON",
       "mongoShell": "Copy as MongoDB Document",
@@ -736,6 +736,7 @@
     "format": "Format",
     "fileFormat": "File format",
     "bsonExample": "BSON example · Hexadecimal",
+    "prettyPrint": "Pretty print",
     "jsonEncoding": "Type representation",
     "encodingHelp": {
       "plain": "BSON types such as ObjectId, Date, and Decimal128 become strings or numbers and are not restored automatically when imported again.",

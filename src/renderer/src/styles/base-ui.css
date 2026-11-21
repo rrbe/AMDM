@@ -41,6 +41,8 @@
 }
 .ui-menu-popup {
   position: static;
+  max-height: var(--available-height);
+  overflow-y: auto;
   outline: none;
 }
 .ctx-item[data-highlighted] {

@@ -603,7 +603,7 @@
     "fieldsUnavailable": "目前頁面沒有已選欄位。",
     "displayOptions": "顯示選項",
     "advancedCopy": {
-      "title": "進階 JSON 格式",
+      "title": "MongoDB JSON 格式",
       "example": "範例",
       "layout": "輸出格式",
       "plain": {
@@ -624,7 +624,7 @@
     },
     "copy": {
       "plainJson": "複製為 JSON",
-      "advancedJson": "複製為進階 JSON",
+      "advancedJson": "複製為 MongoDB JSON",
       "relaxedEjson": "複製為 Relaxed EJSON",
       "canonicalEjson": "複製為 Canonical EJSON",
       "mongoShell": "複製為 MongoDB 文件",
@@ -736,6 +736,7 @@
     "format": "格式",
     "fileFormat": "檔案格式",
     "bsonExample": "BSON 範例 · 十六進位",
+    "prettyPrint": "格式化輸出",
     "jsonEncoding": "型別表示",
     "encodingHelp": {
       "plain": "ObjectId、Date、Decimal128 等 BSON 類型會轉換為字串或數字；重新匯入時不會自動還原原始類型。",
