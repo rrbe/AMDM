@@ -175,7 +175,7 @@ test('Query charts render BSON results and preserve configuration and page scope
     report.steps.push('bar and line render multiple metrics; pie retains a single metric, and view switches retain both selections without rerunning the script')
 
     await renderer.evaluate('document.documentElement.setAttribute("data-theme", "dark")')
-    await main.evaluate(`(() => { const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron'); BrowserWindow.getAllWindows()[0].setSize(1080, 760); })()`)
+    await main.evaluate(`(() => { const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron'); BrowserWindow.getAllWindows()[0].setContentSize(1080, 760); })()`)
     await waitForExpression(renderer, 'innerWidth === 1080')
     await plotted(3)
     await screenshot('pie-dark')
