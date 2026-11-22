@@ -1,13 +1,13 @@
 # Mongosh Compatibility Matrix
 
-This matrix records behavior verified against a real single-node MongoDB replica set. The authoritative executable cases live in `test/integration/mongoshCore.test.ts`; this document describes product-visible compatibility rather than duplicating every assertion.
+This matrix records behavior verified against a real single-node MongoDB replica set. The [evaluator tests](../test/integration/mongoshCore.test.ts) cover Shell semantics. The [paging tests](../test/integration/shellPaging.test.ts) cover the result sessions used by the application.
 
 ## Verified Mongosh behavior
 
 | Area        | Examples                                                         | AMDM result behavior                                                               |
 | ----------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Reads       | `find`, `findOne`, projection, sort, skip, limit                 | Bare cursors are bounded; Find cursors remain pageable                             |
-| Aggregation | `aggregate`, explicit `toArray`                                  | Bare aggregation cursors are bounded and non-pageable; explicit arrays remain full |
+| Aggregation | `aggregate`, explicit `toArray`                                  | Bare cursors page through the same execution. The total becomes known at exhaustion. Explicit `toArray()` materializes the full array and displays it in pages. |
 | Writes      | insert, update, replace, delete, `bulkWrite`, `findOneAndUpdate` | Write results use the existing acknowledgement/value contract                      |
 | Metadata    | collection names/info, database stats, indexes                   | Existing Tree, Table, and JSON rendering receives canonical EJSON                  |
 | Commands    | `runCommand`, `adminCommand`, `rs.status`                        | Server errors retain their error name and message                                  |

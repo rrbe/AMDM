@@ -7,112 +7,33 @@
 - pnpm v10 blocks dependency build scripts by default. When adding a package that compiles native code or downloads a binary, review and update `pnpm.onlyBuiltDependencies`.
 - Documentation must reference scripts that exist in the current `package.json#scripts`. Check Markdown and workflows whenever a script is added, renamed, or removed.
 
-## Test layers
+## Running tests locally
 
-- Unit: pure logic with no MongoDB dependency.
-- Contract: BSON ↔ EJSON and other cross-layer wire formats.
-- Integration: Shell, write paths, and core operations validated against real MongoDB behavior.
-- Packaged smoke: native Electron startup, preload/IPC boundaries, transactions,
-  BSON, workers, and updater initialization (`pnpm test:packaged`).
-- Core UI E2E: real Electron input to connect through Explorer, execute queries
-  using Run/the keyboard shortcut, and render JSON/Table (`pnpm test:e2e:smoke`).
-- Full UI E2E: core smoke plus pagination/write-once behavior, Settings isolation,
-  quick search, and Web scenarios (`pnpm test:e2e`).
-- Benchmarks: repeated production builds and packaged startup/query timings
-  (`pnpm bench:build`, `pnpm bench:runtime`) plus native quick-search UI latency
-  (`pnpm bench:search`), with raw samples and summaries.
-
-Test files are outside the application tsconfig includes, so `pnpm typecheck` does
-not replace tests. During local development, type-check TypeScript changes and
-run only the affected unit/contract test files. Add relevant integration tests
-when MongoDB behavior, writes, or IPC handlers change. For example:
+Use the [validation table](#validation-by-change-type) to select checks. Test files are outside the application tsconfig. When running a single integration file that uses Mongosh, build the runtime first because direct Vitest invocations skip the package pre-script:
 
 ```bash
-pnpm typecheck
-pnpm exec vitest run test/unit/main/stores.test.ts
-# IPC changes that affect connection handling:
-pnpm exec vitest run test/integration/connectionsIpc.test.ts
+pnpm build:mongosh-runtime
+pnpm exec vitest run test/integration/shellPaging.test.ts
 ```
 
-Full suites run in CI. Do not rerun them for every feature, commit, or push when
-the affected code already has valid results. Documentation-only changes need
-link/reference checks and `git diff --check`; routine UI changes do not require
-packaging or E2E. Run the relevant native UI scenarios for complex interactions
-or an observed regression, and packaged smoke for runtime/packaging changes.
+Integration tests reuse a cached `mongod` or download it on first use. Tests that exercise worker-backed code without built workers use the inline implementation.
 
-Integration tests prefer a locally cached `mongod` binary and may need to download one when no cache exists. Worker artifacts are generally not built during tests, so worker-backed modules must support an inline path through the same core.
+Keep core E2E focused on startup, connection, query execution, and result rendering. Each native scenario owns its profile, fixture, and app. Run these scenarios serially because Electron windows share desktop focus. The shared launcher uses a mock keychain on macOS to avoid system prompts during ad-hoc tests.
 
-The `CI` workflow runs on pushes to `master` and on pull requests, using one
-Linux runner for type checking, unit/contract and integration tests, desktop/Web
-production builds, Web runtime tests, native packaging, and core UI E2E.
-Changes limited to Markdown or
-`docs/screenshots/` skip this workflow. Feature branch pushes do not trigger a
-second run alongside PR checks. New runs for the same PR cancel older runs;
-`master` push runs remain independent. Version tags trigger Release only.
-
-`Daily checks` runs once a day at 03:17 Asia/Shanghai (19:17 UTC) against the
-latest `master`, and supports manual runs from Actions or
-`gh workflow run daily.yml --ref <branch>`. Scheduling and manual dispatch become
-available after the workflow is merged into `master`. The scheduled time is a
-target; GitHub may delay a run when runners are busy.
-
-The daily/manual workflow retains the full macOS, Windows, and Linux suite:
-type checking, unit/contract and integration tests, desktop/Web builds, Web
-runtime, native packaging, packaged smoke, full UI E2E (including core smoke),
-and build/runtime benchmarks.
-Both workflows cache MongoDB 8.2.1. Daily packaging targets the host architecture
-using the installed Electron distribution. `pnpm test:packaged`
-then launches that unpacked application with isolated user data and uses Electron
-CDP to verify both window bridges, concurrent first queries, transactions, BSON,
-the serializer worker, and updater initialization. Linux uses Xvfb. Runtime
-diagnostics are written under `dist/runtime-validation/` and uploaded by the
-daily/manual workflow.
-On macOS, the shared packaged-test launcher uses `--use-mock-keychain` to keep
-ad-hoc test builds from blocking on system Keychain authorization prompts.
-
-Both workflows explicitly run `pnpm exec install-electron`, then
-`pnpm package:dir` to package the existing build for the host platform and
-architecture using `node_modules/electron/dist`. This packaging command expects
-`pnpm build` first and `pnpm prepare:sparkle` on macOS; it does not rebuild or
-clean output. Unit tests do not install the Electron binary.
-
-PR smoke reports, Electron logs, and screenshots are uploaded from
-`dist/e2e-validation/smoke-shell/`, including on failure.
-
-Keep new core E2E small and focused on essential user paths. Broader UI cases
-belong to full regression. Each scenario owns its profile, MongoDB fixture, app,
-and diagnostics; shared setup/cleanup lives in `test/helpers/`. Shell execution,
-pagination, and Settings are separate tests and can each run by name:
+Packaged smoke, native E2E, and runtime benchmarks require an unpacked app for the host architecture. For example, on Apple Silicon:
 
 ```bash
-pnpm test:e2e:smoke
-node --test --test-name-pattern='Shell pagination' test/e2e/shell.test.mjs
-node --test --test-name-pattern='Settings opens' test/e2e/shell.test.mjs
+pnpm dist:dir --mac --arm64 --config.electronDist=node_modules/electron/dist
+pnpm test:packaged
 ```
 
-The daily/manual UI E2E runs on all three platforms, with reports, Electron logs,
-and screenshots under `dist/e2e-validation/`. Test files run serially because native
-Electron windows share desktop focus; parallel instances can disrupt mouse,
-keyboard, and focus assertions. Build and runtime benchmarks run with
-three iterations in the daily/manual workflow and upload their reports under
-`dist/benchmarks/`.
-Functional failures fail CI; benchmark timings are recorded without absolute
-performance thresholds because shared runner load varies.
+To package an existing build, run `pnpm build`, `pnpm prepare:sparkle` on macOS, then `pnpm package:dir` with the Electron binary installed. For repeatable performance comparisons and CDP measurement boundaries, see the [benchmark guide](../benchmarks/README.md).
 
-E2E and runtime benchmarks require an unpacked native application first. On
-macOS arm64, prepare it with `pnpm dist:dir --mac --arm64
---config.electronDist=node_modules/electron/dist`, then run `pnpm test:e2e` or
-`pnpm bench:runtime`. These commands use isolated temporary profiles and a local
-MongoDB replica set. They do not install the test application.
-
-See [benchmarks/README.md](../benchmarks/README.md) for repeatable comparisons,
-parameters, measurement boundaries, and where to extend the scenarios. Electron
-CDP, input, native artifact discovery, and process cleanup are shared in
-`test/helpers/packagedElectron.mjs` by smoke, E2E, and runtime benchmarks.
+[CI](../.github/workflows/ci.yml) runs core checks for pull requests and master. [Daily checks](../.github/workflows/daily.yml) runs cross-platform regression and can be triggered manually with `gh workflow run daily.yml --ref <branch>`.
 
 ## Local macOS installation
 
-The minimum supported macOS version is 13 Ventura for both arm64 and x64. The app bundle declares `minimumSystemVersion: "13.0"` in `electron-builder.yml`, and the native Sparkle addon uses `-mmacosx-version-min=13.0` for both architectures, matching Electron 44's minimum requirement.
+The minimum supported macOS version is 13 Ventura for both arm64 and x64. The app bundle declares `minimumSystemVersion: "13.0"` in `electron-builder.yml`, and the native Sparkle addon uses `-mmacosx-version-min=13.0` for both architectures.
 
 `pnpm install:mac` builds and installs the arm64 app using the Electron distribution already installed in `node_modules/electron/dist`. Install dependencies first with `pnpm install` on an Apple Silicon Mac. This local command avoids Electron archive downloads and online checksum requests during packaging; it still builds the app and signs the bundle. Sparkle is downloaded only when its prepared framework is missing or its pinned version changes.
 
@@ -206,8 +127,9 @@ from the first published tag.
 | GitHub Actions workflows          | `actionlint` and `git diff --check`                                  |
 | TypeScript or UI logic            | `pnpm typecheck` and affected unit/contract test files                |
 | MongoDB behavior, writes, or IPC  | The above plus relevant integration test files                       |
-| Build configuration or main deps  | The above plus `pnpm build`, target unpacked app, and packaged smoke  |
-| Renderer interaction or styling   | Relevant checks; inspect Electron when runtime validation is needed |
+| Dependencies or build configuration | Production build for the affected target                            |
+| Desktop main/preload/worker runtime or packaging | Build, package for the target architecture, and run `pnpm test:packaged`. Inspect the artifact for changed main-process dependencies. |
+| Renderer interaction or styling   | Affected checks and [Electron UI validation](renderer.md#ui-validation) for complex interactions or observed regressions |
 
 ## Internal Web edition
 
@@ -216,4 +138,4 @@ from the first published tag.
 isolated mongosh runtime; `pnpm start:web` starts that server.
 `pnpm test:web` launches the compiled server against MongoDB from an isolated
 working directory and checks HTTP, pagination, workers, and shutdown. See
-[AMDM Web](WEB.md) for SSO, persistence, capabilities, and deployment.
+[AMDM Web](web.md) for SSO, persistence, capabilities, and deployment.

@@ -40,13 +40,13 @@ pnpm clean                           # 清理构建产物
 
 - 浏览数据库 / 集合 / 索引 / 用户
 - 数据内联编辑，多标签页查看
-- `vm` 沙箱 Shell，运行 mongosh 风格的 JS（`find` / `aggregate` / `runCommand` …）
+- 使用官方 Mongosh evaluator 执行查询（`find` / `aggregate` / `runCommand` …）
 - 支持自动补全，保存常用查询、查看历史
-- 原生导入 / 导出 JSON / CSV / XLSX / BSON
+- 原生导入 / 导出 JSON / JSONL / CSV / TSV / XLSX / BSON
 - 连接备份、MongoDB URL 列表及其他客户端的连接格式适配
-- Tree / JSON / Table 结果视图
+- Tree / JSON / Table / Grid / Chart 结果视图
 - 可视化 explain
-- 支持内网浏览器访问的 [Web 版本](docs/WEB.md)
+- 支持内网浏览器访问的 [Web 版本](docs/web.md)
 
 桌面版可右键 Connections 标题或空白处导入／导出连接，也可右键某个连接单独导出。
 支持 AMDM 备份、纯 URL 列表、Compass JSON、Studio 3T URI 文件、NoSQLBooster URI

@@ -40,13 +40,13 @@ pnpm clean                           # remove generated build files
 
 - Browse databases / collections / indexes / users
 - Inline document editing, multi-tab views
-- A `vm`-sandboxed shell that runs mongosh-style JS (`find` / `aggregate` / `runCommand` …)
+- Run queries with the official Mongosh evaluator (`find` / `aggregate` / `runCommand` …)
 - Autocomplete, saved queries, and history
 - Native import / export for JSON / JSONL / CSV / TSV / XLSX / BSON
 - Connection backups, MongoDB URL lists, and client-specific connection transfers
-- Tree / JSON / Table result views
+- Tree / JSON / Table / Grid / Chart result views
 - Visual explain
-- Internal [Web edition](docs/WEB.md) for browser access
+- Internal [Web edition](docs/web.md) for browser access
 
 On desktop, right-click the Connections heading or empty space to import/export
 connections, or a connection row to export that connection. Choose an AMDM backup,

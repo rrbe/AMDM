@@ -10,22 +10,12 @@ This document records constraints that span multiple directories and are difficu
 
 The typical call chain is: store action → `window.api` → preload → IPC handler → main service. When changing IPC, check the shared contract, preload, handler, caller, and relevant tests together; never update only one end of the chain.
 
-The internal Web edition uses the same Renderer API through authenticated HTTP
-RPC and an SSE connection-status stream. Server mode injects per-user encrypted
-storage into the shared session/query cores. Browser mode keeps metadata in per-user
-IndexedDB and supplies credentials only to page-owned in-memory server sessions;
-each connection requires fresh password input. The two modes retain independent
-datasets, and switching reloads the page. Result ownership includes page ID and
-storage mode. Closing the status stream releases that page's results and browser
-sessions; the user's last server-mode page also disconnects server-mode clients.
-Native dialogs and file transfers stay desktop-only.
+The Web edition implements the same Renderer API through authenticated HTTP RPC and SSE. Result ownership includes the user, page, and storage mode. See [AMDM Web](web.md) for storage, page cleanup, and deployment requirements.
 
 ## Application updates
 
-- macOS uses the native Sparkle bridge with architecture-specific English/Chinese appcasts selected by the application language and EdDSA-signed delta archives. Each release keeps deltas from the three most recent compatible versions and always retains the full ZIP fallback.
-- Windows NSIS and Linux AppImage builds use `electron-updater` with GitHub release metadata. Downloads start only after an explicit user action; the main process owns progress, cancellation, and installation state.
-- Update state crosses into the Renderer only through the shared IPC contract. Windows/Linux automatically check at most every six hours when enabled; macOS scheduling remains owned by Sparkle.
-- Windows requires `latest.yml` plus the installer blockmap. Linux requires `latest-linux.yml`; its blockmap is embedded in the AppImage. These files are part of the release contract, not optional build output.
+- macOS delegates scheduling and installation to Sparkle. The app selects the feed for its architecture and language and verifies downloaded updates with Sparkle. Windows and Linux start downloads after an explicit user action, and main owns progress, cancellation, and installation state.
+- For required installer metadata, signed deltas, and full archives, see [Update artifacts](development.md#update-artifacts).
 
 ## Testability
 
@@ -33,15 +23,13 @@ Keep transformation, validation, and planning logic in cores that do not depend 
 
 ## Shell compatibility layer
 
-All query execution goes through `src/main/mongo/shellEngine.ts` to `mongoshCore.ts`, which adapts the official evaluator, Shell API, and Node Driver provider to `ShellResult`. The ESM runtime loads through a cached dynamic-import promise on first execution; concurrent executions share that load. Tabs, history, saved queries, and settings do not select an engine; persisted runtime fields from older versions are ignored.
+All query tabs, history entries, and saved queries run through the official Mongosh evaluator. Scripts can access the Node Driver on the selected database through `driverDb`. See [Mongosh compatibility](mongosh-compatibility.md) for script examples and environment limits.
 
 Each execution owns its provider listeners, cursors, and sessions. Document results retain their cursor until exhaustion or result closure; already-read pages are EJSON-canonical chunks in a private temporary directory. Paging and display-size changes read this execution's cursor/cache without evaluating the script again. Closing or evicting a result, closing its tab or Renderer, and disconnecting its connection release the cursor, sessions, listeners, and files without suspending the shared `MongoClient`. Renderer completion handlers must still match the tab's current `execId`, so a closed or superseded tab cannot receive late results, notifications, or database-switch state.
 
 Query `limit`/`skip` remain database semantics; the display page size only bounds each IPC response. Ordinary unconsumed find cursors count their original filter with query skip/limit, collation, hint, and read preferences in a separate bounded operation. Aggregations, consumed cursors, and find options that cannot be counted equivalently show an unknown total until exhaustion. Count failures are explicit and do not fail the data result. Explicit refresh starts a new execution on page one and keeps its display size.
 
-Scripts that need Node Driver method signatures use `driverDb`. It resolves to the selected database on the existing connection and follows `use <database>` changes. Use explicit `await` for intermediate Driver promises. Bare Driver cursors are read in bounded pages. Explicit `toArray()` remains a full operation; the returned array is displayed in pages.
-
-`shellSupport.ts` contains output collection, explicit top-level-await preparation, Driver access, cancellation of serialization waits, and best-effort collection detection. It does not modify Driver prototypes. The result's `collection` is a display hint. Editing, deletion, and refresh by ID require `documentSource`, which records the database and collection of a direct document read with intact IDs and field paths. Each page of that execution carries the same source.
+The result's `collection` is a display hint. Editing, deletion, and refresh by ID require `documentSource`, which records the database and collection of a direct document read with intact IDs and field paths. Each page of the execution carries the same source.
 
 - Preserve official positional arguments, completion values, and implicit-await behavior.
 - Errors created inside `vm` come from another realm. Extract details structurally.
@@ -56,7 +44,7 @@ Scripts that need Node Driver method signatures use `driverDb`. It resolves to t
 
 ## State and resource ownership
 
-- Store connection passwords and SSH passphrases with Electron secure storage. The Renderer should receive only non-sensitive state such as whether a secret exists.
+- Desktop credential storage belongs to main. When Electron secure storage is unavailable, the current fallback saves credentials using reversible Base64 encoding. Such profiles contain unencrypted credentials. Ordinary connection reads expose only presence flags for secret fields.
 - Desktop connection transfers use owner-scoped, expiring import previews. Imported
   source text and decrypted credentials stay in main; the Renderer receives only
   sanitized rows, secret-presence flags, and validation messages. Export writes
@@ -69,6 +57,5 @@ Scripts that need Node Driver method signatures use `driverDb`. It resolves to t
 - The component that creates a resource owns its cleanup. Connection, tab, task, and application shutdown paths must release their cursors, MongoClient instances, SSH tunnels, workers, subscriptions, and caches.
 - Closing the last desktop workspace window exits the application, including on macOS. Window close and application quit share a native confirmation (enabled by default and configurable in Settings → General) when connections are live/pending or the workspace contains query text, results, running queries, or multiple tabs. Cancelling preserves the workspace. Confirmation precedes cleanup; shutdown blocks new connections/queries and awaits connection/result cleanup before destroying windows. Settings windows do not count as workspaces. Query tabs are not restored on relaunch.
 - Disconnecting releases the live catalog, while the Renderer retains a namespace-only snapshot for search during the current app session. Successful reconnection and connection deletion discard that snapshot. Directory search includes loaded descendants regardless of expansion; it does not fetch missing namespaces or persist offline snapshots.
-- Cmd/Ctrl+K searches connected, loaded catalog resources, all open Query/Data tabs, and local saved queries/history. Its lazy Renderer worker receives only search metadata and query code, never result documents or credentials. Index updates are incremental; searches yield between chunks and discard superseded requests. Closing the panel terminates its worker and releases its index. A cooperative inline path retains search behavior if the worker fails.
-- Quick Search limits the overview to three results per group. A scoped search uses cursor-based pages of 100 with a virtual list; truncation is never presented as the complete result. Names allow typo matching; code uses literal, case-insensitive substrings. History is grouped by exact code, connection, and database for presentation only. Recent visits persist at most 50 identifiers/timestamps in Renderer local storage, without query text.
+- Quick Search indexes loaded catalog metadata, open tabs, saved queries, and history. Keep credentials and result documents out of the search index, and query text out of persisted recent visits. Closing search releases its worker and index.
 - Cancellation must do more than stop waiting. Terminate or isolate underlying work and late callbacks so they cannot mutate state after cancellation.
