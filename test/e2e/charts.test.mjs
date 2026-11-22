@@ -114,8 +114,8 @@ test('Query charts render BSON results and preserve configuration and page scope
       await waitForExpression(renderer, 'document.activeElement === document.querySelector(".amdm-field-select-popup input") && !!document.activeElement?.closest(".amdm-field-select-popup")')
       if (multiple) assert.equal(await renderer.evaluate('!!document.querySelector(".amdm-field-select-popup [role=checkbox]")'), false)
       await renderer.call('Input.insertText', { text: value })
-      await waitForExpression(renderer, `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].some(el => el.textContent.trim() === ${JSON.stringify(value)})`)
-      await clickElement(renderer, `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].find(el => el.textContent.trim() === ${JSON.stringify(value)})`)
+      await waitForExpression(renderer, `document.querySelector('.amdm-field-select-popup [role=option][data-highlighted]')?.textContent.trim() === ${JSON.stringify(value)}`)
+      await key('Enter', 'Enter', 13)
       if (multiple) await key('Escape', 'Escape', 27)
       await waitForExpression(renderer, '!document.querySelector(".amdm-field-select-popup")')
     }
@@ -175,7 +175,7 @@ test('Query charts render BSON results and preserve configuration and page scope
     report.steps.push('bar and line render multiple metrics; pie retains a single metric, and view switches retain both selections without rerunning the script')
 
     await renderer.evaluate('document.documentElement.setAttribute("data-theme", "dark")')
-    await main.evaluate(`(() => { const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron'); BrowserWindow.getAllWindows()[0].setSize(1080, 760); })()`)
+    await main.evaluate(`(() => { const { BrowserWindow } = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')('electron'); BrowserWindow.getAllWindows()[0].setContentSize(1080, 760); })()`)
     await waitForExpression(renderer, 'innerWidth === 1080')
     await plotted(3)
     await screenshot('pie-dark')
