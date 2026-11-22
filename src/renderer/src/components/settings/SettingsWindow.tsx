@@ -6,6 +6,7 @@ import {
   HISTORY_LIMITS,
   QUERY_LIMITS,
   QUERY_TIMEOUTS_MS,
+  RESULT_VIEWS,
   type CollectionSort,
   type KeyboardShortcutId,
   type Language,
@@ -13,6 +14,7 @@ import {
   type ThemeMode
 } from '@shared/types'
 import { setLanguage } from '@renderer/i18n'
+import { RESULT_VIEW_LABELS } from '@renderer/lib/tabs'
 import { matchesSettingsSearch } from '@renderer/lib/settingsSearch'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Button } from '@renderer/components/common/Button'
@@ -111,6 +113,9 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
         t('settings.timeZone'),
         t('settings.timeZoneSystem'),
         t('settings.timeZoneHint'),
+        t('settings.enabledResultViews'),
+        ...Object.values(RESULT_VIEW_LABELS),
+        t('chart.title'),
         t('settings.resultFieldSort'),
         t('settings.resultIdFirst'),
         t('settings.tableNestedDisplay'),
@@ -436,6 +441,25 @@ export function SettingsWindow({ onClose }: { onClose?: () => void }): React.JSX
                   ]}
                 />
               </Field>
+              <fieldset className="m-0 mb-4 border-0 p-0">
+                <legend className="mb-2 p-0 text-[11px] font-medium text-muted-foreground">{t('settings.enabledResultViews')}</legend>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {RESULT_VIEWS.map((view) => {
+                    const checked = settings.enabledResultViews.includes(view)
+                    return (
+                      <Checkbox
+                        key={view}
+                        label={view === 'chart' ? t('chart.title') : RESULT_VIEW_LABELS[view]}
+                        checked={checked}
+                        disabled={checked && settings.enabledResultViews.length === 1}
+                        onCheckedChange={(enabled) => void updateSettings({
+                          enabledResultViews: RESULT_VIEWS.filter((mode) => mode === view ? enabled : settings.enabledResultViews.includes(mode))
+                        })}
+                      />
+                    )
+                  })}
+                </div>
+              </fieldset>
               <Field label={t('settings.resultFieldSort')}>
                 <Select<CollectionSort>
                   value={settings.resultFieldSort}

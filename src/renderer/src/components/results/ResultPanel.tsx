@@ -1,10 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Braces, ChartColumn, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
-import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
+import { QUERY_LIMITS, RESULT_VIEWS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
+import { useAppStore, getActiveTab, getActiveResult } from '@renderer/store/useAppStore'
 import type { ResultChartConfig } from '@renderer/lib/resultChart'
-import { resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
+import { RESULT_VIEW_LABELS, resultTabLabel, type ResultFoldView, type ResultTab } from '@renderer/lib/tabs'
 import { formatQueryTime, formatRelativeQueryTime } from '@renderer/lib/queryTime'
 import { resolveResultTimeZone } from '@renderer/lib/dateTimeZone'
 import { docActionContext } from '@renderer/lib/docActions'
@@ -141,7 +141,9 @@ function ResultPanelContent({
       if (!liveIds.has(id)) gridStates.current.delete(id)
     }
   }), [])
-  const view = active?.resultView ?? 'tree'
+  const enabledViews = useAppStore((s) => s.settings.enabledResultViews)
+  const views = enabledViews.filter((mode) => mode !== 'chart' || result?.kind === 'documents')
+  const view = active?.resultView && views.includes(active.resultView) ? active.resultView : views[0]
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
   const fieldInfo = useResultFieldInfo(docs, view === 'table' || view === 'chart')
   const displayFields = useMemo(() => {
@@ -245,7 +247,6 @@ function ResultPanelContent({
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
     if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
-    const views: ResultView[] = ['tree', 'json', 'table', 'grid']
     const onKey = (e: KeyboardEvent): void => {
       if (hasOpenShortcutLayer()) return
       const index = primaryDigitIndex(e, isMacPlatform())
@@ -256,8 +257,8 @@ function ResultPanelContent({
         chooseConsole(true)
         return
       }
-      const target = index == null ? undefined : views[index]
-      if (!target) return
+      const target = index == null ? undefined : RESULT_VIEWS[index]
+      if (!target || !enabledViews.includes(target)) return
       e.preventDefault()
       e.stopPropagation()
       chooseConsole(false)
@@ -265,7 +266,7 @@ function ResultPanelContent({
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [switchable, hasOutput, active?.id, results, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
+  }, [switchable, enabledViews, hasOutput, active?.id, results, setView, disabledKeyboardShortcuts, keyboardShortcutsEnabled])
 
   useEffect(() => {
     if (!result && expanded) onExpandedChange(false)
@@ -359,8 +360,9 @@ function ResultPanelContent({
       {strip}
       <div className="result-bar flex-wrap">
         <div className="view-switch sliding-selection shrink-0">
-          {(['tree', 'json', 'table', 'grid'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : v === 'table' ? 'Table' : 'Grid'
+          {RESULT_VIEWS.map((v, i) => {
+            if (v === 'chart' || !views.includes(v)) return null
+            const label = RESULT_VIEW_LABELS[v]
             const Icon = v === 'tree' ? Network : v === 'json' ? Braces : v === 'table' ? Table : LayoutGrid
             return (
               <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
@@ -382,7 +384,7 @@ function ResultPanelContent({
               </Tooltip>
             )
           })}
-          {result.kind === 'documents' && (
+          {views.includes('chart') && (
             <button
               className={`group/result-view flex items-center justify-center ${!showConsole && view === 'chart' ? 'active is-selected' : ''}`}
               aria-label={t('chart.title')}
@@ -390,6 +392,11 @@ function ResultPanelContent({
               onClick={() => { chooseConsole(false); setView('chart') }}
             >
               <span className="inline-flex items-center gap-1"><ChartColumn size={12} aria-hidden="true" />{t('chart.title')}</span>
+            </button>
+          )}
+          {!view && (
+            <button className={showConsole ? '' : 'active is-selected'} aria-pressed={!showConsole} onClick={() => chooseConsole(false)}>
+              {t('context.result')}
             </button>
           )}
           {hasOutput && (
@@ -495,7 +502,7 @@ function ResultPanelContent({
                 docCtx={docCtx}
               />
             )}
-            {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} visibleFields={visibleFields} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {(!view || view === 'json') && <JsonView folding={foldingFor('json')} value={view ? docs : result.data} visibleFields={visibleFields} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
             {view === 'grid' && gridState && (
               <GridView
                 key={active?.id}
