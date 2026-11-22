@@ -1,6 +1,7 @@
 import {
   DEFAULT_SETTINGS,
   HISTORY_LIMITS,
+  isValidResultViewSelection,
   QUERY_LIMITS,
   QUERY_TIMEOUTS_MS,
   type AppSettings,
@@ -31,6 +32,7 @@ export function mergeWebSettings(
     !next.connectionOrder.every((item) => typeof item === "string") ||
     !["natural", "alpha", "alphaDesc"].includes(next.collectionSort) ||
     !["natural", "alpha", "alphaDesc"].includes(next.resultFieldSort) ||
+    !isValidResultViewSelection(next.enabledResultViews) ||
     typeof next.resultIdFirst !== "boolean" ||
     !["light", "dark", "system"].includes(next.theme) ||
     !["system", "en", "zh-CN", "zh-TW"].includes(next.language) ||

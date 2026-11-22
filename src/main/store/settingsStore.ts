@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { DEFAULT_SETTINGS, type AppSettings } from '../../shared/types'
+import { DEFAULT_SETTINGS, isValidResultViewSelection, type AppSettings } from '../../shared/types'
 
 interface SettingsFile {
   version: 1
@@ -17,6 +17,7 @@ function mergeSettings(stored?: Partial<AppSettings>): AppSettings {
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
+    enabledResultViews: isValidResultViewSelection(stored?.enabledResultViews) ? stored.enabledResultViews : DEFAULT_SETTINGS.enabledResultViews,
     defaultExportDirectory: defaultExportDirectory(stored)
   }
 }
@@ -50,6 +51,9 @@ class SettingsStore {
   }
 
   update(patch: Partial<AppSettings>): AppSettings {
+    if ('enabledResultViews' in patch && !isValidResultViewSelection(patch.enabledResultViews)) {
+      throw new Error('Invalid result view selection.')
+    }
     this.data.settings = { ...this.data.settings, ...patch }
     this.persist()
     return this.data.settings

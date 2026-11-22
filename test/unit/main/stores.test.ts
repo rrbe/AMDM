@@ -78,6 +78,7 @@ describe('settingsStore', () => {
       dataFontSize: 13,
       tableNestedDisplay: 'inline',
       gridHeightMode: 'fixed',
+      enabledResultViews: ['tree', 'json', 'table'],
       theme: 'system',
       activeEditorColorSchemeId: 'pine',
       editorColorSchemes: [],
@@ -116,6 +117,16 @@ describe('settingsStore', () => {
     settingsStore.init()
     expect(settingsStore.get().tableNestedDisplay).toBe('auto')
     expect(settingsStore.get().theme).toBe('dark')
+  })
+
+  it('uses the default result views on upgrade and persists a single selected view', () => {
+    electron.seedStoreFile('settings.json', { version: 1, settings: { theme: 'dark' } })
+    settingsStore.init()
+    expect(settingsStore.get().enabledResultViews).toEqual(['tree', 'json', 'table'])
+    settingsStore.update({ enabledResultViews: ['chart'] })
+    expect(() => settingsStore.update({ enabledResultViews: [] })).toThrow()
+    settingsStore.init()
+    expect(settingsStore.get().enabledResultViews).toEqual(['chart'])
   })
 
   it('defaults existing installations to fixed Grid height and persists the selected mode', () => {

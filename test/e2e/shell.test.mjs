@@ -409,5 +409,23 @@ test('Settings opens in a separate Renderer with an isolated bridge', { timeout:
     assert.equal(await settings.evaluate('typeof window.api'), 'object')
     assert.equal(await settings.evaluate('typeof window.require'), 'undefined')
     report.steps.push('Settings button opened a rendered, isolated Settings window')
+
+    const viewLabels = "[...document.querySelectorAll('.view-switch button')].map(button => button.getAttribute('aria-label'))"
+    assert.deepEqual(await renderer.evaluate(viewLabels), ['Tree', 'JSON', 'Table'])
+    await clickElement(settings, "[...document.querySelectorAll('nav button')].find(button => button.textContent === 'Data Display')", 1, false)
+    const checkbox = (label) => `[...document.querySelectorAll('fieldset [role=checkbox]')].find(box => box.textContent === '${label}')`
+    for (const mode of ['Chart', 'Grid']) {
+      assert.equal(await settings.evaluate(`${checkbox(mode)}.getAttribute('aria-checked')`), 'false')
+      await clickElement(settings, checkbox(mode), 1, false)
+      await waitForExpression(renderer, `${viewLabels}.includes('${mode}')`)
+    }
+    for (const mode of ['Tree', 'JSON', 'Table', 'Grid']) {
+      await clickElement(settings, checkbox(mode), 1, false)
+      await waitForExpression(renderer, `!${viewLabels}.includes('${mode}')`)
+    }
+    assert.equal(await settings.evaluate(`${checkbox('Chart')}.hasAttribute('data-disabled')`), true)
+    await waitForExpression(renderer, "!!document.querySelector('[data-chart-view]')")
+    assert.deepEqual(await settings.evaluate('window.api.settings.get().then(settings => settings.enabledResultViews)'), ['chart'])
+    report.steps.push('result views update in the workspace and the final selected mode stays checked')
   }),
 )

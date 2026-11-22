@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../../src/shared/types'
 import { mergeWebSettings } from '../../../src/shared/webSettings'
 
+it('requires at least one distinct supported result view', () => {
+  expect(mergeWebSettings(DEFAULT_SETTINGS, { enabledResultViews: ['grid'] }).enabledResultViews).toEqual(['grid'])
+  for (const invalid of [[], ['grid', 'grid'], ['other']]) {
+    expect(() => mergeWebSettings(DEFAULT_SETTINGS, { enabledResultViews: invalid as never })).toThrow()
+  }
+})
+
 it('accepts the Grid height modes and rejects invalid input', () => {
   for (const gridHeightMode of ['fixed', 'expanded'] as const) {
     expect(mergeWebSettings(DEFAULT_SETTINGS, { gridHeightMode }).gridHeightMode).toBe(gridHeightMode)

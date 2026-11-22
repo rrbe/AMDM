@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import test from 'node:test'
 import { clickElement, waitForExpression } from '../helpers/packagedElectron.mjs'
+import { updateRendererSettings } from '../helpers/quickSearch.mjs'
 import { runShellScenario } from '../helpers/shellUi.mjs'
 
 test('Chart examples teach a configuration and map it to compatible result fields', { timeout: 120_000 }, () =>
   runShellScenario('chart-examples', async ({ renderer, enterQuery, key, modifier, report }) => {
+    await updateRendererSettings(renderer, { enabledResultViews: ['tree', 'json', 'table', 'chart'] })
     const dialog = 'document.querySelector("[role=dialog]")'
     const button = (label, root = 'document') => `[...${root}.querySelectorAll('button')].find(button => (button.getAttribute('aria-label') || button.textContent.trim()) === ${JSON.stringify(label)})`
     const option = (name) => `[...document.querySelectorAll('.amdm-field-select-popup [role=option]')].find(option => option.textContent.trim() === ${JSON.stringify(name)})`
@@ -79,6 +81,7 @@ test('Chart examples teach a configuration and map it to compatible result field
 
 test('Query charts render BSON results and preserve configuration and page scope', { timeout: 120_000 }, () =>
   runShellScenario('query-charts', async ({ renderer, main, mongo, enterQuery, key, modifier, report }) => {
+    await updateRendererSettings(renderer, { enabledResultViews: ['tree', 'json', 'table', 'chart'] })
     await mongo.db('amdm_e2e').collection('chartSales').insertMany([
       ...Array.from({ length: 12 }, () => ({ status: 'paid' })),
       ...Array.from({ length: 3 }, () => ({ status: 'pending' })),

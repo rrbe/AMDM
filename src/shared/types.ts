@@ -585,6 +585,14 @@ export type Language = 'system' | 'en' | 'zh-CN' | 'zh-TW'
 
 export type KeyboardShortcutId =
   'newConnection' | 'newQuery' | 'tabSearch' | 'quickSearch' | 'contextualTabs' | 'resultView' | 'openSettings'
+export const RESULT_VIEWS = ['tree', 'json', 'table', 'grid', 'chart'] as const
+export type ResultView = (typeof RESULT_VIEWS)[number]
+
+export function isValidResultViewSelection(value: unknown): value is ResultView[] {
+  return Array.isArray(value) && value.length > 0 && value.length === new Set(value).size
+    && value.every((view) => RESULT_VIEWS.includes(view))
+}
+
 export type TableNestedDisplay = 'inline' | 'grouped' | 'auto'
 export type GridHeightMode = 'fixed' | 'expanded'
 
@@ -597,6 +605,7 @@ export interface AppSettings {
   collectionSort: CollectionSort
   resultFieldSort: CollectionSort
   resultIdFirst: boolean
+  enabledResultViews: ResultView[]
   /** 'system' = follow OS (default); 'light' = Stone; 'dark' = Stone Night. */
   theme: ThemeMode
   /** UI language. 'system' (default) follows the OS/app locale. */
@@ -679,6 +688,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   collectionSort: 'alpha',
   resultFieldSort: 'alpha',
   resultIdFirst: true,
+  enabledResultViews: ['tree', 'json', 'table'],
   theme: 'system',
   language: 'system',
   dateTimeZone: 'system',

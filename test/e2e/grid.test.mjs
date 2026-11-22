@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Long } from 'mongodb'
 import { clickElement, waitForExpression } from '../helpers/packagedElectron.mjs'
+import { updateRendererSettings } from '../helpers/quickSearch.mjs'
 import { runShellScenario } from '../helpers/shellUi.mjs'
 
 test('Grid edits a projected document while preserving stored fields and BSON types', { timeout: 120_000 }, () =>
   runShellScenario('grid-edit-projection', async ({ renderer, enterQuery, key, modifier, mongo, report }) => {
+    await updateRendererSettings(renderer, { enabledResultViews: ['tree', 'json', 'table', 'grid'] })
     const collection = mongo.db('amdm_e2e').collection('items')
     const hidden = Long.fromNumber(42)
     await collection.insertOne({ _id: 'projected', name: 'before', hidden })
@@ -37,6 +39,7 @@ test('Grid edits a projected document while preserving stored fields and BSON ty
 
 test('Grid keeps rendering when a focused card is beyond the end of the next page', { timeout: 120_000 }, () =>
   runShellScenario('grid-short-page', async ({ renderer, enterQuery, key, modifier, report }) => {
+    await updateRendererSettings(renderer, { enabledResultViews: ['tree', 'json', 'table', 'grid'] })
     await enterQuery('db.pages.find({ n: { $lt: 51 } }).sort({ n: 1 })')
     await key('Enter', 'Enter', 13, modifier)
     await waitForExpression(renderer, "document.querySelector('.result-range')?.textContent === '1–50'")
@@ -54,6 +57,7 @@ test('Grid keeps rendering when a focused card is beyond the end of the next pag
 
 test('Derived results with a stored document ID are read-only in every document view', { timeout: 120_000 }, () =>
   runShellScenario('result-derived-id', async ({ renderer, enterQuery, key, modifier, mongo, report }) => {
+    await updateRendererSettings(renderer, { enabledResultViews: ['tree', 'json', 'table', 'grid'] })
     const collection = mongo.db('amdm_e2e').collection('items')
     await collection.insertMany([{ _id: 'input', bucket: 'stored' }, { _id: 'stored', name: 'separate record' }])
     const queries = [

@@ -5,10 +5,11 @@
  * outcomes can be compared side by side.
  * Keeping the list/label logic here (no store, no React) makes it unit-testable.
  */
-import type { ShellResult } from '@shared/types'
+import type { ResultView, ShellResult } from '@shared/types'
 import type { ResultChartConfig } from './resultChart'
 
-export type ResultView = 'tree' | 'json' | 'table' | 'grid' | 'chart'
+export type { ResultView }
+export const RESULT_VIEW_LABELS = { tree: 'Tree', json: 'JSON', table: 'Table', grid: 'Grid' } as const
 export type ResultFoldView = 'json' | 'console' | 'explain'
 
 /** The query that produced a result (refresh / doc-edit target). */
