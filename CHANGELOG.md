@@ -4,6 +4,32 @@
 
 <!-- Generated from published release tags and translated commit entries. Dates follow the tagged commits. -->
 
+## [v26.11.1](https://github.com/rrbe/AMDM/releases/tag/v26.11.1) — 2026-11-23
+
+### Features
+
+- Size result table columns to fit their contents
+- Choose which result views are available \(\#42\)
+- Browse documents as cards in a virtualized grid with fixed or expanded card heights \(\#37\)
+- Export results as formatted JSON and use simpler result menus \(\#34\)
+- Visualize MongoDB query results as charts \(\#39\)
+- Pin data tabs from their context menu to keep results across query runs \(\#38\)
+- Configure quit confirmation and set media preview preferences per connection
+- Hover over image links in table and tree views to preview them
+
+### Fixes
+
+- Keep the active result view selected and simplify its display menu
+- Ignore outdated catalog responses and finish resource cleanup when closing results or quitting the app
+- Restore audio preview controls and recognize HLS media paths
+- Update dependencies with known vulnerabilities and migrate mongosh to Zod 4
+
+### Other Updates
+
+- Streamline the project guides and translate the Web deployment guide into English
+- Use content dimensions when resizing the chart viewport in tests \(\#41\)
+- Make chart field selection and query input more reliable in automated tests \(\#40\)
+
 ## [v26.10.5](https://github.com/rrbe/AMDM/releases/tag/v26.10.5) — 2026-10-26
 
 ### Features
