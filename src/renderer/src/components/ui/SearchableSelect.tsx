@@ -34,7 +34,7 @@ interface SearchableSelectProps<T extends string, Multiple extends boolean = fal
   triggerContent: ReactNode
   placeholder: string
   emptyMessage: string
-  className?: string
+  variant?: 'field' | 'menu'
   popupClassName?: string
   side?: 'bottom' | 'right'
   'aria-label': string
@@ -50,7 +50,7 @@ function SearchableSelectInner<T extends string, Multiple extends boolean = fals
     triggerContent,
     placeholder,
     emptyMessage,
-    className,
+    variant = 'field',
     popupClassName,
     side = 'bottom',
     'aria-label': ariaLabel
@@ -95,10 +95,8 @@ function SearchableSelectInner<T extends string, Multiple extends boolean = fals
       autoHighlight
     >
       <Combobox.Trigger
-        className={cn(
-          'flex h-[38px] w-full items-center justify-center rounded-[var(--radius-control)] border border-transparent bg-[var(--surface-control)] text-foreground outline-none transition-[border-color,background-color,box-shadow] hover:bg-[var(--surface-chrome)] focus-visible:border-[var(--separator-strong)] focus-visible:bg-[var(--surface-elevated)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] data-[popup-open]:border-[var(--separator-strong)] data-[popup-open]:bg-[var(--surface-elevated)] data-[popup-open]:shadow-[0_0_0_3px_var(--focus-soft)]',
-          className
-        )}
+        className={variant === 'menu' ? 'ctx-item' :
+          'flex h-[38px] w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-transparent bg-[var(--surface-control)] px-3 text-[13px] text-foreground outline-none transition-[border-color,background-color,box-shadow] hover:bg-[var(--surface-chrome)] focus-visible:border-[var(--separator-strong)] focus-visible:bg-[var(--surface-elevated)] focus-visible:shadow-[0_0_0_3px_var(--focus-soft)] data-[popup-open]:border-[var(--separator-strong)] data-[popup-open]:bg-[var(--surface-elevated)] data-[popup-open]:shadow-[0_0_0_3px_var(--focus-soft)]'}
         aria-label={ariaLabel}
       >
         {triggerContent}

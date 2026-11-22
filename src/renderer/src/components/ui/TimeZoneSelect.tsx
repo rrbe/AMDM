@@ -49,9 +49,7 @@ export function TimeZoneSelect({ value, onChange, variant = 'field' }: TimeZoneS
       emptyMessage={t('settings.timeZoneEmpty')}
       aria-label={t('settings.timeZone')}
       popupClassName="h-[min(360px,var(--available-height))] w-[min(520px,calc(100vw-24px))] min-w-0"
-      className={variant === 'menu'
-        ? 'h-8 justify-between gap-3 rounded-[4px] bg-transparent px-2 text-[13px]'
-        : 'h-[38px] justify-between gap-2 px-3 text-[13px]'}
+      variant={variant}
     />
   )
 }

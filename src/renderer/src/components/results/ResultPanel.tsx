@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Braces, ChartColumn, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table, Table2 } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Braces, ChartColumn, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, Maximize2, Minimize2, Network, Pin, PinOff, Settings, Table, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, RESULT_VIEWS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult } from '@renderer/store/useAppStore'
@@ -23,7 +23,6 @@ import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
 import { Radio, RadioGroup } from '@renderer/components/ui/RadioGroup'
-import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Popover } from '@renderer/components/ui/Popover'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -244,8 +243,12 @@ function ResultPanelContent({
     })
   }
 
-  // Cmd+1–5 (Ctrl elsewhere) selects Tree, JSON, Table, Grid, or available Console.
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
+  useLayoutEffect(() => {
+    if (switchable && view && active?.resultView !== view) setView(view)
+  }, [switchable, view, active?.resultView, setView])
+
+  // Cmd+1–5 (Ctrl elsewhere) selects Tree, JSON, Table, Grid, or available Console.
   useEffect(() => {
     if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
     const onKey = (e: KeyboardEvent): void => {
@@ -596,20 +599,30 @@ function ResultDisplayOptions({ docs, table = false }: { docs?: unknown[]; table
           aria-label={t('result.displayOptions')}
           title={t('result.displayOptions')}
         >
-          <SlidersHorizontal size={14} aria-hidden="true" />
+          <Settings size={16} aria-hidden="true" />
           {docs && visibleFields !== null && <span className="ml-1">{t('result.selectedFields', { count: visibleFields.length })}</span>}
         </button>
       }
     >
-      <div className="min-h-8 w-[256px] max-w-full">
-        {docs && <ResultFieldSelect docs={docs} />}
+      <div className="result-display-options min-h-8 w-[256px] max-w-full">
+        {docs && (
+          <ResultFieldSelect docs={docs} trigger={
+            <button type="button" className="ctx-item">
+              {t('result.selectFields')}
+              <ChevronRight size={14} className="text-muted-foreground" aria-hidden="true" />
+            </button>
+          } />
+        )}
         {table && (
-          <Checkbox
-            className="h-8 w-full rounded-[4px] px-2 hover:bg-muted"
-            checked={tableAutoWidth}
-            label={t('result.tableAutoWidth')}
-            onCheckedChange={(tableAutoWidth) => void updateSettings({ tableAutoWidth })}
-          />
+          <button
+            type="button"
+            className="ctx-item"
+            aria-pressed={tableAutoWidth}
+            onClick={() => void updateSettings({ tableAutoWidth: !tableAutoWidth })}
+          >
+            {t('result.tableAutoWidth')}
+            {tableAutoWidth && <Check size={14} aria-hidden="true" />}
+          </button>
         )}
         <Suspense fallback={null}>
           <TimeZoneSelect

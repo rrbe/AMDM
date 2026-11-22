@@ -1,11 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { FieldSelect } from '@renderer/components/ui/FieldSelect'
 import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
 import { orderFieldNames } from '@renderer/lib/ejson'
 
-export function ResultFieldSelect({ docs }: { docs: unknown[] }): React.JSX.Element | null {
+export function ResultFieldSelect({ docs, trigger }: { docs: unknown[]; trigger?: ReactElement }): React.JSX.Element | null {
   const { t } = useTranslation()
   const selected = useAppStore((s) => getActiveTab(s).visibleFields)
   const setSelected = useAppStore((s) => s.setVisibleFields)
@@ -21,7 +21,8 @@ export function ResultFieldSelect({ docs }: { docs: unknown[] }): React.JSX.Elem
     <FieldSelect
       multiple selectAll fields={options} value={selected} onChange={setSelected}
       label={t('result.visibleFields')}
-      className="mb-2 border-b border-[var(--separator)] pb-2"
+      trigger={trigger}
+      side="right"
       renderField={(field) => <>{field}{!current.has(field) && <span className="ml-1 text-muted-foreground">({t('result.fieldNotOnPage')})</span>}</>}
     />
   )

@@ -686,6 +686,14 @@
 }
 
 /* Icon actions in the result bar. */
+.result-display-options .ctx-item {
+  height: 32px;
+  justify-content: space-between;
+}
+.result-display-options .ctx-item:is(:focus-visible, [data-popup-open]) {
+  background: var(--interaction-hover);
+  box-shadow: none;
+}
 .result-bar-spacer {
   flex: 1;
 }
