@@ -21,23 +21,34 @@ export function gridFields(
   return orderFieldNames(keys, sort, idFirst)
 }
 
-export function gridRowFieldCounts(
-  documents: readonly { value: unknown; keys: readonly string[] | null }[],
+export async function gridDocumentFieldCounts(
+  docs: readonly unknown[],
   visibleFields: readonly string[] | null,
-  columns: number
-): number[] {
+  signal: AbortSignal
+): Promise<number[] | undefined> {
   const selected = visibleFields === null ? null : new Set(visibleFields)
-  const selectedKeys = selected ? [...selected] : null
+  const counts: number[] = []
+  let deadline = performance.now() + 6
+  for (const doc of docs) {
+    if (signal.aborted) return
+    if (!isPlainObject(doc) || isExtended(doc)) counts.push(1)
+    else if (selected) {
+      let count = 0
+      for (const key of selected) if (Object.hasOwn(doc, key)) count++
+      counts.push(count)
+    } else counts.push(Object.keys(doc).length)
+
+    if (performance.now() >= deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      deadline = performance.now() + 6
+    }
+  }
+  return counts
+}
+
+export function gridRowFieldCounts(documentCounts: readonly number[], columns: number): number[] {
   const rows: number[] = []
-  documents.forEach(({ value, keys }, index) => {
-    const count =
-      keys === null
-        ? 1
-        : selected === null
-          ? keys.length
-          : selectedKeys!.length < keys.length
-            ? selectedKeys!.reduce((total, key) => total + Number(Object.hasOwn(value as object, key)), 0)
-            : keys.reduce((total, key) => total + Number(selected.has(key)), 0)
+  documentCounts.forEach((count, index) => {
     const row = Math.floor(index / columns)
     rows[row] = Math.max(rows[row] ?? 1, count)
   })
@@ -52,6 +63,13 @@ export function gridRows(docCount: number, columns: number, fontSize: number, fi
     start += size
     return row
   })
+}
+
+// Keep the native scrollbar below Chromium's layout limit. Rows and fields use logical pixels.
+export function gridScrollGeometry(total: number, viewport: number) {
+  const height = Math.min(total, 8_000_000)
+  const scale = total > height && height > viewport ? (total - viewport) / (height - viewport) : 1
+  return { height, scale }
 }
 
 export function gridAnchorOffset(

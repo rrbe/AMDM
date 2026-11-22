@@ -30,6 +30,8 @@ export function readDocumentOnDb(
   return db.collection(collection).findOne(
     { _id } as Document,
     {
+      promoteValues: false,
+      bsonRegExp: true,
       ...(options.timeoutMS ? { maxTimeMS: options.timeoutMS } : {}),
       ...(options.signal ? { signal: options.signal } : {})
     }

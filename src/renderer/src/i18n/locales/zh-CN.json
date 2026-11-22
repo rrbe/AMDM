@@ -830,7 +830,7 @@
     "save": "保存",
     "errorEmpty": "文档内容为空。",
     "errorUpdateFailed": "更新失败。",
-    "hint": "以全量替换方式编辑。支持 Shell 类型（ObjectId(…)、ISODate(…)），保存时将按 Extended JSON 解析文档。"
+    "hint": "使用 Extended JSON 编辑完整文档。保存后将替换数据库中的文档。"
   },
   "quickSearch": {
     "documents": "文档",

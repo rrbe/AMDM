@@ -1,5 +1,5 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { defaultRangeExtractor, observeElementOffset, useVirtualizer } from '@tanstack/react-virtual'
 import { Eye, Loader2 } from 'lucide-react'
 import type { GridHeightMode } from '@shared/types'
 import { useTranslation } from 'react-i18next'
@@ -12,11 +12,13 @@ import {
   gridAnchorOffset,
   gridColumnCount,
   gridFields,
+  gridDocumentFieldCounts,
+  gridScrollGeometry,
   gridRowFieldCounts,
   gridRows,
   gridVisibleFieldIndexes
 } from '@renderer/lib/gridLayout'
-import { useResultFieldInfo } from '@renderer/lib/useResultFieldInfo'
+import { inlineText } from '@renderer/lib/format'
 import { computeSelection } from '@renderer/lib/selection'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { claimCopyFocus, useCopyHotkey } from '@renderer/lib/useCopyHotkey'
@@ -74,7 +76,7 @@ export function GridView({
   const parentRef = useRef<HTMLDivElement>(null)
   const [columns, setColumns] = useState(1)
   const [viewport, setViewport] = useState({ top: 0, height: 0 })
-  const [focused, setFocused] = useState(viewState.focused)
+  const focused = viewState.focused
   const [activeDocIndex, setActiveDocIndex] = useState<number | null>(null)
   const [activeFieldIndex, setActiveFieldIndex] = useState<number | null>(null)
   const [editIndex, setEditIndex] = useState<number | null>(null)
@@ -86,45 +88,62 @@ export function GridView({
   } | null>(null)
   const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
-  const fieldInfo = useResultFieldInfo(docs, heightMode === 'expanded')
-  const expanded = heightMode === 'expanded' && fieldInfo !== undefined
-  const rowFieldCounts = useMemo(
-    () => (expanded ? gridRowFieldCounts(fieldInfo.documents, visibleFields, columns) : undefined),
-    [expanded, fieldInfo, visibleFields, columns]
-  )
+  const [prepared, setPrepared] = useState<{ docs: unknown[]; fields: string[] | null; counts: number[] }>()
+  useEffect(() => {
+    if (heightMode !== 'expanded') {
+      setPrepared(undefined)
+      return
+    }
+    const controller = new AbortController()
+    void gridDocumentFieldCounts(docs, visibleFields, controller.signal).then((counts) => {
+      if (counts && !controller.signal.aborted) setPrepared({ docs, fields: visibleFields, counts })
+    })
+    return () => controller.abort()
+  }, [docs, visibleFields, heightMode])
+  const expanded = heightMode === 'expanded'
+  const counts = expanded && prepared?.docs === docs && prepared.fields === visibleFields ? prepared.counts : undefined
+  const loading = expanded && !counts
   const rows = useMemo(
-    () => gridRows(docs.length, columns, fontSize, rowFieldCounts),
-    [docs.length, columns, fontSize, rowFieldCounts]
+    () => gridRows(docs.length, columns, fontSize, counts && gridRowFieldCounts(counts, columns)),
+    [docs.length, columns, fontSize, counts]
   )
   const getRowKey = useCallback(
-    (index: number) => `${columns}:${fontSize}:${index}:${rowFieldCounts?.[index] ?? 'fixed'}`,
-    [columns, fontSize, rowFieldCounts]
+    (index: number) => `${columns}:${rows[index].size}:${index}`,
+    [columns, rows]
   )
-  const mode = expanded ? 'expanded' : 'fixed'
-  const anchorOffset = (): number =>
-    gridAnchorOffset(
-      rows,
-      Math.floor(viewState.firstDocIndex / columns),
-      viewState.heightMode === mode ? viewState.rowOffset : 0
-    )
+  const anchorOffset = () => gridAnchorOffset(
+    rows, Math.floor(viewState.firstDocIndex / columns), viewState.heightMode === heightMode ? viewState.rowOffset : 0
+  )
+  const reportOffset = useRef<((offset: number, scrolling: boolean) => void) | null>(null)
   const virtualizer = useVirtualizer({
-    count: rows.length,
+    count: loading ? 0 : rows.length,
     getScrollElement: () => parentRef.current,
     getItemKey: getRowKey,
     estimateSize: (index) => rows[index].size,
     overscan: 2,
-    rangeExtractor: (range) => {
-      const rows = defaultRangeExtractor(range)
-      if (activeDocIndex !== null) {
-        const activeRow = Math.floor(activeDocIndex / columns)
-        if (!rows.includes(activeRow)) rows.push(activeRow)
-      }
-      return rows.sort((a, b) => a - b)
-    },
     paddingStart: GRID_GAP,
     paddingEnd: GRID_GAP,
-    initialOffset: anchorOffset
+    initialOffset: anchorOffset,
+    rangeExtractor: (range) => {
+      const indexes = defaultRangeExtractor(range)
+      const activeRow = activeDocIndex === null ? -1 : Math.floor(activeDocIndex / columns)
+      if (activeRow >= 0 && activeRow < range.count && !indexes.includes(activeRow)) {
+        indexes.push(activeRow)
+        indexes.sort((a, b) => a - b)
+      }
+      return indexes
+    },
+    observeElementOffset: (instance, callback) => {
+      reportOffset.current = callback
+      return observeElementOffset(instance, (top, scrolling) => {
+        const { scale } = gridScrollGeometry(instance.getTotalSize(), instance.scrollRect?.height ?? 0)
+        callback(top * scale, scrolling)
+      })
+    }
   })
+  const { height, scale } = gridScrollGeometry(virtualizer.getTotalSize(), viewport.height)
+  const logicalTop = viewport.top * scale
+  const origin = logicalTop - viewport.top
 
   useLayoutEffect(() => {
     const element = parentRef.current!
@@ -139,13 +158,16 @@ export function GridView({
   }, [expanded])
 
   useLayoutEffect(() => {
-    virtualizer.scrollToOffset(anchorOffset())
-    if (expanded) setViewport({ top: parentRef.current!.scrollTop, height: parentRef.current!.clientHeight })
-    viewState.heightMode = mode
-  }, [rows, columns, mode, viewState, virtualizer])
+    if (loading) return
+    const element = parentRef.current!
+    element.scrollTop = anchorOffset() / scale
+    const offset = element.scrollTop * scale
+    if (virtualizer.scrollOffset !== offset) reportOffset.current?.(offset, false)
+    if (expanded) setViewport({ top: element.scrollTop, height: element.clientHeight })
+    viewState.heightMode = heightMode
+  }, [rows, columns, heightMode, expanded, loading, scale, viewState, virtualizer])
 
   useLayoutEffect(() => {
-    setFocused(viewState.focused)
     setActiveDocIndex(null)
     setActiveFieldIndex(null)
     setPreview(null)
@@ -156,8 +178,8 @@ export function GridView({
 
   const selectField = (docIndex: number, field: string | null): void => {
     const next = { docIndex, field }
+    viewState.anchor = null
     viewState.focused = next
-    setFocused(next)
     onSelectedDocIndexesChange(new Set())
   }
 
@@ -169,7 +191,6 @@ export function GridView({
     })
     viewState.anchor = next.anchor
     viewState.focused = null
-    setFocused(null)
     onSelectedDocIndexesChange(next.selection)
   }
 
@@ -211,7 +232,6 @@ export function GridView({
     else if (!selectedDocIndexes.has(docIndex)) {
       viewState.anchor = docIndex
       viewState.focused = null
-      setFocused(null)
       onSelectedDocIndexesChange(new Set([docIndex]))
     }
     const items: ContextMenuEntry[] = [
@@ -268,7 +288,7 @@ export function GridView({
       ref={parentRef}
       className={styles.scroller}
       style={{ fontSize }}
-      aria-busy={heightMode === 'expanded' && !fieldInfo}
+      aria-busy={loading}
       tabIndex={-1}
       onMouseDown={(event) => {
         if (!event.currentTarget.contains(event.target as Node)) return
@@ -289,56 +309,62 @@ export function GridView({
       onScroll={(event) => {
         const top = event.currentTarget.scrollTop
         if (expanded) setViewport({ top, height: event.currentTarget.clientHeight })
-        const row = virtualizer.getVirtualItemForOffset(top)
-        if (row) {
-          viewState.firstDocIndex = row.index * columns
-          viewState.rowOffset = top - row.start
-          viewState.heightMode = mode
-        }
+        if (loading || !rows.length) return
+        const offset = top * scale
+        const row = virtualizer.getVirtualItemForOffset(offset)
+        if (!row) return
+        viewState.firstDocIndex = row.index * columns
+        viewState.rowOffset = offset - row.start
+        viewState.heightMode = heightMode
       }}
     >
       {docs.length === 0 && <div className="center-msg muted">{t('tree.noDocuments')}</div>}
-      {heightMode === 'expanded' && !fieldInfo && (
+      {loading && (
         <div className={styles.loading} role="status">
           <Loader2 size={20} className="animate-spin" aria-label={t('common.loading')} />
         </div>
       )}
-      <div className={styles.inner} style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((row) => (
-          <div
-            key={row.key}
-            className={styles.row}
-            style={{
-              transform: `translateY(${row.start}px)`,
-              height: row.size - GRID_GAP,
-              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`
-            }}
-          >
-            {Array.from({ length: Math.min(columns, docs.length - row.index * columns) }, (_, column) => {
-              const index = row.index * columns + column
-              return (
-                <GridCard
-                  key={index}
-                  doc={docs[index]}
-                  index={index}
-                  visibleFields={visibleFields}
-                  selected={selectedDocIndexes.has(index)}
-                  focused={selectedDocIndexes.size === 0 && focused?.docIndex === index ? focused : null}
-                  expanded={expanded}
-                  rowStart={row.start}
-                  scrollTop={viewport.top}
-                  viewportHeight={viewport.height}
-                  lineHeight={fontSize + 11}
-                  activeFieldIndex={activeDocIndex === index ? activeFieldIndex : null}
-                  onSelect={(event) => selectDocument(index, event)}
-                  onFieldSelect={(field) => selectField(index, field)}
-                  onPreview={(field) => openPreview(index, field)}
-                  onMenu={(event, field) => openMenu(event, index, field)}
-                />
-              )
-            })}
-          </div>
-        ))}
+      <div className={styles.inner} style={{ height: loading ? viewport.height : height }}>
+        {virtualizer.getVirtualItems().map((row) => {
+          const top = Math.max(0, row.start - origin)
+          const clipped = Math.max(0, origin - row.start)
+          return (
+            <div
+              key={row.key}
+              className={styles.row}
+              style={{
+                transform: `translateY(${top}px)`,
+                height: Math.max(0, Math.min(row.size - GRID_GAP - clipped, height - top)),
+                gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`
+              }}
+            >
+              {Array.from({ length: Math.min(columns, docs.length - row.index * columns) }, (_, column) => {
+                const index = row.index * columns + column
+                return (
+                  <GridCard
+                    key={index}
+                    doc={docs[index]}
+                    index={index}
+                    visibleFields={visibleFields}
+                    selected={selectedDocIndexes.has(index)}
+                    focused={selectedDocIndexes.size === 0 && focused?.docIndex === index ? focused : null}
+                    expanded={expanded}
+                    rowStart={row.start}
+                    scrollTop={logicalTop}
+                    clipped={clipped}
+                    viewportHeight={viewport.height}
+                    lineHeight={fontSize + 11}
+                    activeFieldIndex={activeDocIndex === index ? activeFieldIndex : null}
+                    onSelect={(event) => selectDocument(index, event)}
+                    onFieldSelect={(field) => selectField(index, field)}
+                    onPreview={(field) => openPreview(index, field)}
+                    onMenu={(event, field) => openMenu(event, index, field)}
+                  />
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
       {preview && (
         <JsonPreviewModal
@@ -349,7 +375,7 @@ export function GridView({
         />
       )}
       {docCtx && docHasId(editDoc) && (
-        <DocEditor {...docCtx} doc={editDoc} id={editDoc._id} onClose={() => setEditIndex(null)} />
+        <DocEditor {...docCtx} id={editDoc._id} onClose={() => setEditIndex(null)} />
       )}
       {advancedCopy && <AdvancedJsonCopyModal documents={advancedCopy} onClose={() => setAdvancedCopy(null)} />}
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
@@ -364,6 +390,7 @@ interface GridCardProps {
   selected: boolean
   focused: FieldFocus | null
   expanded: boolean
+  clipped: number
   rowStart: number
   scrollTop: number
   viewportHeight: number
@@ -382,6 +409,7 @@ function GridCard({
   selected,
   focused,
   expanded,
+  clipped,
   rowStart,
   scrollTop,
   viewportHeight,
@@ -428,7 +456,7 @@ function GridCard({
               value={field === null ? doc : (doc as Record<string, unknown>)[field]}
               focused={focused !== null && focused.field === field}
               index={fieldIndex}
-              top={4 + fieldIndex * lineHeight}
+              top={4 + fieldIndex * lineHeight - clipped}
               onSelect={() => onFieldSelect(field)}
               onPreview={() => onPreview(field)}
               onMenu={(event) => {
@@ -486,6 +514,8 @@ function GridField({
         : formatScalar(value, timeZone),
     [value, timeZone]
   )
+  const text = inlineText(display.text)
+  const keyText = field === null ? null : inlineText(field)
   const resource = resourcePreview(value, settings)
   return (
     <div
@@ -501,19 +531,19 @@ function GridField({
         onContextMenu={onMenu}
       >
         {field !== null && (
-          <span className={styles.key} title={field}>
-            {field}
+          <span className={styles.key} title={keyText ?? undefined}>
+            {keyText}
           </span>
         )}
         <Tooltip
-          content={resource ? () => <ResourcePreview key={resource.url} resource={resource} /> : display.text}
+          content={resource ? () => <ResourcePreview key={resource.url} resource={resource} /> : text}
           variant={resource ? 'image' : 'compact'}
         >
-          <span className={`${styles.value} v-${display.type}`}>{display.text}</span>
+          <span className={`${styles.value} v-${display.type}`}>{text}</span>
         </Tooltip>
       </button>
       {isExpandable(value) && (
-        <button type="button" className={styles.expand} aria-label={field ?? display.text} onClick={onPreview}>
+        <button type="button" className={styles.expand} aria-label={keyText ?? text} onClick={onPreview}>
           ›
         </button>
       )}

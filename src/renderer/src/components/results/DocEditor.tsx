@@ -1,53 +1,58 @@
-/**
- * Document editor modal.
- *
- * Shows a document as pretty EJSON in a monospace textarea. On Save we send the
- * raw textarea text to `updateDocument` as a full replacement (the main process
- * parses the EJSON and validates it). We also locally guard against obviously
- * invalid JSON before sending, surfacing parse errors inline.
- *
- * The `_id` is passed straight through (it's the EJSON-serialized value as it
- * arrived in the result); the main process deserializes it for the filter.
- */
-import { useMemo, useState } from 'react'
+/** Load the stored document by its canonical BSON id before editing a full replacement. */
+import { useLayoutEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ResizableModal } from '@renderer/components/common/Modal'
 import { Button } from '@renderer/components/common/Button'
-import { toJsonLines, indentFor } from '@renderer/lib/format'
+import { toStrictEjson } from '@renderer/lib/resultCopy'
+import { randomUuid } from '@renderer/lib/randomUuid'
+import i18n from '@renderer/i18n'
 import { useAppStore } from '@renderer/store/useAppStore'
 
 interface DocEditorProps {
   connectionId: string
   database: string
   collection: string
-  /** The full document (EJSON-canonical plain object) being edited. */
-  doc: Record<string, unknown>
   /** The document's _id, exactly as it arrived (EJSON-serialized). */
   id: unknown
   onClose: () => void
 }
 
-/** Build an editable, indented EJSON text block for the textarea. */
-function toEditableText(doc: unknown): string {
-  return toJsonLines(doc)
-    .map((line) => `${indentFor(line.depth)}${line.text}`)
-    .join('\n')
-}
-
-export function DocEditor({ connectionId, database, collection, doc, id, onClose }: DocEditorProps): React.JSX.Element {
+export function DocEditor({ connectionId, database, collection, id, onClose }: DocEditorProps): React.JSX.Element {
   const { t } = useTranslation()
   const updateDocument = useAppStore((s) => s.updateDocument)
-
-  const initial = useMemo(() => toEditableText(doc), [doc])
-  const [text, setText] = useState(initial)
+  const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  useLayoutEffect(() => {
+    const taskId = `document-edit:${randomUuid()}`
+    const { readDocument, cancelDocumentRead, notify } = useAppStore.getState()
+    let pending = true
+    setText(null)
+    setError(null)
+    void readDocument({ connectionId, database, collection, id, taskId }).then((result) => {
+      if (!pending) return
+      pending = false
+      if (result.ok && result.found) {
+        setText(toStrictEjson(result.document))
+        return
+      }
+      const message = result.ok ? i18n.t('result.documentMissing') :
+        i18n.t('result.documentRefreshFailed', { error: result.error ?? i18n.t('notify.unknown') })
+      setError(message)
+      notify({ variant: 'warn', title: message, source: 'document' })
+    })
+    return () => {
+      if (pending) {
+        pending = false
+        void cancelDocumentRead(taskId)
+      }
+    }
+  }, [connectionId, database, collection, id])
+
   const onSave = async (): Promise<void> => {
     setError(null)
-    // Local sanity check: the editor renders shell-style scalars (ObjectId(..),
-    // ISODate(..)) that aren't valid JSON, so we can't fully validate here — we
-    // only catch empty input and let the main process do real EJSON parsing.
+    if (text === null) return
     if (!text.trim()) {
       setError(t('docEditor.errorEmpty'))
       return
@@ -80,7 +85,7 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
           {error && <span className="doc-edit-error">{error}</span>}
           <span className="spacer" />
           <Button onClick={onClose}>{t('docEditor.cancel')}</Button>
-          <Button variant="primary" busy={saving} onClick={() => void onSave()}>
+          <Button variant="primary" busy={saving} disabled={text === null} onClick={() => void onSave()}>
             {t('docEditor.save')}
           </Button>
         </>
@@ -89,7 +94,9 @@ export function DocEditor({ connectionId, database, collection, doc, id, onClose
       <textarea
         className="doc-edit-area"
         spellCheck={false}
-        value={text}
+        value={text ?? ''}
+        disabled={text === null || saving}
+        placeholder={text === null && !error ? t('common.loading') : undefined}
         onChange={(e) => setText(e.target.value)}
       />
       <div className="hint">

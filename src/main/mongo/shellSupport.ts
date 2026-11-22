@@ -1,6 +1,7 @@
 import { parse as parseJs } from '@babel/parser'
 import type { Collection, Db, DistinctOptions, Document, FindOptions } from 'mongodb'
 import type { ShellOutputLine } from '../../shared/types'
+import { documentSource } from './documentSource'
 import { serializerPool } from '../workers/serializerPool'
 
 /** Bound Console output until transport supports streaming. */
@@ -29,36 +30,21 @@ export function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise
   })
 }
 
-export function wrapTopLevelAwait(code: string): string {
-  const ast = parseJs(code, { sourceType: 'script', allowAwaitOutsideFunction: true })
-  const body = ast.program.body
-  const last = body[body.length - 1]
-  let inner = code
-  if (last?.type === 'ExpressionStatement') {
-    const expr = last.expression as { start: number; end: number }
-    inner =
-      code.slice(0, last.start as number) +
-      'return (' +
-      code.slice(expr.start, expr.end) +
-      ');' +
-      code.slice(last.end as number)
-  }
-  return `(async () => { ${inner}\n})()`
-}
-
-/** Preserve AMDM's explicit top-level-await extension before code enters an
-    evaluator that otherwise parses it as a script. This is a parse-only
-    decision: execution is never retried in another shape. */
-export function prepareTopLevelAwait(code: string): string {
+export function prepareShellInput(code: string, database: string) {
+  let ast: ReturnType<typeof parseJs>
   try {
-    parseJs(code, { sourceType: 'script' })
-    return code
+    ast = parseJs(code, { sourceType: 'script' })
   } catch (error) {
-    if (error instanceof SyntaxError && /'await' is only allowed/.test(error.message)) {
-      return wrapTopLevelAwait(code)
+    if (!(error instanceof SyntaxError && /'await' is only allowed/.test(error.message))) return { code }
+    ast = parseJs(code, { sourceType: 'script', allowAwaitOutsideFunction: true })
+    const last = ast.program.body.at(-1)
+    if (last?.type === 'ExpressionStatement') {
+      code = code.slice(0, last.start!) + 'return (' + code.slice(last.expression.start!, last.expression.end!) +
+        ');' + code.slice(last.end!)
     }
-    return code
+    code = `(async () => { ${code}\n})()`
   }
+  return { code, documentSource: documentSource(ast.program, database) }
 }
 
 function withReadOptions(
@@ -191,7 +177,7 @@ const DB_METHODS = new Set([
   'watch'
 ])
 
-/** Best-effort: which collection does this code target (for doc edit/delete)? */
+/** Best-effort: which collection name should be displayed for this code? */
 export function detectCollection(code: string): string | undefined {
   const getColl = /\bdb\.getCollection\(\s*['"]([^'"]+)['"]\s*\)/.exec(code)
   if (getColl) return getColl[1]

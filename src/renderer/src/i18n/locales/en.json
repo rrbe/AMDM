@@ -830,7 +830,7 @@
     "save": "Save",
     "errorEmpty": "Document is empty.",
     "errorUpdateFailed": "Update failed.",
-    "hint": "Edited as a full replacement. Shell types (ObjectId(…), ISODate(…)) are accepted; the document is parsed as Extended JSON on save."
+    "hint": "Use Extended JSON to edit the full document. Saving replaces the stored document."
   },
   "quickSearch": {
     "documents": "Documents",

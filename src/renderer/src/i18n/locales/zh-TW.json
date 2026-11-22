@@ -830,7 +830,7 @@
     "save": "儲存",
     "errorEmpty": "文件內容為空。",
     "errorUpdateFailed": "更新失敗。",
-    "hint": "以全量替換方式編輯。支援 Shell 類型（ObjectId(…)、ISODate(…)），儲存時將按 Extended JSON 解析文件。"
+    "hint": "使用 Extended JSON 編輯完整文件。儲存後將取代資料庫中的文件。"
   },
   "quickSearch": {
     "documents": "文件",

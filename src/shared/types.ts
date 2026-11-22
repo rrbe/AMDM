@@ -344,8 +344,10 @@ export interface ShellResult {
   pageable?: boolean
   /** Display offset within this execution, separate from the query's skip. */
   skip?: number
-  /** Target collection parsed from the code (enables doc edit/delete). */
+  /** Collection associated with the result for display and export. */
   collection?: string
+  /** Verified source for document edits, deletion and refresh by _id. */
+  documentSource?: { database: string; collection: string }
   /** Server execution time in ms (best-effort). */
   elapsedMs?: number
   /** Populated when kind === 'error'. */

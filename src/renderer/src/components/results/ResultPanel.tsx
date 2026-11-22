@@ -79,7 +79,7 @@ interface ResultPanelProps {
 }
 
 /**
- * Result-tab strip (one tab per run) + view switcher (Fields | JSON | Table | Grid | Chart, plus
+ * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table | Grid | Chart, plus
  * Console when the run printed output) + metadata bar for the focused result.
  * Handles every ShellResult.kind: 'documents', 'value', 'ack', 'explain',
  * 'error'. A run whose only product is its output (final value null/undefined)
@@ -117,18 +117,26 @@ function ResultPanelContent({
   // Normalize to a documents array for the result views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
-  const gridStates = useRef(new Map<string, { docs: unknown[]; state: GridViewState }>())
+  const gridStates = useRef(new Map<string, { data: unknown; kind: ShellResult['kind']; state: GridViewState }>())
   const gridState = useMemo(() => {
-    if (!active) return null
+    if (!active || !result) return null
     const cached = gridStates.current.get(active.id)
-    if (cached?.docs === docs) return cached.state
+    if (cached && cached.kind === result.kind && Object.is(cached.data, result.data)) return cached.state
     const state: GridViewState = { firstDocIndex: 0, rowOffset: 0, focused: null, anchor: null }
-    gridStates.current.set(active.id, { docs, state })
+    gridStates.current.set(active.id, { data: result.data, kind: result.kind, state })
     return state
-  }, [active?.id, docs])
+  }, [active?.id, result])
   useEffect(() => useAppStore.subscribe((state, previous) => {
     if (state.tabs === previous.tabs) return
-    const liveIds = new Set(state.tabs.flatMap((tab) => tab.results.map((entry) => entry.id)))
+    const liveIds = new Set<string>()
+    for (const tab of state.tabs) {
+      for (const entry of tab.results) {
+        liveIds.add(entry.id)
+        const grid = gridStates.current.get(entry.id)?.state
+        const field = grid?.focused?.field
+        if (grid && field != null && tab.visibleFields && !tab.visibleFields.includes(field)) grid.focused = null
+      }
+    }
     for (const id of gridStates.current.keys()) {
       if (!liveIds.has(id)) gridStates.current.delete(id)
     }
@@ -352,7 +360,7 @@ function ResultPanelContent({
       <div className="result-bar flex-wrap">
         <div className="view-switch sliding-selection shrink-0">
           {(['tree', 'json', 'table', 'grid'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? 'Fields' : v === 'json' ? 'JSON' : v === 'table' ? 'Table' : 'Grid'
+            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : v === 'table' ? 'Table' : 'Grid'
             const Icon = v === 'tree' ? Network : v === 'json' ? Braces : v === 'table' ? Table : LayoutGrid
             return (
               <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
@@ -552,8 +560,8 @@ function ResultPanelContent({
             fixedSelection: exportModal.fixedDocuments != null,
             connectionId: docCtx?.connectionId ?? active?.query?.connectionId,
             database: docCtx?.database ?? active?.query?.database,
-            collection: docCtx?.collection,
-            suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
+            collection: docCtx?.collection ?? result.collection,
+            suggestedName: result.collection ? `${result.collection}-result` : 'result'
           }}
           initialFormat={exportModal.format}
           initialJsonEncoding={exportModal.jsonEncoding}

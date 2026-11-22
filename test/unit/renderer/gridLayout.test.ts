@@ -3,11 +3,12 @@ import {
   gridAnchorOffset,
   gridColumnCount,
   gridFields,
+  gridDocumentFieldCounts,
+  gridScrollGeometry,
   gridRowFieldCounts,
   gridRows,
   gridVisibleFieldIndexes
 } from '@renderer/lib/gridLayout'
-import { getResultFieldInfo } from '@renderer/lib/resultFields'
 
 describe('Grid layout', () => {
   it('fits complete cards and gaps inside the result container', () => {
@@ -29,12 +30,29 @@ describe('Grid layout', () => {
     expect(gridFields(doc, null, 'alpha', false)).toEqual(['_id', 'a', 'z'])
   })
 
-  it('uses the tallest document per row after filtering, including scalars and empty documents', () => {
-    const { documents } = getResultFieldInfo([{ a: 1 }, { a: 1, b: 2, c: 3 }, {}, 42, { b: 2 }])
-    expect(gridRowFieldCounts(documents, null, 3)).toEqual([3, 1])
-    expect(gridRowFieldCounts(documents, ['b', 'missing', 'b'], 3)).toEqual([1, 1])
-    expect(gridRowFieldCounts(documents, [], 3)).toEqual([1, 1])
-    expect(gridRowFieldCounts(documents, null, 2)).toEqual([3, 1, 1])
+  it('uses the tallest document per row after filtering, including scalars and empty documents', async () => {
+    const docs = [{ a: 1 }, { a: 1, b: 2, c: 3 }, {}, 42, { b: 2 }]
+    const signal = new AbortController().signal
+    const counts = await gridDocumentFieldCounts(docs, null, signal)
+    expect(counts).toEqual([1, 3, 0, 1, 1])
+    expect(gridRowFieldCounts(counts!, 3)).toEqual([3, 1])
+    expect(gridRowFieldCounts(counts!, 2)).toEqual([3, 1, 1])
+    expect(await gridDocumentFieldCounts(docs, ['b', 'missing', 'b'], signal)).toEqual([0, 1, 0, 1, 1])
+    expect(await gridDocumentFieldCounts(docs, [], signal)).toEqual([0, 0, 0, 1, 0])
+    expect(await gridDocumentFieldCounts(docs, null, AbortSignal.abort())).toBeUndefined()
+  })
+
+  it('maps the bottom of a wide result to its final logical row', () => {
+    const counts = Array(2000).fill(2000)
+    const rows = gridRows(counts.length, 3, 13, gridRowFieldCounts(counts, 3))
+    const last = rows.at(-1)!
+    const total = last.start + last.size + 12
+    const viewport = 601
+    const { height, scale } = gridScrollGeometry(total, viewport)
+    expect(height).toBeLessThan(16_777_216)
+    expect((height - viewport) * scale).toBeCloseTo(total - viewport)
+    expect((height - viewport) * scale).toBeGreaterThan(last.start)
+    expect(gridScrollGeometry(800, viewport)).toEqual({ height: 800, scale: 1 })
   })
 
   it('lays out fixed rows and expanded rows without limiting their field counts', () => {
