@@ -1,5 +1,5 @@
 import { IS_WEB } from '@renderer/lib/platform'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, Braces, ChevronsUpDown, Copy, Eye, ListFilter, Pencil, Table2, TextCursorInput, Trash2 } from 'lucide-react'
@@ -16,11 +16,12 @@ import {
   type TableSortDirection,
   type TableSortState
 } from '@renderer/lib/tableShape'
+import { MAX_AUTO_WIDTH, measureTableColumnWidths } from '@renderer/lib/tableColumnWidths'
 import { useHorizontalReorder } from '@renderer/lib/useHorizontalReorder'
 import { coerceEdit, editableText } from '@renderer/lib/cellEdit'
 import { confirmDeleteDoc, docHasId, type DocActionContext } from '@renderer/lib/docActions'
 import { computeVisibleSelection } from '@renderer/lib/selection'
-import { getActiveTab, useAppStore } from '@renderer/store/useAppStore'
+import { getActiveResult, getActiveTab, useAppStore } from '@renderer/store/useAppStore'
 import { ContextMenu, type ContextMenuEntry } from '@renderer/components/ContextMenu'
 import {
   copyText,
@@ -58,7 +59,7 @@ import { useResultTimeZone } from './ResultTimeZone'
  *    a second header row and independent child columns.
  *    EJSON wrappers ({$oid} etc.) are treated as scalar leaves.
  *  - The header sticks vertically; row handles and _id stay visible horizontally.
- *    Columns default to a fixed width but are resizable — drag the handle on a
+ *    Columns can fit sampled values or use a fixed width, and are resizable — drag the handle on a
  *    header cell's right edge; header and body share the per-column width.
  *
  * NOTE: column derivation scans all docs, but the result set is already bounded
@@ -134,17 +135,12 @@ export function TableView({
   const [editing, setEditing] = useState<{ row: number; col: TableColumn } | null>(null)
   const editingFromMenu = useRef(false)
   const [editError, setEditError] = useState<string | null>(null)
-  // Per-column widths (serialized field path → px); unset columns use COL_WIDTH.
-  const [colWidths, setColWidths] = useState<Record<string, number>>({})
+  const autoWidth = useAppStore((s) => s.settings.tableAutoWidth)
+  const timeZone = useResultTimeZone()
+  const [colWidths, setColWidths] = useState(() => getActiveResult(useAppStore.getState())?.tableColumnWidths ?? {})
   const [tableSort, setTableSort] = useState<TableSortState | null>(null)
   const [draggingGroup, setDraggingGroup] = useState<string | null>(null)
   const endColumnDrag = useCallback(() => setDraggingGroup(null), [])
-  const widthOf = useCallback(
-    (col: TableColumn): number =>
-      colWidths[col.id] ?? (col.path[0] === '_id' ? Math.max(COL_WIDTH, Math.ceil(fontSize * 0.61 * 24) + 28) : COL_WIDTH),
-    [colWidths, fontSize]
-  )
-
   // Selection: a set of whole rows, plus the one "focused" cell that gets an
   // extra overlay highlight on top of its (already selected) row. A single click
   // on any cell selects that whole row and focuses the cell; the # handle selects
@@ -156,23 +152,6 @@ export function TableView({
   const [advancedCopy, setAdvancedCopy] = useState<unknown[] | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuEntry[] } | null>(null)
 
-  // Drag a header cell's right-edge handle to resize that column.
-  const startColResize = (col: TableColumn, e: MouseEvent): void => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startW = widthOf(col)
-    const onMove = (ev: globalThis.MouseEvent): void => {
-      const w = Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX)
-      setColWidths((prev) => ({ ...prev, [col.id]: w }))
-    }
-    const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
-
   const derivedGroups = useMemo(
     () => deriveTableColumnGroups(displayDocs, nestedDisplay, fieldSort, idFirst, fields),
     [displayDocs, nestedDisplay, fieldSort, idFirst, fields]
@@ -182,6 +161,48 @@ export function TableView({
     return orderTableColumns([...byKey.keys()], columnOrder, idFirst).map((key) => byKey.get(key)!)
   }, [derivedGroups, columnOrder, idFirst])
   const columns = useMemo(() => groups.flatMap((group) => group.columns), [groups])
+  const measuredWidths = useMemo(
+    () => autoWidth ? measureTableColumnWidths(columns, displayDocs, fontSize, timeZone) : null,
+    [autoWidth, columns, displayDocs, fontSize, timeZone]
+  )
+  const [widthLimit, setWidthLimit] = useState(MAX_AUTO_WIDTH)
+  const showTable = !loading && docs.length > 0
+  useLayoutEffect(() => {
+    const element = parentRef.current
+    if (!autoWidth || !showTable || !element) return
+    const resize = (): void => setWidthLimit(Math.min(MAX_AUTO_WIDTH, Math.floor(element.clientWidth * 0.3)))
+    resize()
+    const observer = new ResizeObserver(resize)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [autoWidth, showTable])
+  const widthOf = useCallback((column: TableColumn): number => {
+    if (colWidths[column.id] !== undefined) return colWidths[column.id]
+    if (measuredWidths) return Math.max(MIN_COL_WIDTH, Math.min(widthLimit, measuredWidths.get(column.id)!))
+    return column.path[0] === '_id' ? Math.max(COL_WIDTH, Math.ceil(fontSize * 0.61 * 24) + 28) : COL_WIDTH
+  }, [colWidths, measuredWidths, widthLimit, fontSize])
+
+  // Drag a header cell's right-edge handle to resize that column.
+  const startColResize = (col: TableColumn, e: MouseEvent): void => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = widthOf(col)
+    const resultId = getActiveResult(useAppStore.getState())?.id
+    let widths = colWidths
+    const onMove = (ev: globalThis.MouseEvent): void => {
+      const w = Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX)
+      widths = { ...colWidths, [col.id]: w }
+      setColWidths(widths)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      if (resultId && widths !== colWidths) useAppStore.getState().setTableColumnWidths(resultId, widths)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   useEffect(() => {
     setSelectedCell((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)
     setEditing((cell) => cell && columns.some((column) => column.id === cell.col.id) ? cell : null)

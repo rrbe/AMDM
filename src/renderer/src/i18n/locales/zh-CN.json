@@ -602,6 +602,7 @@
     "fieldNotOnPage": "当前页不存在",
     "noMatchingFields": "没有匹配的字段",
     "fieldsUnavailable": "当前页没有已选字段。",
+    "tableAutoWidth": "自适应宽度",
     "displayOptions": "显示选项",
     "advancedCopy": {
       "title": "MongoDB JSON 格式",

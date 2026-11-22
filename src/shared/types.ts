@@ -632,6 +632,7 @@ export interface AppSettings {
   dataFontSize: number
   /** Nested objects in Table: inline preview or one-level grouped columns. */
   tableNestedDisplay: TableNestedDisplay
+  tableAutoWidth: boolean
   gridHeightMode: GridHeightMode
   /** Soft-wrap long lines in the shell editor instead of scrolling sideways. */
   editorWordWrap: boolean
@@ -702,6 +703,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorFontSize: 13,
   dataFontSize: 13,
   tableNestedDisplay: 'inline',
+  tableAutoWidth: true,
   gridHeightMode: 'fixed',
   editorWordWrap: false,
   editorTabSize: 2,

@@ -25,6 +25,7 @@ export interface ResultTab {
   pinned?: boolean
   /** Selected data view for this result tab. */
   resultView?: ResultView
+  tableColumnWidths?: Record<string, number>
   chartConfig?: ResultChartConfig
   foldedLines?: Partial<Record<ResultFoldView, number[]>>
   /** 1-based run sequence within its query tab (drives the "结果 N" label).

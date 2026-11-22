@@ -226,6 +226,7 @@ interface AppState {
   setResultChartConfig(config: ResultChartConfig): void
   setResultFoldedLines(view: ResultFoldView, lines: number[]): void
   setVisibleFields(fields: string[] | null): void
+  setTableColumnWidths(resultId: string, widths: Record<string, number>): void
   setTableColumnOrder(order: string[]): void
   /** Browse a collection from the explorer: run a bounded newest-first query
       on first fill; focus an identical browse tab without re-running it. */
@@ -1371,6 +1372,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         foldedLines: { ...result.foldedLines, json: undefined }
       }))
     }) }))
+  },
+
+  setTableColumnWidths(resultId, widths) {
+    set((s) => {
+      const tab = getActiveTab(s)
+      if (tab.activeResultId !== resultId) return s
+      return { tabs: patchTab(s.tabs, tab.id, patchResult(tab, resultId, { tableColumnWidths: widths })) }
+    })
   },
 
   setTableColumnOrder(order) {

@@ -23,6 +23,7 @@ import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
 import { Radio, RadioGroup } from '@renderer/components/ui/RadioGroup'
+import { Checkbox } from '@renderer/components/ui/Checkbox'
 import { Popover } from '@renderer/components/ui/Popover'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -452,7 +453,7 @@ function ResultPanelContent({
             <ResultPager result={result} />
           </div>
         )}
-        <ResultDisplayOptions docs={showConsole ? undefined : docs} />
+        <ResultDisplayOptions docs={showConsole ? undefined : docs} table={!showConsole && view === 'table'} />
         <span className="inline-flex" ref={setFoldControls} />
         <button
           ref={copyButtonRef}
@@ -579,10 +580,11 @@ function ResultPanelContent({
   )
 }
 
-function ResultDisplayOptions({ docs }: { docs?: unknown[] }): React.JSX.Element {
+function ResultDisplayOptions({ docs, table = false }: { docs?: unknown[]; table?: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const visibleFields = useAppStore((s) => getActiveTab(s).visibleFields)
   const dateTimeZone = useAppStore((s) => s.settings.dateTimeZone)
+  const tableAutoWidth = useAppStore((s) => s.settings.tableAutoWidth)
   const updateSettings = useAppStore((s) => s.updateSettings)
   return (
     <Popover
@@ -601,6 +603,14 @@ function ResultDisplayOptions({ docs }: { docs?: unknown[] }): React.JSX.Element
     >
       <div className="min-h-8 w-[256px] max-w-full">
         {docs && <ResultFieldSelect docs={docs} />}
+        {table && (
+          <Checkbox
+            className="h-8 w-full rounded-[4px] px-2 hover:bg-muted"
+            checked={tableAutoWidth}
+            label={t('result.tableAutoWidth')}
+            onCheckedChange={(tableAutoWidth) => void updateSettings({ tableAutoWidth })}
+          />
+        )}
         <Suspense fallback={null}>
           <TimeZoneSelect
             variant="menu"

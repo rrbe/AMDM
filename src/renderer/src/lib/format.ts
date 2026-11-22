@@ -70,8 +70,9 @@ function inlineValue(value: unknown, timeZone?: string): JsonToken {
   if (typeof value === 'object' && value !== null && !isExtended(value)) {
     return { text: Object.keys(value).length ? '{ … }' : '{}', cls: 'v-object' }
   }
+  if (typeof value === 'string') return { text: JSON.stringify(inlineText(value)), cls: 'v-string' }
   const token = scalarToken(value, timeZone)
-  return { ...token, text: typeof value === 'string' ? JSON.stringify(inlineText(value)) : inlineText(token.text) }
+  return { ...token, text: inlineText(token.text) }
 }
 
 /** One level of an object/array, with bounded entries and text for Table cells. */

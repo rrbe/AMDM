@@ -602,6 +602,7 @@
     "fieldNotOnPage": "Not on this page",
     "noMatchingFields": "No matching fields",
     "fieldsUnavailable": "None of the selected fields are on this page.",
+    "tableAutoWidth": "Auto-fit column widths",
     "displayOptions": "Display options",
     "advancedCopy": {
       "title": "MongoDB JSON Format",
