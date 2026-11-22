@@ -425,7 +425,6 @@ export function TreeView({
           connectionId={docCtx.connectionId}
           database={docCtx.database}
           collection={docCtx.collection}
-          doc={editDoc}
           id={editDoc._id}
           onClose={() => setEditIndex(null)}
         />

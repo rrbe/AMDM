@@ -61,7 +61,7 @@ function scalarToken(value: unknown, timeZone?: string): JsonToken {
 const INLINE_PREVIEW_ITEMS = 5
 const INLINE_PREVIEW_TEXT_LENGTH = 80
 
-function inlineText(text: string): string {
+export function inlineText(text: string): string {
   return text.length > INLINE_PREVIEW_TEXT_LENGTH ? `${text.slice(0, INLINE_PREVIEW_TEXT_LENGTH)}…` : text
 }
 

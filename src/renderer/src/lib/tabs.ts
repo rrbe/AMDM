@@ -8,7 +8,7 @@
 import type { ShellResult } from '@shared/types'
 import type { ResultChartConfig } from './resultChart'
 
-export type ResultView = 'tree' | 'json' | 'table' | 'chart'
+export type ResultView = 'tree' | 'json' | 'table' | 'grid' | 'chart'
 export type ResultFoldView = 'json' | 'console' | 'explain'
 
 /** The query that produced a result (refresh / doc-edit target). */
@@ -22,7 +22,7 @@ export interface ResultQuery {
 export interface ResultTab {
   id: string
   pinned?: boolean
-  /** Selected Tree/JSON/Table/Chart view for this result tab. */
+  /** Selected data view for this result tab. */
   resultView?: ResultView
   chartConfig?: ResultChartConfig
   foldedLines?: Partial<Record<ResultFoldView, number[]>>

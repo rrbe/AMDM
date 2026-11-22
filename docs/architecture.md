@@ -41,7 +41,7 @@ Query `limit`/`skip` remain database semantics; the display page size only bound
 
 Scripts that need Node Driver method signatures use `driverDb`. It resolves to the selected database on the existing connection and follows `use <database>` changes. Use explicit `await` for intermediate Driver promises. Bare Driver cursors are read in bounded pages. Explicit `toArray()` remains a full operation; the returned array is displayed in pages.
 
-`shellSupport.ts` contains output collection, explicit top-level-await preparation, Driver access, cancellation of serialization waits, and best-effort collection detection. It does not modify Driver prototypes.
+`shellSupport.ts` contains output collection, explicit top-level-await preparation, Driver access, cancellation of serialization waits, and best-effort collection detection. It does not modify Driver prototypes. The result's `collection` is a display hint. Editing, deletion, and refresh by ID require `documentSource`, which records the database and collection of a direct document read with intact IDs and field paths. Each page of that execution carries the same source.
 
 - Preserve official positional arguments, completion values, and implicit-await behavior.
 - Errors created inside `vm` come from another realm. Extract details structurally.

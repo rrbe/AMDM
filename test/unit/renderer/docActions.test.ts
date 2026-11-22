@@ -8,17 +8,19 @@ import { docActionContext, docHasId } from '@renderer/lib/docActions'
 const lastQuery = { connectionId: 'c1', database: 'db1' }
 
 describe('docActionContext', () => {
-  it('returns the context when result has a collection and lastQuery is set', () => {
-    expect(docActionContext({ collection: 'users' } as never, lastQuery)).toEqual({
+  const documentSource = { database: 'other', collection: 'users' }
+
+  it('targets the database and collection of the document read on the query connection', () => {
+    expect(docActionContext({ kind: 'value', documentSource }, lastQuery)).toEqual({
       connectionId: 'c1',
-      database: 'db1',
+      database: 'other',
       collection: 'users'
     })
   })
-  it('is null without a result, without a collection, or without lastQuery', () => {
+  it('requires a document source and a query connection', () => {
     expect(docActionContext(null, lastQuery)).toBeNull()
-    expect(docActionContext({ collection: '' } as never, lastQuery)).toBeNull()
-    expect(docActionContext({ collection: 'users' } as never, null)).toBeNull()
+    expect(docActionContext({ kind: 'documents', collection: 'users', data: [{ _id: 'collision' }] }, lastQuery)).toBeNull()
+    expect(docActionContext({ kind: 'documents', documentSource }, null)).toBeNull()
   })
 })
 

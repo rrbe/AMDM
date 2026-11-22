@@ -94,7 +94,7 @@
     "shortcutTabs": "Switch Tabs (9: last)",
     "shortcutQueryTabs": "Query",
     "shortcutDataTabs": "Result",
-    "shortcutResultView": "Switch Tree / JSON / Table / Console",
+    "shortcutResultView": "Switch Tree / JSON / Table / Grid / Console",
     "shortcutOpenSettings": "Open Settings",
     "shortcutClear": "Clear",
     "shortcutRestore": "Restore",
@@ -654,6 +654,11 @@
       "copyTsv": "TSV"
     },
     "documentPreviewTitle": "Document",
+    "gridHeightMode": "Card height",
+    "gridFixedHeight": "Fixed height",
+    "gridExpandedHeight": "Expanded height",
+    "gridMoreFields_one": "{{count}} remaining field",
+    "gridMoreFields_other": "{{count}} remaining fields",
     "documentRefreshed": "Document refreshed",
     "documentMissing": "This document no longer exists",
     "documentRefreshFailed": "Failed to refresh document: {{error}}",
@@ -825,7 +830,7 @@
     "save": "Save",
     "errorEmpty": "Document is empty.",
     "errorUpdateFailed": "Update failed.",
-    "hint": "Edited as a full replacement. Shell types (ObjectId(…), ISODate(…)) are accepted; the document is parsed as Extended JSON on save."
+    "hint": "Use Extended JSON to edit the full document. Saving replaces the stored document."
   },
   "quickSearch": {
     "documents": "Documents",

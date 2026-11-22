@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChartColumn, Braces, Check, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table, Table2 } from 'lucide-react'
+import { Braces, ChartColumn, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, Maximize2, Minimize2, Network, Pin, PinOff, SlidersHorizontal, Table, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { QUERY_LIMITS, type JsonEncoding, type ResultExportFormat, type ShellResult } from '@shared/types'
 import { useAppStore, getActiveTab, getActiveResult, type ResultView } from '@renderer/store/useAppStore'
@@ -22,6 +22,7 @@ import { DocumentTabStrip } from '@renderer/components/common/DocumentTabStrip'
 import { DocumentTab } from '@renderer/components/common/DocumentTab'
 import { useTabReorder } from '@renderer/lib/useTabReorder'
 import { Select } from '@renderer/components/ui/Select'
+import { Radio, RadioGroup } from '@renderer/components/ui/RadioGroup'
 import { Popover } from '@renderer/components/ui/Popover'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ExportModal } from '@renderer/components/io/ExportModal'
@@ -35,6 +36,7 @@ import {
 import { TreeView } from './TreeView'
 import { JsonView } from './JsonView'
 import { TableView } from './TableView'
+import { GridView, type GridViewState } from './GridView'
 import { ExplainView } from './ExplainView'
 import { ConsoleView } from './ConsoleView'
 import { AdvancedJsonCopyModal } from './AdvancedJsonCopyModal'
@@ -77,7 +79,7 @@ interface ResultPanelProps {
 }
 
 /**
- * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table | Chart, plus
+ * Result-tab strip (one tab per run) + view switcher (Tree | JSON | Table | Grid | Chart, plus
  * Console when the run printed output) + metadata bar for the focused result.
  * Handles every ShellResult.kind: 'documents', 'value', 'ack', 'explain',
  * 'error'. A run whose only product is its output (final value null/undefined)
@@ -115,6 +117,30 @@ function ResultPanelContent({
   // Normalize to a documents array for the result views. 'value' / 'ack' get
   // wrapped in a single-element array so the same renderers apply uniformly.
   const docs = useMemo(() => result ? normalizeDocs(result) : [], [result])
+  const gridStates = useRef(new Map<string, { data: unknown; kind: ShellResult['kind']; state: GridViewState }>())
+  const gridState = useMemo(() => {
+    if (!active || !result) return null
+    const cached = gridStates.current.get(active.id)
+    if (cached && cached.kind === result.kind && Object.is(cached.data, result.data)) return cached.state
+    const state: GridViewState = { firstDocIndex: 0, rowOffset: 0, focused: null, anchor: null }
+    gridStates.current.set(active.id, { data: result.data, kind: result.kind, state })
+    return state
+  }, [active?.id, result])
+  useEffect(() => useAppStore.subscribe((state, previous) => {
+    if (state.tabs === previous.tabs) return
+    const liveIds = new Set<string>()
+    for (const tab of state.tabs) {
+      for (const entry of tab.results) {
+        liveIds.add(entry.id)
+        const grid = gridStates.current.get(entry.id)?.state
+        const field = grid?.focused?.field
+        if (grid && field != null && tab.visibleFields && !tab.visibleFields.includes(field)) grid.focused = null
+      }
+    }
+    for (const id of gridStates.current.keys()) {
+      if (!liveIds.has(id)) gridStates.current.delete(id)
+    }
+  }), [])
   const view = active?.resultView ?? 'tree'
   const fieldSort = useAppStore((s) => s.settings.resultFieldSort)
   const fieldInfo = useResultFieldInfo(docs, view === 'table' || view === 'chart')
@@ -133,6 +159,8 @@ function ResultPanelContent({
   const filterTableColumns = view === 'table' && fieldInfo?.allDocuments
   const displayDocs = useMemo(() => noVisibleFields || view !== 'table' || !fieldInfo || filterTableColumns ? docs : selectDisplayFields(docs, visibleFields), [docs, visibleFields, noVisibleFields, filterTableColumns, view, fieldInfo])
   const dataFontSize = useAppStore((s) => s.settings.dataFontSize)
+  const gridHeightMode = useAppStore((s) => s.settings.gridHeightMode)
+  const updateSettings = useAppStore((s) => s.updateSettings)
   const keyboardShortcutsEnabled = useAppStore((s) => s.settings.keyboardShortcutsEnabled)
   const disabledKeyboardShortcuts = useAppStore((s) => s.settings.disabledKeyboardShortcuts)
   const primaryKey = isMacPlatform() ? '⌘' : 'Ctrl+'
@@ -213,15 +241,15 @@ function ResultPanelContent({
     })
   }
 
-  // Cmd+1–4 (Ctrl elsewhere) selects Tree, JSON, Table, or available Console.
+  // Cmd+1–5 (Ctrl elsewhere) selects Tree, JSON, Table, Grid, or available Console.
   const switchable = !!result && result.kind !== 'error' && result.kind !== 'explain'
   useEffect(() => {
     if (!switchable || !isAppShortcutEnabled(keyboardShortcutsEnabled, disabledKeyboardShortcuts, 'resultView')) return
-    const views: ResultView[] = ['tree', 'json', 'table']
+    const views: ResultView[] = ['tree', 'json', 'table', 'grid']
     const onKey = (e: KeyboardEvent): void => {
       if (hasOpenShortcutLayer()) return
       const index = primaryDigitIndex(e, isMacPlatform())
-      if (index === 3) {
+      if (index === 4) {
         if (!hasOutput) return
         e.preventDefault()
         e.stopPropagation()
@@ -331,9 +359,9 @@ function ResultPanelContent({
       {strip}
       <div className="result-bar flex-wrap">
         <div className="view-switch sliding-selection shrink-0">
-          {(['tree', 'json', 'table'] as ResultView[]).map((v, i) => {
-            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : 'Table'
-            const Icon = v === 'tree' ? Network : v === 'json' ? Braces : Table
+          {(['tree', 'json', 'table', 'grid'] as ResultView[]).map((v, i) => {
+            const label = v === 'tree' ? 'Tree' : v === 'json' ? 'JSON' : v === 'table' ? 'Table' : 'Grid'
+            const Icon = v === 'tree' ? Network : v === 'json' ? Braces : v === 'table' ? Table : LayoutGrid
             return (
               <Tooltip key={v} content={`${label} (${primaryKey}${i + 1})`} disabled={!viewShortcutEnabled}>
                 <button
@@ -365,7 +393,7 @@ function ResultPanelContent({
             </button>
           )}
           {hasOutput && (
-            <Tooltip content={`Console (${primaryKey}4)`} disabled={!viewShortcutEnabled}>
+            <Tooltip content={`Console (${primaryKey}5)`} disabled={!viewShortcutEnabled}>
               <button
                 className={`group/result-view flex items-center justify-center ${showConsole ? 'active is-selected' : ''}`}
                 aria-label="Console"
@@ -373,12 +401,33 @@ function ResultPanelContent({
                 onClick={() => chooseConsole(true)}
               >
                 Console
-                {showViewShortcutHints && viewShortcutEnabled && <ViewShortcutHint number={4} />}
+                {showViewShortcutHints && viewShortcutEnabled && <ViewShortcutHint number={5} />}
               </button>
             </Tooltip>
           )}
           <span className="selection-indicator" aria-hidden="true" />
         </div>
+        {!showConsole && view === 'grid' && (
+          <RadioGroup
+            className="view-switch sliding-selection"
+            aria-label={t('result.gridHeightMode')}
+            value={gridHeightMode}
+            onValueChange={(value) => void updateSettings({ gridHeightMode: value as typeof gridHeightMode })}
+          >
+            {(['fixed', 'expanded'] as const).map((mode) => (
+              <Radio
+                key={mode}
+                value={mode}
+                nativeButton
+                render={<button type="button" />}
+                className={gridHeightMode === mode ? 'active is-selected' : ''}
+              >
+                {t(mode === 'fixed' ? 'result.gridFixedHeight' : 'result.gridExpandedHeight')}
+              </Radio>
+            ))}
+            <span className="selection-indicator" aria-hidden="true" />
+          </RadioGroup>
+        )}
         <span className="result-bar-spacer" />
         <ResultMeta result={result} docCount={docs.length} executedAt={active!.executedAt} />
         {result.kind === 'documents' && (
@@ -447,6 +496,21 @@ function ResultPanelContent({
               />
             )}
             {view === 'json' && <JsonView folding={foldingFor('json')} value={docs} visibleFields={visibleFields} onSelectFields={openFieldModal} fontSize={dataFontSize} controlsContainer={foldControls} />}
+            {view === 'grid' && gridState && (
+              <GridView
+                key={active?.id}
+                docs={docs}
+                visibleFields={visibleFields}
+                onSelectFields={openFieldModal}
+                fontSize={dataFontSize}
+                selectedDocIndexes={selectedDocIndexes}
+                onSelectedDocIndexesChange={setSelectedDocIndexes}
+                onExport={openSelectionExport}
+                docCtx={docCtx}
+                viewState={gridState}
+                heightMode={gridHeightMode}
+              />
+            )}
             {view === 'table' && (
               <TableView
                 key={active?.id}
@@ -496,8 +560,8 @@ function ResultPanelContent({
             fixedSelection: exportModal.fixedDocuments != null,
             connectionId: docCtx?.connectionId ?? active?.query?.connectionId,
             database: docCtx?.database ?? active?.query?.database,
-            collection: docCtx?.collection,
-            suggestedName: docCtx?.collection ? `${docCtx.collection}-result` : 'result'
+            collection: docCtx?.collection ?? result.collection,
+            suggestedName: result.collection ? `${result.collection}-result` : 'result'
           }}
           initialFormat={exportModal.format}
           initialJsonEncoding={exportModal.jsonEncoding}

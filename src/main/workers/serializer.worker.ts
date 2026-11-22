@@ -39,7 +39,7 @@ port?.on('message', async (job: Job) => {
   const reply: Response = { id: job.id, ok: true }
   try {
     if (job.op === 'serialize') {
-      reply.result = job.items.map((it) => serializeValue(unwrap(it)))
+      reply.result = job.items.map((it) => serializeValue(deserialize(it, { promoteValues: false, bsonRegExp: true }).v))
     } else if (job.op === 'fields') {
       reply.result = extractFieldPaths(job.items.map(unwrap))
     } else {

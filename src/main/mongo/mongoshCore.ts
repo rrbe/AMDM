@@ -12,7 +12,7 @@ import type { ShellEvaluator } from '@mongosh/shell-evaluator'
 import type { ShellResult } from '../../shared/types'
 import { serializerPool } from '../workers/serializerPool'
 import { classifyOperationFailure } from './errorCore'
-import { detectCollection, makeDriverDbProxy, OutputCollector, prepareTopLevelAwait, withAbort } from './shellSupport'
+import { detectCollection, makeDriverDbProxy, OutputCollector, prepareShellInput, withAbort } from './shellSupport'
 import type { ShellResultSession } from './shellResults'
 
 const DEFAULT_LIMIT = 50
@@ -88,6 +88,7 @@ export interface MongoshEvaluationOptions {
 
 export interface MongoshEvaluation {
   result: MongoshResult
+  documentSource?: ShellResult['documentSource']
   database: string
 }
 
@@ -141,6 +142,7 @@ export async function evaluateMongosh(
     }
   }
 
+  const input = prepareShellInput(code, database)
   const evaluator = new runtime.ShellEvaluator(state, async (value) => {
     const type = runtime.getShellApiType(value)
     if (options.explain) {
@@ -154,7 +156,7 @@ export async function evaluateMongosh(
       const native = value instanceof AbstractCursor
         ? value
         : (value as { _cursor?: unknown })._cursor
-      await options.resultSession.capture(value, native instanceof FindCursor ? native : undefined)
+      await options.resultSession.capture(value, native instanceof FindCursor ? native : undefined, input.documentSource)
       const page = await options.resultSession.page(0, options.limit ?? DEFAULT_LIMIT)
       return {
         type: 'AMDMResultPage',
@@ -200,8 +202,8 @@ export async function evaluateMongosh(
   options.signal?.addEventListener('abort', onAbort, { once: true })
   try {
     if (options.signal?.aborted) await state.interrupted.set()
-    const result = await evaluator.customEval(evaluate, prepareTopLevelAwait(code), contextObject, 'shell.js')
-    return { result, database: state.currentDb.getName() }
+    const result = await evaluator.customEval(evaluate, input.code, contextObject, 'shell.js')
+    return { result, database: state.currentDb.getName(), documentSource: options.explain ? undefined : input.documentSource }
   } finally {
     options.signal?.removeEventListener('abort', onAbort)
   }
@@ -243,9 +245,9 @@ async function adaptMongoshResult(
   output: OutputCollector
 ): Promise<ShellResult> {
   const { result } = evaluation
-  const collection = result.source?.namespace.collection ?? detectCollection(code)
+  const collection = evaluation.documentSource?.collection ?? result.source?.namespace.collection ?? detectCollection(code)
   const elapsedMs = Date.now() - started
-  const common = { collection, elapsedMs, ...(await outputFields(output)) }
+  const common = { collection, documentSource: evaluation.documentSource, elapsedMs, ...(await outputFields(output)) }
 
   if (result.type === 'AMDMResultPage') return { ...result.printable as ShellResult, ...common }
 

@@ -1,14 +1,3 @@
-/**
- * Shared helpers for per-document Edit/Delete actions in the result views.
- *
- * Doc actions are only available when:
- *   - the result has a `collection` (parsed from the query), AND
- *   - `lastQuery` is non-null (so we know the target conn/db), AND
- *   - the specific document is a plain object with an `_id`.
- *
- * Target connection/database come from `lastQuery`; the collection from the
- * result. The `_id` is passed straight through to the store as the EJSON value.
- */
 import type { ShellResult } from '@shared/types'
 import { useAppStore } from '@renderer/store/useAppStore'
 
@@ -30,13 +19,12 @@ function isPlainObject(value: unknown): value is Dict {
  */
 export function docActionContext(
   result: ShellResult | null,
-  lastQuery: { connectionId: string; database: string } | null
+  lastQuery: { connectionId: string } | null
 ): DocActionContext | null {
-  if (!result || !result.collection || !lastQuery) return null
+  if (!result?.documentSource || !lastQuery) return null
   return {
     connectionId: lastQuery.connectionId,
-    database: lastQuery.database,
-    collection: result.collection
+    ...result.documentSource
   }
 }
 

@@ -61,6 +61,8 @@ describe('execution-owned result pages', () => {
     await expect(readShellTotal(result.resultId!, owner)).resolves.toEqual({ totalStatus: 'known', totalCount: 3 })
     const next = await page(result, 2)
     expect(numbers(next)).toEqual([4])
+    expect(result.documentSource).toEqual({ database: 'paging', collection: 'items' })
+    expect(next.documentSource).toEqual(result.documentSource)
     expect(next).toMatchObject({ totalCount: 3, truncated: false, skip: 2 })
     const larger = await page(result, 0, 10)
     expect(numbers(larger)).toEqual([2, 3, 4])
@@ -97,7 +99,20 @@ describe('execution-owned result pages', () => {
     expect(result).toMatchObject({ pageable: true, totalStatus: 'unknown' })
     const next = await page(result, 2)
     expect(numbers(next)).toEqual([4])
+    expect(result.documentSource).toBeUndefined()
+    expect(next.documentSource).toBeUndefined()
     expect(next).toMatchObject({ totalCount: 3, totalStatus: 'known', truncated: false })
+  })
+
+  it('uses the source database for single documents and materialized arrays', async () => {
+    const source = { database: 'sibling', collection: 'items' }
+    const collection = client.db(source.database).collection<{ _id: string; n: number }>(source.collection)
+    await collection.insertMany([{ _id: 'a', n: 1 }, { _id: 'b', n: 2 }])
+    const one = await run("db.getSiblingDB('sibling').items.findOne({ _id: 'a' }, { n: 1 })")
+    expect(one).toMatchObject({ kind: 'value', data: { _id: 'a' }, documentSource: source })
+    const array = await run("db.getSiblingDB('sibling').items.find().sort({n:1}).toArray()", 1)
+    expect(array).toMatchObject({ documentSource: source, data: [{ _id: 'a' }] })
+    expect(await page(array, 1, 1)).toMatchObject({ documentSource: source, data: [{ _id: 'b' }] })
   })
 
   it.each(['db.items.find().sort({n:1}).limit(4).toArray()', '[{n:0},{n:1},{n:2},{n:3}]'])('pages explicit arrays: %s', async (code) => {

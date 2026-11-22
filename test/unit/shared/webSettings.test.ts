@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../../src/shared/types'
 import { mergeWebSettings } from '../../../src/shared/webSettings'
 
+it('accepts the Grid height modes and rejects invalid input', () => {
+  for (const gridHeightMode of ['fixed', 'expanded'] as const) {
+    expect(mergeWebSettings(DEFAULT_SETTINGS, { gridHeightMode }).gridHeightMode).toBe(gridHeightMode)
+  }
+  expect(() => mergeWebSettings(DEFAULT_SETTINGS, { gridHeightMode: 'auto' as never })).toThrow('Invalid settings patch.')
+})
+
 describe('mergeWebSettings time zones', () => {
   it('accepts the app display time zone', () => {
     expect(mergeWebSettings(DEFAULT_SETTINGS, {

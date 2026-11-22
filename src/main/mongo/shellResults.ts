@@ -23,6 +23,7 @@ export class ShellResultSession {
   private directory?: string
   private chunks: { from: number; count: number; path: string }[] = []
   private loaded = 0
+  private documentSource?: ShellResult['documentSource']
   private cursor?: ResultCursor
   private exhausted = false
   private closed = false
@@ -47,7 +48,8 @@ export class ShellResultSession {
     this.cleanup = cleanup
   }
 
-  async capture(value: unknown[] | ResultCursor, nativeFind?: FindCursor): Promise<void> {
+  async capture(value: unknown[] | ResultCursor, nativeFind?: FindCursor, documentSource?: ShellResult['documentSource']): Promise<void> {
+    this.documentSource = documentSource
     const capturing = this.reading.then(() => this.captureValue(value, nativeFind))
     this.reading = capturing.catch(() => {})
     return capturing
@@ -172,6 +174,7 @@ export class ShellResultSession {
     return {
       kind: 'documents', data: documents, count: documents.length,
       resultId: this.id, pageSize, skip, pageable: true,
+      ...(this.documentSource && { documentSource: this.documentSource }),
       truncated: !this.exhausted || end < this.loaded,
       ...this.total
     }
