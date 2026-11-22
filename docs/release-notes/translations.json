@@ -1,4 +1,64 @@
 {
+  "preserve the active result view and simplify its display menu": {
+    "en": "Keep the active result view selected and simplify its display menu",
+    "zh": "保留当前选中的结果视图，并简化显示选项菜单"
+  },
+  "add adaptive column widths to table results": {
+    "en": "Size result table columns to fit their contents",
+    "zh": "支持按内容自动调整结果表格的列宽"
+  },
+  "streamline project guides and translate the web deployment guide": {
+    "en": "Streamline the project guides and translate the Web deployment guide into English",
+    "zh": "精简项目指南，并将 Web 部署指南译为英文"
+  },
+  "make result views configurable (#42)": {
+    "en": "Choose which result views are available (#42)",
+    "zh": "支持在设置中选择启用哪些结果视图 (#42)"
+  },
+  "add virtualized document grid view (#37)": {
+    "en": "Browse documents as cards in a virtualized grid with fixed or expanded card heights (#37)",
+    "zh": "新增文档卡片网格视图，支持虚拟滚动，可固定卡片高度或展开内容 (#37)"
+  },
+  "resize the chart viewport using content dimensions (#41)": {
+    "en": "Use content dimensions when resizing the chart viewport in tests (#41)",
+    "zh": "图表测试按内容区域尺寸调整视口大小 (#41)"
+  },
+  "stabilize chart field selection and query entry (#40)": {
+    "en": "Make chart field selection and query input more reliable in automated tests (#40)",
+    "zh": "提高自动化测试中图表字段选择和查询输入的稳定性 (#40)"
+  },
+  "add formatted JSON export and simplify result menus (#34)": {
+    "en": "Export results as formatted JSON and use simpler result menus (#34)",
+    "zh": "支持将结果导出为带缩进的 JSON，并简化结果菜单 (#34)"
+  },
+  "visualize MongoDB query results as charts (#39)": {
+    "en": "Visualize MongoDB query results as charts (#39)",
+    "zh": "支持将 MongoDB 查询结果绘制成图表 (#39)"
+  },
+  "add data tab context menu and pinning (#38)": {
+    "en": "Pin data tabs from their context menu to keep results across query runs (#38)",
+    "zh": "支持通过右键菜单固定数据标签页，保留上次查询的结果 (#38)"
+  },
+  "guard stale catalog requests and complete resource cleanup": {
+    "en": "Ignore outdated catalog responses and finish resource cleanup when closing results or quitting the app",
+    "zh": "忽略过期的目录请求结果，并修复关闭查询结果或退出应用时资源清理不完整的问题"
+  },
+  "show audio preview controls and recognize HLS media paths": {
+    "en": "Restore audio preview controls and recognize HLS media paths",
+    "zh": "修复音频预览控件的显示，并支持识别 HLS 媒体路径"
+  },
+  "configure quit confirmation and connection media previews": {
+    "en": "Configure quit confirmation and set media preview preferences per connection",
+    "zh": "支持设置退出时是否确认，并可按连接配置媒体预览"
+  },
+  "upgrade vulnerable dependencies and migrate mongosh to Zod 4": {
+    "en": "Update dependencies with known vulnerabilities and migrate mongosh to Zod 4",
+    "zh": "升级受已知漏洞影响的依赖，并将 mongosh 迁移至 Zod 4"
+  },
+  "preview image links on hover in table and tree views": {
+    "en": "Hover over image links in table and tree views to preview them",
+    "zh": "在表格和树形视图中，将鼠标悬停在图片链接上即可预览"
+  },
   "add result display field filtering": {
     "en": "Select which fields appear in query results",
     "zh": "支持选择查询结果中显示的字段"
