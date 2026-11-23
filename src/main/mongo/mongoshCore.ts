@@ -133,16 +133,12 @@ export async function evaluateMongosh(
       makeDriverDbProxy(provider.mongoClient.db(state.currentDb.getName()), options.signal, options.timeoutMS)
   })
   if (options.output) {
-    const print = (...values: unknown[]): void => options.output?.push('print', values)
-    contextObject.console = {
-      log: print,
-      info: print,
-      warn: (...values: unknown[]) => options.output?.push('print', values, 'warn'),
-      error: (...values: unknown[]) => options.output?.push('print', values, 'error')
-    }
+    const log = (method: 'log' | 'info' | 'warn' | 'error') => (...values: unknown[]): void =>
+      options.output?.push('print', values, method === 'info' ? 'log' : method, `console.${method}`)
+    contextObject.console = { log: log('log'), info: log('info'), warn: log('warn'), error: log('error') }
   }
 
-  const input = prepareShellInput(code, database)
+  const input = prepareShellInput(code, database, options.output ? contextObject : undefined)
   const evaluator = new runtime.ShellEvaluator(state, async (value) => {
     const type = runtime.getShellApiType(value)
     if (options.explain) {

@@ -774,6 +774,19 @@
   display: flex;
   flex-direction: column;
 }
+.console-source[data-spaced] pre::before {
+  content: '';
+  position: absolute;
+  inset: 3px 12px auto var(--json-gutter-width);
+  border-top: 1px solid var(--separator);
+  pointer-events: none;
+}
+.console-source pre {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .console-line pre {
   color: var(--fg-1);
 }

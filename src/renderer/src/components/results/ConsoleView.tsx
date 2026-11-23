@@ -1,5 +1,5 @@
 import { useAppStore } from '@renderer/store/useAppStore'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ShellOutputLine } from '@shared/types'
 import { consoleText, toConsoleLines } from '@renderer/lib/consoleOutput'
@@ -31,6 +31,8 @@ export function ConsoleView({ output, fontSize, truncated, controlsContainer, fo
   const { t } = useTranslation()
   const lines = useMemo(() => toConsoleLines(output, timeZone, fieldSort, idFirst), [output, timeZone, fieldSort, idFirst])
 
+  const rowSpacing = useCallback((index: number) => index > 0 && lines[index].heading ? 8 : 0, [lines])
+
   useCopyHotkey(() => consoleText(output))
 
   return (
@@ -42,7 +44,8 @@ export function ConsoleView({ output, fontSize, truncated, controlsContainer, fo
         folding={folding}
         controlsContainer={controlsContainer}
         includeRootInCollapseAll
-        rowClassName={(line) => `console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
+        rowSpacing={rowSpacing}
+        rowClassName={(line) => line.heading ? 'console-source' : `console-line${line.level !== 'log' ? ` ${line.level}` : ''}`}
       />
     </div>
   )

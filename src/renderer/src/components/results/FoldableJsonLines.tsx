@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Tooltip } from '@renderer/components/ui/Tooltip'
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
@@ -27,6 +27,7 @@ interface Props<T extends FoldableLine> {
   controlsContainer: HTMLElement | null
   folding?: JsonFoldingState
   rowClassName?: (line: T) => string
+  rowSpacing?: (lineIndex: number) => number
   allSelected?: boolean
   disabled?: boolean
   includeRootInCollapseAll?: boolean
@@ -43,6 +44,7 @@ export function FoldableJsonLines<T extends FoldableLine>({
   controlsContainer,
   folding,
   rowClassName,
+  rowSpacing,
   allSelected = false,
   disabled = false,
   includeRootInCollapseAll = false,
@@ -76,11 +78,12 @@ export function FoldableJsonLines<T extends FoldableLine>({
   const virtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
+    estimateSize: (i) => rowHeight + (rowSpacing?.(Array.isArray(visible) ? visible[i] : visible.at(i)) ?? 0),
     overscan: 20
   })
 
-  useEffect(() => virtualizer.measure(), [fontSize, virtualizer])
+  const spacedRows = rowSpacing && visible
+  useLayoutEffect(() => virtualizer.measure(), [fontSize, rowSpacing, spacedRows, virtualizer])
 
   const setCollapsed = (update: (current: Set<number>) => Set<number>): void => {
     if (folding) {
@@ -147,7 +150,8 @@ export function FoldableJsonLines<T extends FoldableLine>({
               <div
                 key={index}
                 className={`vrow json-line${rowClassName ? ` ${rowClassName(line)}` : ''}`}
-                style={{ transform: `translateY(${item.start}px)`, height: rowHeight }}
+                data-spaced={item.size > rowHeight || undefined}
+                style={{ transform: `translateY(${item.start}px)`, height: item.size, paddingTop: item.size - rowHeight || undefined }}
               >
                 {line.fold && (
                   <button

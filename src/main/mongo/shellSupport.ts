@@ -1,6 +1,7 @@
 import { parse as parseJs } from '@babel/parser'
 import type { Collection, Db, DistinctOptions, Document, FindOptions } from 'mongodb'
 import type { ShellOutputLine } from '../../shared/types'
+import { annotateConsoleCalls, currentConsoleSource } from './consoleSource'
 import { documentSource } from './documentSource'
 import { serializerPool } from '../workers/serializerPool'
 
@@ -30,13 +31,18 @@ export function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise
   })
 }
 
-export function prepareShellInput(code: string, database: string) {
+export function prepareShellInput(code: string, database: string, outputContext?: Record<string, unknown>) {
   let ast: ReturnType<typeof parseJs>
+  let wrapAwait = false
   try {
     ast = parseJs(code, { sourceType: 'script' })
   } catch (error) {
     if (!(error instanceof SyntaxError && /'await' is only allowed/.test(error.message))) return { code }
     ast = parseJs(code, { sourceType: 'script', allowAwaitOutsideFunction: true })
+    wrapAwait = true
+  }
+  const source = documentSource(ast.program, database)
+  if (wrapAwait) {
     const last = ast.program.body.at(-1)
     if (last?.type === 'ExpressionStatement') {
       code = code.slice(0, last.start!) + 'return (' + code.slice(last.expression.start!, last.expression.end!) +
@@ -44,7 +50,10 @@ export function prepareShellInput(code: string, database: string) {
     }
     code = `(async () => { ${code}\n})()`
   }
-  return { code, documentSource: documentSource(ast.program, database) }
+  if (outputContext && /print|console/.test(code)) {
+    code = annotateConsoleCalls(code, wrapAwait ? parseJs(code).program : ast.program, outputContext)
+  }
+  return { code, documentSource: source }
 }
 
 function withReadOptions(
@@ -113,15 +122,15 @@ export function makeDriverDbProxy(db: Db, signal?: AbortSignal, timeoutMS?: numb
 }
 
 export class OutputCollector {
-  private entries: { kind: 'print' | 'printjson'; values: unknown[]; level: 'log' | 'warn' | 'error' }[] = []
+  private entries: { kind: 'print' | 'printjson'; values: unknown[]; source?: string; level: 'log' | 'warn' | 'error' }[] = []
   truncated = false
 
-  push(kind: 'print' | 'printjson', values: unknown[], level: 'log' | 'warn' | 'error' = 'log'): void {
+  push(kind: 'print' | 'printjson', values: unknown[], level: 'log' | 'warn' | 'error' = 'log', source = String(kind)): void {
     if (this.entries.length >= MAX_OUTPUT_LINES) {
       this.truncated = true
       return
     }
-    this.entries.push({ kind, values, level })
+    this.entries.push({ kind, values, level, source: currentConsoleSource() ?? source })
   }
 
   get size(): number {
@@ -133,7 +142,7 @@ export class OutputCollector {
     const lines: ShellOutputLine[] = []
     for (const e of this.entries) {
       if (e.kind === 'printjson') {
-        lines.push({ kind: 'json', data: await serializerPool.serializeOne(e.values[0] ?? null), level: e.level })
+        lines.push({ kind: 'json', data: await serializerPool.serializeOne(e.values[0] ?? null), level: e.level, source: e.source })
         continue
       }
       // print/console: primitives via String(); objects (likely BSON) as a
@@ -150,7 +159,7 @@ export class OutputCollector {
           parts.push(String(v))
         }
       }
-      lines.push({ kind: 'text', text: parts.join(' '), level: e.level })
+      lines.push({ kind: 'text', text: parts.join(' '), level: e.level, source: e.source })
     }
     return lines
   }

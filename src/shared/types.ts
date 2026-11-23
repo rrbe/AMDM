@@ -312,6 +312,8 @@ export interface ShellPageRequest {
  * JSON view.
  */
 export interface ShellOutputLine {
+  /** Single-line source excerpt of the printing call. */
+  source?: string
   kind: 'text' | 'json'
   /** Display string when kind === 'text'. */
   text?: string

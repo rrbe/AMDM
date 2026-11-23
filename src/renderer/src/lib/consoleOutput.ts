@@ -9,6 +9,7 @@ import type { CollectionSort, ShellOutputLine } from '@shared/types'
 import { toJsonLines, type JsonLine, type JsonToken } from './format'
 
 export interface ConsoleLine {
+  heading?: boolean
   /** Indentation depth (2-space units; always 0 for text lines). */
   depth: number
   /** Plain text of the line (indent-free). */
@@ -23,7 +24,9 @@ export interface ConsoleLine {
 /** Flatten output entries into individual display lines, in call order. */
 export function toConsoleLines(output: ShellOutputLine[], timeZone?: string, sort: CollectionSort = 'natural', idFirst = false): ConsoleLine[] {
   const lines: ConsoleLine[] = []
-  for (const entry of output) {
+  for (const [index, entry] of output.entries()) {
+    const label = entry.source ? `#${index + 1}  ${entry.source}` : `#${index + 1}`
+    lines.push({ depth: 0, text: label, heading: true, level: 'log' })
     const level = entry.level ?? 'log'
     if (entry.kind === 'json') {
       const offset = lines.length
@@ -49,6 +52,7 @@ export function toConsoleLines(output: ShellOutputLine[], timeZone?: string, sor
 /** The whole console as plain text (the ⌘C payload when nothing is selected). */
 export function consoleText(output: ShellOutputLine[]): string {
   return toConsoleLines(output)
+    .filter((line) => !line.heading)
     .map((l) => '  '.repeat(l.depth) + l.text)
     .join('\n')
 }

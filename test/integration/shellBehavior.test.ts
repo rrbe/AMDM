@@ -580,8 +580,8 @@ describe('console output capture (print / printjson / console.*)', () => {
     expect(r.kind).toBe('value')
     expect(r.data).toEqual({ $numberInt: '5' })
     expect(r.output).toEqual([
-      { kind: 'text', text: 'start', level: 'log' },
-      { kind: 'text', text: 'n = 42', level: 'log' }
+      { source: "print('start')", kind: 'text', text: 'start', level: 'log' },
+      { source: "print('n =', 42)", kind: 'text', text: 'n = 42', level: 'log' }
     ])
     expect(r.outputTruncated).toBeUndefined()
   })
@@ -594,20 +594,46 @@ describe('console output capture (print / printjson / console.*)', () => {
     )
     expect(r.kind).toBe('value')
     expect(r.output?.[0]).toEqual({
+      source: "printjson({ id: ObjectId('65f1a2b3c4d5e6f7a8b9c0d1'), big: NumberLong('9007199254740993') })",
       kind: 'json',
       data: { id: { $oid: '65f1a2b3c4d5e6f7a8b9c0d1' }, big: { $numberLong: '9007199254740993' } },
       level: 'log'
     })
     expect(r.output?.slice(1)).toEqual([
-      { kind: 'text', text: 'bad', level: 'error' },
-      { kind: 'text', text: 'meh', level: 'warn' },
-      { kind: 'text', text: 'ok', level: 'log' }
+      { source: "console.error('bad')", kind: 'text', text: 'bad', level: 'error' },
+      { source: "console.warn('meh')", kind: 'text', text: 'meh', level: 'warn' },
+      { source: "console.log('ok')", kind: 'text', text: 'ok', level: 'log' }
     ])
+  })
+
+  it('labels the executed calls across loops, branches and nested output', async () => {
+    const result = await run(`for (const n of [1, 2, 3]) {
+      if (n % 2) console.log(n)
+      else printjson(
+        { value: n }
+      )
+    }
+    print(console.info("inner"))`)
+    expect(result.output?.map(line => line.source)).toEqual([
+      'console.log(n)', 'printjson( { value: n } )', 'console.log(n)', 'console.info("inner")', 'print(console.info("inner"))'
+    ])
+  })
+
+  it('preserves receivers, callback identity and explicit await when labeling calls', async () => {
+    const result = await run(`
+      const console = { value: 42, log() { return this.value } }
+      const visitor = { forEach(fn) { return fn === printjson } }
+      const total = await Promise.resolve((console).log())
+      print(total, (visitor).forEach(printjson))
+    `)
+    expect(result.output).toEqual([{
+      kind: 'text', text: '42 true', level: 'log', source: 'print(total, (visitor).forEach(printjson))'
+    }])
   })
 
   it('print with a BSON object argument inlines it as compact EJSON', async () => {
     const r = await run(`print('doc:', { n: NumberInt(7) }); null`)
-    expect(r.output?.[0]).toEqual({ kind: 'text', text: 'doc: {"n":{"$numberInt":"7"}}', level: 'log' })
+    expect(r.output?.[0]).toEqual({ source: "print('doc:', { n: NumberInt(7) })", kind: 'text', text: 'doc: {"n":{"$numberInt":"7"}}', level: 'log' })
   })
 
   it('cursor.forEach(printjson) streams docs into the output (script-only run)', async () => {
@@ -616,7 +642,7 @@ describe('console output capture (print / printjson / console.*)', () => {
     expect(r.kind).toBe('value')
     expect(r.data).toBeNull()
     expect(r.output).toHaveLength(5)
-    expect(r.output?.every((l) => l.kind === 'json')).toBe(true)
+    expect(r.output?.every((l) => l.kind === 'json' && l.source === 'db.nums.find({}).sort({ n: 1 }).forEach(printjson)')).toBe(true)
     expect((r.output?.[0].data as { n: unknown }).n).toEqual({ $numberInt: '1' })
   })
 
@@ -624,21 +650,21 @@ describe('console output capture (print / printjson / console.*)', () => {
     const r = await run(`print('querying'); db.nums.find({})`)
     expect(r.kind).toBe('documents')
     expect(r.count).toBe(5)
-    expect(r.output).toEqual([{ kind: 'text', text: 'querying', level: 'log' }])
+    expect(r.output).toEqual([{ source: "print('querying')", kind: 'text', text: 'querying', level: 'log' }])
   })
 
   it('an error keeps the output printed before the failure', async () => {
     const r = await run(`print('step 1 ok'); nope()`)
     expect(r.kind).toBe('error')
     expect(r.errorName).toBe('ReferenceError')
-    expect(r.output).toEqual([{ kind: 'text', text: 'step 1 ok', level: 'log' }])
+    expect(r.output).toEqual([{ source: "print('step 1 ok')", kind: 'text', text: 'step 1 ok', level: 'log' }])
   })
 
   it('caps captured lines at MAX_OUTPUT_LINES and flags truncation', async () => {
     const r = await run(`for (let i = 0; i < 1500; i++) print('line', i); null`)
     expect(r.output).toHaveLength(1000)
     expect(r.outputTruncated).toBe(true)
-    expect(r.output?.[999]).toEqual({ kind: 'text', text: 'line 999', level: 'log' })
+    expect(r.output?.[999]).toEqual({ source: "print('line', i)", kind: 'text', text: 'line 999', level: 'log' })
   })
 
   it('results with no printed output omit the output field entirely', async () => {
@@ -725,7 +751,7 @@ describe('implicit await (async-rewriter2)', () => {
     const r = await run(`const c = db.nums.countDocuments({}); print('count = ' + c); boom()`)
     expect(r.kind).toBe('error')
     expect(r.errorName).toBe('ReferenceError')
-    expect(r.output).toEqual([{ kind: 'text', text: 'count = 5', level: 'log' }])
+    expect(r.output).toEqual([{ source: "print('count = ' + c)", kind: 'text', text: 'count = 5', level: 'log' }])
   })
 })
 
@@ -768,6 +794,7 @@ describe('Mongosh async array and cursor iteration', () => {
     // The printed JSON proves rows held real values at stringify time.
     expect(r.output?.[0]).toEqual({
       kind: 'text',
+      source: 'print(JSON.stringify(rows))',
       text: '[{"name":"nums","count":5,"topFields":"_id,n,g"}]',
       level: 'log'
     })

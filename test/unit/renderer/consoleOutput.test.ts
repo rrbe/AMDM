@@ -14,15 +14,15 @@ describe('toConsoleLines', () => {
       { kind: 'text', text: 'boom', level: 'error' }
     ]
     const lines = toConsoleLines(out)
-    expect(lines).toHaveLength(2)
-    expect(lines[0]).toMatchObject({ depth: 0, text: 'hello', level: 'log' })
-    expect(lines[1]).toMatchObject({ text: 'boom', level: 'error' })
-    expect(lines[0].tokens).toBeUndefined()
+    expect(lines).toHaveLength(4)
+    expect(lines[1]).toMatchObject({ depth: 0, text: 'hello', level: 'log' })
+    expect(lines[3]).toMatchObject({ text: 'boom', level: 'error' })
+    expect(lines[1].tokens).toBeUndefined()
   })
 
   it('splits embedded newlines into separate display lines', () => {
-    const lines = toConsoleLines([{ kind: 'text', text: 'a\nb\nc' }])
-    expect(lines.map((l) => l.text)).toEqual(['a', 'b', 'c'])
+    const lines = toConsoleLines([{ kind: 'text', text: 'a\nb\nc', source: 'print(message)' }])
+    expect(lines.map((l) => l.text)).toEqual(['#1  print(message)', 'a', 'b', 'c'])
   })
 
   it('expands printjson payloads into indented, tokenized JSON lines', () => {
@@ -31,11 +31,11 @@ describe('toConsoleLines', () => {
     ])
     // { ... } over multiple lines, shell-style ObjectId rendering.
     expect(lines.length).toBeGreaterThan(2)
-    expect(lines[0].text).toBe('{')
+    expect(lines[1].text).toBe('{')
     expect(lines.some((l) => l.text.includes('ObjectId("65f1a2b3c4d5e6f7a8b9c0d1")'))).toBe(true)
     expect(lines.every((l) => l.level === 'log')).toBe(true)
-    expect(lines[1].depth).toBe(1)
-    expect(lines[1].tokens?.length).toBeGreaterThan(0)
+    expect(lines[2].depth).toBe(1)
+    expect(lines[2].tokens?.length).toBeGreaterThan(0)
   })
 
   it('formats printjson BSON Dates in the selected display zone', () => {
@@ -52,7 +52,7 @@ describe('toConsoleLines', () => {
       { kind: 'json', data: 42 },
       { kind: 'text', text: 'after' }
     ])
-    expect(lines.map((l) => l.text)).toEqual(['before', '42', 'after'])
+    expect(lines.map((l) => l.text)).toEqual(['#1', 'before', '#2', '42', '#3', 'after'])
   })
 
   it('folds each printjson payload without hiding adjacent text or payloads', () => {
@@ -63,9 +63,9 @@ describe('toConsoleLines', () => {
       { kind: 'json', data: { b: 3 } }
     ]
     const lines = toConsoleLines(output)
-    expect(lines[1].fold?.end).toBe(6)
-    expect(lines[8].fold?.end).toBe(10)
-    expect(visibleJsonLineIndexes(lines, new Set([1, 8]))).toEqual([0, 1, 7, 8])
+    expect(lines[3].fold?.end).toBe(8)
+    expect(lines[12].fold?.end).toBe(14)
+    expect(visibleJsonLineIndexes(lines, new Set([3, 12]))).toEqual([0, 1, 2, 3, 9, 10, 11, 12])
     expect(consoleText(output)).toContain('  "a": [')
   })
 })
