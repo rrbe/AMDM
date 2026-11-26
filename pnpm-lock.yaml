@@ -6,7 +6,8 @@ settings:
 
 overrides:
   exceljs>uuid: 11.1.1
-  get-uri>basic-ftp: 6.2.1
+  get-uri>basic-ftp: 6.2.6
+  minimatch@>=7 <11.0.1: 11.0.9
 
 importers:
 
@@ -939,6 +940,9 @@ packages:
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
     engines: {node: '>=18.0.0'}
 
+  '@isaacs/nonrecursive-glob-match@1.1.0':
+    resolution: {integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==}
+
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
 
@@ -1756,8 +1760,8 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
-  basic-ftp@6.2.1:
-    resolution: {integrity: sha512-bK67isD+lKq46AU8vNtjvMaT2ZqAOAmNCbxUHlFBRD4k15NWxyEjmaKtZPlgce58So4BNTjITGQOVTjL9y0ECA==}
+  basic-ftp@6.2.6:
+    resolution: {integrity: sha512-0EjZCaodOz6yiokv2JA1VyKGNdGxULZ+GGlPgG9tm4d+T/bHtX1hUch8CumDneBfpIbiSdn7TaCGwpM+gwsOlw==}
     engines: {node: '>=10.0.0'}
 
   bcrypt-pbkdf@1.0.2:
@@ -1802,8 +1806,8 @@ packages:
   brace-expansion@2.1.7:
     resolution: {integrity: sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g==}
 
-  brace-expansion@5.0.12:
-    resolution: {integrity: sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==}
+  brace-expansion@5.1.0:
+    resolution: {integrity: sha512-aa11Dv491GKnYqxaul3aRJ0szew7yMJMfZPnqD44NjGrZXoj62l41OEDDpdpC4eE2P88vBFfLuSyRhpG91NUvg==}
     engines: {node: 20 || >=22}
 
   browserslist@4.29.3:
@@ -2363,8 +2367,8 @@ packages:
     resolution: {integrity: sha512-kWyh8ADvHBFz6ua5xYOPnUroZTT/bwWfrCeL0Wj1dzG4/YOmOcfJ99W8dOVyyynJN35rZ9aCOtHChqQovV7yog==}
     engines: {node: '>=6'}
 
-  follow-redirects@1.16.1:
-    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
+  follow-redirects@1.16.3:
+    resolution: {integrity: sha512-toOSoqN6d51Wjf1aOFJYcoVv1aND9rj/CwjLU0Vz40oDuSpWDayCeKe4JpL5NL0WdFvoOOCI3BRo69HahjbR1A==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -3124,9 +3128,9 @@ packages:
     resolution: {integrity: sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ==}
     engines: {node: '>=10'}
 
-  minimatch@10.2.6:
-    resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
-    engines: {node: 18 || 20 || >=22}
+  minimatch@11.0.9:
+    resolution: {integrity: sha512-KCFkfyjqerNlSstjlhIGNXIKZGA/6O4V4RlhZ+Dsr621SPPw0mzlypE9D9ZOoPiVefHID+j7/XuMMlqfD/F60Q==}
+    engines: {node: 20 || >=22}
 
   minimatch@3.1.5:
     resolution: {integrity: sha512-VgjWUsnnT6n+NUk6eZq77zeFdpW2LWDzP6zFGrCbHXiYNul5Dzqk2HHQ5uFH2DNW5Xbp8+jVzaeNt94ssEEl4w==}
@@ -3134,10 +3138,6 @@ packages:
   minimatch@5.1.9:
     resolution: {integrity: sha512-7o1wEA2RyMP7Iu7GNba9vc0RWWGACJOCZBJX2GJWip0ikV+wcOsgVuY9uE8CPiyQhkGFSlhuSkZPavN7u1c2Fw==}
     engines: {node: '>=10'}
-
-  minimatch@9.0.9:
-    resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
-    engines: {node: '>=16 || 14 >=14.17'}
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
@@ -4924,7 +4924,7 @@ snapshots:
       debug: 4.4.3
       dir-compare: 4.2.0
       fs-extra: 11.4.1
-      minimatch: 9.0.9
+      minimatch: 11.0.9
       plist: 3.1.0
     transitivePeerDependencies:
       - supports-color
@@ -5137,6 +5137,8 @@ snapshots:
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
       minipass: 7.1.3
+
+  '@isaacs/nonrecursive-glob-match@1.1.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -5845,7 +5847,7 @@ snapshots:
       js-yaml: 4.3.2
       json5: 2.2.3
       lazy-val: 1.0.5
-      minimatch: 10.2.6
+      minimatch: 11.0.9
       pkijs: 3.4.1
       plist: 3.1.0
       proper-lockfile: 4.1.2
@@ -5993,7 +5995,7 @@ snapshots:
 
   baseline-browser-mapping@2.11.28: {}
 
-  basic-ftp@6.2.1: {}
+  basic-ftp@6.2.6: {}
 
   bcrypt-pbkdf@1.0.2:
     dependencies:
@@ -6051,7 +6053,7 @@ snapshots:
     dependencies:
       balanced-match: 1.0.2
 
-  brace-expansion@5.0.12:
+  brace-expansion@5.1.0:
     dependencies:
       balanced-match: 4.0.4
 
@@ -6793,7 +6795,7 @@ snapshots:
 
   flru@1.0.2: {}
 
-  follow-redirects@1.16.1(debug@4.4.3):
+  follow-redirects@1.16.3(debug@4.4.3):
     optionalDependencies:
       debug: 4.4.3
 
@@ -6941,7 +6943,7 @@ snapshots:
 
   get-uri@6.0.5:
     dependencies:
-      basic-ftp: 6.2.1
+      basic-ftp: 6.2.6
       data-uri-to-buffer: 6.0.2
       debug: 4.4.3
     transitivePeerDependencies:
@@ -7503,19 +7505,16 @@ snapshots:
 
   mimic-response@3.1.0: {}
 
-  minimatch@10.2.6:
+  minimatch@11.0.9:
     dependencies:
-      brace-expansion: 5.0.12
+      '@isaacs/nonrecursive-glob-match': 1.1.0
+      brace-expansion: 5.1.0
 
   minimatch@3.1.5:
     dependencies:
       brace-expansion: 1.1.21
 
   minimatch@5.1.9:
-    dependencies:
-      brace-expansion: 2.1.7
-
-  minimatch@9.0.9:
     dependencies:
       brace-expansion: 2.1.7
 
@@ -7570,7 +7569,7 @@ snapshots:
       camelcase: 6.3.0
       debug: 4.4.3
       find-cache-dir: 3.3.2
-      follow-redirects: 1.16.1(debug@4.4.3)
+      follow-redirects: 1.16.3(debug@4.4.3)
       https-proxy-agent: 7.0.6
       mongodb: 7.5.0(@aws-sdk/credential-providers@3.1149.0)(gcp-metadata@7.0.1)(kerberos@7.0.0)(mongodb-client-encryption@7.2.1)(socks@2.8.10)
       new-find-package-json: 2.0.0
